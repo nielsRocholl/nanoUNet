@@ -1,0 +1,38 @@
+[project]
+name = "nanounet"
+version = "0.1.0"
+description = "Standalone prompt-aware 3D ResEnc nnU-Net (Lightning); no nnunetv2 dependency"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "torch>=2.1.2",
+    "pytorch-lightning>=2.2.0",
+    "wandb>=0.16.0",
+    "dynamic-network-architectures>=0.4.1,<0.5",
+    "batchgenerators>=0.25",
+    "batchgeneratorsv2>=0.3.0",
+    "acvl-utils>=0.2.3,<0.3",
+    "numpy>=1.24",
+    "scipy",
+    "scikit-image>=0.19.3",
+    "connected-components-3d>=3.12",
+    "SimpleITK>=2.2.1",
+    "blosc2>=3.0.0b1",
+    "scikit-learn",
+    "rich>=13.0",
+]
+
+[project.scripts]
+nanounet_preprocess = "nanounet.cli.preprocess:main"
+nanounet_train = "nanounet.cli.train:main"
+nanounet_pretrain = "nanounet.cli.pretrain:main"
+nanounet_predict = "nanounet.cli.predict:main"
+
+[build-system]
+requires = ["setuptools>=67.8.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nanounet*"]
