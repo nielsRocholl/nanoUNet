@@ -1,4 +1,4 @@
-"""Per-click prompt sampling: jitter authored centroids, optionally inject background clicks, encode on positive channel."""
+"""Per-click prompt sampling: jitter authored centroids, optional false-positive clicks (gated by probability), encode positives."""
 
 from __future__ import annotations
 
@@ -128,7 +128,10 @@ def build_patch(
         rg2 = np.random.default_rng(int(rng.integers(0, 2**31)))
         pp = [apply_propagation_offset(p, patch_shape, prop.sigma_per_axis, prop.max_vox, rg2) for p in kept]
         lo_fp, hi_fp = cfg.sampling.n_false_pos
-        n_fp = int(rng.integers(lo_fp, hi_fp + 1)) if hi_fp > 0 else 0
+        if hi_fp <= 0 or rng.random() >= cfg.sampling.false_pos_probability:
+            n_fp = 0
+        else:
+            n_fp = int(rng.integers(lo_fp, hi_fp + 1))
         if n_fp > 0:
             pp = pp + _sample_false_pos(seg_crop, n_fp, cfg.sampling.false_pos_min_dist_vox, rng)
 
