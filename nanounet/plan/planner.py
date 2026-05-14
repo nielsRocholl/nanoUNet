@@ -23,7 +23,7 @@ def _maybe_copy_splits(raw_folder: str, pre_folder: str) -> None:
     if not isfile(s):
         return
     if not isfile(t):
-        shutil.copy(s, t)
+        shutil.copyfile(s, t)
         return
     a, b = load_json(s), load_json(t)
     for i in range(len(a)):
@@ -141,7 +141,7 @@ def run_plan(
     image_rw = reader_writer_class_from_dataset(dj, ex, verbose=verbose).__name__
     med_sp = np.median(fp["spacings"], 0)[tf]
     med_sh = np.median(np.stack(fp["shapes_after_crop"], 0), 0)[tf]
-    shutil.copy(join(rf, "dataset.json"), join(pf, "dataset.json"))
+    shutil.copyfile(join(rf, "dataset.json"), join(pf, "dataset.json"))
     plans = {
         "dataset_name": dn,
         "plans_name": ident,

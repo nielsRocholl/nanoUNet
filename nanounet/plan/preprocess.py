@@ -93,7 +93,7 @@ def run_preprocess(
     maybe_mkdir_p(join(pre, "gt_segmentations"))
     fe = dj_raw["file_ending"]
     for k in ds:
-        shutil.copy2(ds[k]["label"], join(pre, "gt_segmentations", k + fe))
+        shutil.copyfile(ds[k]["label"], join(pre, "gt_segmentations", k + fe))
     precompute_folder(out_dir, num_processes, resume)
     if verbose:
         cprint(f"[bold green]✓ {len(ds)} cases → {out_dir}[/bold green]")

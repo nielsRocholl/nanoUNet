@@ -131,8 +131,8 @@ def main() -> None:
         pre_out = join(out, "mae_pretrain")
         maybe_mkdir_p(pre_out)
         os.makedirs(join(pre_out, "checkpoints"), exist_ok=True)
-        shutil.copy(plans_path, join(pre_out, "plans.json"))
-        shutil.copy(dj_path, join(pre_out, "dataset.json"))
+        shutil.copyfile(plans_path, join(pre_out, "plans.json"))
+        shutil.copyfile(dj_path, join(pre_out, "dataset.json"))
         tr_pre, va_pre = build_pretrain_dataloaders(
             ds,
             args.fold,

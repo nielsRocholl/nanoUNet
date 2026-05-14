@@ -55,8 +55,8 @@ def main() -> None:
     out = args.out or join(results_dir(), "nanounet", f"{ds}_{args.plans_identifier}_mae_pretrain_f{args.fold}")
     maybe_mkdir_p(out)
     os.makedirs(join(out, "checkpoints"), exist_ok=True)
-    shutil.copy(plans_path, join(out, "plans.json"))
-    shutil.copy(dj_path, join(out, "dataset.json"))
+    shutil.copyfile(plans_path, join(out, "plans.json"))
+    shutil.copyfile(dj_path, join(out, "dataset.json"))
 
     from nanounet.plan.plans import Plans
 

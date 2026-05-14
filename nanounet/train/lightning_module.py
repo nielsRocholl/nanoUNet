@@ -67,8 +67,8 @@ class NanoUNetLM(pl.LightningModule):
 
     def on_train_start(self) -> None:
         maybe_mkdir_p(self.output_dir)
-        shutil.copy(self.plans_path, join(self.output_dir, "plans.json"))
-        shutil.copy(self.dataset_json_path, join(self.output_dir, "dataset.json"))
+        shutil.copyfile(self.plans_path, join(self.output_dir, "plans.json"))
+        shutil.copyfile(self.dataset_json_path, join(self.output_dir, "dataset.json"))
         save_config(self.roi_cfg, join(self.output_dir, "nano_config.json"))
         wid = os.environ.get("WANDB_RUN_ID", "").strip()
         if wid:
