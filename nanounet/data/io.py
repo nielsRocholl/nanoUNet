@@ -88,9 +88,17 @@ def write_seg(rw_class: Type[SimpleITKIO], seg: np.ndarray, out_trunc: str, prop
 def reader_writer_class_from_dataset(dataset_json: dict, example_file: str | None, verbose: bool = True) -> Type[SimpleITKIO]:
     ow = dataset_json.get("overwrite_image_reader_writer")
     if ow and str(ow) != "None":
-        cls = pydoc.locate(ow)
+        o = str(ow)
+        cls = pydoc.locate(o)
+        # dataset.json often has bare "SimpleITKIO" or nnU-Net's dotted path; pydoc only resolves fully qualified names.
+        if cls is None and (
+            o == "SimpleITKIO"
+            or o.endswith(".SimpleITKIO")
+            or "simpleitk_reader_writer.SimpleITKIO" in o
+        ):
+            cls = SimpleITKIO
         if cls is None:
-            raise RuntimeError(ow)
+            raise RuntimeError(o)
         if verbose:
             cprint(f"[dim]Using {cls} reader/writer[/dim]")
         return cls
