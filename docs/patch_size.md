@@ -45,6 +45,6 @@ Prioritise empirical measurement over doctrine:
 3. If **mega lesions** truncate across many cases even after raising `--gpu-memory-gb`: either **train a second specialised model** on larger footprints (`xlarge` starter + maximal VRAM) or split workflow (whole-tumour model vs nodular refinement). Ensemble or cascade by lesion bounding-box volume inferred from prompts.
 4. If the cohort is dominated by **sub-centimetre** metastases/micro bleeds/etc., freeing memory via `--patch-vol medium` (192³-ish) frequently improves **effective batch size**, stabilising gradients from auxiliary objectives like CC-DiceCE without sacrificing lesion-centred coverage.
 5. Never assume `--patch-vol small` nails a literal small patch blindly — presets only initialise the shrink loop; finalisation still obeys [`planner_resenc.py`](../nanounet/plan/planner_resenc.py) feasibility checks.
-6. Compare runs using tracked validation metrics (`val_dice_pos`, mode splits) alongside qualitative mega-lesion scans before locking production footprints.
+6. Compare runs using tracked validation metric (`val_dice`) alongside qualitative mega-lesion scans before locking production footprints.
 
 Universal lesion segmentation seldom has one magic patch; expect **dual-scale thinking** unless your dataset concentrates in one tumour size bracket.

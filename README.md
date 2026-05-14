@@ -41,16 +41,6 @@ nanounet_preprocess -d 001 --planner nnUNetPlannerResEncTiny --patch-vol small -
 nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetTinyPlans --config configs/default.json
 ```
 
-**Merging multiple datasets.** Pass several `-d` ids; sources must share the same `channel_names` (or `modality`), `labels`, and `file_ending`. nanoUNet writes `$nnUNet_raw/Dataset{merged_id:03d}_{merged_name}/` (defaults `--merged-id 999`, `--merged-name Merged`) with a single merged `dataset.json` (absolute paths into each source tree), plus `merged_sources.json` for audit. Case ids are prefixed `d001_`, `d002_`, … so preprocessed files stay traceable. Fingerprint, plan, and preprocess then run on that merged id as usual.
-
-```bash
-nanounet_preprocess -d 001 002 003 --merged-id 999 --merged-name Combined \
-  --planner nnUNetPlannerResEncL -np 8
-nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans --config configs/default.json
-```
-
-`--merged-id` must not appear in the source list and must not already be used by another `DatasetNNN_*` folder (unless you are re-running the same `DatasetNNN_{merged_name}`).
-
 Optional flags: `--skip-fingerprint` (reuse existing fingerprint), `--skip-plan --plans-name <ident>` (reuse an existing plan JSON).
 
 `**--gpu-memory-gb**` overrides the VRAM budget the planner shrinks towards. The preset default is 24 GB for ResEncL. On a cluster where you preprocess on a CPU node but train on an H200 (80 GB), pass `--gpu-memory-gb 80` so the planner does not unnecessarily shrink the patch for a GPU it will never see during preprocessing.

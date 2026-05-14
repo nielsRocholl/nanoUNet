@@ -101,18 +101,17 @@ class _PatchIterable(IterableDataset):
             se = torch.from_numpy(raw["segmentation"]).short()
             with torch.no_grad():
                 o = self.tf(**{"image": im, "segmentation": se})
-            yield {"data": o["image"], "target": o["segmentation"], "mode": raw["mode"]}
+            yield {"data": o["image"], "target": o["segmentation"]}
 
 
 def _collate(batch: list) -> dict:
     data = torch.stack([b["data"] for b in batch])
-    mode = torch.tensor([b["mode"] for b in batch], dtype=torch.long)
     t0 = batch[0]["target"]
     if isinstance(t0, list):
         target = [torch.stack([b["target"][i] for b in batch], dim=0) for i in range(len(t0))]
     else:
         target = torch.stack([b["target"] for b in batch])
-    return {"data": data, "target": target, "mode": mode}
+    return {"data": data, "target": target}
 
 
 class NanoDataModule(pl.LightningDataModule):

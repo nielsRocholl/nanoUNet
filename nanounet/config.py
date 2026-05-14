@@ -23,10 +23,15 @@ class PropagatedConfig:
 
 
 @dataclass(frozen=True)
+class ClickModeConfig:
+    pos: float
+    drop: float
+
+
+@dataclass(frozen=True)
 class SamplingConfig:
-    mode_probs: Tuple[float, float, float, float]
-    n_spur: Tuple[int, int]
-    n_neg: Tuple[int, int]
+    fg_patch_prob: float
+    click_modes: ClickModeConfig
     large_lesion: LargeLesionConfig
     propagated: PropagatedConfig
 
@@ -90,17 +95,22 @@ def _load_prop(d: dict | None) -> PropagatedConfig:
 
 
 def _load_sampling(d: dict) -> SamplingConfig:
-    mp = _require(d, "mode_probs")
-    assert isinstance(mp, (list, tuple)) and len(mp) == 4
-    probs = tuple(float(x) for x in mp)
-    if abs(sum(probs) - 1.0) > 1e-5:
-        raise ValueError("mode_probs must sum to 1")
+    fgp = float(_require(d, "fg_patch_prob"))
+    if not 0.0 <= fgp <= 1.0:
+        raise ValueError("fg_patch_prob must be in [0, 1]")
+    cm = _require(d, "click_modes")
+    assert isinstance(cm, dict)
+    p = float(cm["pos"])
+    dr = float(cm["drop"])
+    if p < 0 or p > 1 or dr < 0 or dr > 1:
+        raise ValueError("click_modes pos and drop must be in [0, 1]")
+    if abs(p + dr - 1.0) > 1e-5:
+        raise ValueError("click_modes.pos + click_modes.drop must sum to 1")
     ll = _require(d, "large_lesion")
     assert isinstance(ll, dict)
     return SamplingConfig(
-        mode_probs=probs,
-        n_spur=_parse_int_range(_require(d, "n_spur"), "n_spur"),
-        n_neg=_parse_int_range(_require(d, "n_neg"), "n_neg"),
+        fg_patch_prob=fgp,
+        click_modes=ClickModeConfig(pos=p, drop=dr),
         large_lesion=_load_large(ll),
         propagated=_load_prop(d.get("propagated")),
     )
