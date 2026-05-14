@@ -13,7 +13,15 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
-from nanounet.common import cprint, nano_header, preprocessed_dir, raw_dir, results_dir, sync_nnunet_env
+from nanounet.common import (
+    cprint,
+    nano_header,
+    preprocessed_dir,
+    raw_dir,
+    resolve_user_config_path,
+    results_dir,
+    sync_nnunet_env,
+)
 from nanounet.plan.dataset_id import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
@@ -61,7 +69,12 @@ def main() -> None:
     ap.add_argument("-d", "--dataset_id", type=int, required=True)
     ap.add_argument("-f", "--fold", type=int, default=0)
     ap.add_argument("--plans", dest="plans_identifier", required=True)
-    ap.add_argument("--config", dest="roi_cfg", default="configs/default.json")
+    ap.add_argument(
+        "--config",
+        dest="roi_cfg",
+        default="configs/default.json",
+        help="ROI/prompt JSON; relative path tries cwd then nanoUNet repo root.",
+    )
     ap.add_argument("--epochs", type=int, default=1000)
     ap.add_argument("--lr", type=float, default=0.01)
     ap.add_argument("--wd", type=float, default=3e-5)
@@ -92,6 +105,7 @@ def main() -> None:
     ap.add_argument("--mae-mask-ratio", type=float, default=0.75)
     ap.add_argument("--mae-iters-per-epoch", type=int, default=None, help="Default: same as --iters-per-epoch.")
     args = ap.parse_args()
+    args.roi_cfg = resolve_user_config_path(args.roi_cfg)
 
     ds = convert_id_to_dataset_name(args.dataset_id)
     nano_header(f"nanoUNet train  {ds}  fold {args.fold}", color="green")

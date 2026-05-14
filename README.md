@@ -32,14 +32,17 @@ nanounet_preprocess -d 001 --planner nnUNetPlannerResEncL -np 8
 
 This writes `dataset_fingerprint.json` and `nnUNetResEncUNetLPlans.json` next to the raw data, then a `nnUNetResEncUNetLPlans/3d_fullres/` folder of `*.b2nd` / `*.pkl` pairs and a `gt_segmentations/` copy.
 
-The planner is where the "planning phase" lives. `--planner` selects the ResEnc preset: **Tiny** (~1–5M params, fast local / Mac runs), **M** / **L** / **XL** (8 / 24 / 40 GB VRAM targets). The resulting `<plans>.json` is what training reads; you pass its basename as `--plans`.
+The planner is where the "planning phase" lives. `--planner` selects the ResEnc preset: **Tiny** (~1–5M params, fast local / Mac runs), **M** / **L** / **XL** (8 / 24 / 40 GB VRAM targets). The resulting `<plans>.json` is what training reads; you pass its basename as `--plans`. **Network width and patch layout follow the plans file, not `[configs/default.json](configs/default.json)`.** Passing `--plans nnUNetResEncUNetLPlans` after only preprocessing L will produce a multi–100 M-parameter model regardless of ROI config—use `**nnUNetResEncTinyPlans`** everywhere (preprocess + train) for lightweight local experiments.
 
 For fast local test runs on a laptop (small network, smaller patches), use Tiny with `--patch-vol small`:
 
 ```bash
 nanounet_preprocess -d 001 --planner nnUNetPlannerResEncTiny --patch-vol small -np 4
-nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetTinyPlans --config configs/default.json
+nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetTinyPlans --config configs/default.json \
+  --epochs 2 --iters-per-epoch 50 --accelerator cpu --precision 32-true --batch-size 1 --no-wandb
 ```
+
+In `[configs/default.json](configs/default.json)`, `**click_modes**` must sum to 1: `**pos**` is the probability each in-patch centroid is jittered and encoded on the positive channel; `**drop**` is the probability that centroid is omitted (simulate a missing click at inference). With `**"drop": 0.0**`, every centroid is prompted.
 
 Optional flags: `--skip-fingerprint` (reuse existing fingerprint), `--skip-plan --plans-name <ident>` (reuse an existing plan JSON).
 
@@ -70,9 +73,9 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --mae-pretrain --mae-e
 
 Use `last.ckpt` for transfer; fine-tune with a lower peak LR (e.g. `1e-3`) than scratch ([Wald et al., arXiv:2410.23132](https://arxiv.org/abs/2410.23132)). Only encoder weights load; prompt channels on the stem are zero-initialized.
 
-**Loss.** Default is nnU-Net DC+CE with deep supervision. For multi-instance lesion data (many small lesions per case) enable **CC-DiceCE** (Bouteille et al., ISBI 2026): `--loss cc_dc_ce` (synonym `-loss`). See [`docs/losses.md`](docs/losses.md) for math, `batch_dice` behaviour, and caveats.
+**Loss.** Default is nnU-Net DC+CE with deep supervision. For multi-instance lesion data (many small lesions per case) enable **CC-DiceCE** (Bouteille et al., ISBI 2026): `--loss cc_dc_ce` (synonym `-loss`). See `[docs/losses.md](docs/losses.md)` for math, `batch_dice` behaviour, and caveats.
 
-**Patch size** trade-offs (FOV vs resolution for tiny vs huge lesions) are summarised in [`docs/patch_size.md`](docs/patch_size.md).
+**Patch size** trade-offs (FOV vs resolution for tiny vs huge lesions) are summarised in `[docs/patch_size.md](docs/patch_size.md)`.
 
 On Apple Silicon, `auto` picks MPS; add `--accelerator mps` to force it. Prefer `--precision 32-true` only if `16-mixed` causes issues.
 

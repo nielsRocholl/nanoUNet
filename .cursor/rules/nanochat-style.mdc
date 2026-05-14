@@ -1,8 +1,6 @@
 ---
-description: nanoUNet coding style (nanochat-derived); non-negotiable for nanounet/
-alwaysApply: true
+alwaysApply: false
 ---
-
 ### Coding philosophy and style (read this first)
 
 This section is **non-negotiable**. Every file in `nanoUNet/nanounet/` must obey it. It is distilled from Karpathy's [nanochat](https://github.com/karpathy/nanochat) plus the user's own style guides.

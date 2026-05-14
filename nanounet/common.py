@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from pathlib import Path
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any
@@ -19,6 +20,23 @@ _CONSOLE = Console(stderr=True)
 
 ANISO_THRESHOLD = 3
 DEFAULT_NUM_PROCESSES = 8 if "nnUNet_def_n_proc" not in os.environ else int(os.environ["nnUNet_def_n_proc"])
+
+# nanounet/common.py -> repo root (editable install); site-packages installs keep bundled configs next to nanounet/
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def resolve_user_config_path(path_str: str) -> str:
+    """Relative paths: try cwd first, then repo/package root so CLI works outside the nanoUNet directory."""
+    p = Path(path_str).expanduser()
+    if p.is_absolute():
+        if not p.is_file():
+            raise FileNotFoundError(path_str)
+        return str(p.resolve())
+    for base in (Path.cwd(), _REPO_ROOT):
+        cand = (base / p).resolve()
+        if cand.is_file():
+            return str(cand)
+    raise FileNotFoundError(path_str)
 
 
 def _rank0() -> bool:
