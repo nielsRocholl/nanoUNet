@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import numpy as np
 import pytorch_lightning as pl
 import torch
@@ -68,6 +70,17 @@ class NanoMAELM(pl.LightningModule):
         loss = self._loss(batch)
         self.log("val_recon_loss", loss, prog_bar=False, batch_size=batch["data"].shape[0])
         return loss
+
+    def on_train_epoch_start(self) -> None:
+        self._epoch_t0 = time.perf_counter()
+
+    def on_validation_epoch_end(self) -> None:
+        if (
+            self.trainer.sanity_checking
+            or not hasattr(self, "_epoch_t0")
+        ):
+            return
+        self.log("epoch_wall_time_sec", float(time.perf_counter() - self._epoch_t0))
 
     def configure_optimizers(self):
         opt = torch.optim.SGD(

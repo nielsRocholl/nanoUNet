@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import time
 from typing import Any, Dict, List
 
 import numpy as np
@@ -74,6 +75,9 @@ class NanoUNetLM(pl.LightningModule):
         if wid:
             open(join(self.output_dir, "wandb_run_id.txt"), "w", encoding="utf-8").write(wid + "\n")
 
+    def on_train_epoch_start(self) -> None:
+        self._epoch_t0 = time.perf_counter()
+
     def training_step(self, batch: dict, _bidx: int):
         x = batch["data"].to(self.device, non_blocking=True)
         y = batch["target"]
@@ -120,6 +124,8 @@ class NanoUNetLM(pl.LightningModule):
         self._val_buf.clear()
 
     def on_validation_epoch_end(self) -> None:
+        if hasattr(self, "_epoch_t0") and not self.trainer.sanity_checking:
+            self.log("epoch_wall_time_sec", float(time.perf_counter() - self._epoch_t0))
         if not self._val_buf:
             return
         tp = torch.cat([v["tp"] for v in self._val_buf], dim=0)
