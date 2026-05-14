@@ -32,6 +32,8 @@ class ClickModeConfig:
 class SamplingConfig:
     fg_patch_prob: float
     click_modes: ClickModeConfig
+    n_false_pos: Tuple[int, int]
+    false_pos_min_dist_vox: int
     large_lesion: LargeLesionConfig
     propagated: PropagatedConfig
 
@@ -108,9 +110,17 @@ def _load_sampling(d: dict) -> SamplingConfig:
         raise ValueError("click_modes.pos + click_modes.drop must sum to 1")
     ll = _require(d, "large_lesion")
     assert isinstance(ll, dict)
+    nfp = _parse_int_range(d.get("n_false_pos", [0, 0]), "n_false_pos")
+    if nfp[0] < 0 or nfp[1] < 0:
+        raise ValueError("n_false_pos endpoints must be >= 0")
+    fp_min = int(d.get("false_pos_min_dist_vox", 8))
+    if fp_min < 0:
+        raise ValueError("false_pos_min_dist_vox must be >= 0")
     return SamplingConfig(
         fg_patch_prob=fgp,
         click_modes=ClickModeConfig(pos=p, drop=dr),
+        n_false_pos=nfp,
+        false_pos_min_dist_vox=fp_min,
         large_lesion=_load_large(ll),
         propagated=_load_prop(d.get("propagated")),
     )

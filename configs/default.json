@@ -8,6 +8,8 @@
   "sampling": {
     "fg_patch_prob": 0.67,
     "click_modes": { "pos": 1.0, "drop": 0.0 },
+    "n_false_pos": [0, 2],
+    "false_pos_min_dist_vox": 8,
     "large_lesion": { "K": 2, "K_min": 1, "K_max": 4, "max_extra": 0 },
     "propagated": { "sigma_per_axis": [2.75, 5.19, 5.40], "max_vox": 34.0 }
   },
