@@ -1,0 +1,117 @@
+---
+description: nanoUNet coding style (nanochat-derived); non-negotiable for nanounet/
+alwaysApply: true
+---
+
+### Coding philosophy and style (read this first)
+
+This section is **non-negotiable**. Every file in `nanoUNet/nanounet/` must obey it. It is distilled from Karpathy's [nanochat](https://github.com/karpathy/nanochat) plus the user's own style guides.
+
+#### Read first: what nanochat actually does
+
+Direct observations from reading [`nanochat/gpt.py`](https://github.com/karpathy/nanochat/blob/master/nanochat/gpt.py), [`nanochat/dataloader.py`](https://github.com/karpathy/nanochat/blob/master/nanochat/dataloader.py), [`nanochat/common.py`](https://github.com/karpathy/nanochat/blob/master/nanochat/common.py), and [`scripts/base_train.py`](https://github.com/karpathy/nanochat/blob/master/scripts/base_train.py):
+
+- One file = one concept. `gpt.py` (508 LOC) defines the whole transformer; `dataloader.py` is a single generator function; `optim.py` is just the optimizer. Files are **not** split for the sake of being small; they are split only when the concept is independent.
+- Every file opens with a short `"""docstring"""` listing notable features ("rotary embeddings", "QK norm", "no bias in linear layers"). The reader knows in 30s what the file contains and what is novel.
+- Scripts (`scripts/base_train.py`) are **top-to-bottom procedural**. No `def main()` wrapping. argparse at the top, code falls through to the loop, cleanup at the bottom. They read like a notebook, not a framework entry point.
+- Tiny utilities live together in a single `common.py` (~280 LOC: `print0`, `DummyWandb`, `get_dist_info`, `compute_init`, `COMPUTE_DTYPE`, etc.). No `utils/` package, no registries, no "abstract base" anything.
+- **Dataclasses for config**, not dicts or Pydantic. `GPTConfig` is 8 fields and a default. argparse parses CLI into a flat namespace and feeds it into the dataclass.
+- **Globals are fine when they are constants.** `COMPUTE_DTYPE` is detected once at import time and reused everywhere. No `Settings()` singletons, no DI containers.
+- **Classes only when state is needed.** The dataloader is a generator function. `CausalSelfAttention` is a class because it owns `nn.Linear` modules.
+- **No defensive programming.** `assert split in ("train","val")` rather than `if ... raise`. Errors die at the call site, not three layers deep.
+- Comments say *why*, never *what*. "split scale between Q and K, TODO think through better" is a comment. "Create the model" is not.
+- No abstract base classes. No factories. No plugins. No mixin chains. No "Strategy" patterns. If you can replace a class with a function, do.
+- No frameworks except PyTorch + a tokenizer. The training loop is literally `for step in range(num_iterations): ...`.
+
+#### How nanoUNet adopts this (and where it deviates)
+
+Same spirit, three explicit deviations:
+
+1. **Subfolders inside `nanounet/`.** nanochat keeps everything flat. The user prefers grouped subfolders. Allowed grouping (one level deep, max 5 files per folder):
+   ```
+   nanounet/
+   ├── data/        # io.py, geometry.py, dataset.py, sampling.py, augment.py
+   ├── prompt/      # encoding.py, propagation.py, centroids.py
+   ├── plan/        # fingerprint.py, planner.py, preprocess.py, splits.py
+   ├── model/       # network.py, losses.py, lr_schedule.py
+   ├── train/       # data_module.py, lightning_module.py
+   ├── infer/       # predictor.py, border_expand.py, export.py
+   ├── cli/         # preprocess.py, train.py, predict.py
+   ├── common.py    # paths, env vars, logger, dtype, seed — flat, nanochat-style
+   └── config.py    # RoiPromptConfig dataclass + load/save — flat
+   ```
+   Subfolder names must be **nouns**, never `utils/` or `helpers/`. If a file does not clearly belong, it goes in `common.py`, not in a new folder.
+2. **PyTorch Lightning** instead of a hand-rolled loop. The user asked for it. The cost is one `LightningModule` plus one `LightningDataModule`; everything else (logging, ckpt, resume, mixed precision, prefetch) is free. We will not use Lightning *callbacks* for custom logic — anything non-trivial goes in the LightningModule.
+3. **Heavy reuse of upstream packages** (`dynamic_network_architectures`, `batchgeneratorsv2`, `acvl_utils`, `cc3d`, `blosc2`, `SimpleITK`). Reimplementing them is bloat. nanochat does this too (PyTorch, `pyarrow`, `wandb`, `filelock`).
+
+#### Hard rules
+
+| # | Rule |
+|---|------|
+| R1 | **<200 LOC per file** (user style guide). Hard limit. If a file grows past 200, split it on a concept boundary, not arbitrarily. |
+| R2 | **No file shorter than ~30 LOC** that exists only to host one function. Inline it into the nearest sibling or put it in `common.py`. nanochat's `common.py` has 12 helpers in one file — copy that pattern. |
+| R3 | **No abstract base classes, no factories, no registries, no plugin systems.** If you want to support two of something, write `if cfg.x == "a": ... else: ...`. Two cases is not a registry. |
+| R4 | **No `utils/` package.** Real names only. `geometry.py`, `centroids.py`, `propagation.py`. |
+| R5 | **No defensive programming.** `assert` on invariants, raise on user input at the boundary (CLI / config / file I/O). Do not wrap things in try/except just to log and re-raise. |
+| R6 | **One module-level docstring per file.** Short, lists what is in the file and any non-obvious feature. No section banners, no decorative comments. |
+| R7 | **Type hints on public function signatures and dataclasses.** Skip them inside small helpers. Don't paint walls of `Optional[Union[...]]`. |
+| R8 | **Dataclasses for config**, argparse for CLI, JSON for on-disk config. No Hydra, no OmegaConf, no Pydantic. |
+| R9 | **Constants and detected facts go at module top** as `UPPER_CASE = ...`. No `Settings()` class. |
+| R10 | **Comments explain why** (intent, invariant, trade-off, gotcha). Never *what*. Delete any comment that paraphrases the next line. |
+| R11 | **No print statements** outside `common.py` (`print0` for rank-0). Logger or `Trainer`/Lightning logging everywhere else. |
+| R12 | **No fallbacks for missing data**, ever (user style guide). Centroids file missing → raise. Plan missing → raise. No silent recompute, no synthetic defaults. (nnUNet-pro's runtime centroid recompute is the *one* exception we are dropping.) |
+| R13 | **CLI scripts are top-to-bottom procedural.** argparse → setup → call into library → exit. No `def main():` wrapper unless `pyproject.toml` console_scripts requires it (in which case `main()` is 10 lines and does only argparse). |
+| R14 | **No code-level abstractions over Lightning.** Use `LightningModule`, `LightningDataModule`, `Trainer`, `WandbLogger`, `ModelCheckpoint` directly. Do not write a `BaseTrainer` or a `LightningModuleFactory`. |
+| R15 | **Errors are loud and immediate.** Validate config at load time and crash. Validate inputs at CLI entry and crash. The training loop assumes valid state. |
+| R16 | **Tests are temporary.** Per the user style guide: write tests, validate, delete. The final repo has no `tests/` folder. |
+
+#### Naming
+
+- `snake_case` for functions / variables / files / folders.
+- `PascalCase` for classes and dataclasses.
+- `UPPER_CASE` for module-level constants.
+- Names are short and precise: `bbox`, `seg`, `hm`, `lr`, `dl`. nanochat uses `q`, `k`, `v`, `B`, `T`. Don't write `query_tensor` when `q` is unambiguous in context.
+- File names are nouns: `centroids.py`, not `centroid_utils.py`. Folder names are nouns: `infer/`, not `inference_helpers/`.
+
+#### Reference: a "good" file looks like this
+
+```python
+"""4-mode patch sampling: pos, pos+spurious, pos+no_prompt, negative.
+
+Mode draws from cfg.sampling.mode_probs. For non-negative modes the patch is
+forced to overlap a foreground voxel from properties['class_locations'].
+Centroids may carry a propagation offset to simulate baseline->follow-up COG.
+"""
+
+from dataclasses import dataclass
+import numpy as np
+
+from nanounet.config import SamplingConfig
+from nanounet.prompt.propagation import apply_propagation_offset
+
+MODE_POS, MODE_SPUR, MODE_NO_PROMPT, MODE_NEG = 0, 1, 2, 3
+
+
+def mode_bbox(shape, class_locations, cfg: SamplingConfig, rng):
+    mode = int(rng.choice(4, p=cfg.mode_probs))
+    force_fg = mode != MODE_NEG
+    lbs, ubs = _bbox(shape, force_fg, class_locations, rng)
+    return lbs, ubs, mode
+
+def _bbox(...): ...
+```
+
+100 LOC, no class, no factory, no logger, top docstring tells you everything in 4 lines. **This is the target.**
+
+#### Reference: a "bad" file we will not write
+
+- 400 LOC `BaseSampler` with three subclasses and a registry.
+- `sampling_utils/spurious_helpers.py` with one 5-line function.
+- A `SamplingStrategy` ABC with a single concrete implementation.
+- A try/except around every cc3d call that logs and falls back to scipy.
+- A `Settings` singleton imported into every module.
+
+If you catch yourself writing any of the above, stop and inline it.
+
+
+

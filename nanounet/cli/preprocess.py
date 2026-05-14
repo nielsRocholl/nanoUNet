@@ -6,6 +6,7 @@ import argparse
 
 from nanounet.common import nano_header, nano_rule, sync_nnunet_env
 from nanounet.plan.fingerprint import run_fingerprint
+from nanounet.plan.merge import build_merged_raw
 from nanounet.plan.planner import run_plan
 from nanounet.plan.preprocess import run_preprocess
 
@@ -15,7 +16,9 @@ PATCH_VOL = {"small": 128, "medium": 192, "large": 256, "xlarge": 320}
 def main() -> None:
     sync_nnunet_env()
     ap = argparse.ArgumentParser()
-    ap.add_argument("-d", "--dataset_id", type=int, required=True)
+    ap.add_argument("-d", "--dataset_id", type=int, nargs="+", required=True)
+    ap.add_argument("--merged-id", type=int, default=999)
+    ap.add_argument("--merged-name", default="Merged")
     ap.add_argument("--planner", default="nnUNetPlannerResEncL")
     ap.add_argument("-np", "--num_processes", type=int, default=8)
     ap.add_argument("--resume", action="store_true")
@@ -31,8 +34,16 @@ def main() -> None:
     ap.add_argument("--skip-fingerprint", action="store_true")
     ap.add_argument("--skip-plan", action="store_true")
     args = ap.parse_args()
-    did = args.dataset_id
-    nano_header(f"nanoUNet preprocess  Dataset{did:03d}")
+    if len(args.dataset_id) == 1:
+        did = args.dataset_id[0]
+        nano_header(f"nanoUNet preprocess  Dataset{did:03d}")
+    else:
+        build_merged_raw(args.dataset_id, args.merged_id, args.merged_name)
+        did = args.merged_id
+        nano_header(
+            "nanoUNet preprocess  merge "
+            f"{','.join(str(i) for i in args.dataset_id)} -> Dataset{did:03d}_{args.merged_name}"
+        )
     if not args.skip_fingerprint:
         run_fingerprint(did, args.num_processes)
         nano_rule()
