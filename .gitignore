@@ -71,3 +71,4 @@ Thumbs.db
 # nnUNet_results/
 
 wandb/
+scripts/

@@ -46,6 +46,11 @@ class Blosc2Folder:
             chunks_seg = chunks
         if blocks_seg is None:
             blocks_seg = blocks
+        # blosc2.asarray refuses an existing urlpath; drop any partial outputs from a killed prior worker.
+        for s in (".b2nd", "_seg.b2nd", ".pkl"):
+            p = output_filename_truncated + s
+            if os.path.isfile(p):
+                os.remove(p)
         cparams = {"codec": codec, "clevel": clevel}
         blosc2.asarray(np.ascontiguousarray(data), urlpath=output_filename_truncated + ".b2nd", chunks=chunks, blocks=blocks, cparams=cparams)
         blosc2.asarray(np.ascontiguousarray(seg), urlpath=output_filename_truncated + "_seg.b2nd", chunks=chunks_seg, blocks=blocks_seg, cparams=cparams)
