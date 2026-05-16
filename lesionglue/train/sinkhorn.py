@@ -1,4 +1,4 @@
-"""Log-domain Sinkhorn normalization and dustbin assignment loss (SuperGlue-style)."""
+"""Log-domain Sinkhorn + SuperGlue-style dustbin marginals for assignment."""
 
 from __future__ import annotations
 
@@ -7,11 +7,25 @@ import math
 import torch
 
 
-def log_sinkhorn(M: torch.Tensor, iters: int = 20) -> torch.Tensor:
-    """M: (R, C) log-scores; marginals uniform 1/R and 1/C so total mass = 1."""
+def superglue_marginals(n_bl: int, n_fu: int, dev, dtype: torch.dtype) -> tuple[torch.Tensor, torch.Tensor]:
+    norm = math.log(n_bl + n_fu)
+    log_a = torch.zeros(n_bl + 1, device=dev, dtype=dtype)
+    log_a[n_bl] = math.log(n_fu)
+    log_b = torch.zeros(n_fu + 1, device=dev, dtype=dtype)
+    log_b[n_fu] = math.log(n_bl)
+    return log_a - norm, log_b - norm
+
+
+def log_sinkhorn(
+    M: torch.Tensor,
+    iters: int = 20,
+    log_a: torch.Tensor | None = None,
+    log_b: torch.Tensor | None = None,
+) -> torch.Tensor:
     r, c = M.shape
-    log_a = torch.full((r,), -math.log(r), device=M.device, dtype=M.dtype)
-    log_b = torch.full((c,), -math.log(c), device=M.device, dtype=M.dtype)
+    if log_a is None:
+        log_a = torch.full((r,), -math.log(r), device=M.device, dtype=M.dtype)
+        log_b = torch.full((c,), -math.log(c), device=M.device, dtype=M.dtype)
     u = torch.zeros(r, device=M.device, dtype=M.dtype)
     v = torch.zeros(c, device=M.device, dtype=M.dtype)
     for _ in range(iters):
@@ -33,7 +47,8 @@ def sinkhorn_loss(
     S[:n_bl, :n_fu] = pair_logits.reshape(n_bl, n_fu)
     S[:n_bl, n_fu] = dust_bl
     S[n_bl, :n_fu] = dust_fu
-    P = log_sinkhorn(S, iters)
+    log_a, log_b = superglue_marginals(n_bl, n_fu, S.device, S.dtype)
+    P = log_sinkhorn(S, iters, log_a, log_b)
     pos = (lab.reshape(n_bl, n_fu) > 0.5)
     dev = S.device
     bl_tgt = torch.where(

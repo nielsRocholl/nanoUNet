@@ -34,6 +34,8 @@ class TrainConfig:
     sinkhorn_w: float = 1.0
     pair_w: float = 0.1
     nce_w: float = 0.3
+    dust_w: float = 0.3
+    dust_pos_w: float = 5.0
     nce_tau: float = 0.1
     sinkhorn_iters: int = 20
     fu_jitter: float = 0.3
@@ -63,6 +65,8 @@ if __name__ == "__main__":
     ap.add_argument("--sinkhorn-w", type=float, default=TrainConfig.sinkhorn_w)
     ap.add_argument("--pair-w", type=float, default=TrainConfig.pair_w)
     ap.add_argument("--nce-w", type=float, default=TrainConfig.nce_w)
+    ap.add_argument("--dust-w", type=float, default=TrainConfig.dust_w)
+    ap.add_argument("--dust-pos-w", type=float, default=TrainConfig.dust_pos_w)
     ap.add_argument("--nce-tau", type=float, default=TrainConfig.nce_tau)
     ap.add_argument("--sinkhorn-iters", type=int, default=TrainConfig.sinkhorn_iters)
     ap.add_argument("--fu-jitter", type=float, default=TrainConfig.fu_jitter, help="FU jitter scale; 0 disables FU noise")
@@ -85,6 +89,8 @@ if __name__ == "__main__":
         sinkhorn_w=args.sinkhorn_w,
         pair_w=args.pair_w,
         nce_w=args.nce_w,
+        dust_w=args.dust_w,
+        dust_pos_w=args.dust_pos_w,
         nce_tau=args.nce_tau,
         sinkhorn_iters=args.sinkhorn_iters,
         fu_jitter=args.fu_jitter,
@@ -109,13 +115,15 @@ if __name__ == "__main__":
         sinkhorn_w=cfg.sinkhorn_w,
         pair_w=cfg.pair_w,
         nce_w=cfg.nce_w,
+        dust_w=cfg.dust_w,
+        dust_pos_w=cfg.dust_pos_w,
         nce_tau=cfg.nce_tau,
         sinkhorn_iters=cfg.sinkhorn_iters,
         max_epochs=cfg.epochs,
     )
     Path(args.out).mkdir(parents=True, exist_ok=True)
-    ckpt = ModelCheckpoint(dirpath=args.out, monitor="val_row_acc_hungarian", save_top_k=3, mode="max")
-    stop = EarlyStopping(monitor="val_row_acc_hungarian", mode="max", patience=30)
+    ckpt = ModelCheckpoint(dirpath=args.out, monitor="val_match_score", save_top_k=3, mode="max")
+    stop = EarlyStopping(monitor="val_match_score", mode="max", patience=30)
     use_wandb = args.wandb or bool(args.wandb_run_name.strip())
     logger = False
     if use_wandb:

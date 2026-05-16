@@ -13,7 +13,7 @@ from torch_geometric.data import HeteroData
 from torch_geometric.nn import HeteroConv, TransformerConv
 
 from tracking.data.pairs import CROSS_DIM
-from tracking.train.sinkhorn import log_sinkhorn
+from tracking.train.sinkhorn import log_sinkhorn, superglue_marginals
 
 
 @dataclass
@@ -84,8 +84,7 @@ class Matcher(nn.Module):
         self.head = nn.Sequential(
             nn.Linear(2 * cfg.d + CROSS_DIM, cfg.d), nn.ReLU(inplace=True), nn.Dropout(cfg.dropout), nn.Linear(cfg.d, 1)
         )
-        self.dust_bl = nn.Parameter(torch.zeros(()))
-        self.dust_fu = nn.Parameter(torch.zeros(()))
+        self.dust_head = nn.Linear(cfg.d, 1)
 
     def forward(self, data: HeteroData) -> MatcherOutput:
         z = {"bl": self.enc(data["bl"].x), "fu": self.enc(data["fu"].x)}
@@ -95,8 +94,8 @@ class Matcher(nn.Module):
         h = torch.cat([z["bl"][ei[0]], z["fu"][ei[1]], ea], dim=1)
         return MatcherOutput(
             self.head(h).squeeze(-1),
-            self.dust_bl,
-            self.dust_fu,
+            self.dust_head(z["bl"]).squeeze(-1),
+            self.dust_head(z["fu"]).squeeze(-1),
             z["bl"],
             z["fu"],
         )
@@ -116,7 +115,8 @@ def decode_sinkhorn(
     S[:n_bl, :n_fu] = pair_log.reshape(n_bl, n_fu)
     S[:n_bl, n_fu] = dust_bl
     S[n_bl, :n_fu] = dust_fu
-    P = log_sinkhorn(S, iters).exp()
+    la, lb = superglue_marginals(n_bl, n_fu, device, dtype)
+    P = log_sinkhorn(S, iters, la, lb).exp()
     out = np.full(n_bl, -1, dtype=np.int64)
     for i in range(n_bl):
         row = P[i] / P[i].sum().clamp_min(1e-9)
@@ -141,7 +141,8 @@ def decode_sinkhorn_hungarian(
     S[:n_bl, :n_fu] = pair_log.reshape(n_bl, n_fu)
     S[:n_bl, n_fu] = dust_bl
     S[n_bl, :n_fu] = dust_fu
-    P = log_sinkhorn(S, iters).exp()
+    la, lb = superglue_marginals(n_bl, n_fu, device, dtype)
+    P = log_sinkhorn(S, iters, la, lb).exp()
     Prows = P[:n_bl].cpu().numpy()
     cost = -np.log(np.clip(Prows[:, : n_fu + 1], 1e-12, 1.0))
     ri, ci = linear_sum_assignment(cost)

@@ -12,7 +12,7 @@ from torchmetrics.classification import BinaryAUROC, BinaryAveragePrecision
 
 from tracking.data.graph import FEAT_DIM
 from tracking.matcher import Matcher, MatcherOutput, ModelConfig, decode_sinkhorn_hungarian
-from tracking.train.sinkhorn import log_sinkhorn, sinkhorn_loss
+from tracking.train.sinkhorn import log_sinkhorn, sinkhorn_loss, superglue_marginals
 
 LT_IDX = FEAT_DIM - 1
 
@@ -23,6 +23,17 @@ def focal_bce_with_logits(logits: torch.Tensor, target: torch.Tensor, alpha: flo
     pt = p * target + (1 - p) * (1 - target)
     w = (alpha * target + (1 - alpha) * (1 - target)) * (1 - pt).clamp_min(1e-6).pow(gamma)
     return (w * bce).mean()
+
+
+def _split_per_graph(
+    batch: Batch, out: MatcherOutput
+) -> tuple[list[HeteroData], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]]:
+    graphs = batch.to_data_list()
+    es = [g["bl", "cross", "fu"].num_edges for g in graphs]
+    nb = [g["bl"].num_nodes for g in graphs]
+    nf = [g["fu"].num_nodes for g in graphs]
+    pp, db, df = torch.split(out.pair, es), torch.split(out.dust_bl, nb), torch.split(out.dust_fu, nf)
+    return graphs, list(pp), list(db), list(df)
 
 
 def infonce_batch(
@@ -97,6 +108,8 @@ class MatcherModule(pl.LightningModule):
         sinkhorn_w: float = 1.0,
         pair_w: float = 0.1,
         nce_w: float = 0.3,
+        dust_w: float = 0.3,
+        dust_pos_w: float = 5.0,
         nce_tau: float = 0.1,
         proj_dim: int = 64,
         sinkhorn_iters: int = 20,
@@ -115,18 +128,27 @@ class MatcherModule(pl.LightningModule):
     def _loss(self, batch: Batch, out: MatcherOutput) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
         labels = batch["bl", "cross", "fu"].edge_label
         pair_focal = focal_bce_with_logits(out.pair, labels)
-        graphs = batch.to_data_list()
-        edge_sizes = [g["bl", "cross", "fu"].num_edges for g in graphs]
-        sk = []
-        for g, p in zip(graphs, torch.split(out.pair, edge_sizes)):
-            n_bl, n_fu = g["bl"].num_nodes, g["fu"].num_nodes
-            sk.append(
-                sinkhorn_loss(p, n_bl, n_fu, out.dust_bl, out.dust_fu, g["bl", "cross", "fu"].edge_label, self.hparams.sinkhorn_iters)
-            )
+        graphs, pp, db, df = _split_per_graph(batch, out)
+        sk = [
+            sinkhorn_loss(p, g["bl"].num_nodes, g["fu"].num_nodes, b, f, g["bl", "cross", "fu"].edge_label, self.hparams.sinkhorn_iters)
+            for g, p, b, f in zip(graphs, pp, db, df)
+        ]
         sk_loss = torch.stack(sk).mean()
         nce = infonce_batch(out.z_bl, out.z_fu, self.proj, batch["bl", "cross", "fu"].edge_index, labels, self.hparams.nce_tau, batch)
-        total = self.hparams.sinkhorn_w * sk_loss + self.hparams.pair_w * pair_focal + self.hparams.nce_w * nce
-        return total, {"sinkhorn_loss": sk_loss, "pair_loss": pair_focal, "nce_loss": nce}
+        pw = torch.as_tensor(self.hparams.dust_pos_w, device=out.pair.device, dtype=out.pair.dtype)
+        tgt_b = batch["bl"].no_match_label.to(out.pair.dtype)
+        tgt_f = batch["fu"].no_match_label.to(out.pair.dtype)
+        dust_bce = 0.5 * (
+            F.binary_cross_entropy_with_logits(out.dust_bl, tgt_b, pos_weight=pw)
+            + F.binary_cross_entropy_with_logits(out.dust_fu, tgt_f, pos_weight=pw)
+        )
+        total = (
+            self.hparams.sinkhorn_w * sk_loss
+            + self.hparams.pair_w * pair_focal
+            + self.hparams.nce_w * nce
+            + self.hparams.dust_w * dust_bce
+        )
+        return total, {"sinkhorn_loss": sk_loss, "pair_loss": pair_focal, "nce_loss": nce, "dust_bce": dust_bce}
 
     def on_validation_start(self) -> None:
         self._uc_ok = self._uc_tot = 0
@@ -146,27 +168,26 @@ class MatcherModule(pl.LightningModule):
         loss, parts = self._loss(batch, out)
         labels = batch["bl", "cross", "fu"].edge_label
         self.auroc.update(torch.sigmoid(out.pair.detach()), labels.int())
-        graphs = batch.to_data_list()
-        edge_sizes = [g["bl", "cross", "fu"].num_edges for g in graphs]
+        graphs, pp, db, df = _split_per_graph(batch, out)
         it = self.hparams.sinkhorn_iters
-        acc = sum(
-            row_hungarian_match_acc(g, p.detach(), out.dust_bl.detach(), out.dust_fu.detach(), it)
-            for g, p in zip(graphs, torch.split(out.pair, edge_sizes))
-        ) / len(graphs)
-        for g, p in zip(graphs, torch.split(out.pair, edge_sizes)):
+        acc = sum(row_hungarian_match_acc(g, p.detach(), b.detach(), f.detach(), it) for g, p, b, f in zip(graphs, pp, db, df)) / len(
+            graphs
+        )
+        for g, p, b_bl, d_fu in zip(graphs, pp, db, df):
             n_bl, n_fu = g["bl"].num_nodes, g["fu"].num_nodes
             dev, dt = p.device, p.dtype
             S = torch.zeros((n_bl + 1, n_fu + 1), device=dev, dtype=dt)
             S[:n_bl, :n_fu] = p.reshape(n_bl, n_fu)
-            S[:n_bl, n_fu] = out.dust_bl.detach()
-            S[n_bl, :n_fu] = out.dust_fu.detach()
-            P = log_sinkhorn(S, it).exp()
+            S[:n_bl, n_fu] = b_bl.detach()
+            S[n_bl, :n_fu] = d_fu.detach()
+            la, lb = superglue_marginals(n_bl, n_fu, dev, dt)
+            P = log_sinkhorn(S, it, la, lb).exp()
             Rn = P[:n_bl] / P[:n_bl].sum(dim=1, keepdim=True).clamp_min(1e-9)
             ei = g["bl", "cross", "fu"].edge_index
             self.ap_sinkhorn.update(Rn[ei[0], ei[1]].detach(), g["bl", "cross", "fu"].edge_label.int())
 
             lab = g["bl", "cross", "fu"].edge_label.reshape(n_bl, n_fu).cpu().numpy()
-            dec = decode_sinkhorn_hungarian(p.detach(), out.dust_bl.detach(), out.dust_fu.detach(), n_bl, n_fu, iters=it)
+            dec = decode_sinkhorn_hungarian(p.detach(), b_bl.detach(), d_fu.detach(), n_bl, n_fu, iters=it)
             no_bl = g["bl"].no_match_label.cpu().numpy()
             no_fu = g["fu"].no_match_label.cpu().numpy()
             for i in range(n_bl):
@@ -200,6 +221,16 @@ class MatcherModule(pl.LightningModule):
             self.log("val_acc_disappeared", self._dis_ok / self._dis_tot)
         if self._new_tot:
             self.log("val_acc_newly_appearing", self._new_ok / self._new_tot)
+        parts_ms: list[tuple[float, float]] = []
+        if self._uc_tot:
+            parts_ms.append((0.5, self._uc_ok / self._uc_tot))
+        if self._dis_tot:
+            parts_ms.append((0.25, self._dis_ok / self._dis_tot))
+        if self._new_tot:
+            parts_ms.append((0.25, self._new_ok / self._new_tot))
+        ws = sum(w for w, _ in parts_ms)
+        if ws > 0:
+            self.log("val_match_score", sum(w * a for w, a in parts_ms) / ws, prog_bar=True)
         self.auroc.reset()
         self.ap_sinkhorn.reset()
 
