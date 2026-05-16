@@ -24,6 +24,8 @@ class ModelConfig:
     lt_vocab: int = 12
     lt_embed: int = 8
     dropout: float = 0.2
+    use_dust_pair_summary: bool = True
+    dust_legacy_linear: bool = False
 
 
 @dataclass
@@ -47,6 +49,32 @@ class NodeEncoder(nn.Module):
         st = x[:, 1372:1386]
         ti = x[:, 1386].long()
         return self.net(torch.cat([desc, st, self.emb(ti)], dim=1))
+
+
+class DustHead(nn.Module):
+    def __init__(self, d: int, drop: float = 0.5):
+        super().__init__()
+        h = max(8, d // 2)
+        self.net = nn.Sequential(
+            nn.Linear(d + 3, h),
+            nn.ReLU(inplace=True),
+            nn.Dropout(drop),
+            nn.Linear(h, 1),
+        )
+
+    def forward(self, z: torch.Tensor, pair_summary: torch.Tensor) -> torch.Tensor:
+        return self.net(torch.cat([z, pair_summary], dim=1)).squeeze(-1)
+
+
+def _row_summaries(M: torch.Tensor) -> torch.Tensor:
+    maxv = M.max(dim=1).values
+    meanv = M.mean(dim=1)
+    if M.size(1) >= 2:
+        t = M.topk(2, dim=1).values
+        gap = t[:, 0] - t[:, 1]
+    else:
+        gap = torch.zeros_like(maxv)
+    return torch.stack([maxv, meanv, gap], dim=1)
 
 
 class HeteroGnn(nn.Module):
@@ -79,12 +107,47 @@ class HeteroGnn(nn.Module):
 class Matcher(nn.Module):
     def __init__(self, cfg: ModelConfig):
         super().__init__()
+        self.cfg = cfg
         self.enc = NodeEncoder(cfg)
         self.gnn = HeteroGnn(cfg.d, cfg.layers, cfg.heads, cfg.dropout)
         self.head = nn.Sequential(
             nn.Linear(2 * cfg.d + CROSS_DIM, cfg.d), nn.ReLU(inplace=True), nn.Dropout(cfg.dropout), nn.Linear(cfg.d, 1)
         )
-        self.dust_head = nn.Linear(cfg.d, 1)
+        if cfg.dust_legacy_linear:
+            self.dust_mlp: DustHead | None = None
+            self.dust_lin = nn.Linear(cfg.d, 1)
+        else:
+            self.dust_lin = None
+            self.dust_mlp = DustHead(cfg.d, drop=0.5)
+
+    def _dust_from_pair(self, pair: torch.Tensor, data: HeteroData, z_bl: torch.Tensor, z_fu: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        if self.cfg.dust_legacy_linear:
+            assert self.dust_lin is not None
+            return self.dust_lin(z_bl).squeeze(-1), self.dust_lin(z_fu).squeeze(-1)
+        assert self.dust_mlp is not None
+        dev, dt = pair.device, pair.dtype
+        use_sum = self.cfg.use_dust_pair_summary
+        if hasattr(data["bl"], "batch") and data["bl"].batch is not None:
+            ng = int(data.num_graphs)
+            nb = torch.bincount(data["bl"].batch, minlength=ng)
+            nf = torch.bincount(data["fu"].batch, minlength=ng)
+            es = (nb * nf).tolist()
+            parts = torch.split(pair, es)
+            zbs = torch.split(z_bl, nb.tolist())
+            zfs = torch.split(z_fu, nf.tolist())
+            dbl, dfu = [], []
+            for p, zb, zf, nbg, nfg in zip(parts, zbs, zfs, nb.tolist(), nf.tolist()):
+                M = p.reshape(nbg, nfg)
+                sbl = _row_summaries(M) if use_sum else torch.zeros((nbg, 3), device=dev, dtype=dt)
+                sfu = _row_summaries(M.T) if use_sum else torch.zeros((nfg, 3), device=dev, dtype=dt)
+                dbl.append(self.dust_mlp(zb, sbl))
+                dfu.append(self.dust_mlp(zf, sfu))
+            return torch.cat(dbl, dim=0), torch.cat(dfu, dim=0)
+        n_bl, n_fu = int(data["bl"].num_nodes), int(data["fu"].num_nodes)
+        M = pair.reshape(n_bl, n_fu)
+        sbl = _row_summaries(M) if use_sum else torch.zeros((n_bl, 3), device=dev, dtype=dt)
+        sfu = _row_summaries(M.T) if use_sum else torch.zeros((n_fu, 3), device=dev, dtype=dt)
+        return self.dust_mlp(z_bl, sbl), self.dust_mlp(z_fu, sfu)
 
     def forward(self, data: HeteroData) -> MatcherOutput:
         z = {"bl": self.enc(data["bl"].x), "fu": self.enc(data["fu"].x)}
@@ -92,13 +155,9 @@ class Matcher(nn.Module):
         ei = data["bl", "cross", "fu"].edge_index
         ea = data["bl", "cross", "fu"].edge_attr
         h = torch.cat([z["bl"][ei[0]], z["fu"][ei[1]], ea], dim=1)
-        return MatcherOutput(
-            self.head(h).squeeze(-1),
-            self.dust_head(z["bl"]).squeeze(-1),
-            self.dust_head(z["fu"]).squeeze(-1),
-            z["bl"],
-            z["fu"],
-        )
+        pair = self.head(h).squeeze(-1)
+        dust_bl, dust_fu = self._dust_from_pair(pair, data, z["bl"], z["fu"])
+        return MatcherOutput(pair, dust_bl, dust_fu, z["bl"], z["fu"])
 
 
 def decode_sinkhorn(

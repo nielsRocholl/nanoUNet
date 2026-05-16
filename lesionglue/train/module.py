@@ -109,15 +109,26 @@ class MatcherModule(pl.LightningModule):
         pair_w: float = 0.1,
         nce_w: float = 0.3,
         dust_w: float = 0.3,
-        dust_pos_w: float = 5.0,
+        dust_pos_w: float = 1.0,
         nce_tau: float = 0.1,
         proj_dim: int = 64,
         sinkhorn_iters: int = 20,
         max_epochs: int = 200,
+        dust_pair_summary: bool = True,
+        dust_legacy_linear: bool = False,
     ):
         super().__init__()
         self.save_hyperparameters()
-        self.matcher = Matcher(ModelConfig(d=d, layers=layers, heads=heads, dropout=dropout))
+        self.matcher = Matcher(
+            ModelConfig(
+                d=d,
+                layers=layers,
+                heads=heads,
+                dropout=dropout,
+                use_dust_pair_summary=dust_pair_summary,
+                dust_legacy_linear=dust_legacy_linear,
+            )
+        )
         self.proj = nn.Linear(d, proj_dim)
         self.auroc = BinaryAUROC()
         self.ap_sinkhorn = BinaryAveragePrecision()
@@ -142,11 +153,12 @@ class MatcherModule(pl.LightningModule):
             F.binary_cross_entropy_with_logits(out.dust_bl, tgt_b, pos_weight=pw)
             + F.binary_cross_entropy_with_logits(out.dust_fu, tgt_f, pos_weight=pw)
         )
+        dust_w_eff = self.hparams.dust_w * min(1.0, float(self.current_epoch) / 20.0)
         total = (
             self.hparams.sinkhorn_w * sk_loss
             + self.hparams.pair_w * pair_focal
             + self.hparams.nce_w * nce
-            + self.hparams.dust_w * dust_bce
+            + dust_w_eff * dust_bce
         )
         return total, {"sinkhorn_loss": sk_loss, "pair_loss": pair_focal, "nce_loss": nce, "dust_bce": dust_bce}
 

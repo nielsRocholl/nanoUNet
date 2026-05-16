@@ -35,10 +35,14 @@ class TrainConfig:
     pair_w: float = 0.1
     nce_w: float = 0.3
     dust_w: float = 0.3
-    dust_pos_w: float = 5.0
+    dust_pos_w: float = 1.0
     nce_tau: float = 0.1
     sinkhorn_iters: int = 20
     fu_jitter: float = 0.3
+    p_drop_fu: float = 0.1
+    p_drop_bl: float = 0.1
+    dust_pair_summary: bool = True
+    dust_legacy_linear: bool = False
 
 
 def _accelerator() -> str:
@@ -70,6 +74,18 @@ if __name__ == "__main__":
     ap.add_argument("--nce-tau", type=float, default=TrainConfig.nce_tau)
     ap.add_argument("--sinkhorn-iters", type=int, default=TrainConfig.sinkhorn_iters)
     ap.add_argument("--fu-jitter", type=float, default=TrainConfig.fu_jitter, help="FU jitter scale; 0 disables FU noise")
+    ap.add_argument("--p-drop-fu", type=float, default=TrainConfig.p_drop_fu)
+    ap.add_argument("--p-drop-bl", type=float, default=TrainConfig.p_drop_bl)
+    ap.add_argument(
+        "--dust-no-pair-summary",
+        action="store_true",
+        help="ablation: zero pair-logit summaries for DustHead (structural lever off)",
+    )
+    ap.add_argument(
+        "--dust-legacy-linear",
+        action="store_true",
+        help="Round-5-style nn.Linear(d,1) dust head (for aug-only smoke vs DustHead)",
+    )
     ap.add_argument("--wandb", action="store_true", help="log to W&B (also on if --wandb-run-name is set)")
     ap.add_argument("--wandb-project", default="lesion-tracking")
     ap.add_argument("--wandb-run-name", default="", type=str)
@@ -94,6 +110,10 @@ if __name__ == "__main__":
         nce_tau=args.nce_tau,
         sinkhorn_iters=args.sinkhorn_iters,
         fu_jitter=args.fu_jitter,
+        p_drop_fu=args.p_drop_fu,
+        p_drop_bl=args.p_drop_bl,
+        dust_pair_summary=not args.dust_no_pair_summary,
+        dust_legacy_linear=args.dust_legacy_linear,
     )
     seed_all(cfg.seed)
     dm = MatcherDataModule(
@@ -102,6 +122,8 @@ if __name__ == "__main__":
         batch_size=cfg.batch_size,
         num_workers=cfg.num_workers,
         fu_jitter_scale=cfg.fu_jitter,
+        p_drop_fu=cfg.p_drop_fu,
+        p_drop_bl=cfg.p_drop_bl,
     )
     dm.prepare_data()
     dm.setup()
@@ -120,6 +142,8 @@ if __name__ == "__main__":
         nce_tau=cfg.nce_tau,
         sinkhorn_iters=cfg.sinkhorn_iters,
         max_epochs=cfg.epochs,
+        dust_pair_summary=cfg.dust_pair_summary,
+        dust_legacy_linear=cfg.dust_legacy_linear,
     )
     Path(args.out).mkdir(parents=True, exist_ok=True)
     ckpt = ModelCheckpoint(dirpath=args.out, monitor="val_match_score", save_top_k=3, mode="max")

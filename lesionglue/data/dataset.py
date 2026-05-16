@@ -15,7 +15,7 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from torch_geometric.data import HeteroData, InMemoryDataset
 
 from tracking.common import DATASET_ROOT
-from tracking.data.augment import jitter_both
+from tracking.data.augment import drop_nodes, jitter_both
 from tracking.data.graph import GraphConfig, build_hetero_data
 from tracking.data.meta import load_split_json
 
@@ -36,6 +36,8 @@ class LesionDataset(InMemoryDataset):
         num_workers: int = 1,
         augment: bool = False,
         fu_jitter_scale: float = 0.3,
+        p_drop_fu: float = 0.1,
+        p_drop_bl: float = 0.1,
     ):
         assert split in {"train", "val", "test"}
         self.split = split
@@ -44,6 +46,8 @@ class LesionDataset(InMemoryDataset):
         self.num_workers = max(1, num_workers)
         self.augment = augment
         self.fu_jitter_scale = fu_jitter_scale
+        self.p_drop_fu = p_drop_fu
+        self.p_drop_bl = p_drop_bl
         super().__init__(root)
         self.load(self.processed_paths[0])
 
@@ -54,6 +58,14 @@ class LesionDataset(InMemoryDataset):
     def get(self, idx: int) -> HeteroData:
         d = super().get(idx).clone()
         if self.augment:
+            if self.p_drop_fu > 0.0 or self.p_drop_bl > 0.0:
+                drop_nodes(
+                    d,
+                    self.p_drop_fu,
+                    self.p_drop_bl,
+                    self.cfg.k_intra,
+                    rng=np.random.default_rng(),
+                )
             jitter_both(
                 d,
                 k_intra=self.cfg.k_intra,

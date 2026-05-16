@@ -8,7 +8,66 @@ from torch_geometric.data import HeteroData
 
 from tracking.common import PROP_SIGMA
 from tracking.data.graph import intra_knn
-from tracking.data.pairs import cross_attr, reverse_cross_attr
+from tracking.data.pairs import cross_attr, dense_pair_index, reverse_cross_attr
+
+
+def drop_nodes(
+    data: HeteroData,
+    p_drop_fu: float,
+    p_drop_bl: float,
+    k_intra: int,
+    rng: np.random.Generator | None = None,
+) -> HeteroData:
+    if p_drop_fu <= 0.0 and p_drop_bl <= 0.0:
+        return data
+    rng = rng or np.random.default_rng()
+    n_bl = int(data["bl"].num_nodes)
+    n_fu = int(data["fu"].num_nodes)
+    keep_bl = rng.random(n_bl) >= p_drop_bl
+    keep_fu = rng.random(n_fu) >= p_drop_fu
+    if not bool(keep_bl.any()):
+        keep_bl[int(rng.integers(n_bl))] = True
+    if not bool(keep_fu.any()):
+        keep_fu[int(rng.integers(n_fu))] = True
+    kb = torch.from_numpy(keep_bl).to(device=data["bl"].x.device)
+    kf = torch.from_numpy(keep_fu).to(device=data["fu"].x.device)
+    lab = data["bl", "cross", "fu"].edge_label.reshape(n_bl, n_fu).clone()
+    nm_bl = data["bl"].no_match_label.clone()
+    nm_fu = data["fu"].no_match_label.clone()
+    pos_r = lab > 0.5
+    for i in range(n_bl):
+        if not keep_bl[i]:
+            continue
+        row = pos_r[i]
+        if row.any() and not (row & kf).any():
+            nm_bl[i] = 1.0
+    for j in range(n_fu):
+        if not keep_fu[j]:
+            continue
+        col = pos_r[:, j]
+        if col.any() and not (col & kb).any():
+            nm_fu[j] = 1.0
+    data["bl"].x = data["bl"].x[kb]
+    data["bl"].pos = data["bl"].pos[kb]
+    data["bl"].no_match_label = nm_bl[kb]
+    if hasattr(data["bl"], "lesion_id") and data["bl"].lesion_id is not None:
+        data["bl"].lesion_id = data["bl"].lesion_id[kb]
+    data["fu"].x = data["fu"].x[kf]
+    data["fu"].pos = data["fu"].pos[kf]
+    data["fu"].no_match_label = nm_fu[kf]
+    if hasattr(data["fu"], "lesion_id") and data["fu"].lesion_id is not None:
+        data["fu"].lesion_id = data["fu"].lesion_id[kf]
+    lab_s = lab[kb][:, kf]
+    ei = dense_pair_index(int(lab_s.shape[0]), int(lab_s.shape[1]), dev=data["bl"].pos.device)
+    ea = cross_attr(data["bl"].pos, data["fu"].pos, data["bl"].x, data["fu"].x, ei)
+    data["bl", "cross", "fu"].edge_index = ei
+    data["bl", "cross", "fu"].edge_attr = ea
+    data["bl", "cross", "fu"].edge_label = lab_s.reshape(-1)
+    data["fu", "cross", "bl"].edge_index = ei.flip(0)
+    data["fu", "cross", "bl"].edge_attr = reverse_cross_attr(ea)
+    data["bl", "intra", "bl"].edge_index, data["bl", "intra", "bl"].edge_attr = intra_knn(data["bl"].pos, k_intra)
+    data["fu", "intra", "fu"].edge_index, data["fu", "intra", "fu"].edge_attr = intra_knn(data["fu"].pos, k_intra)
+    return data
 
 
 def jitter_both(
