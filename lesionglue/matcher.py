@@ -1,0 +1,108 @@
+"""Dense heterogeneous matcher: edge-aware GNN, pair head, BL/FU no-match heads."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+from scipy.optimize import linear_sum_assignment
+from torch import nn
+from torch_geometric.data import HeteroData
+from torch_geometric.nn import HeteroConv, TransformerConv
+
+from tracking.data.pairs import CROSS_DIM
+
+
+@dataclass
+class ModelConfig:
+    d: int = 128
+    layers: int = 4
+    heads: int = 4
+    lt_vocab: int = 12
+    lt_embed: int = 8
+
+
+@dataclass
+class MatcherOutput:
+    pair: torch.Tensor
+    bl_no_match: torch.Tensor
+    fu_no_match: torch.Tensor
+
+
+class NodeEncoder(nn.Module):
+    def __init__(self, cfg: ModelConfig):
+        super().__init__()
+        self.emb = nn.Embedding(cfg.lt_vocab, cfg.lt_embed)
+        inn = 1372 + 3 + cfg.lt_embed + 3
+        self.net = nn.Sequential(nn.Linear(inn, 256), nn.ReLU(inplace=True), nn.Linear(256, cfg.d))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        desc = x[:, :1372]
+        st = x[:, 1372:1375]
+        ti = x[:, 1375].long()
+        po = x[:, 1376:1379]
+        return self.net(torch.cat([desc, st, self.emb(ti), po], dim=1))
+
+
+class HeteroGnn(nn.Module):
+    def __init__(self, d: int, layers: int, heads: int):
+        super().__init__()
+
+        def block() -> HeteroConv:
+            return HeteroConv(
+                {
+                    ("bl", "intra", "bl"): TransformerConv(d, d // heads, heads=heads, edge_dim=1),
+                    ("fu", "intra", "fu"): TransformerConv(d, d // heads, heads=heads, edge_dim=1),
+                    ("bl", "cross", "fu"): TransformerConv((d, d), d // heads, heads=heads, edge_dim=CROSS_DIM),
+                    ("fu", "cross", "bl"): TransformerConv((d, d), d // heads, heads=heads, edge_dim=CROSS_DIM),
+                },
+                aggr="sum",
+            )
+
+        self.layers = nn.ModuleList([block() for _ in range(layers)])
+
+    def forward(self, x_dict: dict, edge_index_dict: dict, edge_attr_dict: dict) -> dict:
+        for conv in self.layers:
+            h = conv(x_dict, edge_index_dict, edge_attr_dict=edge_attr_dict)
+            x_dict = {k: F.relu(x_dict[k] + h[k]) for k in x_dict}
+        return x_dict
+
+
+class Matcher(nn.Module):
+    def __init__(self, cfg: ModelConfig):
+        super().__init__()
+        self.enc = NodeEncoder(cfg)
+        self.gnn = HeteroGnn(cfg.d, cfg.layers, cfg.heads)
+        self.head = nn.Sequential(nn.Linear(2 * cfg.d + CROSS_DIM, cfg.d), nn.ReLU(inplace=True), nn.Linear(cfg.d, 1))
+        self.bl_none = nn.Linear(cfg.d, 1)
+        self.fu_none = nn.Linear(cfg.d, 1)
+
+    def forward(self, data: HeteroData) -> MatcherOutput:
+        z = {"bl": self.enc(data["bl"].x), "fu": self.enc(data["fu"].x)}
+        z = self.gnn(z, data.edge_index_dict, data.edge_attr_dict)
+        ei = data["bl", "cross", "fu"].edge_index
+        ea = data["bl", "cross", "fu"].edge_attr
+        h = torch.cat([z["bl"][ei[0]], z["fu"][ei[1]], ea], dim=1)
+        return MatcherOutput(
+            self.head(h).squeeze(-1),
+            self.bl_none(z["bl"]).squeeze(-1),
+            self.fu_none(z["fu"]).squeeze(-1),
+        )
+
+
+def decode_hungarian(prob: np.ndarray, thresh: float = 0.5) -> np.ndarray:
+    n, m = prob.shape
+    cost = np.full((n + 1, m + 1), 1e6, dtype=np.float64)
+    cost[:n, :m] = -np.log(np.clip(prob, 1e-9, 1.0))
+    ct = float(-np.log(max(thresh, 1e-9)))
+    cost[:n, m] = ct
+    cost[n, :m] = ct
+    cost[n, m] = 0.0
+    ri, ci = linear_sum_assignment(cost)
+    out = np.full(n, -1, dtype=np.int64)
+    for r, c in zip(ri, ci):
+        if r < n and c < m:
+            out[r] = int(c)
+    return out

@@ -1,0 +1,106 @@
+"""CSV-free dense graph builder from CTs, instance masks, and propagated BL centroids."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import torch
+from torch_geometric.data import HeteroData
+
+from tracking.common import LESION_TYPES
+from tracking.data.appearance import descriptor_l0, mask_stats
+from tracking.data.graph import GraphConfig, _intra_knn, _load_vol, _pack
+from tracking.data.pairs import cross_attr, dense_pair_index, reverse_cross_attr
+
+
+def _labels(mask: np.ndarray) -> list[int]:
+    ids = sorted(int(x) for x in np.unique(mask.astype(np.int64)) if int(x) != 0)
+    assert ids
+    return ids
+
+
+def _centroids(mask: np.ndarray, ids: list[int]) -> dict[int, np.ndarray]:
+    out = {}
+    for lid in ids:
+        pts = np.argwhere(mask == lid)
+        assert pts.size, f"empty mask label {lid}"
+        out[lid] = pts.mean(axis=0).astype(np.float64) + 0.5
+    return out
+
+
+def _propagated(path: Path, bl_ids: list[int]) -> tuple[dict[int, np.ndarray], dict[int, str]]:
+    df = pd.read_csv(path)
+    need = {"lesion_id", "z", "y", "x"}
+    assert need.issubset(df.columns), f"{path} needs columns {sorted(need)}"
+    prop, typ = {}, {}
+    for _, r in df.iterrows():
+        lid = int(r["lesion_id"])
+        prop[lid] = np.asarray([float(r["z"]), float(r["y"]), float(r["x"])], dtype=np.float64)
+        if "lesion_type" in df.columns and str(r["lesion_type"]).strip():
+            lt = str(r["lesion_type"]).strip()
+            assert lt in LESION_TYPES, f"unknown lesion_type {lt!r}"
+            typ[lid] = lt
+    assert set(prop) == set(bl_ids), "propagated centroid CSV must match baseline mask labels exactly"
+    return prop, typ
+
+
+def _lt(lid: int, table: dict[int, str], default: str | None) -> int:
+    if lid in table:
+        return LESION_TYPES.index(table[lid])
+    assert default is not None, f"lesion {lid} needs lesion_type or explicit default"
+    assert default in LESION_TYPES, f"unknown default lesion_type {default!r}"
+    return LESION_TYPES.index(default)
+
+
+def build_mask_graph(
+    bl_img: Path,
+    bl_mask: Path,
+    fu_img: Path,
+    fu_mask: Path,
+    propagated_csv: Path,
+    cfg: GraphConfig,
+    default_lesion_type: str | None = None,
+) -> HeteroData:
+    ct_bl, aff_bl, sp_bl = _load_vol(bl_img)
+    mk_bl, _, _ = _load_vol(bl_mask)
+    ct_fu, aff_fu, sp_fu = _load_vol(fu_img)
+    mk_fu, _, _ = _load_vol(fu_mask)
+    bl_ids, fu_ids = _labels(mk_bl), _labels(mk_fu)
+    c_bl, c_fu = _centroids(mk_bl, bl_ids), _centroids(mk_fu, fu_ids)
+    prop, bl_types = _propagated(propagated_csv, bl_ids)
+    den = np.maximum(np.asarray(ct_fu.shape, dtype=np.float64) - 1.0, 1.0)
+
+    xb, pb = [], []
+    for lid in bl_ids:
+        lv, mh, sph = mask_stats(mk_bl, lid, sp_bl, ct_bl)
+        desc = descriptor_l0(ct_bl, aff_bl, c_bl[lid])
+        xb.append(_pack(desc, lv, mh, sph, _lt(lid, bl_types, default_lesion_type), prop[lid] / den))
+        pb.append(prop[lid] * sp_fu)
+
+    xf, pf = [], []
+    for lid in fu_ids:
+        lv, mh, sph = mask_stats(mk_fu, lid, sp_fu, ct_fu)
+        desc = descriptor_l0(ct_fu, aff_fu, c_fu[lid])
+        xf.append(_pack(desc, lv, mh, sph, _lt(lid, {}, default_lesion_type), c_fu[lid] / den))
+        pf.append(c_fu[lid] * sp_fu)
+
+    data = HeteroData()
+    data["bl"].x, data["fu"].x = torch.tensor(np.stack(xb)), torch.tensor(np.stack(xf))
+    data["bl"].pos, data["fu"].pos = torch.tensor(np.stack(pb), dtype=torch.float32), torch.tensor(np.stack(pf), dtype=torch.float32)
+    data["bl"].lesion_id, data["fu"].lesion_id = torch.tensor(bl_ids), torch.tensor(fu_ids)
+    data["bl"].no_match_label = torch.zeros(len(bl_ids))
+    data["fu"].no_match_label = torch.zeros(len(fu_ids))
+    data["bl", "intra", "bl"].edge_index, data["bl", "intra", "bl"].edge_attr = _intra_knn(data["bl"].pos, cfg.k_intra)
+    data["fu", "intra", "fu"].edge_index, data["fu", "intra", "fu"].edge_attr = _intra_knn(data["fu"].pos, cfg.k_intra)
+    ei = dense_pair_index(len(bl_ids), len(fu_ids))
+    ea = cross_attr(data["bl"].pos, data["fu"].pos, data["bl"].x, data["fu"].x, ei)
+    data["bl", "cross", "fu"].edge_index = ei
+    data["bl", "cross", "fu"].edge_attr = ea
+    data["bl", "cross", "fu"].edge_label = torch.zeros(ei.shape[1])
+    data["fu", "cross", "bl"].edge_index = ei.flip(0)
+    data["fu", "cross", "bl"].edge_attr = reverse_cross_attr(ea)
+    data.pid = "mask_graph"
+    data.img_id_fu_used = 0
+    return data
