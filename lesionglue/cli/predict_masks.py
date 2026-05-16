@@ -8,6 +8,7 @@ import torch
 
 from tracking.data.graph import GraphConfig
 from tracking.data.masks import build_mask_graph
+from tracking.matcher import decode_sinkhorn_hungarian
 from tracking.train.module import MatcherModule
 
 ap = argparse.ArgumentParser()
@@ -21,6 +22,8 @@ ap.add_argument("--out", required=True)
 ap.add_argument("--pairs-out", default="")
 ap.add_argument("--default-lesion-type", default=None)
 ap.add_argument("--k-intra", type=int, default=8)
+ap.add_argument("--sinkhorn-iters", type=int, default=20)
+ap.add_argument("--sinkhorn-tau", type=float, default=0.2)
 args = ap.parse_args()
 
 data = build_mask_graph(
@@ -39,23 +42,25 @@ data = data.to(mod.device)
 with torch.no_grad():
     outp = mod.matcher(data)
     pair_prob = torch.sigmoid(outp.pair).cpu()
-    none_prob = torch.sigmoid(outp.bl_no_match).cpu()
-    pair_log = outp.pair.cpu()
-    none_log = outp.bl_no_match.cpu()
+    pr = outp.pair.cpu()
+    db = outp.dust_bl.cpu()
+    df = outp.dust_fu.cpu()
 
 bl_ids = data["bl"].lesion_id.cpu().tolist()
 fu_ids = data["fu"].lesion_id.cpu().tolist()
 n_bl, n_fu = len(bl_ids), len(fu_ids)
 pmat = pair_prob.reshape(n_bl, n_fu)
-lmat = pair_log.reshape(n_bl, n_fu)
+dec = decode_sinkhorn_hungarian(pr, db, df, n_bl, n_fu, iters=args.sinkhorn_iters, tau=args.sinkhorn_tau)
 
 with Path(args.out).open("w", newline="") as f:
     w = csv.writer(f)
-    w.writerow(["bl_lesion_id", "fu_lesion_id", "pair_prob", "no_match_prob", "decoded"])
+    w.writerow(["bl_lesion_id", "fu_lesion_id", "pair_prob", "decoded"])
     for i, lid in enumerate(bl_ids):
-        j = int(torch.argmax(lmat[i]).item())
-        is_none = bool(none_log[i] > lmat[i, j])
-        w.writerow([int(lid), -1 if is_none else int(fu_ids[j]), float(pmat[i, j]), float(none_prob[i]), int(not is_none)])
+        j = int(dec[i])
+        if j < 0:
+            w.writerow([int(lid), -1, 0.0, 0])
+        else:
+            w.writerow([int(lid), int(fu_ids[j]), float(pmat[i, j]), 1])
 
 if args.pairs_out:
     ei = data["bl", "cross", "fu"].edge_index.cpu()

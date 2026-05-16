@@ -8,7 +8,7 @@ import random
 import numpy as np
 import torch
 
-DATASET_ROOT = Path("/Users/nielsrocholl/Documents/PhD DIAG - Local/Data/Datasets/Longitudinal_CT_v2")
+DATASET_ROOT = Path("/nnunet_data/unprocessed-universal-lesion-segmentation/")
 CACHE_ROOT = Path(__file__).resolve().parents[1] / ".cache" / "graphs"
 
 LESION_TYPES = (

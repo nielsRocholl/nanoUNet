@@ -1,10 +1,9 @@
-"""LightningDataModule over cached dense v2 LesionDataset + PyG DataLoader."""
+"""LightningDataModule: cached dense v4 LesionDataset + PyG DataLoader."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import torch
 from pytorch_lightning import LightningDataModule
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
@@ -19,25 +18,30 @@ class MatcherDataModule(LightningDataModule):
         dataset_root: Path | str = DATASET_ROOT,
         batch_size: int = 8,
         num_workers: int = 2,
+        fu_jitter_scale: float = 0.3,
     ):
         super().__init__()
         self.cache_root = Path(cache_root)
         self.dataset_root = Path(dataset_root)
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.pos_weight = 1.0
+        self.fu_jitter_scale = fu_jitter_scale
 
     def prepare_data(self) -> None:
         for sp in ("train", "val"):
-            p = self.cache_root / "processed" / f"{sp}_v2.pt"
+            p = self.cache_root / "processed" / f"{sp}_v4.pt"
             if not p.is_file():
                 raise FileNotFoundError(f"run preprocess --split {sp}; missing {p}")
 
     def setup(self, stage: str | None = None) -> None:
-        self.train_ds = LesionDataset(root=str(self.cache_root), split="train", dataset_root=self.dataset_root)
+        self.train_ds = LesionDataset(
+            root=str(self.cache_root),
+            split="train",
+            dataset_root=self.dataset_root,
+            augment=True,
+            fu_jitter_scale=self.fu_jitter_scale,
+        )
         self.val_ds = LesionDataset(root=str(self.cache_root), split="val", dataset_root=self.dataset_root)
-        meta = torch.load(self.cache_root / "processed" / "train_v2_meta.pt", map_location="cpu")
-        self.pos_weight = float(meta["pos_weight"])
 
     def train_dataloader(self):
         nw = self.num_workers

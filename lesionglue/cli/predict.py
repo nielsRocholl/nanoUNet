@@ -10,7 +10,7 @@ from torch_geometric.loader import DataLoader as PyGDataLoader
 
 from tracking.common import CACHE_ROOT, DATASET_ROOT
 from tracking.data.dataset import LesionDataset
-from tracking.matcher import decode_hungarian
+from tracking.matcher import decode_sinkhorn_hungarian
 from tracking.train.module import MatcherModule
 
 if __name__ == "__main__":
@@ -21,6 +21,8 @@ if __name__ == "__main__":
     ap.add_argument("--split", choices=["val", "test"], default="val")
     ap.add_argument("--out", default="preds")
     ap.add_argument("--thresh", type=float, default=0.5)
+    ap.add_argument("--sinkhorn-iters", type=int, default=20)
+    ap.add_argument("--sinkhorn-tau", type=float, default=0.2)
     ap.add_argument("--dump-all", action="store_true")
     ap.add_argument("--strict", action="store_true")
     args = ap.parse_args()
@@ -47,18 +49,29 @@ if __name__ == "__main__":
             pm = np.zeros((n_bl, n_fu), dtype=np.float64)
             for k in range(ei.shape[1]):
                 pm[ei[0, k], ei[1, k]] = prob[k]
-            hung = decode_hungarian(pm, args.thresh) if args.strict else None
+            dec_arr = None
+            if args.strict:
+                dec_arr = decode_sinkhorn_hungarian(
+                    outp.pair.cpu(),
+                    outp.dust_bl.cpu(),
+                    outp.dust_fu.cpu(),
+                    n_bl,
+                    n_fu,
+                    iters=args.sinkhorn_iters,
+                    tau=args.sinkhorn_tau,
+                )
             rows = []
             for k in range(ei.shape[1]):
                 bi, fj = ei[:, k]
                 p = float(prob[k])
                 if not args.dump_all and p < args.thresh:
                     continue
-                if args.strict and hung is not None:
-                    dec = int(hung[bi] == fj)
+                if dec_arr is not None:
+                    di = int(dec_arr[int(bi)])
+                    edge_dec = int(di == int(fj) and di >= 0)
                 else:
-                    dec = int(p >= args.thresh)
-                rows.append((int(bl_ids[bi]), int(fu_ids[fj]), p, dec))
+                    edge_dec = int(p >= args.thresh)
+                rows.append((int(bl_ids[bi]), int(fu_ids[fj]), p, edge_dec))
             path = out / f"{pid}.csv"
             with path.open("w", newline="") as f:
                 w = csv.writer(f)

@@ -1,10 +1,8 @@
 """Train bipartite lesion matcher (Lightning).
 
-`RichProgressBar` requires `rich` (see `requirements.txt`); Lightning errors if it is missing.
-W&B metrics require `wandb` in the environment (`pip install -r requirements.txt`).
+Uses `TQDMProgressBar`. W&B: `pip install wandb`.
 
-DataLoader workers on macOS use spawn: keep ``trainer.fit`` under ``if __name__ == "__main__"`` so
-re-imported worker modules do not recurse into training.
+DataLoader workers on macOS use spawn: keep ``trainer.fit`` under ``if __name__ == "__main__"``.
 """
 
 import argparse
@@ -14,7 +12,7 @@ from pathlib import Path
 
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.callbacks import ModelCheckpoint, RichProgressBar
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, TQDMProgressBar
 
 from tracking.common import CACHE_ROOT, DATASET_ROOT, seed_all
 from tracking.train.datamodule import MatcherDataModule
@@ -32,9 +30,13 @@ class TrainConfig:
     d: int = 128
     layers: int = 4
     heads: int = 4
-    pair_w: float = 1.0
-    row_w: float = 0.5
-    none_w: float = 0.2
+    dropout: float = 0.2
+    sinkhorn_w: float = 1.0
+    pair_w: float = 0.1
+    nce_w: float = 0.3
+    nce_tau: float = 0.1
+    sinkhorn_iters: int = 20
+    fu_jitter: float = 0.3
 
 
 def _accelerator() -> str:
@@ -57,9 +59,13 @@ if __name__ == "__main__":
     ap.add_argument("--d", type=int, default=TrainConfig.d)
     ap.add_argument("--layers", type=int, default=TrainConfig.layers)
     ap.add_argument("--heads", type=int, default=TrainConfig.heads)
+    ap.add_argument("--dropout", type=float, default=TrainConfig.dropout)
+    ap.add_argument("--sinkhorn-w", type=float, default=TrainConfig.sinkhorn_w)
     ap.add_argument("--pair-w", type=float, default=TrainConfig.pair_w)
-    ap.add_argument("--row-w", type=float, default=TrainConfig.row_w)
-    ap.add_argument("--none-w", type=float, default=TrainConfig.none_w)
+    ap.add_argument("--nce-w", type=float, default=TrainConfig.nce_w)
+    ap.add_argument("--nce-tau", type=float, default=TrainConfig.nce_tau)
+    ap.add_argument("--sinkhorn-iters", type=int, default=TrainConfig.sinkhorn_iters)
+    ap.add_argument("--fu-jitter", type=float, default=TrainConfig.fu_jitter, help="FU jitter scale; 0 disables FU noise")
     ap.add_argument("--wandb", action="store_true", help="log to W&B (also on if --wandb-run-name is set)")
     ap.add_argument("--wandb-project", default="lesion-tracking")
     ap.add_argument("--wandb-run-name", default="", type=str)
@@ -75,9 +81,13 @@ if __name__ == "__main__":
         d=args.d,
         layers=args.layers,
         heads=args.heads,
+        dropout=args.dropout,
+        sinkhorn_w=args.sinkhorn_w,
         pair_w=args.pair_w,
-        row_w=args.row_w,
-        none_w=args.none_w,
+        nce_w=args.nce_w,
+        nce_tau=args.nce_tau,
+        sinkhorn_iters=args.sinkhorn_iters,
+        fu_jitter=args.fu_jitter,
     )
     seed_all(cfg.seed)
     dm = MatcherDataModule(
@@ -85,6 +95,7 @@ if __name__ == "__main__":
         dataset_root=Path(args.root),
         batch_size=cfg.batch_size,
         num_workers=cfg.num_workers,
+        fu_jitter_scale=cfg.fu_jitter,
     )
     dm.prepare_data()
     dm.setup()
@@ -94,13 +105,17 @@ if __name__ == "__main__":
         heads=cfg.heads,
         lr=cfg.lr,
         weight_decay=cfg.weight_decay,
-        pos_weight=dm.pos_weight,
+        dropout=cfg.dropout,
+        sinkhorn_w=cfg.sinkhorn_w,
         pair_w=cfg.pair_w,
-        row_w=cfg.row_w,
-        none_w=cfg.none_w,
+        nce_w=cfg.nce_w,
+        nce_tau=cfg.nce_tau,
+        sinkhorn_iters=cfg.sinkhorn_iters,
+        max_epochs=cfg.epochs,
     )
     Path(args.out).mkdir(parents=True, exist_ok=True)
-    ckpt = ModelCheckpoint(dirpath=args.out, monitor="val_loss", save_top_k=3, mode="min")
+    ckpt = ModelCheckpoint(dirpath=args.out, monitor="val_row_acc_hungarian", save_top_k=3, mode="max")
+    stop = EarlyStopping(monitor="val_row_acc_hungarian", mode="max", patience=30)
     use_wandb = args.wandb or bool(args.wandb_run_name.strip())
     logger = False
     if use_wandb:
@@ -118,7 +133,7 @@ if __name__ == "__main__":
         accelerator=_accelerator(),
         devices=1,
         log_every_n_steps=10,
-        callbacks=[ckpt, RichProgressBar()],
+        callbacks=[ckpt, stop, TQDMProgressBar()],
         logger=logger,
     )
     trainer.fit(mod, dm)

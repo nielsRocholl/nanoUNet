@@ -11,7 +11,7 @@ from torch_geometric.data import HeteroData
 
 from tracking.common import LESION_TYPES
 from tracking.data.appearance import descriptor_l0, mask_stats
-from tracking.data.graph import GraphConfig, _intra_knn, _load_vol, _pack
+from tracking.data.graph import GraphConfig, intra_knn, _load_vol, _pack
 from tracking.data.pairs import cross_attr, dense_pair_index, reverse_cross_attr
 
 
@@ -70,20 +70,19 @@ def build_mask_graph(
     bl_ids, fu_ids = _labels(mk_bl), _labels(mk_fu)
     c_bl, c_fu = _centroids(mk_bl, bl_ids), _centroids(mk_fu, fu_ids)
     prop, bl_types = _propagated(propagated_csv, bl_ids)
-    den = np.maximum(np.asarray(ct_fu.shape, dtype=np.float64) - 1.0, 1.0)
 
     xb, pb = [], []
     for lid in bl_ids:
-        lv, mh, sph = mask_stats(mk_bl, lid, sp_bl, ct_bl)
+        mf_b = mask_stats(mk_bl, lid, sp_bl, ct_bl)
         desc = descriptor_l0(ct_bl, aff_bl, c_bl[lid])
-        xb.append(_pack(desc, lv, mh, sph, _lt(lid, bl_types, default_lesion_type), prop[lid] / den))
+        xb.append(_pack(desc, mf_b, _lt(lid, bl_types, default_lesion_type)))
         pb.append(prop[lid] * sp_fu)
 
     xf, pf = [], []
     for lid in fu_ids:
-        lv, mh, sph = mask_stats(mk_fu, lid, sp_fu, ct_fu)
+        mf_f = mask_stats(mk_fu, lid, sp_fu, ct_fu)
         desc = descriptor_l0(ct_fu, aff_fu, c_fu[lid])
-        xf.append(_pack(desc, lv, mh, sph, _lt(lid, {}, default_lesion_type), c_fu[lid] / den))
+        xf.append(_pack(desc, mf_f, _lt(lid, {}, default_lesion_type)))
         pf.append(c_fu[lid] * sp_fu)
 
     data = HeteroData()
@@ -92,8 +91,8 @@ def build_mask_graph(
     data["bl"].lesion_id, data["fu"].lesion_id = torch.tensor(bl_ids), torch.tensor(fu_ids)
     data["bl"].no_match_label = torch.zeros(len(bl_ids))
     data["fu"].no_match_label = torch.zeros(len(fu_ids))
-    data["bl", "intra", "bl"].edge_index, data["bl", "intra", "bl"].edge_attr = _intra_knn(data["bl"].pos, cfg.k_intra)
-    data["fu", "intra", "fu"].edge_index, data["fu", "intra", "fu"].edge_attr = _intra_knn(data["fu"].pos, cfg.k_intra)
+    data["bl", "intra", "bl"].edge_index, data["bl", "intra", "bl"].edge_attr = intra_knn(data["bl"].pos, cfg.k_intra)
+    data["fu", "intra", "fu"].edge_index, data["fu", "intra", "fu"].edge_attr = intra_knn(data["fu"].pos, cfg.k_intra)
     ei = dense_pair_index(len(bl_ids), len(fu_ids))
     ea = cross_attr(data["bl"].pos, data["fu"].pos, data["bl"].x, data["fu"].x, ei)
     data["bl", "cross", "fu"].edge_index = ei
@@ -103,4 +102,5 @@ def build_mask_graph(
     data["fu", "cross", "bl"].edge_attr = reverse_cross_attr(ea)
     data.pid = "mask_graph"
     data.img_id_fu_used = 0
+    data.sp_fu = torch.tensor(sp_fu.astype(np.float32))
     return data

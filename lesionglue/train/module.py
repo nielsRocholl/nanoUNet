@@ -1,37 +1,87 @@
-"""LightningModule: dense pair BCE, row dustbin loss, no-match BCE, edge metrics."""
+"""LightningModule: Sinkhorn assignment loss, focal pair aux, batch InfoNCE, edge metrics."""
 
 from __future__ import annotations
 
+import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
+from torch import nn
 from torch_geometric.data import Batch, HeteroData
 from torchmetrics.classification import BinaryAUROC, BinaryAveragePrecision
 
-from tracking.matcher import Matcher, MatcherOutput, ModelConfig
+from tracking.data.graph import FEAT_DIM
+from tracking.matcher import Matcher, MatcherOutput, ModelConfig, decode_sinkhorn_hungarian
+from tracking.train.sinkhorn import log_sinkhorn, sinkhorn_loss
+
+LT_IDX = FEAT_DIM - 1
 
 
-def row_loss(data: HeteroData, pair_logits: torch.Tensor, bl_none: torch.Tensor) -> torch.Tensor:
+def focal_bce_with_logits(logits: torch.Tensor, target: torch.Tensor, alpha: float = 0.25, gamma: float = 2.0) -> torch.Tensor:
+    bce = F.binary_cross_entropy_with_logits(logits, target, reduction="none")
+    p = torch.sigmoid(logits)
+    pt = p * target + (1 - p) * (1 - target)
+    w = (alpha * target + (1 - alpha) * (1 - target)) * (1 - pt).clamp_min(1e-6).pow(gamma)
+    return (w * bce).mean()
+
+
+def infonce_batch(
+    z_bl: torch.Tensor,
+    z_fu: torch.Tensor,
+    proj: nn.Module,
+    edge_index: torch.Tensor,
+    edge_label: torch.Tensor,
+    tau: float,
+    batch: Batch,
+) -> torch.Tensor:
+    pb = F.normalize(proj(z_bl), dim=1)
+    pf = F.normalize(proj(z_fu), dim=1)
+    sim = (pb @ pf.T) / tau
+    pos = edge_label > 0.5
+    if not pos.any():
+        return z_bl.sum() * 0.0
+    lt_bl = batch["bl"].x[:, LT_IDX].long()
+    lt_fu = batch["fu"].x[:, LT_IDX].long()
+    same = lt_bl[:, None] == lt_fu[None, :]
+    bi, fj = edge_index[0, pos], edge_index[1, pos]
+    sort_idx = torch.argsort(bi)
+    sb, sf = bi[sort_idx], fj[sort_idx]
+    mask = torch.ones(sb.shape[0], dtype=torch.bool, device=sb.device)
+    mask[1:] = sb[1:] != sb[:-1]
+    bi_u, fj_u = sb[mask], sf[mask]
+    sim_a = sim.clone()
+    for b in bi_u:
+        if same[b].sum() > 1:
+            sim_a[b] = sim_a[b].masked_fill(~same[b], float("-inf"))
+    la = F.cross_entropy(sim_a[bi_u], fj_u)
+    sort_idx = torch.argsort(fj)
+    sb, si = fj[sort_idx], bi[sort_idx]
+    mask = torch.ones(sb.shape[0], dtype=torch.bool, device=sb.device)
+    mask[1:] = sb[1:] != sb[:-1]
+    fj_u2, bi_u2 = sb[mask], si[mask]
+    sim_t = sim_a.T.clone()
+    for f in torch.unique(fj_u2):
+        if same[:, f].sum() > 1:
+            sim_t[f] = sim_t[f].masked_fill(~same[:, f], float("-inf"))
+    lb = F.cross_entropy(sim_t[fj_u2], bi_u2)
+    return 0.5 * (la + lb)
+
+
+def row_hungarian_match_acc(
+    data: HeteroData,
+    pair_log: torch.Tensor,
+    dust_bl: torch.Tensor,
+    dust_fu: torch.Tensor,
+    iters: int,
+) -> float:
     n_bl, n_fu = data["bl"].num_nodes, data["fu"].num_nodes
-    lab = data["bl", "cross", "fu"].edge_label.to(pair_logits.device).reshape(n_bl, n_fu)
-    scores = torch.cat([pair_logits.reshape(n_bl, n_fu), bl_none.reshape(n_bl, 1)], dim=1)
-    pos = lab > 0.5
-    counts = pos.sum(dim=1)
-    target = torch.zeros_like(scores)
-    target[:, :n_fu] = pos.float() / counts.clamp_min(1).unsqueeze(1)
-    target[counts == 0, n_fu] = 1.0
-    return -(target * F.log_softmax(scores, dim=1)).sum(dim=1).mean()
-
-
-def row_match_acc(data: HeteroData, pair_logits: torch.Tensor, bl_none: torch.Tensor) -> float:
-    n_bl, n_fu = data["bl"].num_nodes, data["fu"].num_nodes
-    lab = data["bl", "cross", "fu"].edge_label.reshape(n_bl, n_fu).cpu()
-    scores = torch.cat([pair_logits.reshape(n_bl, n_fu).cpu(), bl_none.reshape(n_bl, 1).cpu()], dim=1)
-    pred = scores.argmax(dim=1)
+    lab = data["bl", "cross", "fu"].edge_label.reshape(n_bl, n_fu)
+    dec = decode_sinkhorn_hungarian(pair_log, dust_bl, dust_fu, n_bl, n_fu, iters=iters)
     ok = 0
     for i in range(n_bl):
         pos = torch.where(lab[i] > 0.5)[0]
-        ok += int(pred[i].item() == n_fu) if pos.numel() == 0 else int((pos == pred[i]).any().item())
+        di = int(dec[i])
+        ok += int(di < 0) if pos.numel() == 0 else int((pos == di).any().item())
     return ok / max(n_bl, 1)
 
 
@@ -43,34 +93,45 @@ class MatcherModule(pl.LightningModule):
         heads: int = 4,
         lr: float = 1e-4,
         weight_decay: float = 1e-2,
-        pos_weight: float = 1.0,
-        pair_w: float = 1.0,
-        row_w: float = 0.5,
-        none_w: float = 0.2,
+        dropout: float = 0.2,
+        sinkhorn_w: float = 1.0,
+        pair_w: float = 0.1,
+        nce_w: float = 0.3,
+        nce_tau: float = 0.1,
+        proj_dim: int = 64,
+        sinkhorn_iters: int = 20,
+        max_epochs: int = 200,
     ):
         super().__init__()
         self.save_hyperparameters()
-        self.matcher = Matcher(ModelConfig(d=d, layers=layers, heads=heads))
-        self.register_buffer("pw", torch.tensor(float(pos_weight)))
+        self.matcher = Matcher(ModelConfig(d=d, layers=layers, heads=heads, dropout=dropout))
+        self.proj = nn.Linear(d, proj_dim)
         self.auroc = BinaryAUROC()
-        self.ap = BinaryAveragePrecision()
+        self.ap_sinkhorn = BinaryAveragePrecision()
 
     def forward(self, batch: Batch) -> MatcherOutput:
         return self.matcher(batch)
 
     def _loss(self, batch: Batch, out: MatcherOutput) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
         labels = batch["bl", "cross", "fu"].edge_label
-        pair = F.binary_cross_entropy_with_logits(out.pair, labels, pos_weight=self.pw)
+        pair_focal = focal_bce_with_logits(out.pair, labels)
         graphs = batch.to_data_list()
         edge_sizes = [g["bl", "cross", "fu"].num_edges for g in graphs]
-        bl_sizes = [g["bl"].num_nodes for g in graphs]
-        rows = [row_loss(g, p, b) for g, p, b in zip(graphs, torch.split(out.pair, edge_sizes), torch.split(out.bl_no_match, bl_sizes))]
-        row = torch.stack(rows).mean()
-        bl_none = F.binary_cross_entropy_with_logits(out.bl_no_match, batch["bl"].no_match_label.float())
-        fu_none = F.binary_cross_entropy_with_logits(out.fu_no_match, batch["fu"].no_match_label.float())
-        none = 0.5 * (bl_none + fu_none)
-        total = self.hparams.pair_w * pair + self.hparams.row_w * row + self.hparams.none_w * none
-        return total, {"pair_loss": pair, "row_loss": row, "none_loss": none}
+        sk = []
+        for g, p in zip(graphs, torch.split(out.pair, edge_sizes)):
+            n_bl, n_fu = g["bl"].num_nodes, g["fu"].num_nodes
+            sk.append(
+                sinkhorn_loss(p, n_bl, n_fu, out.dust_bl, out.dust_fu, g["bl", "cross", "fu"].edge_label, self.hparams.sinkhorn_iters)
+            )
+        sk_loss = torch.stack(sk).mean()
+        nce = infonce_batch(out.z_bl, out.z_fu, self.proj, batch["bl", "cross", "fu"].edge_index, labels, self.hparams.nce_tau, batch)
+        total = self.hparams.sinkhorn_w * sk_loss + self.hparams.pair_w * pair_focal + self.hparams.nce_w * nce
+        return total, {"sinkhorn_loss": sk_loss, "pair_loss": pair_focal, "nce_loss": nce}
+
+    def on_validation_start(self) -> None:
+        self._uc_ok = self._uc_tot = 0
+        self._dis_ok = self._dis_tot = 0
+        self._new_ok = self._new_tot = 0
 
     def training_step(self, batch: Batch, _) -> torch.Tensor:
         out = self.matcher(batch)
@@ -85,24 +146,67 @@ class MatcherModule(pl.LightningModule):
         loss, parts = self._loss(batch, out)
         labels = batch["bl", "cross", "fu"].edge_label
         self.auroc.update(torch.sigmoid(out.pair.detach()), labels.int())
-        self.ap.update(torch.sigmoid(out.pair.detach()), labels.int())
         graphs = batch.to_data_list()
         edge_sizes = [g["bl", "cross", "fu"].num_edges for g in graphs]
-        bl_sizes = [g["bl"].num_nodes for g in graphs]
-        acc = sum(row_match_acc(g, p.detach(), b.detach()) for g, p, b in zip(graphs, torch.split(out.pair, edge_sizes), torch.split(out.bl_no_match, bl_sizes))) / len(graphs)
+        it = self.hparams.sinkhorn_iters
+        acc = sum(
+            row_hungarian_match_acc(g, p.detach(), out.dust_bl.detach(), out.dust_fu.detach(), it)
+            for g, p in zip(graphs, torch.split(out.pair, edge_sizes))
+        ) / len(graphs)
+        for g, p in zip(graphs, torch.split(out.pair, edge_sizes)):
+            n_bl, n_fu = g["bl"].num_nodes, g["fu"].num_nodes
+            dev, dt = p.device, p.dtype
+            S = torch.zeros((n_bl + 1, n_fu + 1), device=dev, dtype=dt)
+            S[:n_bl, :n_fu] = p.reshape(n_bl, n_fu)
+            S[:n_bl, n_fu] = out.dust_bl.detach()
+            S[n_bl, :n_fu] = out.dust_fu.detach()
+            P = log_sinkhorn(S, it).exp()
+            Rn = P[:n_bl] / P[:n_bl].sum(dim=1, keepdim=True).clamp_min(1e-9)
+            ei = g["bl", "cross", "fu"].edge_index
+            self.ap_sinkhorn.update(Rn[ei[0], ei[1]].detach(), g["bl", "cross", "fu"].edge_label.int())
+
+            lab = g["bl", "cross", "fu"].edge_label.reshape(n_bl, n_fu).cpu().numpy()
+            dec = decode_sinkhorn_hungarian(p.detach(), out.dust_bl.detach(), out.dust_fu.detach(), n_bl, n_fu, iters=it)
+            no_bl = g["bl"].no_match_label.cpu().numpy()
+            no_fu = g["fu"].no_match_label.cpu().numpy()
+            for i in range(n_bl):
+                if lab[i].any():
+                    js = set(map(int, np.where(lab[i] > 0.5)[0]))
+                    di = int(dec[i])
+                    self._uc_tot += 1
+                    self._uc_ok += int(di in js)
+            for i in range(n_bl):
+                if no_bl[i] > 0.5:
+                    self._dis_tot += 1
+                    self._dis_ok += int(int(dec[i]) < 0)
+            claimed = {int(dec[i]) for i in range(n_bl) if int(dec[i]) >= 0}
+            for j in range(n_fu):
+                if no_fu[j] > 0.5:
+                    self._new_tot += 1
+                    self._new_ok += int(j not in claimed)
+
         self.log("val_loss", loss, prog_bar=True, batch_size=batch.num_graphs)
-        self.log("val_row_acc", acc, prog_bar=True, batch_size=batch.num_graphs)
+        self.log("val_row_acc_hungarian", acc, prog_bar=True, batch_size=batch.num_graphs)
         for k, v in parts.items():
             self.log(f"val_{k}", v, batch_size=batch.num_graphs)
         return loss
 
     def on_validation_epoch_end(self) -> None:
         self.log("val_auroc", self.auroc.compute(), prog_bar=True)
-        self.log("val_ap", self.ap.compute(), prog_bar=True)
+        self.log("val_ap_sinkhorn", self.ap_sinkhorn.compute(), prog_bar=True)
+        if self._uc_tot:
+            self.log("val_acc_unchanged_split", self._uc_ok / self._uc_tot)
+        if self._dis_tot:
+            self.log("val_acc_disappeared", self._dis_ok / self._dis_tot)
+        if self._new_tot:
+            self.log("val_acc_newly_appearing", self._new_ok / self._new_tot)
         self.auroc.reset()
-        self.ap.reset()
+        self.ap_sinkhorn.reset()
 
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
-        sch = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, patience=10, factor=0.5)
-        return {"optimizer": opt, "lr_scheduler": {"scheduler": sch, "monitor": "val_loss", "interval": "epoch"}}
+        me = max(1, int(self.hparams.max_epochs))
+        warm = torch.optim.lr_scheduler.LinearLR(opt, start_factor=0.1, total_iters=5)
+        cos = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, me - 5))
+        sch = torch.optim.lr_scheduler.SequentialLR(opt, [warm, cos], milestones=[5])
+        return {"optimizer": opt, "lr_scheduler": {"scheduler": sch, "interval": "epoch"}}

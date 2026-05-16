@@ -1,19 +1,21 @@
-"""Cached v2 per-split PyG InMemoryDataset built from dense Longitudinal_CT_v2 graphs.
+"""Cached v4 per-split PyG InMemoryDataset from dense Longitudinal_CT_v2 graphs.
 
-Process builds graphs per patient behind a Rich progress bar. Optional ProcessPoolExecutor
-(--jobs > 1) for CPU parallelism; each worker loads full NIfTIs — watch RAM on large --jobs."""
+Workers load NIfTIs; optional ProcessPoolExecutor (--jobs > 1). Train split can
+apply propagation-noise jitter in __getitem__ when augment=True."""
 
 from __future__ import annotations
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
+import numpy as np
 import torch
 from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from torch_geometric.data import HeteroData, InMemoryDataset
 
 from tracking.common import DATASET_ROOT
+from tracking.data.augment import jitter_both
 from tracking.data.graph import GraphConfig, build_hetero_data
 from tracking.data.meta import load_split_json
 
@@ -32,18 +34,33 @@ class LesionDataset(InMemoryDataset):
         dataset_root: Path | str = DATASET_ROOT,
         cfg: GraphConfig | None = None,
         num_workers: int = 1,
+        augment: bool = False,
+        fu_jitter_scale: float = 0.3,
     ):
         assert split in {"train", "val", "test"}
         self.split = split
         self.dataset_root = Path(dataset_root)
         self.cfg = cfg or GraphConfig()
         self.num_workers = max(1, num_workers)
+        self.augment = augment
+        self.fu_jitter_scale = fu_jitter_scale
         super().__init__(root)
         self.load(self.processed_paths[0])
 
     @property
     def processed_file_names(self) -> list[str]:
-        return [f"{self.split}_v2.pt"]
+        return [f"{self.split}_v4.pt"]
+
+    def get(self, idx: int) -> HeteroData:
+        d = super().get(idx).clone()
+        if self.augment:
+            jitter_both(
+                d,
+                k_intra=self.cfg.k_intra,
+                sigma_fu_scale=self.fu_jitter_scale,
+                rng=np.random.default_rng(),
+            )
+        return d
 
     def _log_graph(self, pid: str, g: HeteroData, console: Console) -> None:
         el = g["bl", "cross", "fu"].edge_label
@@ -100,6 +117,5 @@ class LesionDataset(InMemoryDataset):
             raise RuntimeError(f"zero graphs for split={self.split}")
         tp = sum(int(g["bl", "cross", "fu"].edge_label.sum()) for g in graphs)
         te = sum(g["bl", "cross", "fu"].num_edges for g in graphs)
-        pw = max(1.0, min(100.0, ((te - tp) / max(tp, 1))))
-        torch.save({"pos_weight": pw, "edges": te, "positives": tp}, Path(self.processed_dir) / f"{self.split}_v2_meta.pt")
+        torch.save({"edges": te, "positives": tp}, Path(self.processed_dir) / f"{self.split}_v4_meta.pt")
         self.save(graphs, self.processed_paths[0])

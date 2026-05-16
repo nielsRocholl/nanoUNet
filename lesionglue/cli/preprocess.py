@@ -1,7 +1,7 @@
-"""Materialize cached dense v2 PyG graphs for one data_split.json split.
+"""Materialize cached dense v4 PyG graphs for one data_split.json split.
 
-Reads Longitudinal_CT_v2/{meta,inputs*,targets*}; writes processed/{split}_v2.pt
-and {split}_v2_meta.pt (pos_weight for BCE). Run train splits before Trainer fit.
+Reads Longitudinal_CT_v2/{meta,inputs*,targets*}; writes processed/{split}_v4.pt
+and {split}_v4_meta.pt (edge/positive counts). Run train splits before Trainer fit.
 
 --jobs > 1 uses spawn (macOS default): entry logic lives under ``if __name__ == "__main__"`` so
 worker subprocesses (``__mp_main__``) do not recurse into ProcessPoolExecutor again.

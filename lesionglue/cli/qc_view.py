@@ -10,7 +10,7 @@ from torch_geometric.data import HeteroData
 from tracking.common import LESION_TYPES
 from tracking.data.dataset import LesionDataset
 
-FEAT_DIM = 1379
+FEAT_DIM = 1387
 _UI_FG = "#e6edf3"
 _UI_FG_DIM = "#b7c0ca"
 _PRE = {"margin": 0, "fontSize": 13, "whiteSpace": "pre-wrap", "color": _UI_FG}
@@ -77,7 +77,7 @@ def _spread_xy(xy: np.ndarray, mind: float = 56.0, iters: int = 160) -> np.ndarr
 def _node_dict(x: np.ndarray, pos_mm: np.ndarray, side: str, lid: int) -> dict:
     d = x[:1372].astype(np.float64)
     lv = float(x[1372])
-    lt_i = int(round(float(x[1375])))
+    lt_i = int(round(float(x[1386])))
     ant = LESION_TYPES[lt_i] if 0 <= lt_i < len(LESION_TYPES) else f"idx_{lt_i}"
     return {
         "id": f"{side}-{lid}",
@@ -90,7 +90,6 @@ def _node_dict(x: np.ndarray, pos_mm: np.ndarray, side: str, lid: int) -> dict:
         "log1p_volume_mm3": lv * 10.0,
         "mean_hu": float(x[1373] * 1000.0),
         "sphericity": float(x[1374]),
-        "norm_pos_zyx": (float(x[1376]), float(x[1377]), float(x[1378])),
         "pos_mm_zyx": pos_mm.tolist(),
         "descriptor_min": float(d.min()),
         "descriptor_max": float(d.max()),
@@ -149,7 +148,7 @@ def format_detail(nd: dict | None, ed: dict | None, pid: str, img_fu: int) -> ht
             s += f"  distance_mm (edge_attr): {ed['distance_mm']:.6g}\n"
         if "edge_label" in ed:
             s += f"  edge_label: {ed['edge_label']}\n"
-        s += "  tensors: intra edge_attr dim 1; cross edge_attr dim 11.\n"
+        s += "  tensors: intra edge_attr dim 1; cross edge_attr dim 13.\n"
         return html.Pre(s, style=_PRE)
     if nd:
         lv = nd["log1p_volume_mm3"]
@@ -158,7 +157,6 @@ def format_detail(nd: dict | None, ed: dict | None, pid: str, img_fu: int) -> ht
             f"  anatomy: {nd.get('anatomy')}  lesion_type_idx: {nd.get('lesion_type_idx')}\n"
             f"  log1p(vol_mm3)= {lv:.6g}   volume_mm3(expm1)= {nd['volume_mm3']:.6g}\n"
             f"  mean_hu= {nd['mean_hu']:.6g}   sphericity= {nd['sphericity']:.6g}\n"
-            f"  norm_pos z,y,x (x[1376:]): {nd.get('norm_pos_zyx')}\n"
             f"  pos_mm z,y,x (graph.pos): {nd.get('pos_mm_zyx')}\n"
             f"  descriptor L0 [0:1372]: min={nd['descriptor_min']:.6g} max={nd['descriptor_max']:.6g} mean={nd['descriptor_mean']:.6g} std={nd['descriptor_std']:.6g}\n"
             f"  full x length {FEAT_DIM}\n"

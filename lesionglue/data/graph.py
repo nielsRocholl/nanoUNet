@@ -12,11 +12,11 @@ import torch
 from torch_geometric.data import HeteroData
 
 from tracking.common import LESION_TYPES, print0
-from tracking.data.appearance import descriptor_l0, mask_stats
+from tracking.data.appearance import MaskFeats, descriptor_l0, mask_stats
 from tracking.data.meta import LesionRow, V2Paths, parse_meta_csv
 from tracking.data.pairs import cross_attr, dense_pair_index, reverse_cross_attr
 
-FEAT_DIM = 1379
+FEAT_DIM = 1387
 
 
 @dataclass
@@ -24,7 +24,7 @@ class GraphConfig:
     k_intra: int = 8
 
 
-def _intra_knn(pos: torch.Tensor, k: int) -> tuple[torch.Tensor, torch.Tensor]:
+def intra_knn(pos: torch.Tensor, k: int) -> tuple[torch.Tensor, torch.Tensor]:
     n = pos.shape[0]
     dev = pos.device
     if n == 1:
@@ -53,14 +53,24 @@ def _dom_fu(rows: list[LesionRow]) -> int:
     return dom
 
 
-def _pack(desc: np.ndarray, lv: float, mh: float, sph: float, lt_i: int, pos: np.ndarray) -> np.ndarray:
+def _pack(desc: np.ndarray, mf: MaskFeats, lt_i: int) -> np.ndarray:
     x = np.zeros(FEAT_DIM, np.float32)
     x[:1372] = np.clip(desc, -1000.0, 1000.0) / 1000.0
-    x[1372] = lv / 10.0
-    x[1373] = np.clip(mh, -1000.0, 1000.0) / 1000.0
-    x[1374] = np.clip(sph, 0.0, 2.0)
-    x[1375] = float(lt_i)
-    x[1376:1379] = pos.astype(np.float32)
+    x[1372] = mf.log_volume / 10.0
+    x[1373] = np.clip(mf.mean_hu, -1000.0, 1000.0) / 1000.0
+    x[1374] = np.clip(mf.sphericity, 0.0, 2.0)
+    x[1375] = mf.hu_std / 500.0
+    x[1376] = np.clip(mf.hu_p10, -1000.0, 1000.0) / 1000.0
+    x[1377] = np.clip(mf.hu_p50, -1000.0, 1000.0) / 1000.0
+    x[1378] = np.clip(mf.hu_p90, -1000.0, 1000.0) / 1000.0
+    x[1379] = np.clip(mf.hu_min, -1000.0, 1000.0) / 1000.0
+    x[1380] = np.clip(mf.hu_max, -1000.0, 1000.0) / 1000.0
+    x[1381] = mf.bbox_e0_mm / 100.0
+    x[1382] = mf.bbox_e1_mm / 100.0
+    x[1383] = mf.bbox_e2_mm / 100.0
+    x[1384] = mf.pca_l1_mm / 100.0
+    x[1385] = mf.pca_l2_mm / 100.0
+    x[1386] = float(lt_i)
     return x
 
 
@@ -107,7 +117,6 @@ def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> HeteroData | No
 
     ct_fu, aff_fu, sp_fu = _load_vol(vp.fu_img(dom))
     mk_fu, _, _ = _load_vol(vp.fu_mask(dom))
-    den = np.maximum(np.asarray(ct_fu.shape, dtype=np.float64) - 1.0, 1.0)
     bl_cache: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = {}
     for lid in bl_ids:
         k = bl_rep[lid].img_id_bl
@@ -121,19 +130,19 @@ def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> HeteroData | No
         r = bl_rep[lid]
         assert r.cog_bl is not None
         cb, ab, sb, mb = bl_cache[r.img_id_bl]
-        lv, mh, sph = mask_stats(mb, lid, sb, cb)
+        mf_b = mask_stats(mb, lid, sb, cb)
         cp = np.asarray(r.cog_propagated, dtype=np.float64)
         desc = descriptor_l0(cb, ab, np.asarray(r.cog_bl, dtype=np.float64))
-        xb.append(_pack(desc, lv, mh, sph, LESION_TYPES.index(r.lesion_type), cp / den))
+        xb.append(_pack(desc, mf_b, LESION_TYPES.index(r.lesion_type)))
         pb.append(cp * sp_fu)
 
     xf, pf = [], []
     for lid in fu_ids:
         r = fu_rep[lid]
         cf = np.asarray(r.cog_fu, dtype=np.float64)
-        lv, mh, sph = mask_stats(mk_fu, lid, sp_fu, ct_fu)
+        mf_f = mask_stats(mk_fu, lid, sp_fu, ct_fu)
         desc = descriptor_l0(ct_fu, aff_fu, cf)
-        xf.append(_pack(desc, lv, mh, sph, LESION_TYPES.index(r.lesion_type), cf / den))
+        xf.append(_pack(desc, mf_f, LESION_TYPES.index(r.lesion_type)))
         pf.append(cf * sp_fu)
 
     data = HeteroData()
@@ -145,8 +154,8 @@ def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> HeteroData | No
     data["bl"].no_match_label = (~lab.bool().any(dim=1)).float()
     data["fu"].no_match_label = (~lab.bool().any(dim=0)).float()
 
-    data["bl", "intra", "bl"].edge_index, data["bl", "intra", "bl"].edge_attr = _intra_knn(data["bl"].pos, cfg.k_intra)
-    data["fu", "intra", "fu"].edge_index, data["fu", "intra", "fu"].edge_attr = _intra_knn(data["fu"].pos, cfg.k_intra)
+    data["bl", "intra", "bl"].edge_index, data["bl", "intra", "bl"].edge_attr = intra_knn(data["bl"].pos, cfg.k_intra)
+    data["fu", "intra", "fu"].edge_index, data["fu", "intra", "fu"].edge_attr = intra_knn(data["fu"].pos, cfg.k_intra)
     ei = dense_pair_index(len(bl_ids), len(fu_ids))
     ea = cross_attr(data["bl"].pos, data["fu"].pos, data["bl"].x, data["fu"].x, ei)
     data["bl", "cross", "fu"].edge_index = ei
@@ -156,4 +165,5 @@ def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> HeteroData | No
     data["fu", "cross", "bl"].edge_attr = reverse_cross_attr(ea)
     data.pid = pid
     data.img_id_fu_used = int(dom)
+    data.sp_fu = torch.tensor(sp_fu.astype(np.float32))
     return data
