@@ -15,7 +15,7 @@
       1,
       1
     ],
-    "false_pos_min_dist_vox": 8,
+    "false_pos_min_dist_vox": 50,
     "false_pos_probability": 0.2,
     "large_lesion": {
       "K": 2,

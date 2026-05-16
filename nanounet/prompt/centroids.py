@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
 from typing import Any, Dict, List, Tuple
 
@@ -70,13 +71,25 @@ def _one_case(seg_path: str) -> Dict[str, Any]:
     return {"centroids_zyx": centroids, "bboxes_zyx": bboxes}
 
 
-def precompute_folder(folder: str, _num_proc: int, resume: bool) -> None:
+def _write_centroids_for_case(folder: str, case_id: str) -> None:
+    suf = "_seg.b2nd"
+    out = os.path.join(folder, f"{case_id}_centroids.json")
+    d = _one_case(os.path.join(folder, case_id + suf))
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(d, f)
+
+
+def precompute_folder(folder: str, num_processes: int, resume: bool) -> None:
     suf = "_seg.b2nd"
     ids = sorted(i[: -len(suf)] for i in os.listdir(folder) if i.endswith(suf))
-    for case_id in ids:
-        out = os.path.join(folder, f"{case_id}_centroids.json")
-        if resume and os.path.isfile(out):
-            continue
-        d = _one_case(os.path.join(folder, case_id + suf))
-        with open(out, "w", encoding="utf-8") as f:
-            json.dump(d, f)
+    if resume:
+        ids = [c for c in ids if not os.path.isfile(os.path.join(folder, f"{c}_centroids.json"))]
+    if not ids:
+        return
+    if num_processes <= 1:
+        for case_id in ids:
+            _write_centroids_for_case(folder, case_id)
+        return
+    args = [(folder, c) for c in ids]
+    with multiprocessing.get_context("spawn").Pool(num_processes) as pool:
+        pool.starmap(_write_centroids_for_case, args)
