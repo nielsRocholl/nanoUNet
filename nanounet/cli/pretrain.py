@@ -7,19 +7,29 @@ import os
 import shutil
 
 from batchgenerators.utilities.file_and_folder_operations import join, maybe_mkdir_p
+
+from nanounet.common import (
+    cprint,
+    nano_header,
+    preprocessed_dir,
+    quiet_lightning_runtime,
+    raw_dir,
+    results_dir,
+    sync_nnunet_env,
+)
+
+quiet_lightning_runtime()
+
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
-from nanounet.cli.train import _quiet_train_runtime
-from nanounet.common import cprint, nano_header, preprocessed_dir, raw_dir, results_dir, sync_nnunet_env
 from nanounet.plan.dataset_id import convert_id_to_dataset_name
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
 from nanounet.pretrain.module import NanoMAELM
 
 
 def main() -> None:
-    _quiet_train_runtime()
     sync_nnunet_env()
     ap = argparse.ArgumentParser()
     ap.add_argument("-d", "--dataset_id", type=int, required=True)

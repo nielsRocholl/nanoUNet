@@ -5,23 +5,27 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
-import warnings
 
 import torch
 from batchgenerators.utilities.file_and_folder_operations import join, maybe_mkdir_p
-from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
 
 from nanounet.common import (
     cprint,
     nano_header,
     preprocessed_dir,
+    quiet_lightning_runtime,
     raw_dir,
     resolve_user_config_path,
     results_dir,
     sync_nnunet_env,
 )
+
+quiet_lightning_runtime()
+
+from pytorch_lightning import Trainer
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import WandbLogger
+
 from nanounet.plan.dataset_id import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
@@ -30,40 +34,7 @@ from nanounet.train.data_module import NanoDataModule
 from nanounet.train.lightning_module import NanoUNetLM
 
 
-def _quiet_train_runtime() -> None:
-    warnings.filterwarnings(
-        "ignore",
-        message=r".*pin_memory.*not supported on MPS.*",
-        category=UserWarning,
-        module=r"torch.utils.data.dataloader",
-    )
-    warnings.filterwarnings(
-        "ignore",
-        message=r".*Precision 16-mixed is not supported by the model summary.*",
-        category=UserWarning,
-    )
-    warnings.filterwarnings("ignore", message=r".*LeafSpec.*")
-    warnings.filterwarnings("ignore", message=r".*anonymous setting has no effect.*", category=UserWarning)
-    warnings.filterwarnings(
-        "ignore",
-        message=r".*IterableDataset.*__len__.*multi-process data loading.*",
-        category=UserWarning,
-    )
-
-    import pytorch_lightning.trainer.connectors.logger_connector.logger_connector as _lc
-
-    _orig = _lc.rank_zero_info
-
-    def _no_litlogger_tip(*a: object, **k: object) -> None:
-        if a and "litlogger" in str(a[0]).lower():
-            return
-        _orig(*a, **k)
-
-    _lc.rank_zero_info = _no_litlogger_tip
-
-
 def main() -> None:
-    _quiet_train_runtime()
     sync_nnunet_env()
     ap = argparse.ArgumentParser()
     ap.add_argument("-d", "--dataset_id", type=int, required=True)

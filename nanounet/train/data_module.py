@@ -10,7 +10,13 @@ import torch
 from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from torch.utils.data import DataLoader, IterableDataset
 
-from nanounet.common import ANISO_THRESHOLD, preprocessed_dir, raw_dir, setup_logging
+from nanounet.common import (
+    ANISO_THRESHOLD,
+    dataloader_num_workers,
+    preprocessed_dir,
+    raw_dir,
+    setup_logging,
+)
 from nanounet.config import RoiPromptConfig, load_config
 from nanounet.data import augment
 from nanounet.data.blosc2_dataset import Blosc2Folder
@@ -188,7 +194,7 @@ class NanoDataModule(pl.LightningDataModule):
             self.batch_size,
             self.fold + 1000 * self.num_iterations_per_epoch,
         )
-        nw = max(4, (__import__("os").cpu_count() or 8) // 2)
+        nw = dataloader_num_workers(train=True)
         return DataLoader(
             it,
             batch_size=self.batch_size,
@@ -213,7 +219,7 @@ class NanoDataModule(pl.LightningDataModule):
             self.batch_size,
             self.fold + 2000,
         )
-        nw = max(2, (__import__("os").cpu_count() or 8) // 4)
+        nw = dataloader_num_workers(train=False)
         return DataLoader(
             it,
             batch_size=self.batch_size,

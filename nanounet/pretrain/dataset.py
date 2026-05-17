@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from typing import List
 
+import os
+
+import blosc2
 import numpy as np
 import torch
 from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from torch.utils.data import DataLoader, IterableDataset
 
-from nanounet.common import preprocessed_dir, raw_dir
+from nanounet.common import dataloader_num_workers, preprocessed_dir, raw_dir
 from nanounet.data.blosc2_dataset import Blosc2Folder
 from nanounet.plan.plans import Plans
 from nanounet.plan.splits import fold_keys, load_or_create_splits
@@ -72,6 +75,18 @@ class PretrainPatchIterable(IterableDataset):
             yield {"data": torch.from_numpy(patch).float()}
 
 
+def _keys_fit_patch(case_dir: str, keys: List[str], ps: np.ndarray) -> List[str]:
+    dparams = {"nthreads": 1}
+    mmap = {} if os.name == "nt" else {"mmap_mode": "r"}
+    out: List[str] = []
+    for k in keys:
+        data = blosc2.open(urlpath=join(case_dir, k + ".b2nd"), mode="r", dparams=dparams, **mmap)
+        shp = data.shape[1:]
+        if all(int(shp[i]) >= int(ps[i]) for i in range(3)):
+            out.append(k)
+    return out
+
+
 def build_pretrain_dataloaders(
     dataset_name: str,
     fold: int,
@@ -98,10 +113,17 @@ def build_pretrain_dataloaders(
     spl = load_or_create_splits(sp, tr_keys, 5, 12345)
     tr_k, va_k = fold_keys(spl, fold)
     ps = np.array(cm.patch_size)
+    tr_k = _keys_fit_patch(case_dir, tr_k, ps)
+    va_k = _keys_fit_patch(case_dir, va_k, ps)
+    if not tr_k or not va_k:
+        raise ValueError(
+            "MAE pretrain needs at least one case per split with spatial shape >= patch; "
+            f"patch={tuple(ps.tolist())} train_ok={len(tr_k)} val_ok={len(va_k)}"
+        )
     if pin_memory is None:
         pin_memory = torch.cuda.is_available()
-    nw_tr = max(4, (__import__("os").cpu_count() or 8) // 2)
-    nw_va = max(2, (__import__("os").cpu_count() or 8) // 4)
+    nw_tr = dataloader_num_workers(train=True)
+    nw_va = dataloader_num_workers(train=False)
     tr_it = PretrainPatchIterable(case_dir, tr_k, ps, num_iterations_per_epoch, batch_size, base_seed_train)
     va_it = PretrainPatchIterable(case_dir, va_k, ps, num_val_iterations, batch_size, base_seed_val)
     tr = DataLoader(

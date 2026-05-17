@@ -1,4 +1,4 @@
-"""Paths, logging, Rich CLI on stderr, rank-0 output. Sync NANOUNET_* env to nnUNet_*."""
+"""Paths, logging, SLURM/affinity CPU count, Lightning quiet hook — call `quiet_lightning_runtime()` before PL."""
 
 from __future__ import annotations
 
@@ -18,15 +18,85 @@ from rich.rule import Rule
 _LOG = logging.getLogger("nanounet")
 _CONSOLE = Console(stderr=True)
 
+_LIGHTNING_QUIET = False
+
 ANISO_THRESHOLD = 3
 DEFAULT_NUM_PROCESSES = 8 if "nnUNet_def_n_proc" not in os.environ else int(os.environ["nnUNet_def_n_proc"])
+
+def usable_cpu_count() -> int:
+    try:
+        return max(1, len(os.sched_getaffinity(0)))
+    except AttributeError:
+        pass
+    for k in ("SLURM_CPUS_PER_TASK", "SLURM_CPUS_ON_NODE"):
+        v = os.environ.get(k)
+        if v and v.isdigit():
+            return int(v)
+    return max(1, os.cpu_count() or 8)
+
+
+def dataloader_num_workers(*, train: bool) -> int:
+    c = usable_cpu_count()
+    want = max(4, c // 2) if train else max(2, c // 4)
+    return max(0, min(want, c - 1))
 
 # nanounet/common.py -> repo root (editable install); site-packages installs keep bundled configs next to nanounet/
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
+def quiet_lightning_runtime() -> None:
+    import warnings
+
+    warnings.filterwarnings(
+        "ignore",
+        message=r".*pin_memory.*not supported on MPS.*",
+        category=UserWarning,
+        module=r"torch.utils.data.dataloader",
+    )
+    warnings.filterwarnings(
+        "ignore",
+        message=r".*Precision 16-mixed is not supported by the model summary.*",
+        category=UserWarning,
+    )
+    warnings.filterwarnings("ignore", message=r".*LeafSpec.*")
+    warnings.filterwarnings("ignore", message=r".*anonymous setting has no effect.*", category=UserWarning)
+    warnings.filterwarnings(
+        "ignore",
+        message=r".*IterableDataset.*__len__.*multi-process data loading.*",
+        category=UserWarning,
+    )
+    warnings.filterwarnings(
+        "ignore",
+        message=r".*DataLoader will create.*worker processes in total.*",
+        category=UserWarning,
+        module=r"torch.utils.data.dataloader",
+    )
+    warnings.filterwarnings(
+        "ignore",
+        message=r".*set_float32_matmul_precision.*",
+        category=UserWarning,
+    )
+    global _LIGHTNING_QUIET
+    if _LIGHTNING_QUIET:
+        return
+    import pytorch_lightning.utilities.rank_zero as _rz
+
+    _orig = _rz.rank_zero_info
+
+    def _no_litlogger_tip(*a: object, **k: object) -> None:
+        if a and "litlogger" in str(a[0]).lower():
+            return
+        _orig(*a, **k)
+
+    _rz.rank_zero_info = _no_litlogger_tip
+    _LIGHTNING_QUIET = True
+
+    import torch
+
+    if torch.cuda.is_available():
+        torch.set_float32_matmul_precision("high")
+
 
 def resolve_user_config_path(path_str: str) -> str:
-    """Relative paths: try cwd first, then repo/package root so CLI works outside the nanoUNet directory."""
     p = Path(path_str).expanduser()
     if p.is_absolute():
         if not p.is_file():
