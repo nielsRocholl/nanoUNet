@@ -1,4 +1,23 @@
-"""Dense within-graph self + cross-attention after heterogeneous GNN."""
+"""Dense within-graph self + cross-attention after heterogeneous GNN.
+
+UNUSED by default (ModelConfig.set_attn_blocks=0).
+
+Disabled after Round 7 empirical run: stacking 2 SetAttn blocks on top of the
+dense bipartite TransformerConv in HeteroGnn grew params 1.5M -> 2.6M and
+regressed val_match_score 0.92 -> 0.78 and val_acc_unchanged_split 0.85 -> 0.70
+(~224 train graphs).
+
+Mechanism: HeteroGnn already attends within each scan plus across BL/FU with
+the full 27-D cross_attr as TransformerConv edge_bias. These blocks attend on
+embedding space only — extra capacity without new relational signal, i.e.
+over-parameterization on tiny data.
+
+May be worth revisiting after swapping the frozen L0 descriptor for a learned
+encoder (Round 8+). Wire set_attn_blocks>0 only when that experiment is explicit.
+
+Implementation: torch_geometric.utils.to_dense_batch (+ padding masks) feeding
+torch.nn.MultiheadAttention; unchanged when disabled via set_attn_blocks=0.
+"""
 
 from __future__ import annotations
 

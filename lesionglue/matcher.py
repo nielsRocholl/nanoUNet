@@ -24,7 +24,7 @@ class ModelConfig:
     dropout: float = 0.2
     use_dust_pair_summary: bool = True
     dust_legacy_linear: bool = False
-    set_attn_blocks: int = 2
+    set_attn_blocks: int = 0
 
 
 @dataclass

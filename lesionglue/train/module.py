@@ -30,7 +30,7 @@ class MatcherModule(pl.LightningModule):
         sinkhorn_w: float = 1.0,
         pair_w: float = 0.1,
         nce_w: float = 0.3,
-        dust_w: float = 0.25,
+        dust_w: float = 0.30,
         dust_pos_w: float = 1.0,
         nce_tau: float = 0.1,
         proj_dim: int = 64,
@@ -38,14 +38,15 @@ class MatcherModule(pl.LightningModule):
         max_epochs: int = 400,
         dust_pair_summary: bool = True,
         dust_legacy_linear: bool = False,
-        set_attn_blocks: int = 2,
+        set_attn_blocks: int = 0,
+        sinkhorn_uniform_fu: bool = True,
         ema_decay: float = 0.999,
         ema_start_epoch: int = 5,
         tta_n: int = 0,
         dust_tau: float = 0.2,
         k_intra: int = 8,
         fu_jitter_scale: float = 0.3,
-        desc_jitter_frac: float = 0.02,
+        desc_jitter_frac: float = 0.0,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -102,8 +103,18 @@ class MatcherModule(pl.LightningModule):
         labels = batch["bl", "cross", "fu"].edge_label
         pair_focal = focal_bce_with_logits(out.pair, labels)
         graphs, pp, db, df = split_per_graph(batch, out)
+        ufu = bool(self.hparams.sinkhorn_uniform_fu)
         sk = [
-            sinkhorn_loss(p, g["bl"].num_nodes, g["fu"].num_nodes, b, f, g["bl", "cross", "fu"].edge_label, self.hparams.sinkhorn_iters)
+            sinkhorn_loss(
+                p,
+                g["bl"].num_nodes,
+                g["fu"].num_nodes,
+                b,
+                f,
+                g["bl", "cross", "fu"].edge_label,
+                self.hparams.sinkhorn_iters,
+                uniform_fu_targets=ufu,
+            )
             for g, p, b, f in zip(graphs, pp, db, df)
         ]
         sk_loss = torch.stack(sk).mean()

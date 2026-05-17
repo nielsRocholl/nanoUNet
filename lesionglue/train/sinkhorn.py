@@ -42,6 +42,7 @@ def sinkhorn_loss(
     dust_fu: torch.Tensor,
     lab: torch.Tensor,
     iters: int = 20,
+    uniform_fu_targets: bool = True,
 ) -> torch.Tensor:
     S = torch.zeros((n_bl + 1, n_fu + 1), device=pair_logits.device, dtype=pair_logits.dtype)
     S[:n_bl, :n_fu] = pair_logits.reshape(n_bl, n_fu)
@@ -56,11 +57,21 @@ def sinkhorn_loss(
         pos.float().argmax(dim=1),
         torch.full((n_bl,), n_fu, device=dev, dtype=torch.long),
     )
-    fu_tgt = torch.where(
-        pos.any(dim=0),
-        pos.float().argmax(dim=0),
-        torch.full((n_fu,), n_bl, device=dev, dtype=torch.long),
-    )
     bl_term = -P[torch.arange(n_bl, device=dev), bl_tgt].mean()
-    fu_term = -P[fu_tgt, torch.arange(n_fu, device=dev)].mean()
+    pos_f = pos.to(dtype=S.dtype)
+    if uniform_fu_targets:
+        has_claim = pos.any(dim=0)
+        n_claim = pos_f.sum(dim=0).clamp(min=1.0)
+        sum_neg = (pos_f * (-P[:n_bl, :n_fu])).sum(dim=0)
+        fu_from_bl_rows = sum_neg / n_claim
+        fu_no_bl = -P[n_bl, torch.arange(n_fu, device=dev)]
+        fu_per_col = torch.where(has_claim, fu_from_bl_rows, fu_no_bl)
+        fu_term = fu_per_col.mean()
+    else:
+        fu_tgt = torch.where(
+            pos.any(dim=0),
+            pos.float().argmax(dim=0),
+            torch.full((n_fu,), n_bl, device=dev, dtype=torch.long),
+        )
+        fu_term = -P[fu_tgt, torch.arange(n_fu, device=dev)].mean()
     return 0.5 * (bl_term + fu_term)

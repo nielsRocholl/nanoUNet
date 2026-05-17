@@ -38,7 +38,7 @@ class LesionDataset(InMemoryDataset):
         fu_jitter_scale: float = 0.3,
         p_drop_fu: float = 0.1,
         p_drop_bl: float = 0.1,
-        desc_jitter_frac: float = 0.02,
+        desc_jitter_frac: float = 0.0,
     ):
         assert split in {"train", "val", "test"}
         self.split = split

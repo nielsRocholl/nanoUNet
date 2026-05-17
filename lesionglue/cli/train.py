@@ -34,17 +34,18 @@ class TrainConfig:
     sinkhorn_w: float = 1.0
     pair_w: float = 0.1
     nce_w: float = 0.3
-    dust_w: float = 0.25
+    dust_w: float = 0.30
     dust_pos_w: float = 1.0
     nce_tau: float = 0.1
     sinkhorn_iters: int = 20
     fu_jitter: float = 0.3
-    p_drop_fu: float = 0.07
-    p_drop_bl: float = 0.07
-    desc_jitter_frac: float = 0.02
+    p_drop_fu: float = 0.10
+    p_drop_bl: float = 0.10
+    desc_jitter_frac: float = 0.0
     dust_pair_summary: bool = True
     dust_legacy_linear: bool = False
-    set_attn_blocks: int = 2
+    set_attn_blocks: int = 0
+    sinkhorn_uniform_fu: bool = True
     ema_decay: float = 0.999
     ema_start_epoch: int = 5
     tta_n: int = 0
@@ -89,6 +90,11 @@ if __name__ == "__main__":
     ap.add_argument("--ema-decay", type=float, default=TrainConfig.ema_decay, help="0 disables EMA")
     ap.add_argument("--ema-start", type=int, default=TrainConfig.ema_start_epoch)
     ap.add_argument("--tta-n", type=int, default=TrainConfig.tta_n, help="val TTA passes (0=off)")
+    ap.add_argument(
+        "--single-pos-fu",
+        action="store_true",
+        help="Sinkhorn loss: legacy one-argmax FU target (ablates Round 7.1 uniform merge supervision)",
+    )
     ap.add_argument("--early-stop-patience", type=int, default=TrainConfig.early_stop_patience)
     ap.add_argument(
         "--no-early-stop",
@@ -140,6 +146,7 @@ if __name__ == "__main__":
         tta_n=args.tta_n,
         dust_tau=args.dust_tau,
         early_stop_patience=args.early_stop_patience,
+        sinkhorn_uniform_fu=not args.single_pos_fu,
     )
     seed_all(cfg.seed)
     dm = MatcherDataModule(
@@ -179,6 +186,7 @@ if __name__ == "__main__":
         k_intra=8,
         fu_jitter_scale=cfg.fu_jitter,
         desc_jitter_frac=cfg.desc_jitter_frac,
+        sinkhorn_uniform_fu=cfg.sinkhorn_uniform_fu,
     )
     Path(args.out).mkdir(parents=True, exist_ok=True)
     ckpt = ModelCheckpoint(dirpath=args.out, monitor="val_match_score", save_top_k=3, mode="max")
