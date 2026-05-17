@@ -1,4 +1,8 @@
-"""Pretrain patch iterable: random crop from preprocessed b2nd, mirror aug, no prompts."""
+"""MAE pretrain patches: random crop from b2nd, mirror aug, no prompts.
+
+Cases with spatial shape smaller than the plan 3d_fullres patch on any axis are excluded;
+build raises if train or val has no qualifying case after that filter.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +16,7 @@ import torch
 from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from torch.utils.data import DataLoader, IterableDataset
 
-from nanounet.common import dataloader_num_workers, preprocessed_dir, raw_dir
+from nanounet.common import dataloader_num_workers, preprocessed_dir, print0, raw_dir
 from nanounet.data.blosc2_dataset import Blosc2Folder
 from nanounet.plan.plans import Plans
 from nanounet.plan.splits import fold_keys, load_or_create_splits
@@ -56,9 +60,7 @@ class PretrainPatchIterable(IterableDataset):
             cid = self.keys[int(rng.integers(0, len(self.keys)))]
             data, _, _, _ = ds.load_case(cid)
             shp = data.shape[1:]
-            for i in range(3):
-                if shp[i] < ps[i]:
-                    raise ValueError(f"case {cid} spatial {shp} smaller than patch {tuple(ps.tolist())}")
+            assert all(int(shp[i]) >= int(ps[i]) for i in range(3))
             lb = [int(rng.integers(0, shp[i] - ps[i] + 1)) for i in range(3)]
             patch = np.asarray(
                 data[
@@ -113,8 +115,14 @@ def build_pretrain_dataloaders(
     spl = load_or_create_splits(sp, tr_keys, 5, 12345)
     tr_k, va_k = fold_keys(spl, fold)
     ps = np.array(cm.patch_size)
+    tr_0, va_0 = tr_k, va_k
     tr_k = _keys_fit_patch(case_dir, tr_k, ps)
     va_k = _keys_fit_patch(case_dir, va_k, ps)
+    if len(tr_k) < len(tr_0) or len(va_k) < len(va_0):
+        print0(
+            "[dim]MAE pretrain: skipped cases smaller than patch "
+            f"{tuple(ps.tolist())} — train {len(tr_0)}→{len(tr_k)}, val {len(va_0)}→{len(va_k)}[/dim]"
+        )
     if not tr_k or not va_k:
         raise ValueError(
             "MAE pretrain needs at least one case per split with spatial shape >= patch; "

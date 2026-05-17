@@ -1,4 +1,9 @@
-"""Paths, logging, SLURM/affinity CPU count, Lightning quiet hook — call `quiet_lightning_runtime()` before PL."""
+"""nnUNet path env sync, Rich rank-0 UI (`print0`, headers, progress), logging.
+
+`usable_cpu_count` / `dataloader_num_workers`: Slurm `sched_getaffinity` or env, capped workers.
+`quiet_lightning_runtime`: call once before importing pytorch_lightning — warning filters,
+rank_zero_info shim (litlogger noise), CUDA matmul precision high.
+"""
 
 from __future__ import annotations
 
@@ -22,12 +27,12 @@ _LIGHTNING_QUIET = False
 
 ANISO_THRESHOLD = 3
 DEFAULT_NUM_PROCESSES = 8 if "nnUNet_def_n_proc" not in os.environ else int(os.environ["nnUNet_def_n_proc"])
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+
 
 def usable_cpu_count() -> int:
-    try:
+    if hasattr(os, "sched_getaffinity"):
         return max(1, len(os.sched_getaffinity(0)))
-    except AttributeError:
-        pass
     for k in ("SLURM_CPUS_PER_TASK", "SLURM_CPUS_ON_NODE"):
         v = os.environ.get(k)
         if v and v.isdigit():
@@ -40,8 +45,6 @@ def dataloader_num_workers(*, train: bool) -> int:
     want = max(4, c // 2) if train else max(2, c // 4)
     return max(0, min(want, c - 1))
 
-# nanounet/common.py -> repo root (editable install); site-packages installs keep bundled configs next to nanounet/
-_REPO_ROOT = Path(__file__).resolve().parent.parent
 
 def quiet_lightning_runtime() -> None:
     import warnings
