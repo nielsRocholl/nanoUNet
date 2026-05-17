@@ -21,6 +21,7 @@ class MatcherDataModule(LightningDataModule):
         fu_jitter_scale: float = 0.3,
         p_drop_fu: float = 0.1,
         p_drop_bl: float = 0.1,
+        desc_jitter_frac: float = 0.02,
     ):
         super().__init__()
         self.cache_root = Path(cache_root)
@@ -30,6 +31,7 @@ class MatcherDataModule(LightningDataModule):
         self.fu_jitter_scale = fu_jitter_scale
         self.p_drop_fu = p_drop_fu
         self.p_drop_bl = p_drop_bl
+        self.desc_jitter_frac = desc_jitter_frac
 
     def prepare_data(self) -> None:
         for sp in ("train", "val"):
@@ -46,6 +48,7 @@ class MatcherDataModule(LightningDataModule):
             fu_jitter_scale=self.fu_jitter_scale,
             p_drop_fu=self.p_drop_fu,
             p_drop_bl=self.p_drop_bl,
+            desc_jitter_frac=self.desc_jitter_frac,
         )
         self.val_ds = LesionDataset(root=str(self.cache_root), split="val", dataset_root=self.dataset_root)
 

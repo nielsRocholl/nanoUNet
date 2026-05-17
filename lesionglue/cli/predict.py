@@ -10,7 +10,7 @@ from torch_geometric.loader import DataLoader as PyGDataLoader
 
 from tracking.common import CACHE_ROOT, DATASET_ROOT
 from tracking.data.dataset import LesionDataset
-from tracking.matcher import decode_sinkhorn_hungarian
+from tracking.decode import decode_sinkhorn_hungarian
 from tracking.train.module import MatcherModule
 
 if __name__ == "__main__":
@@ -23,6 +23,8 @@ if __name__ == "__main__":
     ap.add_argument("--thresh", type=float, default=0.5)
     ap.add_argument("--sinkhorn-iters", type=int, default=20)
     ap.add_argument("--sinkhorn-tau", type=float, default=0.2)
+    ap.add_argument("--tta-n", type=int, default=5, help="TTA jitter passes; 0 disables")
+    ap.add_argument("--no-ema", action="store_true", help="use training weights instead of EMA shadow")
     ap.add_argument("--dump-all", action="store_true")
     ap.add_argument("--strict", action="store_true")
     args = ap.parse_args()
@@ -37,7 +39,7 @@ if __name__ == "__main__":
     with torch.no_grad():
         for batch in loader:
             batch = batch.to(dev)
-            outp = mod.matcher(batch)
+            outp = mod.predict_batch(batch, tta_n=args.tta_n, use_ema=not args.no_ema)
             prob = torch.sigmoid(outp.pair).cpu().numpy()
             data = batch.to_data_list()[0]
             pid = data.pid

@@ -7,93 +7,15 @@ import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 from torch import nn
-from torch_geometric.data import Batch, HeteroData
+from torch.optim.swa_utils import AveragedModel
+from torch_geometric.data import Batch
 from torchmetrics.classification import BinaryAUROC, BinaryAveragePrecision
 
-from tracking.data.graph import FEAT_DIM
-from tracking.matcher import Matcher, MatcherOutput, ModelConfig, decode_sinkhorn_hungarian
+from tracking.decode import decode_sinkhorn_hungarian
+from tracking.matcher import Matcher, MatcherOutput, ModelConfig
+from tracking.train.match_utils import focal_bce_with_logits, infonce_batch, row_hungarian_match_acc, split_per_graph
 from tracking.train.sinkhorn import log_sinkhorn, sinkhorn_loss, superglue_marginals
-
-LT_IDX = FEAT_DIM - 1
-
-
-def focal_bce_with_logits(logits: torch.Tensor, target: torch.Tensor, alpha: float = 0.25, gamma: float = 2.0) -> torch.Tensor:
-    bce = F.binary_cross_entropy_with_logits(logits, target, reduction="none")
-    p = torch.sigmoid(logits)
-    pt = p * target + (1 - p) * (1 - target)
-    w = (alpha * target + (1 - alpha) * (1 - target)) * (1 - pt).clamp_min(1e-6).pow(gamma)
-    return (w * bce).mean()
-
-
-def _split_per_graph(
-    batch: Batch, out: MatcherOutput
-) -> tuple[list[HeteroData], list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]]:
-    graphs = batch.to_data_list()
-    es = [g["bl", "cross", "fu"].num_edges for g in graphs]
-    nb = [g["bl"].num_nodes for g in graphs]
-    nf = [g["fu"].num_nodes for g in graphs]
-    pp, db, df = torch.split(out.pair, es), torch.split(out.dust_bl, nb), torch.split(out.dust_fu, nf)
-    return graphs, list(pp), list(db), list(df)
-
-
-def infonce_batch(
-    z_bl: torch.Tensor,
-    z_fu: torch.Tensor,
-    proj: nn.Module,
-    edge_index: torch.Tensor,
-    edge_label: torch.Tensor,
-    tau: float,
-    batch: Batch,
-) -> torch.Tensor:
-    pb = F.normalize(proj(z_bl), dim=1)
-    pf = F.normalize(proj(z_fu), dim=1)
-    sim = (pb @ pf.T) / tau
-    pos = edge_label > 0.5
-    if not pos.any():
-        return z_bl.sum() * 0.0
-    lt_bl = batch["bl"].x[:, LT_IDX].long()
-    lt_fu = batch["fu"].x[:, LT_IDX].long()
-    same = lt_bl[:, None] == lt_fu[None, :]
-    bi, fj = edge_index[0, pos], edge_index[1, pos]
-    sort_idx = torch.argsort(bi)
-    sb, sf = bi[sort_idx], fj[sort_idx]
-    mask = torch.ones(sb.shape[0], dtype=torch.bool, device=sb.device)
-    mask[1:] = sb[1:] != sb[:-1]
-    bi_u, fj_u = sb[mask], sf[mask]
-    sim_a = sim.clone()
-    for b in bi_u:
-        if same[b].sum() > 1:
-            sim_a[b] = sim_a[b].masked_fill(~same[b], float("-inf"))
-    la = F.cross_entropy(sim_a[bi_u], fj_u)
-    sort_idx = torch.argsort(fj)
-    sb, si = fj[sort_idx], bi[sort_idx]
-    mask = torch.ones(sb.shape[0], dtype=torch.bool, device=sb.device)
-    mask[1:] = sb[1:] != sb[:-1]
-    fj_u2, bi_u2 = sb[mask], si[mask]
-    sim_t = sim_a.T.clone()
-    for f in torch.unique(fj_u2):
-        if same[:, f].sum() > 1:
-            sim_t[f] = sim_t[f].masked_fill(~same[:, f], float("-inf"))
-    lb = F.cross_entropy(sim_t[fj_u2], bi_u2)
-    return 0.5 * (la + lb)
-
-
-def row_hungarian_match_acc(
-    data: HeteroData,
-    pair_log: torch.Tensor,
-    dust_bl: torch.Tensor,
-    dust_fu: torch.Tensor,
-    iters: int,
-) -> float:
-    n_bl, n_fu = data["bl"].num_nodes, data["fu"].num_nodes
-    lab = data["bl", "cross", "fu"].edge_label.reshape(n_bl, n_fu)
-    dec = decode_sinkhorn_hungarian(pair_log, dust_bl, dust_fu, n_bl, n_fu, iters=iters)
-    ok = 0
-    for i in range(n_bl):
-        pos = torch.where(lab[i] > 0.5)[0]
-        di = int(dec[i])
-        ok += int(di < 0) if pos.numel() == 0 else int((pos == di).any().item())
-    return ok / max(n_bl, 1)
+from tracking.train.tta import matcher_tta_forward
 
 
 class MatcherModule(pl.LightningModule):
@@ -108,14 +30,22 @@ class MatcherModule(pl.LightningModule):
         sinkhorn_w: float = 1.0,
         pair_w: float = 0.1,
         nce_w: float = 0.3,
-        dust_w: float = 0.3,
+        dust_w: float = 0.25,
         dust_pos_w: float = 1.0,
         nce_tau: float = 0.1,
         proj_dim: int = 64,
         sinkhorn_iters: int = 20,
-        max_epochs: int = 200,
+        max_epochs: int = 400,
         dust_pair_summary: bool = True,
         dust_legacy_linear: bool = False,
+        set_attn_blocks: int = 2,
+        ema_decay: float = 0.999,
+        ema_start_epoch: int = 5,
+        tta_n: int = 0,
+        dust_tau: float = 0.2,
+        k_intra: int = 8,
+        fu_jitter_scale: float = 0.3,
+        desc_jitter_frac: float = 0.02,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -127,11 +57,43 @@ class MatcherModule(pl.LightningModule):
                 dropout=dropout,
                 use_dust_pair_summary=dust_pair_summary,
                 dust_legacy_linear=dust_legacy_linear,
+                set_attn_blocks=set_attn_blocks,
             )
         )
+        decay = ema_decay
+        if decay > 0.0:
+            self.ema_matcher: AveragedModel | None = AveragedModel(
+                self.matcher,
+                avg_fn=lambda a, m, n_avg: decay * a + (1.0 - decay) * m,
+            )
+        else:
+            self.ema_matcher = None
         self.proj = nn.Linear(d, proj_dim)
         self.auroc = BinaryAUROC()
         self.ap_sinkhorn = BinaryAveragePrecision()
+
+    def _val_net(self) -> nn.Module | AveragedModel:
+        if self.ema_matcher is None:
+            return self.matcher
+        if self.current_epoch >= self.hparams.ema_start_epoch:
+            return self.ema_matcher
+        return self.matcher
+
+    def _forward_val_loss(self, batch: Batch) -> MatcherOutput:
+        return self._val_net()(batch)
+
+    def _forward_val_metrics(self, batch: Batch) -> MatcherOutput:
+        net = self._val_net()
+        if int(self.hparams.tta_n) > 0:
+            return matcher_tta_forward(
+                net,
+                batch,
+                int(self.hparams.tta_n),
+                int(self.hparams.k_intra),
+                float(self.hparams.fu_jitter_scale),
+                float(self.hparams.desc_jitter_frac),
+            )
+        return net(batch)
 
     def forward(self, batch: Batch) -> MatcherOutput:
         return self.matcher(batch)
@@ -139,7 +101,7 @@ class MatcherModule(pl.LightningModule):
     def _loss(self, batch: Batch, out: MatcherOutput) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
         labels = batch["bl", "cross", "fu"].edge_label
         pair_focal = focal_bce_with_logits(out.pair, labels)
-        graphs, pp, db, df = _split_per_graph(batch, out)
+        graphs, pp, db, df = split_per_graph(batch, out)
         sk = [
             sinkhorn_loss(p, g["bl"].num_nodes, g["fu"].num_nodes, b, f, g["bl", "cross", "fu"].edge_label, self.hparams.sinkhorn_iters)
             for g, p, b, f in zip(graphs, pp, db, df)
@@ -162,6 +124,10 @@ class MatcherModule(pl.LightningModule):
         )
         return total, {"sinkhorn_loss": sk_loss, "pair_loss": pair_focal, "nce_loss": nce, "dust_bce": dust_bce}
 
+    def on_train_batch_end(self, outputs, batch, batch_idx: int) -> None:
+        if self.ema_matcher is not None:
+            self.ema_matcher.update_parameters(self.matcher)
+
     def on_validation_start(self) -> None:
         self._uc_ok = self._uc_tot = 0
         self._dis_ok = self._dis_tot = 0
@@ -176,15 +142,17 @@ class MatcherModule(pl.LightningModule):
         return loss
 
     def validation_step(self, batch: Batch, _) -> torch.Tensor:
-        out = self.matcher(batch)
-        loss, parts = self._loss(batch, out)
+        out_m = self._forward_val_loss(batch)
+        loss, parts = self._loss(batch, out_m)
+        out = self._forward_val_metrics(batch)
         labels = batch["bl", "cross", "fu"].edge_label
         self.auroc.update(torch.sigmoid(out.pair.detach()), labels.int())
-        graphs, pp, db, df = _split_per_graph(batch, out)
+        graphs, pp, db, df = split_per_graph(batch, out)
         it = self.hparams.sinkhorn_iters
-        acc = sum(row_hungarian_match_acc(g, p.detach(), b.detach(), f.detach(), it) for g, p, b, f in zip(graphs, pp, db, df)) / len(
-            graphs
-        )
+        tau = float(self.hparams.dust_tau)
+        acc = sum(
+            row_hungarian_match_acc(g, p.detach(), b.detach(), f.detach(), it, tau) for g, p, b, f in zip(graphs, pp, db, df)
+        ) / len(graphs)
         for g, p, b_bl, d_fu in zip(graphs, pp, db, df):
             n_bl, n_fu = g["bl"].num_nodes, g["fu"].num_nodes
             dev, dt = p.device, p.dtype
@@ -199,7 +167,7 @@ class MatcherModule(pl.LightningModule):
             self.ap_sinkhorn.update(Rn[ei[0], ei[1]].detach(), g["bl", "cross", "fu"].edge_label.int())
 
             lab = g["bl", "cross", "fu"].edge_label.reshape(n_bl, n_fu).cpu().numpy()
-            dec = decode_sinkhorn_hungarian(p.detach(), b_bl.detach(), d_fu.detach(), n_bl, n_fu, iters=it)
+            dec = decode_sinkhorn_hungarian(p.detach(), b_bl.detach(), d_fu.detach(), n_bl, n_fu, iters=it, tau=tau)
             no_bl = g["bl"].no_match_label.cpu().numpy()
             no_fu = g["fu"].no_match_label.cpu().numpy()
             for i in range(n_bl):
@@ -253,3 +221,18 @@ class MatcherModule(pl.LightningModule):
         cos = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, me - 5))
         sch = torch.optim.lr_scheduler.SequentialLR(opt, [warm, cos], milestones=[5])
         return {"optimizer": opt, "lr_scheduler": {"scheduler": sch, "interval": "epoch"}}
+
+    def predict_batch(self, batch: Batch, tta_n: int | None = None, use_ema: bool = True) -> MatcherOutput:
+        """Inference: optional EMA + TTA (for CLIs)."""
+        ntta = int(self.hparams.tta_n if tta_n is None else tta_n)
+        net: nn.Module = self.ema_matcher if (use_ema and self.ema_matcher is not None) else self.matcher
+        if ntta > 0:
+            return matcher_tta_forward(
+                net,
+                batch,
+                ntta,
+                int(self.hparams.k_intra),
+                float(self.hparams.fu_jitter_scale),
+                float(self.hparams.desc_jitter_frac),
+            )
+        return net(batch)

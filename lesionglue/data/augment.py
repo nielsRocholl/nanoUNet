@@ -11,6 +11,10 @@ from tracking.data.graph import intra_knn
 from tracking.data.pairs import cross_attr, dense_pair_index, reverse_cross_attr
 
 
+def _desc_noise_scale(block: torch.Tensor, frac: float) -> torch.Tensor:
+    return block.std(dim=0, keepdim=True).clamp(min=1e-3) * frac
+
+
 def drop_nodes(
     data: HeteroData,
     p_drop_fu: float,
@@ -75,6 +79,7 @@ def jitter_both(
     k_intra: int = 8,
     sigma_fu_scale: float = 0.3,
     rng: np.random.Generator | None = None,
+    desc_jitter_frac: float = 0.0,
 ) -> HeteroData:
     if rng is None:
         rng = np.random.default_rng()
@@ -86,6 +91,12 @@ def jitter_both(
     dev, dt = data["bl"].pos.device, data["bl"].pos.dtype
     data["bl"].pos = data["bl"].pos + torch.from_numpy(nb).to(device=dev, dtype=dt)
     data["fu"].pos = data["fu"].pos + torch.from_numpy(nf).to(device=dev, dtype=dt)
+    if desc_jitter_frac > 0.0:
+        db = _desc_noise_scale(data["bl"].x[:, :1372], desc_jitter_frac)
+        data["bl"].x[:, :1372] = data["bl"].x[:, :1372] + torch.randn_like(data["bl"].x[:, :1372]) * db
+        fu_frac = desc_jitter_frac * sigma_fu_scale
+        df = _desc_noise_scale(data["fu"].x[:, :1372], fu_frac)
+        data["fu"].x[:, :1372] = data["fu"].x[:, :1372] + torch.randn_like(data["fu"].x[:, :1372]) * df
     data["bl", "intra", "bl"].edge_index, data["bl", "intra", "bl"].edge_attr = intra_knn(data["bl"].pos, k_intra)
     data["fu", "intra", "fu"].edge_index, data["fu", "intra", "fu"].edge_attr = intra_knn(data["fu"].pos, k_intra)
     ei = data["bl", "cross", "fu"].edge_index

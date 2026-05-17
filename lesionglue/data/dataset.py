@@ -38,6 +38,7 @@ class LesionDataset(InMemoryDataset):
         fu_jitter_scale: float = 0.3,
         p_drop_fu: float = 0.1,
         p_drop_bl: float = 0.1,
+        desc_jitter_frac: float = 0.02,
     ):
         assert split in {"train", "val", "test"}
         self.split = split
@@ -48,6 +49,7 @@ class LesionDataset(InMemoryDataset):
         self.fu_jitter_scale = fu_jitter_scale
         self.p_drop_fu = p_drop_fu
         self.p_drop_bl = p_drop_bl
+        self.desc_jitter_frac = desc_jitter_frac
         super().__init__(root)
         self.load(self.processed_paths[0])
 
@@ -71,6 +73,7 @@ class LesionDataset(InMemoryDataset):
                 k_intra=self.cfg.k_intra,
                 sigma_fu_scale=self.fu_jitter_scale,
                 rng=np.random.default_rng(),
+                desc_jitter_frac=self.desc_jitter_frac,
             )
         return d
 

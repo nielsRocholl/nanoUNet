@@ -5,10 +5,11 @@ import csv
 from pathlib import Path
 
 import torch
+from torch_geometric.data import Batch
 
 from tracking.data.graph import GraphConfig
 from tracking.data.masks import build_mask_graph
-from tracking.matcher import decode_sinkhorn_hungarian
+from tracking.decode import decode_sinkhorn_hungarian
 from tracking.train.module import MatcherModule
 
 ap = argparse.ArgumentParser()
@@ -24,6 +25,8 @@ ap.add_argument("--default-lesion-type", default=None)
 ap.add_argument("--k-intra", type=int, default=8)
 ap.add_argument("--sinkhorn-iters", type=int, default=20)
 ap.add_argument("--sinkhorn-tau", type=float, default=0.2)
+ap.add_argument("--tta-n", type=int, default=5, help="TTA jitter passes; 0 disables")
+ap.add_argument("--no-ema", action="store_true", help="use training weights instead of EMA shadow")
 args = ap.parse_args()
 
 data = build_mask_graph(
@@ -38,9 +41,10 @@ data = build_mask_graph(
 mod = MatcherModule.load_from_checkpoint(args.ckpt, map_location="cpu")
 mod.eval()
 data = data.to(mod.device)
+bat = Batch.from_data_list([data]).to(mod.device)
 
 with torch.no_grad():
-    outp = mod.matcher(data)
+    outp = mod.predict_batch(bat, tta_n=args.tta_n, use_ema=not args.no_ema)
     pair_prob = torch.sigmoid(outp.pair).cpu()
     pr = outp.pair.cpu()
     db = outp.dust_bl.cpu()

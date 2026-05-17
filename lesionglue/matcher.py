@@ -1,19 +1,17 @@
-"""Dense heterogeneous matcher: GNN pair logits + learnable Sinkhorn dustbin scalars."""
+"""Dense heterogeneous matcher: GNN pair logits + Sinkhorn dustbin."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-import numpy as np
 import torch
 import torch.nn.functional as F
-from scipy.optimize import linear_sum_assignment
 from torch import nn
 from torch_geometric.data import HeteroData
 from torch_geometric.nn import HeteroConv, TransformerConv
 
 from tracking.data.pairs import CROSS_DIM
-from tracking.train.sinkhorn import log_sinkhorn, superglue_marginals
+from tracking.set_attn import SetAttn
 
 
 @dataclass
@@ -26,6 +24,7 @@ class ModelConfig:
     dropout: float = 0.2
     use_dust_pair_summary: bool = True
     dust_legacy_linear: bool = False
+    set_attn_blocks: int = 2
 
 
 @dataclass
@@ -110,6 +109,9 @@ class Matcher(nn.Module):
         self.cfg = cfg
         self.enc = NodeEncoder(cfg)
         self.gnn = HeteroGnn(cfg.d, cfg.layers, cfg.heads, cfg.dropout)
+        self.set_attn = (
+            SetAttn(cfg.d, cfg.heads, cfg.dropout, cfg.set_attn_blocks) if cfg.set_attn_blocks > 0 else None
+        )
         self.head = nn.Sequential(
             nn.Linear(2 * cfg.d + CROSS_DIM, cfg.d), nn.ReLU(inplace=True), nn.Dropout(cfg.dropout), nn.Linear(cfg.d, 1)
         )
@@ -152,65 +154,18 @@ class Matcher(nn.Module):
     def forward(self, data: HeteroData) -> MatcherOutput:
         z = {"bl": self.enc(data["bl"].x), "fu": self.enc(data["fu"].x)}
         z = self.gnn(z, data.edge_index_dict, data.edge_attr_dict)
+        if self.set_attn is not None:
+            bbl = data["bl"].batch
+            bfu = data["fu"].batch
+            dev = z["bl"].device
+            if bbl is None:
+                bbl = torch.zeros(z["bl"].size(0), dtype=torch.long, device=dev)
+            if bfu is None:
+                bfu = torch.zeros(z["fu"].size(0), dtype=torch.long, device=dev)
+            z["bl"], z["fu"] = self.set_attn(z["bl"], z["fu"], bbl, bfu)
         ei = data["bl", "cross", "fu"].edge_index
         ea = data["bl", "cross", "fu"].edge_attr
         h = torch.cat([z["bl"][ei[0]], z["fu"][ei[1]], ea], dim=1)
         pair = self.head(h).squeeze(-1)
         dust_bl, dust_fu = self._dust_from_pair(pair, data, z["bl"], z["fu"])
         return MatcherOutput(pair, dust_bl, dust_fu, z["bl"], z["fu"])
-
-
-def decode_sinkhorn(
-    pair_log: torch.Tensor,
-    dust_bl: torch.Tensor,
-    dust_fu: torch.Tensor,
-    n_bl: int,
-    n_fu: int,
-    iters: int = 20,
-    tau: float = 0.2,
-) -> np.ndarray:
-    device, dtype = pair_log.device, pair_log.dtype
-    S = torch.zeros((n_bl + 1, n_fu + 1), device=device, dtype=dtype)
-    S[:n_bl, :n_fu] = pair_log.reshape(n_bl, n_fu)
-    S[:n_bl, n_fu] = dust_bl
-    S[n_bl, :n_fu] = dust_fu
-    la, lb = superglue_marginals(n_bl, n_fu, device, dtype)
-    P = log_sinkhorn(S, iters, la, lb).exp()
-    out = np.full(n_bl, -1, dtype=np.int64)
-    for i in range(n_bl):
-        row = P[i] / P[i].sum().clamp_min(1e-9)
-        j = int(row.argmax().item())
-        if j == n_fu or float(row[j].item()) < tau:
-            continue
-        out[i] = j
-    return out
-
-
-def decode_sinkhorn_hungarian(
-    pair_log: torch.Tensor,
-    dust_bl: torch.Tensor,
-    dust_fu: torch.Tensor,
-    n_bl: int,
-    n_fu: int,
-    iters: int = 20,
-    tau: float = 0.2,
-) -> np.ndarray:
-    device, dtype = pair_log.device, pair_log.dtype
-    S = torch.zeros((n_bl + 1, n_fu + 1), device=device, dtype=dtype)
-    S[:n_bl, :n_fu] = pair_log.reshape(n_bl, n_fu)
-    S[:n_bl, n_fu] = dust_bl
-    S[n_bl, :n_fu] = dust_fu
-    la, lb = superglue_marginals(n_bl, n_fu, device, dtype)
-    P = log_sinkhorn(S, iters, la, lb).exp()
-    Prows = P[:n_bl].cpu().numpy()
-    cost = -np.log(np.clip(Prows[:, : n_fu + 1], 1e-12, 1.0))
-    ri, ci = linear_sum_assignment(cost)
-    out = np.full(n_bl, -1, dtype=np.int64)
-    rs = np.sum(Prows, axis=1)
-    for r, c in zip(ri, ci):
-        r = int(r)
-        if int(c) >= n_fu:
-            continue
-        if float(Prows[r, int(c)] / max(rs[r], 1e-12)) >= tau:
-            out[r] = int(c)
-    return out
