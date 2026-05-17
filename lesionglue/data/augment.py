@@ -12,7 +12,10 @@ from tracking.data.pairs import cross_attr, dense_pair_index, reverse_cross_attr
 
 
 def _desc_noise_scale(block: torch.Tensor, frac: float) -> torch.Tensor:
-    return block.std(dim=0, keepdim=True).clamp(min=1e-3) * frac
+    # unbiased std with N=1 is NaN (ddof=1); that poisons features and Hungarian cost.
+    if block.size(0) < 2:
+        return torch.full((1, block.size(1)), 1e-3 * frac, device=block.device, dtype=block.dtype)
+    return block.std(dim=0, keepdim=True, unbiased=False).clamp(min=1e-3) * frac
 
 
 def drop_nodes(

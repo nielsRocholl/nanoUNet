@@ -91,6 +91,11 @@ if __name__ == "__main__":
     ap.add_argument("--tta-n", type=int, default=TrainConfig.tta_n, help="val TTA passes (0=off)")
     ap.add_argument("--early-stop-patience", type=int, default=TrainConfig.early_stop_patience)
     ap.add_argument(
+        "--no-early-stop",
+        action="store_true",
+        help="run all --epochs (no stop on val_match_score plateau)",
+    )
+    ap.add_argument(
         "--dust-no-pair-summary",
         action="store_true",
         help="ablation: zero pair-logit summaries for DustHead (structural lever off)",
@@ -177,7 +182,9 @@ if __name__ == "__main__":
     )
     Path(args.out).mkdir(parents=True, exist_ok=True)
     ckpt = ModelCheckpoint(dirpath=args.out, monitor="val_match_score", save_top_k=3, mode="max")
-    stop = EarlyStopping(monitor="val_match_score", mode="max", patience=cfg.early_stop_patience)
+    callbacks = [ckpt, TQDMProgressBar()]
+    if not args.no_early_stop:
+        callbacks.insert(1, EarlyStopping(monitor="val_match_score", mode="max", patience=cfg.early_stop_patience))
     use_wandb = args.wandb or bool(args.wandb_run_name.strip())
     logger = False
     if use_wandb:
@@ -195,7 +202,7 @@ if __name__ == "__main__":
         accelerator=_accelerator(),
         devices=1,
         log_every_n_steps=10,
-        callbacks=[ckpt, stop, TQDMProgressBar()],
+        callbacks=callbacks,
         logger=logger,
     )
     trainer.fit(mod, dm)
