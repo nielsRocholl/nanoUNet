@@ -1,18 +1,14 @@
 # nanoUNet
 
-nanoUNet is a minimal port of the nnUNet, with promting support, and MAE pretraining. The defining feature of this codebase is its [nanochat](https://github.com/karpathy/nanochat) inspired code/architechture style. 
-
-nanoUNet is wraps all torch in pytorch lightning to remove boilerplate code. 
+Minimal prompt-aware 3D ResEnc nnU-Net with PyTorch Lightning and optional MAE pretraining. Layout and style follow [nanochat](https://github.com/karpathy/nanochat): small modules, no framework sprawl.
 
 ## Getting started
-
-Install from the repo root into a virtual environment:
 
 ```bash
 python -m pip install -e .
 ```
 
-Set the same three environment variables as nnU-Net (or use the `NANOUNET_*` aliases; they are synced automatically):
+Environment (same as nnU-Net; `NANOUNET_*` aliases are synced to `nnUNet_*`):
 
 ```bash
 export NANOUNET_RAW="/path/to/nnUNet_raw"
@@ -20,138 +16,192 @@ export NANOUNET_PREPROCESSED="/path/to/nnUNet_preprocessed"
 export NANOUNET_RESULTS="/path/to/nnUNet_results"
 ```
 
-Paths with spaces must be quoted.
+Quote paths that contain spaces.
 
-## Full pipeline
+---
 
-**Step 1 — Preprocess.** Reads every training case, extracts a dataset fingerprint (spacings, shapes, intensity statistics), runs the ResEnc planner to determine target spacing / patch size / network topology, then resamples and normalises every case into blosc2 tensors. All three phases run in one command:
+## CLI reference
+
+### `nanounet_preprocess`
+
+Fingerprint → ResEnc plan → resample to blosc2 (`3d_fullres`). One dataset id or multiple ids (merge → `Dataset<merged-id>_<merged-name>`).
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `-d`, `--dataset_id` | (required) | One or more integers, e.g. `-d 001` or `-d 1 2 3` for merge |
+| `--merged-id` | `999` | Output dataset id when merging multiple `-d` |
+| `--merged-name` | `Merged` | Name segment for merged folder `DatasetNNN_<name>` |
+| `--planner` | `nnUNetPlannerResEncL` | Planner class (e.g. `nnUNetPlannerResEncTiny`, `…ResEncL`) |
+| `-np`, `--num_processes` | `8` | Parallel workers for fingerprint / preprocess |
+| `--resume` | off (flag) | Keep existing preprocess output; do not wipe `3d_fullres` folder |
+| `--gpu-memory-gb` | none | VRAM budget (GB) for planner patch shrink loop |
+| `--patch-vol` | `large` | `small` (128) \| `medium` (192) \| `large` (256) \| `xlarge` (320) isotropic edge before aniso handling |
+| `--plans-name` | none | Basename of plans JSON (no `.json`) when using `--skip-plan` |
+| `--config-path` | none | Optional path forwarded into preprocessing |
+| `--skip-fingerprint` | off (flag) | Skip fingerprint; use existing `dataset_fingerprint.json` |
+| `--skip-plan` | off (flag) | Skip planning; requires `--plans-name` |
+
+Artifacts: `dataset_fingerprint.json`, `<plans>.json`, `<plans>/3d_fullres/*.b2nd`, `gt_segmentations` under the raw dataset folder.
+
+---
+
+### `nanounet_train`
+
+Supervised training on one fold; optional integrated MAE then supervised. Default run dir: `$NANOUNET_RESULTS/nanounet/<DatasetFolder>_<plans>_f<fold>/`.
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `-d`, `--dataset_id` | (required) | Dataset id (folder must exist under raw/preprocessed as `DatasetXXX_*`) |
+| `-f`, `--fold` | `0` | Fold index (0–4 with default 5-fold split) |
+| `--plans` | (required) | Plans basename without `.json` (must exist in preprocessed dataset dir) |
+| `--config` | `configs/default.json` | ROI / prompt JSON (relative resolves from cwd, then repo root) |
+| `--epochs` | `1000` | Supervised epoch budget |
+| `--lr` | `0.01` | Supervised initial learning rate |
+| `--wd` | `3e-5` | Weight decay |
+| `--batch-size` | from plans | If omitted, `3d_fullres.batch_size` from plans |
+| `--iters-per-epoch` | `250` | Training batches per epoch (iterable dataloaders) |
+| `--val-iters` | `50` | Validation batches per epoch |
+| `--out` | see above | Override run directory |
+| `--lr-schedule` | `poly` | `poly` \| `stretched_tail_poly` |
+| `--stretched-k` | `750` | Used when `stretched_tail_poly` |
+| `--stretched-ref` | `1000` | Used when `stretched_tail_poly` |
+| `--stretched-exp` | `0.9` | Used when `stretched_tail_poly` |
+| `--no-wandb` | off (flag) | Disable W&B logger |
+| `--wandb-project` | `nanounet` | W&B project name |
+| `--wandb-name` | auto | W&B run name |
+| `--loss`, `-loss` | `dc_ce` | `dc_ce` \| `cc_dc_ce` (CC-DiceCE; see [docs/losses.md](docs/losses.md)) |
+| `--resume` | none | Supervised Lightning checkpoint path; must exist. No auto `last.ckpt`. If set and ckpt already finished `epochs`, exits cleanly after checks |
+| `--precision` | `16-mixed` | Passed to Lightning (e.g. `32-true`) |
+| `--accelerator` | `auto` | `auto` \| `cpu` \| `cuda` \| `gpu` \| `mps` (`gpu` normalized to `cuda`) |
+| `--mae-ckpt` | none | Load encoder weights only (no integrated MAE run) |
+| `--mae-pretrain` | off (flag) | Run MAE under `<run>/mae_pretrain/` then supervised |
+| `--mae-resume` | none | With `--mae-pretrain` only: MAE ckpt to resume or to detect MAE already done; must match `--mae-epochs`. Conflicts with `--mae-ckpt` |
+| `--mae-epochs` | `1000` | MAE epoch budget when using `--mae-pretrain` |
+| `--mae-lr` | `1e-2` | MAE initial LR |
+| `--mae-mask-ratio` | `0.75` | MAE mask ratio |
+| `--mae-iters-per-epoch` | same as `--iters-per-epoch` | MAE batches per epoch |
+| `--dl-bucket` | `m` | DataLoader preset: `s` (low RAM) \| `m` \| `l` (workers + prefetch) |
+
+Checkpoints: `<run>/checkpoints/last.ckpt` (supervised); `<run>/mae_pretrain/checkpoints/` (integrated MAE). Re-running without `--resume` / `--mae-resume` trains from scratch and may overwrite those paths.
+
+---
+
+### `nanounet_pretrain`
+
+Standalone MAE only (no prompts). Default out: `$NANOUNET_RESULTS/nanounet/<DatasetFolder>_<plans>_mae_pretrain_f<fold>/`.
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `-d`, `--dataset_id` | (required) | Dataset id |
+| `-f`, `--fold` | `0` | Fold |
+| `--plans` | (required) | Plans basename (no `.json`) |
+| `--epochs` | `1000` | MAE epoch budget |
+| `--lr` | `1e-2` | Initial LR |
+| `--wd` | `3e-5` | Weight decay |
+| `--mask-ratio` | `0.75` | Mask ratio |
+| `--batch-size` | from plans | Optional override |
+| `--iters-per-epoch` | `250` | Batches per epoch |
+| `--val-iters` | `50` | Val batches per epoch |
+| `--out` | auto | Output directory |
+| `--no-wandb` | off (flag) | Disable W&B |
+| `--wandb-project` | `nanounet-mae` | W&B project |
+| `--wandb-name` | auto | W&B run name |
+| `--dl-bucket` | `m` | `s` \| `m` \| `l` |
+| `--resume` | none | MAE Lightning ckpt; must exist. No auto `last.ckpt`. Epoch target must match `--epochs` |
+| `--precision` | `16-mixed` | Lightning precision |
+| `--accelerator` | `auto` | `auto` \| `cpu` \| `cuda` \| `gpu` \| `mps` |
+
+---
+
+### `nanounet_predict`
+
+Segment from preprocessed-space point prompt; TTA on by default.
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `-i`, `--images` | (required) | One or more input image paths (channels) |
+| `-o`, `--output` | (required) | Output `.nii.gz` or base path (suffix from `dataset.json`) |
+| `-m`, `--model-dir` | (required) | Training run directory (with `plans.json`, `dataset.json`, `checkpoints/`) |
+| `--ckpt` | auto | Checkpoint name/path; default picks from `checkpoints/` via [predictor](nanounet/infer/predictor.py) |
+| `--point-zyx` | (required) | Comma-separated `z,y,x` in **preprocessed** voxels |
+| `--seg` | none | Optional segmentation input for predictor |
+| `--no-prompt-encode` | off (flag) | Skip prompt encoding |
+| `--border-expand` | off (flag) | BFS hull-shell merge (see [infer/border_expand.py](nanounet/infer/border_expand.py)) |
+| `--max-border-extra` | library default | Max extra voxels for border expand |
+| `--disable-tta` | off (flag) | Disable test-time augmentation |
+| `--device` | `cuda` | Torch device string for inference |
+
+---
+
+## Pipeline overview
+
+**1 — Preprocess**
 
 ```bash
 nanounet_preprocess -d 001 --planner nnUNetPlannerResEncL -np 8
 ```
 
-This writes `dataset_fingerprint.json` and `nnUNetResEncUNetLPlans.json` next to the raw data, then a `nnUNetResEncUNetLPlans/3d_fullres/` folder of `*.b2nd` / `*.pkl` pairs and a `gt_segmentations/` copy.
-
-The planner is where the "planning phase" lives. `--planner` selects the ResEnc preset: **Tiny** (~1–5M params, fast local / Mac runs), **M** / **L** / **XL** (8 / 24 / 40 GB VRAM targets). The resulting `<plans>.json` is what training reads; you pass its basename as `--plans`. **Network width and patch layout follow the plans file, not `[configs/default.json](configs/default.json)`.** Passing `--plans nnUNetResEncUNetLPlans` after only preprocessing L will produce a multi–100 M-parameter model regardless of ROI config—use `**nnUNetResEncTinyPlans`** everywhere (preprocess + train) for lightweight local experiments.
-
-For fast local test runs on a laptop (small network, smaller patches), use Tiny with `--patch-vol small`:
+Planner **Tiny** / **L** / **XL** set network scale (~1–5M vs 8–40+ GB VRAM targets). The `<plans>.json` sets patch size and topology—not [configs/default.json](configs/default.json). For small local models use Tiny everywhere (preprocess + train).
 
 ```bash
 nanounet_preprocess -d 001 --planner nnUNetPlannerResEncTiny --patch-vol small -np 4
-nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetTinyPlans --config configs/default.json \
-  --epochs 2 --iters-per-epoch 50 --accelerator cpu --precision 32-true --batch-size 1 --no-wandb
 ```
 
-In `[configs/default.json](configs/default.json)`, `**click_modes**` must sum to 1: `**pos**` is the probability each in-patch centroid is jittered and encoded on the positive channel; `**drop**` is the probability that centroid is omitted (simulate a missing click at inference). With `**"drop": 0.0**`, every centroid is prompted.
+Cluster example (CPU preprocess, large GPU train): add `--gpu-memory-gb 80 --patch-vol medium`. See CLI table for `--skip-fingerprint`, `--skip-plan`, `--resume`.
 
-Optional flags: `--skip-fingerprint` (reuse existing fingerprint), `--skip-plan --plans-name <ident>` (reuse an existing plan JSON).
-
-`**--gpu-memory-gb**` overrides the VRAM budget the planner shrinks towards. The preset default is 24 GB for ResEncL. On a cluster where you preprocess on a CPU node but train on an H200 (80 GB), pass `--gpu-memory-gb 80` so the planner does not unnecessarily shrink the patch for a GPU it will never see during preprocessing.
-
-`**--patch-vol small|medium|large|xlarge**` sets the initial target volume for the patch before the VRAM shrink loop runs. The four presets map to an isotropic edge length of 128 / 192 / 256 / 320 voxels (volumes of ~2M / 7M / 17M / 33M voxels). The default is `large` (256), which matches historical nnU-Net behaviour. On large GPUs with large anatomy the planner may produce very large patches; passing `--patch-vol medium` caps the starting point so patches stay tractable even if VRAM would technically allow more. The two flags are independent: `--gpu-memory-gb` controls the ceiling the VRAM loop converges to, `--patch-vol` controls the floor it starts from.
-
-A typical cluster workflow where you preprocess on a CPU node and train on an H200:
-
-```bash
-nanounet_preprocess -d 001 --planner nnUNetPlannerResEncL \
-  --gpu-memory-gb 80 --patch-vol medium -np 8
-```
-
-**Step 2 — Train.** Lightning fit on one fold. On first run it writes `splits_final.json` (5-fold KFold, seed 12345) next to the preprocessed dataset and reuses it on subsequent runs:
+**2 — Train**
 
 ```bash
 nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/default.json
 ```
 
-On Slurm (or tight `--mem`), reduce host RAM from DataLoader workers with `--dl-bucket s` (`m` default, `l` when you have plenty of RAM).
+First run writes `splits_final.json` (5-fold, fixed seed). MAE options: `--mae-pretrain` / `--mae-ckpt`, standalone `nanounet_pretrain`, encoder transfer ([Wald et al.](https://arxiv.org/abs/2410.23132)). Resume flags: **CLI reference** (`--resume`, `--mae-resume`). On Slurm, prefer `--dl-bucket s` if host RAM is tight.
 
-**Resume.** Training starts from scratch unless you pass **`--resume PATH`** (supervised Lightning ckpt, or standalone `nanounet_pretrain` MAE ckpt): no automatic `last.ckpt`. With **`--mae-pretrain`**, pass **`--mae-resume PATH`** to continue integrated MAE (or to skip MAE when that ckpt already reached `--mae-epochs`). `--mae-resume` conflicts with **`--mae-ckpt`**. If the chosen ckpt already reached the matching `--epochs` / `--mae-epochs`, the process exits with a short message; mismatching those flags against a checkpoint raises an error. Reusing the same `out` dir without resume may overwrite old checkpoints.
-
-**MAE pretraining (optional).** Masked reconstruction on the same ResEnc backbone and `*.b2nd` tensors (labels unused):
+Tiny laptop smoke:
 
 ```bash
-nanounet_pretrain -d 001 -f 0 --plans nnUNetResEncUNetLPlans --epochs 1000
-nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --mae-ckpt /path/to/.../checkpoints/last.ckpt --lr 0.001
-nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --mae-pretrain --mae-epochs 1000 --lr 0.001
+nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetTinyPlans --config configs/default.json \
+  --epochs 2 --iters-per-epoch 50 --accelerator cpu --precision 32-true --batch-size 1 --no-wandb
 ```
 
-Use `last.ckpt` for transfer; fine-tune with a lower peak LR (e.g. `1e-3`) than scratch ([Wald et al., arXiv:2410.23132](https://arxiv.org/abs/2410.23132)). Only encoder weights load; prompt channels on the stem are zero-initialized.
-
-**Loss.** Default is nnU-Net DC+CE with deep supervision. For multi-instance lesion data (many small lesions per case) enable **CC-DiceCE** (Bouteille et al., ISBI 2026): `--loss cc_dc_ce` (synonym `-loss`). See `[docs/losses.md](docs/losses.md)` for math, `batch_dice` behaviour, and caveats.
-
-**Patch size** trade-offs (FOV vs resolution for tiny vs huge lesions) are summarised in `[docs/patch_size.md](docs/patch_size.md)`.
-
-On Apple Silicon, `auto` picks MPS; add `--accelerator mps` to force it. Prefer `--precision 32-true` only if `16-mixed` causes issues.
-
-Train all five folds by repeating with `-f 1` through `-f 4`. Checkpoints and a copy of the plans/config land in `$NANOUNET_RESULTS/nanounet/<dataset>_<plans>_f<fold>/`.
-
-**Step 3 — Predict.** Pass one or more channel images, a model directory, and a point prompt in preprocessed voxel space (z,y,x, comma-separated). The forward pass runs with TTA by default; add `--border-expand` for the BFS hull-shell post-processing step:
+**3 — Predict**
 
 ```bash
-nanounet_predict \
-  -i case_0000.nii.gz \
-  -o seg.nii.gz \
-  -m /path/to/run \
-  --point-zyx 48,120,95
+nanounet_predict -i case_0000.nii.gz -o seg.nii.gz -m /path/to/run --point-zyx 48,120,95
 ```
 
-The `--point-zyx` coordinates are in the **preprocessed** (cropped + resampled) space, not original image space.
+`--point-zyx` is in **preprocessed** space, not original scanner space.
 
-## File structure
+---
+
+## Configuration and docs
+
+| Resource | Role |
+|----------|------|
+| [configs/default.json](configs/default.json) | ROI sampling, prompts: `click_modes` must sum to 1 (`pos` = jittered centroid prompt probability, `drop` = omit prompt). |
+| [docs/losses.md](docs/losses.md) | DC+CE vs CC-DiceCE (`--loss cc_dc_ce`). |
+| [docs/patch_size.md](docs/patch_size.md) | Patch FOV vs lesion scale. |
+
+---
+
+## Repository layout
 
 ```
 nanounet/
-├── common.py          # env paths, Rich CLI helpers (cprint, nano_progress, …)
-├── config.py          # RoiPromptConfig dataclass
-├── dataloader_prefs.py  # DataLoader bucket presets (workers + prefetch)
-├── lightning_ckpt.py  # PL ckpt epoch / num_epochs peek for resume
-├── data/
-│   ├── io.py          # SimpleITK read/write, reader resolution
-│   ├── resampling.py  # 3D resample (separate-z for anisotropic data)
-│   ├── normalization.py
-│   ├── crop.py        # nonzero crop / insert
-│   ├── augment.py     # batchgeneratorsv2 train/val transforms
-│   ├── dataset.py     # Blosc2Case lazy reader
-│   └── sampling.py    # 4-mode patch sampling
-├── prompt/
-│   ├── centroids.py   # cc3d centroids → *_centroids.json
-│   ├── encoding.py    # EDT / binary heatmap pair
-│   └── propagation.py # baseline→follow-up COG offset
-├── plan/
-│   ├── fingerprint.py # multiprocess intensity / shape stats
-│   ├── planner.py     # orchestration: fingerprint → plans.json
-│   ├── planner_resenc.py  # ResEnc VRAM loop + topology
-│   ├── planner_topology.py
-│   ├── preprocess.py  # spawn-pool case preprocessing
-│   ├── case_pp.py     # single case: transpose → crop → norm → resample
-│   └── splits.py      # KFold splits_final.json
-├── model/
-│   ├── network.py     # ResidualEncoderUNet (+ optional extra in / num_classes)
-│   ├── mae_transfer.py # encoder-only load from MAE ckpt (+ prompt stem zero-fill)
-│   ├── losses.py      # DC + CE + deep supervision
-│   ├── cc_dice_ce.py  # optional Voronoi CC-DiceCE (+ global DC+CE)
-│   └── lr_schedule.py # poly / stretched_tail_poly
-├── pretrain/
-│   ├── masking.py     # bottleneck-grid mask → full res
-│   ├── dataset.py    # random ROI iterables (no prompts)
-│   └── module.py     # NanoMAELM
-├── train/
-│   ├── lightning_module.py  # training_step, val Dice, configure_optimizers
-│   └── data_module.py       # IterableDataset + LightningDataModule
-├── infer/
-│   ├── predictor.py   # single-tile forward, TTA
-│   ├── border_expand.py  # BFS hull-shell Gaussian merge
-│   └── export.py      # logits → original space → NIfTI
-└── cli/
-    ├── preprocess.py
-    ├── pretrain.py
-    ├── train.py
-    └── predict.py
+├── common.py           # paths, Rich UI, logging shims
+├── config.py           # RoiPromptConfig
+├── dataloader_prefs.py # DataLoader s/m/l buckets
+├── lightning_ckpt.py   # resume epoch / num_epochs peek
+├── data/ plan/ model/ pretrain/ train/ infer/ cli/
+└── …
 ```
+
+Entry points: `nanounet_preprocess`, `nanounet_train`, `nanounet_pretrain`, `nanounet_predict` (see [pyproject.toml](pyproject.toml)).
+
+---
 
 ## Smoke test
 
 ```bash
 python -c "import sys; import nanounet.cli.preprocess, nanounet.cli.train, nanounet.cli.predict; assert 'nnunetv2' not in sys.modules; print('ok')"
 ```
-
