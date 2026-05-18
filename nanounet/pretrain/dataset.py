@@ -16,7 +16,8 @@ import torch
 from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from torch.utils.data import DataLoader, IterableDataset
 
-from nanounet.common import dataloader_num_workers, preprocessed_dir, print0, raw_dir
+from nanounet.common import preprocessed_dir, print0, raw_dir
+from nanounet.dataloader_prefs import DataloaderBucket
 from nanounet.data.blosc2_dataset import Blosc2Folder
 from nanounet.plan.plans import Plans
 from nanounet.plan.splits import fold_keys, load_or_create_splits
@@ -98,6 +99,7 @@ def build_pretrain_dataloaders(
     num_val_iterations: int,
     base_seed_train: int,
     base_seed_val: int,
+    bucket: DataloaderBucket,
     pin_memory: bool | None = None,
 ) -> tuple[DataLoader, DataLoader]:
     pp = preprocessed_dir()
@@ -130,17 +132,19 @@ def build_pretrain_dataloaders(
         )
     if pin_memory is None:
         pin_memory = torch.cuda.is_available()
-    nw_tr = dataloader_num_workers(train=True)
-    nw_va = dataloader_num_workers(train=False)
+    nw_tr = bucket.nw_train
+    nw_va = bucket.nw_val
     tr_it = PretrainPatchIterable(case_dir, tr_k, ps, num_iterations_per_epoch, batch_size, base_seed_train)
     va_it = PretrainPatchIterable(case_dir, va_k, ps, num_val_iterations, batch_size, base_seed_val)
+    pf_tr = bucket.prefetch_train if nw_tr else None
+    pf_va = bucket.prefetch_val if nw_va else None
     tr = DataLoader(
         tr_it,
         batch_size=batch_size,
         num_workers=nw_tr,
         pin_memory=pin_memory,
         persistent_workers=nw_tr > 0,
-        prefetch_factor=4 if nw_tr else None,
+        prefetch_factor=pf_tr,
         collate_fn=_pretrain_collate,
     )
     va = DataLoader(
@@ -149,7 +153,7 @@ def build_pretrain_dataloaders(
         num_workers=nw_va,
         pin_memory=pin_memory,
         persistent_workers=nw_va > 0,
-        prefetch_factor=2 if nw_va else None,
+        prefetch_factor=pf_va,
         collate_fn=_pretrain_collate,
     )
     return tr, va

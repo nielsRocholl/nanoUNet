@@ -63,6 +63,10 @@ nanounet_preprocess -d 001 --planner nnUNetPlannerResEncL \
 nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/default.json
 ```
 
+On Slurm (or tight `--mem`), reduce host RAM from DataLoader workers with `--dl-bucket s` (`m` default, `l` when you have plenty of RAM).
+
+**Resume.** Training starts from scratch unless you pass **`--resume PATH`** (supervised Lightning ckpt, or standalone `nanounet_pretrain` MAE ckpt): no automatic `last.ckpt`. With **`--mae-pretrain`**, pass **`--mae-resume PATH`** to continue integrated MAE (or to skip MAE when that ckpt already reached `--mae-epochs`). `--mae-resume` conflicts with **`--mae-ckpt`**. If the chosen ckpt already reached the matching `--epochs` / `--mae-epochs`, the process exits with a short message; mismatching those flags against a checkpoint raises an error. Reusing the same `out` dir without resume may overwrite old checkpoints.
+
 **MAE pretraining (optional).** Masked reconstruction on the same ResEnc backbone and `*.b2nd` tensors (labels unused):
 
 ```bash
@@ -99,6 +103,8 @@ The `--point-zyx` coordinates are in the **preprocessed** (cropped + resampled) 
 nanounet/
 ├── common.py          # env paths, Rich CLI helpers (cprint, nano_progress, …)
 ├── config.py          # RoiPromptConfig dataclass
+├── dataloader_prefs.py  # DataLoader bucket presets (workers + prefetch)
+├── lightning_ckpt.py  # PL ckpt epoch / num_epochs peek for resume
 ├── data/
 │   ├── io.py          # SimpleITK read/write, reader resolution
 │   ├── resampling.py  # 3D resample (separate-z for anisotropic data)

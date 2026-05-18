@@ -1,23 +1,22 @@
 #!/bin/bash
-#SBATCH --qos=high
-#SBATCH --exclude=dlc-groudon,dlc-arceus,dlc-slowpoke,dlc-meowth
+#SBATCH --qos=vram
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=48
-#SBATCH --mem=128G
+#SBATCH --cpus-per-task=64
+#SBATCH --mem=300G
 #SBATCH --time=07-00:00:00
 #SBATCH --job-name=nanounet-plan-pp-999
-#SBATCH --output=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_plan_preprocess_999_%j.out
-#SBATCH --error=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_plan_preprocess_999_%j.err
+#SBATCH --output=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_plan_preprocess_999.out
+#SBATCH --error=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_plan_preprocess_999.err
 #SBATCH --no-container-entrypoint
 #SBATCH --container-mounts=/data/oncology/experiments/universal-lesion-segmentation:/nnunet_data
 #SBATCH --container-image="dockerdex.umcn.nl:5005/nielsrocholl/nnunet-v2-pro-sol-docker:latest"
 #
-# Continue preprocess for Dataset999_Merged: fingerprint + plans already present; only missing .b2nd cases run.
-# Raw: nnUNet_raw; out: NanoUNet_preprocessed / NanoUNet_results.
+# Dataset999_Merged: run planner (--patch-vol small → patch_edge 128) then preprocess.cases (--resume).
+# Fingerprint reused (--skip-fingerprint). Point nanounet_train --plans at PLANS_NAME below.
 #
 set -euo pipefail
 
-NP=8
+NP=25
 
 export PIP_CACHE_DIR=/root/.pip-cache
 mkdir -p "$PIP_CACHE_DIR"
@@ -36,7 +35,7 @@ IDS=(10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 27)
 
 PLANNER=nnUNetPlannerResEncL
 GPU_MEM_GB=100
-PLANS_NAME=nnUNetResEncUNetLPlans_h200
+PLANS_NAME=nnUNetResEncUNetLPlans_h200_smallpv
 
 nanounet_preprocess \
   -d "${IDS[@]}" \
@@ -47,5 +46,5 @@ nanounet_preprocess \
   --plans-name "$PLANS_NAME" \
   -np "$NP" \
   --skip-fingerprint \
-  --skip-plan \
+  --patch-vol small \
   --resume

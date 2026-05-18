@@ -24,6 +24,12 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
+from nanounet.dataloader_prefs import dataloader_bucket
+from nanounet.lightning_ckpt import (
+    pl_ckpt_assert_epochs_match,
+    pl_ckpt_epoch_and_target,
+    pl_ckpt_stage_done,
+)
 from nanounet.plan.dataset_id import convert_id_to_dataset_name
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
 from nanounet.pretrain.module import NanoMAELM
@@ -46,7 +52,17 @@ def main() -> None:
     ap.add_argument("--no-wandb", action="store_true")
     ap.add_argument("--wandb-project", default="nanounet-mae")
     ap.add_argument("--wandb-name", default=None)
-    ap.add_argument("--resume", default=None)
+    ap.add_argument(
+        "--dl-bucket",
+        choices=("s", "m", "l"),
+        default="m",
+        help="DataLoader workers+prefetch: s low RAM (e.g. Slurm --mem), m default, l high RAM.",
+    )
+    ap.add_argument(
+        "--resume",
+        default=None,
+        help="Resume MAE from this Lightning ckpt; omit for a fresh run (no auto last.ckpt).",
+    )
     ap.add_argument("--precision", default="16-mixed")
     ap.add_argument(
         "--accelerator",
@@ -56,6 +72,7 @@ def main() -> None:
     )
     args = ap.parse_args()
 
+    dl_b = dataloader_bucket(args.dl_bucket)
     ds = convert_id_to_dataset_name(args.dataset_id)
     nano_header(f"nanoUNet pretrain MAE  {ds}  fold {args.fold}", color="cyan")
     pp = preprocessed_dir()
@@ -67,6 +84,15 @@ def main() -> None:
     os.makedirs(join(out, "checkpoints"), exist_ok=True)
     shutil.copyfile(plans_path, join(out, "plans.json"))
     shutil.copyfile(dj_path, join(out, "dataset.json"))
+
+    ckpt = args.resume
+    if ckpt:
+        if not os.path.isfile(ckpt):
+            raise ValueError(ckpt)
+        ep0, tgt0 = pl_ckpt_epoch_and_target(ckpt)
+        if pl_ckpt_stage_done(ep0, tgt0):
+            cprint("[dim]MAE pretrain already reached num_epochs; nothing to do.[/dim]")
+            return
 
     from nanounet.plan.plans import Plans
 
@@ -82,6 +108,7 @@ def main() -> None:
         args.val_iters,
         args.fold + 3000 * args.iters_per_epoch,
         args.fold + 4000,
+        dl_b,
     )
     lm = NanoMAELM(
         plans_path,
@@ -116,7 +143,7 @@ def main() -> None:
         default_root_dir=out,
     )
     cprint(f"[dim]MAE pretrain out {out}[/dim]")
-    tr.fit(lm, train_dataloaders=tr_dl, val_dataloaders=va_dl, ckpt_path=args.resume)
+    tr.fit(lm, train_dataloaders=tr_dl, val_dataloaders=va_dl, ckpt_path=ckpt)
 
 
 if __name__ == "__main__":

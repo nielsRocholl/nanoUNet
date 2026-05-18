@@ -26,6 +26,12 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
+from nanounet.dataloader_prefs import dataloader_bucket
+from nanounet.lightning_ckpt import (
+    pl_ckpt_assert_epochs_match,
+    pl_ckpt_epoch_and_target,
+    pl_ckpt_stage_done,
+)
 from nanounet.plan.dataset_id import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
@@ -61,7 +67,11 @@ def main() -> None:
     ap.add_argument("--wandb-project", default="nanounet")
     ap.add_argument("--wandb-name", default=None)
     ap.add_argument("--loss", "-loss", choices=("dc_ce", "cc_dc_ce"), default="dc_ce", metavar="MODE")
-    ap.add_argument("--resume", default=None)
+    ap.add_argument(
+        "--resume",
+        default=None,
+        help="Resume supervised from this Lightning ckpt; omit for scratch (no auto last.ckpt).",
+    )
     ap.add_argument("--precision", default="16-mixed")
     ap.add_argument(
         "--accelerator",
@@ -71,12 +81,28 @@ def main() -> None:
     )
     ap.add_argument("--mae-ckpt", default=None, help="Load encoder weights from MAE Lightning checkpoint.")
     ap.add_argument("--mae-pretrain", action="store_true", help="Run MAE in out/mae_pretrain then supervised.")
+    ap.add_argument(
+        "--mae-resume",
+        default=None,
+        help="Integrated MAE only: resume or skip-if-done from this ckpt; must match --mae-epochs.",
+    )
     ap.add_argument("--mae-epochs", type=int, default=1000)
     ap.add_argument("--mae-lr", type=float, default=1e-2)
     ap.add_argument("--mae-mask-ratio", type=float, default=0.75)
     ap.add_argument("--mae-iters-per-epoch", type=int, default=None, help="Default: same as --iters-per-epoch.")
+    ap.add_argument(
+        "--dl-bucket",
+        choices=("s", "m", "l"),
+        default="m",
+        help="DataLoader workers+prefetch: s low RAM (e.g. Slurm --mem), m default, l high RAM.",
+    )
     args = ap.parse_args()
+    if args.mae_resume and not args.mae_pretrain:
+        raise ValueError("--mae-resume requires --mae-pretrain")
+    if args.mae_resume and args.mae_ckpt:
+        raise ValueError("--mae-resume conflicts with --mae-ckpt")
     args.roi_cfg = resolve_user_config_path(args.roi_cfg)
+    dl_b = dataloader_bucket(args.dl_bucket)
 
     ds = convert_id_to_dataset_name(args.dataset_id)
     nano_header(f"nanoUNet train  {ds}  fold {args.fold}", color="green")
@@ -98,64 +124,91 @@ def main() -> None:
     mae_ckpt_arg = args.mae_ckpt
     mae_iters = args.mae_iters_per_epoch if args.mae_iters_per_epoch is not None else args.iters_per_epoch
 
-    if args.mae_pretrain and mae_ckpt_arg is None and args.resume is None:
-        pre_out = join(out, "mae_pretrain")
+    pre_out = join(out, "mae_pretrain")
+    mae_last = join(pre_out, "checkpoints", "last.ckpt")
+    sup_resume = args.resume
+    if sup_resume and not os.path.isfile(sup_resume):
+        raise ValueError(sup_resume)
+
+    if args.mae_pretrain and mae_ckpt_arg is None:
         maybe_mkdir_p(pre_out)
         os.makedirs(join(pre_out, "checkpoints"), exist_ok=True)
         shutil.copyfile(plans_path, join(pre_out, "plans.json"))
         shutil.copyfile(dj_path, join(pre_out, "dataset.json"))
-        tr_pre, va_pre = build_pretrain_dataloaders(
-            ds,
-            args.fold,
-            args.plans_identifier,
-            batch_mae,
-            mae_iters,
-            args.val_iters,
-            args.fold + 5000 * mae_iters,
-            args.fold + 6000,
-        )
-        pre_lm = NanoMAELM(
-            plans_path,
-            dj_path,
-            pre_out,
-            mask_ratio=args.mae_mask_ratio,
-            initial_lr=args.mae_lr,
-            weight_decay=args.wd,
-            num_epochs=args.mae_epochs,
-        )
-        pre_cb = [
-            ModelCheckpoint(dirpath=join(pre_out, "checkpoints"), save_last=True),
-            ModelCheckpoint(
-                dirpath=join(pre_out, "checkpoints"),
-                monitor="val_recon_loss",
-                mode="min",
-                filename="best-{epoch}-{val_recon_loss:.4f}",
-                save_top_k=1,
-            ),
-        ]
-        pre_trnr = Trainer(
-            max_epochs=args.mae_epochs,
-            accelerator=accel,
-            devices=1,
-            precision=args.precision,
-            callbacks=pre_cb,
-            logger=loggers or False,
-            default_root_dir=pre_out,
-        )
-        pre_trnr.fit(pre_lm, train_dataloaders=tr_pre, val_dataloaders=va_pre)
-        mae_ckpt_arg = join(pre_out, "checkpoints", "last.ckpt")
-        del pre_lm, tr_pre, va_pre, pre_trnr
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        run_mae_fit = True
+        mae_fit_ckpt: str | None = None
+        if args.mae_resume:
+            if not os.path.isfile(args.mae_resume):
+                raise ValueError(args.mae_resume)
+            pl_ckpt_assert_epochs_match(args.mae_resume, args.mae_epochs)
+            ep_m, tgt_m = pl_ckpt_epoch_and_target(args.mae_resume)
+            if pl_ckpt_stage_done(ep_m, tgt_m):
+                mae_ckpt_arg = args.mae_resume
+                run_mae_fit = False
+            else:
+                mae_fit_ckpt = args.mae_resume
+        if run_mae_fit:
+            tr_pre, va_pre = build_pretrain_dataloaders(
+                ds,
+                args.fold,
+                args.plans_identifier,
+                batch_mae,
+                mae_iters,
+                args.val_iters,
+                args.fold + 5000 * mae_iters,
+                args.fold + 6000,
+                dl_b,
+            )
+            pre_lm = NanoMAELM(
+                plans_path,
+                dj_path,
+                pre_out,
+                mask_ratio=args.mae_mask_ratio,
+                initial_lr=args.mae_lr,
+                weight_decay=args.wd,
+                num_epochs=args.mae_epochs,
+            )
+            pre_cb = [
+                ModelCheckpoint(dirpath=join(pre_out, "checkpoints"), save_last=True),
+                ModelCheckpoint(
+                    dirpath=join(pre_out, "checkpoints"),
+                    monitor="val_recon_loss",
+                    mode="min",
+                    filename="best-{epoch}-{val_recon_loss:.4f}",
+                    save_top_k=1,
+                ),
+            ]
+            pre_trnr = Trainer(
+                max_epochs=args.mae_epochs,
+                accelerator=accel,
+                devices=1,
+                precision=args.precision,
+                callbacks=pre_cb,
+                logger=loggers or False,
+                default_root_dir=pre_out,
+            )
+            pre_trnr.fit(pre_lm, train_dataloaders=tr_pre, val_dataloaders=va_pre, ckpt_path=mae_fit_ckpt)
+            mae_ckpt_arg = mae_last
+            del pre_lm, tr_pre, va_pre, pre_trnr
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+    if sup_resume:
+        pl_ckpt_assert_epochs_match(sup_resume, args.epochs)
+        ep_s, tgt_s = pl_ckpt_epoch_and_target(sup_resume)
+        if pl_ckpt_stage_done(ep_s, tgt_s):
+            cprint("[dim]supervised training already reached num_epochs; nothing to do.[/dim]")
+            return
 
     dm = NanoDataModule(
         ds,
         args.fold,
         args.plans_identifier,
         args.roi_cfg,
-        batch_size=args.batch_size,
-        num_iterations_per_epoch=args.iters_per_epoch,
-        num_val_iterations=args.val_iters,
+        dl_b,
+        args.batch_size,
+        args.iters_per_epoch,
+        args.val_iters,
     )
     lm = NanoUNetLM(
         plans_path,
@@ -170,7 +223,7 @@ def main() -> None:
         stretched_ref=args.stretched_ref,
         stretched_exp=args.stretched_exp,
         loss_type=args.loss,
-        mae_ckpt=None if args.resume else mae_ckpt_arg,
+        mae_ckpt=None if sup_resume else mae_ckpt_arg,
     )
     cb = [
         ModelCheckpoint(
@@ -192,7 +245,7 @@ def main() -> None:
         default_root_dir=out,
     )
     cprint(f"[dim]out {out}[/dim]")
-    tr.fit(lm, datamodule=dm, ckpt_path=args.resume)
+    tr.fit(lm, datamodule=dm, ckpt_path=sup_resume)
 
 
 if __name__ == "__main__":

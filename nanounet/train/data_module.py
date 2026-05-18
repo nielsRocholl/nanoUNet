@@ -12,7 +12,6 @@ from torch.utils.data import DataLoader, IterableDataset
 
 from nanounet.common import (
     ANISO_THRESHOLD,
-    dataloader_num_workers,
     preprocessed_dir,
     raw_dir,
     setup_logging,
@@ -21,6 +20,7 @@ from nanounet.config import RoiPromptConfig, load_config
 from nanounet.data import augment
 from nanounet.data.blosc2_dataset import Blosc2Folder
 from nanounet.data.sampling import build_patch
+from nanounet.dataloader_prefs import DataloaderBucket
 from nanounet.plan.plans import Plans
 from nanounet.plan.splits import fold_keys, load_or_create_splits
 from nanounet.train.patch_size import get_patch_size
@@ -127,6 +127,7 @@ class NanoDataModule(pl.LightningDataModule):
         fold: int,
         plans_identifier: str,
         roi_cfg_path: str,
+        dl_bucket: DataloaderBucket,
         batch_size: int | None = None,
         num_iterations_per_epoch: int = 250,
         num_val_iterations: int = 50,
@@ -140,6 +141,7 @@ class NanoDataModule(pl.LightningDataModule):
         self.plans_identifier = plans_identifier
         self.roi_cfg = load_config(roi_cfg_path)
         self.batch_size = batch_size
+        self.dl_bucket = dl_bucket
         self.num_iterations_per_epoch = num_iterations_per_epoch
         self.num_val_iterations = num_val_iterations
         self.oversample_foreground = oversample_foreground
@@ -194,14 +196,15 @@ class NanoDataModule(pl.LightningDataModule):
             self.batch_size,
             self.fold + 1000 * self.num_iterations_per_epoch,
         )
-        nw = dataloader_num_workers(train=True)
+        b = self.dl_bucket
+        nw = b.nw_train
         return DataLoader(
             it,
             batch_size=self.batch_size,
             num_workers=nw,
             pin_memory=self.pin_memory,
             persistent_workers=nw > 0,
-            prefetch_factor=4 if nw else None,
+            prefetch_factor=b.prefetch_train if nw else None,
             collate_fn=_collate,
         )
 
@@ -219,13 +222,14 @@ class NanoDataModule(pl.LightningDataModule):
             self.batch_size,
             self.fold + 2000,
         )
-        nw = dataloader_num_workers(train=False)
+        b = self.dl_bucket
+        nw = b.nw_val
         return DataLoader(
             it,
             batch_size=self.batch_size,
             num_workers=nw,
             pin_memory=self.pin_memory,
             persistent_workers=nw > 0,
-            prefetch_factor=2 if nw else None,
+            prefetch_factor=b.prefetch_val if nw else None,
             collate_fn=_collate,
         )
