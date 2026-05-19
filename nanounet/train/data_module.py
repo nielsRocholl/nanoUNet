@@ -89,25 +89,29 @@ class _PatchIterable(IterableDataset):
         seed = self.base_seed + wid * 10007
         rng = np.random.default_rng(seed)
         ds = Blosc2Folder(self.folder, identifiers=self.keys)
-        for _ in range(n_here):
+        remaining = n_here
+        while remaining > 0:
             cid = self.keys[int(rng.integers(0, len(self.keys)))]
-            data, seg, _, prop = ds.load_case(cid)
-            raw = build_patch(
-                data,
-                seg,
-                prop,
-                self.roi_cfg,
-                self.patch_size,
-                self.final_patch_size,
-                self.annotated_key,
-                self.force_zero_prompt,
-                rng,
-            )
-            im = torch.from_numpy(raw["image"]).float()
-            se = torch.from_numpy(raw["segmentation"]).short()
-            with torch.no_grad():
-                o = self.tf(**{"image": im, "segmentation": se})
-            yield {"data": o["image"], "target": o["segmentation"]}
+            k = min(self.batch_size, remaining)
+            with ds.open_case(cid) as (data, seg, _, prop):
+                for _ in range(k):
+                    raw = build_patch(
+                        data,
+                        seg,
+                        prop,
+                        self.roi_cfg,
+                        self.patch_size,
+                        self.final_patch_size,
+                        self.annotated_key,
+                        self.force_zero_prompt,
+                        rng,
+                    )
+                    im = torch.from_numpy(raw["image"]).float()
+                    se = torch.from_numpy(raw["segmentation"]).short()
+                    with torch.no_grad():
+                        o = self.tf(**{"image": im, "segmentation": se})
+                    yield {"data": o["image"], "target": o["segmentation"]}
+                    remaining -= 1
 
 
 def _collate(batch: list) -> dict:
@@ -203,7 +207,7 @@ class NanoDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=nw,
             pin_memory=self.pin_memory,
-            persistent_workers=nw > 0,
+            persistent_workers=False,  # mmap IterableDataset: persistent workers leak host RAM on cluster
             prefetch_factor=b.prefetch_train if nw else None,
             collate_fn=_collate,
         )
@@ -229,7 +233,7 @@ class NanoDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=nw,
             pin_memory=self.pin_memory,
-            persistent_workers=nw > 0,
+            persistent_workers=False,
             prefetch_factor=b.prefetch_val if nw else None,
             collate_fn=_collate,
         )

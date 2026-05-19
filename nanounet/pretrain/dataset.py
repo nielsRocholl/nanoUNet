@@ -8,9 +8,6 @@ from __future__ import annotations
 
 from typing import List
 
-import os
-
-import blosc2
 import numpy as np
 import torch
 from batchgenerators.utilities.file_and_folder_operations import join, load_json
@@ -57,36 +54,39 @@ class PretrainPatchIterable(IterableDataset):
         rng = np.random.default_rng(seed)
         ds = Blosc2Folder(self.folder, identifiers=self.keys)
         ps = self.patch_size
-        for _ in range(n_here):
+        remaining = n_here
+        while remaining > 0:
             cid = self.keys[int(rng.integers(0, len(self.keys)))]
-            data, _, _, _ = ds.load_case(cid)
-            shp = data.shape[1:]
-            assert all(int(shp[i]) >= int(ps[i]) for i in range(3))
-            lb = [int(rng.integers(0, shp[i] - ps[i] + 1)) for i in range(3)]
-            patch = np.asarray(
-                data[
-                    :,
-                    lb[0] : lb[0] + ps[0],
-                    lb[1] : lb[1] + ps[1],
-                    lb[2] : lb[2] + ps[2],
-                ],
-                dtype=np.float32,
-            )
-            for ax in (0, 1, 2):
-                if rng.random() < 0.5:
-                    patch = np.flip(patch, axis=ax + 1).copy()
-            yield {"data": torch.from_numpy(patch).float()}
+            k = min(self.batch_size, remaining)
+            with ds.open_case(cid) as (data, _, _, _):
+                shp = data.shape[1:]
+                assert all(int(shp[i]) >= int(ps[i]) for i in range(3))
+                for _ in range(k):
+                    lb = [int(rng.integers(0, shp[i] - ps[i] + 1)) for i in range(3)]
+                    patch = np.asarray(
+                        data[
+                            :,
+                            lb[0] : lb[0] + ps[0],
+                            lb[1] : lb[1] + ps[1],
+                            lb[2] : lb[2] + ps[2],
+                        ],
+                        dtype=np.float32,
+                    )
+                    for ax in (0, 1, 2):
+                        if rng.random() < 0.5:
+                            patch = np.flip(patch, axis=ax + 1).copy()
+                    yield {"data": torch.from_numpy(patch).float()}
+                    remaining -= 1
 
 
 def _keys_fit_patch(case_dir: str, keys: List[str], ps: np.ndarray) -> List[str]:
-    dparams = {"nthreads": 1}
-    mmap = {} if os.name == "nt" else {"mmap_mode": "r"}
+    folder = Blosc2Folder(case_dir, identifiers=keys)
     out: List[str] = []
     for k in keys:
-        data = blosc2.open(urlpath=join(case_dir, k + ".b2nd"), mode="r", dparams=dparams, **mmap)
-        shp = data.shape[1:]
-        if all(int(shp[i]) >= int(ps[i]) for i in range(3)):
-            out.append(k)
+        with folder.open_case(k) as (data, _, _, _):
+            shp = data.shape[1:]
+            if all(int(shp[i]) >= int(ps[i]) for i in range(3)):
+                out.append(k)
     return out
 
 
@@ -143,7 +143,7 @@ def build_pretrain_dataloaders(
         batch_size=batch_size,
         num_workers=nw_tr,
         pin_memory=pin_memory,
-        persistent_workers=nw_tr > 0,
+        persistent_workers=False,  # mmap IterableDataset: persistent workers leak host RAM on cluster
         prefetch_factor=pf_tr,
         collate_fn=_pretrain_collate,
     )
@@ -152,7 +152,7 @@ def build_pretrain_dataloaders(
         batch_size=batch_size,
         num_workers=nw_va,
         pin_memory=pin_memory,
-        persistent_workers=nw_va > 0,
+        persistent_workers=False,
         prefetch_factor=pf_va,
         collate_fn=_pretrain_collate,
     )

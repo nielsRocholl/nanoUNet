@@ -80,7 +80,7 @@ Supervised training on one fold; optional integrated MAE then supervised. Defaul
 | `--mae-lr` | `1e-2` | MAE initial LR |
 | `--mae-mask-ratio` | `0.75` | MAE mask ratio |
 | `--mae-iters-per-epoch` | same as `--iters-per-epoch` | MAE batches per epoch |
-| `--dl-bucket` | `m` | DataLoader preset: `s` (low RAM) \| `m` \| `l` (workers + prefetch) |
+| `--dl-bucket` | `m` | DataLoader preset: `s` (low RAM) \| `m` \| `l` (workers + prefetch). Loaders use case-sticky Blosc2 I/O (`K=batch_size` patches per open) and non-persistent workers to limit Slurm host RAM. |
 
 Checkpoints: `<run>/checkpoints/last.ckpt` (supervised); `<run>/mae_pretrain/checkpoints/` (integrated MAE). Re-running without `--resume` / `--mae-resume` trains from scratch and may overwrite those paths.
 
@@ -148,6 +148,8 @@ nanounet_preprocess -d 001 --planner nnUNetPlannerResEncTiny --patch-vol small -
 ```
 
 Cluster example (CPU preprocess, large GPU train): add `--gpu-memory-gb 80 --patch-vol medium`. See CLI table for `--skip-fingerprint`, `--skip-plan`, `--resume`.
+
+On Slurm, prefer `--dl-bucket s` if host RAM is tight; MAE and supervised training close mmap’d cases after each sticky batch and restart DataLoader workers each epoch.
 
 **2 — Train**
 

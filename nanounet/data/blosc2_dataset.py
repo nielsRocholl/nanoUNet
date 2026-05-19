@@ -1,16 +1,23 @@
-"""Blosc2 preprocessed cases: identifiers, load_case, optional centroids JSON merge."""
+"""Blosc2 preprocessed cases: open_case context manager, save_case, identifiers."""
 
 from __future__ import annotations
 
 import json
 import math
 import os
+from contextlib import contextmanager
 from copy import deepcopy
-from typing import Tuple, Union
+from typing import Iterator, Tuple, Union
 
 import blosc2
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import isfile, join, load_pickle, write_pickle
+
+
+def _close_b2(arr) -> None:
+    if arr is not None and hasattr(arr, "close"):
+        arr.close()
+
 
 class Blosc2Folder:
     def __init__(self, folder: str, identifiers: list[str] | None = None, folder_with_segs_from_previous_stage: str | None = None):
@@ -19,11 +26,16 @@ class Blosc2Folder:
         self.identifiers = sorted(identifiers) if identifiers is not None else self.get_identifiers(folder)
         blosc2.set_nthreads(1)
 
-    def load_case(self, identifier: str):
+    @contextmanager
+    def open_case(self, identifier: str) -> Iterator[tuple]:
         dparams = {"nthreads": 1}
         mmap_kwargs = {} if os.name == "nt" else {"mmap_mode": "r"}
-        data = blosc2.open(urlpath=join(self.source_folder, identifier + ".b2nd"), mode="r", dparams=dparams, **mmap_kwargs)
-        seg = blosc2.open(urlpath=join(self.source_folder, identifier + "_seg.b2nd"), mode="r", dparams=dparams, **mmap_kwargs)
+        data = blosc2.open(
+            urlpath=join(self.source_folder, identifier + ".b2nd"), mode="r", dparams=dparams, **mmap_kwargs
+        )
+        seg = blosc2.open(
+            urlpath=join(self.source_folder, identifier + "_seg.b2nd"), mode="r", dparams=dparams, **mmap_kwargs
+        )
         if self.folder_with_segs_from_previous_stage is not None:
             seg_prev = blosc2.open(
                 urlpath=join(self.folder_with_segs_from_previous_stage, identifier + ".b2nd"),
@@ -33,11 +45,17 @@ class Blosc2Folder:
             )
         else:
             seg_prev = None
-        properties = load_pickle(join(self.source_folder, identifier + ".pkl"))
-        cj = join(self.source_folder, identifier + "_centroids.json")
-        if isfile(cj):
-            properties = {**properties, **json.load(open(cj, encoding="utf-8"))}
-        return data, seg, seg_prev, properties
+        try:
+            properties = load_pickle(join(self.source_folder, identifier + ".pkl"))
+            cj = join(self.source_folder, identifier + "_centroids.json")
+            if isfile(cj):
+                with open(cj, encoding="utf-8") as f:
+                    properties = {**properties, **json.load(f)}
+            yield data, seg, seg_prev, properties
+        finally:
+            _close_b2(data)
+            _close_b2(seg)
+            _close_b2(seg_prev)
 
     @staticmethod
     def save_case(data: np.ndarray, seg: np.ndarray, properties: dict, output_filename_truncated: str, chunks=None, blocks=None, chunks_seg=None, blocks_seg=None, clevel: int = 8, codec=blosc2.Codec.ZSTD):
