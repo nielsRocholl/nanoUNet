@@ -6,6 +6,7 @@ build raises if train or val has no qualifying case after that filter.
 
 from __future__ import annotations
 
+from functools import partial
 from typing import List
 
 import numpy as np
@@ -14,14 +15,25 @@ from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from torch.utils.data import DataLoader, IterableDataset
 
 from nanounet.common import preprocessed_dir, print0, raw_dir
-from nanounet.dataloader_prefs import DataloaderBucket
-from nanounet.data.blosc2_dataset import Blosc2Folder
+from nanounet.dataloader_prefs import DataloaderBucket, mae_keep_workers
+from nanounet.data.blosc2_dataset import Blosc2Folder, case_spatial_shape
+from nanounet.mem_diag import (
+    log_snapshot,
+    mem_diag_enabled,
+    worker_diag_init,
+    worker_diag_iter_end,
+    worker_diag_tick,
+)
 from nanounet.plan.plans import Plans
 from nanounet.plan.splits import fold_keys, load_or_create_splits
 
 
 def _pretrain_collate(batch: list) -> dict:
     return {"data": torch.stack([b["data"] for b in batch])}
+
+
+def _worker_init(worker_id: int, out_dir: str) -> None:
+    worker_diag_init(worker_id, out_dir)
 
 
 class PretrainPatchIterable(IterableDataset):
@@ -33,6 +45,7 @@ class PretrainPatchIterable(IterableDataset):
         num_batches: int,
         batch_size: int,
         base_seed: int,
+        mem_diag_dir: str | None = None,
     ):
         self.folder = folder
         self.keys = keys
@@ -40,6 +53,7 @@ class PretrainPatchIterable(IterableDataset):
         self.num_batches = num_batches
         self.batch_size = batch_size
         self.base_seed = base_seed
+        self.mem_diag_dir = mem_diag_dir
 
     def __len__(self) -> int:
         return self.num_batches * self.batch_size
@@ -55,10 +69,20 @@ class PretrainPatchIterable(IterableDataset):
         ds = Blosc2Folder(self.folder, identifiers=self.keys)
         ps = self.patch_size
         remaining = n_here
+        opens = 0
+        patches = 0
+        if mem_diag_enabled() and self.mem_diag_dir:
+            log_snapshot(
+                f"worker_{wid}_iter_start",
+                self.mem_diag_dir,
+                extra={"worker_id": wid, "n_here": n_here, "num_keys": len(self.keys), "batch_size": self.batch_size},
+                filename=f"mem_diag_worker_{wid}.jsonl",
+            )
         while remaining > 0:
             cid = self.keys[int(rng.integers(0, len(self.keys)))]
             k = min(self.batch_size, remaining)
-            with ds.open_case(cid) as (data, _, _, _):
+            with ds.open_case(cid, need_seg=False) as (data, _, _, _):
+                opens += 1
                 shp = data.shape[1:]
                 assert all(int(shp[i]) >= int(ps[i]) for i in range(3))
                 for _ in range(k):
@@ -77,16 +101,26 @@ class PretrainPatchIterable(IterableDataset):
                             patch = np.flip(patch, axis=ax + 1).copy()
                     yield {"data": torch.from_numpy(patch).float()}
                     remaining -= 1
+                    patches += 1
+            if mem_diag_enabled() and self.mem_diag_dir:
+                worker_diag_tick(wid, {"opens": opens, "patches": patches, "worker_id": wid})
+        if mem_diag_enabled() and self.mem_diag_dir:
+            worker_diag_iter_end(
+                wid,
+                {"opens": opens, "patches": patches, "worker_id": wid, "n_here": n_here},
+            )
 
 
-def _keys_fit_patch(case_dir: str, keys: List[str], ps: np.ndarray) -> List[str]:
-    folder = Blosc2Folder(case_dir, identifiers=keys)
+def _keys_fit_patch(case_dir: str, keys: List[str], ps: np.ndarray, mem_diag_dir: str | None, tag: str) -> List[str]:
+    if mem_diag_enabled() and mem_diag_dir:
+        log_snapshot(f"keys_fit_patch_before_{tag}", mem_diag_dir, extra={"n_keys": len(keys)})
     out: List[str] = []
     for k in keys:
-        with folder.open_case(k) as (data, _, _, _):
-            shp = data.shape[1:]
-            if all(int(shp[i]) >= int(ps[i]) for i in range(3)):
-                out.append(k)
+        shp = case_spatial_shape(case_dir, k)
+        if all(int(shp[i]) >= int(ps[i]) for i in range(3)):
+            out.append(k)
+    if mem_diag_enabled() and mem_diag_dir:
+        log_snapshot(f"keys_fit_patch_after_{tag}", mem_diag_dir, extra={"n_keys": len(out)})
     return out
 
 
@@ -101,6 +135,7 @@ def build_pretrain_dataloaders(
     base_seed_val: int,
     bucket: DataloaderBucket,
     pin_memory: bool | None = None,
+    mem_diag_dir: str | None = None,
 ) -> tuple[DataLoader, DataLoader]:
     pp = preprocessed_dir()
     raw = raw_dir()
@@ -118,8 +153,8 @@ def build_pretrain_dataloaders(
     tr_k, va_k = fold_keys(spl, fold)
     ps = np.array(cm.patch_size)
     tr_0, va_0 = tr_k, va_k
-    tr_k = _keys_fit_patch(case_dir, tr_k, ps)
-    va_k = _keys_fit_patch(case_dir, va_k, ps)
+    tr_k = _keys_fit_patch(case_dir, tr_k, ps, mem_diag_dir, "train")
+    va_k = _keys_fit_patch(case_dir, va_k, ps, mem_diag_dir, "val")
     if len(tr_k) < len(tr_0) or len(va_k) < len(va_0):
         print0(
             "[dim]MAE pretrain: skipped cases smaller than patch "
@@ -130,30 +165,35 @@ def build_pretrain_dataloaders(
             "MAE pretrain needs at least one case per split with spatial shape >= patch; "
             f"patch={tuple(ps.tolist())} train_ok={len(tr_k)} val_ok={len(va_k)}"
         )
-    if pin_memory is None:
-        pin_memory = torch.cuda.is_available()
+    if mae_keep_workers():
+        import torch.multiprocessing as tmp
+
+        if tmp.get_sharing_strategy() != "file_system":
+            tmp.set_sharing_strategy("file_system")
+
     nw_tr = bucket.nw_train
     nw_va = bucket.nw_val
-    tr_it = PretrainPatchIterable(case_dir, tr_k, ps, num_iterations_per_epoch, batch_size, base_seed_train)
-    va_it = PretrainPatchIterable(case_dir, va_k, ps, num_val_iterations, batch_size, base_seed_val)
-    pf_tr = bucket.prefetch_train if nw_tr else None
-    pf_va = bucket.prefetch_val if nw_va else None
-    tr = DataLoader(
-        tr_it,
-        batch_size=batch_size,
-        num_workers=nw_tr,
-        pin_memory=pin_memory,
-        persistent_workers=False,  # mmap IterableDataset: persistent workers leak host RAM on cluster
-        prefetch_factor=pf_tr,
-        collate_fn=_pretrain_collate,
+    pin_mem = False if nw_tr == 0 else (pin_memory if pin_memory is not None else False)
+    tr_it = PretrainPatchIterable(
+        case_dir, tr_k, ps, num_iterations_per_epoch, batch_size, base_seed_train, mem_diag_dir
     )
-    va = DataLoader(
-        va_it,
-        batch_size=batch_size,
-        num_workers=nw_va,
-        pin_memory=pin_memory,
-        persistent_workers=False,
-        prefetch_factor=pf_va,
-        collate_fn=_pretrain_collate,
-    )
+    va_it = PretrainPatchIterable(case_dir, va_k, ps, num_val_iterations, batch_size, base_seed_val, mem_diag_dir)
+    winit_tr = partial(_worker_init, out_dir=mem_diag_dir or ".") if mem_diag_enabled() and mem_diag_dir and nw_tr else None
+    winit_va = partial(_worker_init, out_dir=mem_diag_dir or ".") if mem_diag_enabled() and mem_diag_dir and nw_va else None
+
+    def _dl(it, nw, pf, winit, pin):
+        kw: dict = {
+            "batch_size": batch_size,
+            "num_workers": nw,
+            "pin_memory": pin,
+            "collate_fn": _pretrain_collate,
+        }
+        if nw:
+            kw["persistent_workers"] = False
+            kw["prefetch_factor"] = pf
+            kw["worker_init_fn"] = winit
+        return DataLoader(it, **kw)
+
+    tr = _dl(tr_it, nw_tr, bucket.prefetch_train if nw_tr else None, winit_tr, pin_mem)
+    va = _dl(va_it, nw_va, bucket.prefetch_val if nw_va else None, winit_va, False if nw_va == 0 else pin_mem)
     return tr, va

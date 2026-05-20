@@ -17,8 +17,10 @@ from nanounet.common import (
     raw_dir,
     resolve_user_config_path,
     results_dir,
+    setup_logging,
     sync_nnunet_env,
 )
+from nanounet.mem_diag import log_snapshot, mem_diag_enabled, set_mem_diag
 
 quiet_lightning_runtime()
 
@@ -26,7 +28,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
-from nanounet.dataloader_prefs import dataloader_bucket
+from nanounet.dataloader_prefs import dataloader_bucket, mae_dataloader_bucket
 from nanounet.lightning_ckpt import (
     pl_ckpt_assert_epochs_match,
     pl_ckpt_epoch_and_target,
@@ -96,13 +98,21 @@ def main() -> None:
         default="m",
         help="DataLoader workers+prefetch: s low RAM (e.g. Slurm --mem), m default, l high RAM.",
     )
+    ap.add_argument(
+        "--mem-diag",
+        action="store_true",
+        help="Log cgroup/process RAM to OUT/mem_diag.jsonl and W&B mem/* metrics.",
+    )
     args = ap.parse_args()
     if args.mae_resume and not args.mae_pretrain:
         raise ValueError("--mae-resume requires --mae-pretrain")
     if args.mae_resume and args.mae_ckpt:
         raise ValueError("--mae-resume conflicts with --mae-ckpt")
     args.roi_cfg = resolve_user_config_path(args.roi_cfg)
+    set_mem_diag(args.mem_diag)
+    setup_logging()
     dl_b = dataloader_bucket(args.dl_bucket)
+    mae_dl_b = mae_dataloader_bucket(args.dl_bucket)
 
     ds = convert_id_to_dataset_name(args.dataset_id)
     nano_header(f"nanoUNet train  {ds}  fold {args.fold}", color="green")
@@ -129,6 +139,7 @@ def main() -> None:
     sup_resume = args.resume
     if sup_resume and not os.path.isfile(sup_resume):
         raise ValueError(sup_resume)
+    mem_dir = pre_out if mem_diag_enabled() else None
 
     if args.mae_pretrain and mae_ckpt_arg is None:
         maybe_mkdir_p(pre_out)
@@ -148,6 +159,25 @@ def main() -> None:
             else:
                 mae_fit_ckpt = args.mae_resume
         if run_mae_fit:
+            if mem_diag_enabled():
+                log_snapshot(
+                    "mae_config",
+                    pre_out,
+                    extra={
+                        "batch_size": batch_mae,
+                        "patch_size": list(pm0.get_configuration("3d_fullres").patch_size),
+                        "dl_bucket": args.dl_bucket,
+                        "nw_train": mae_dl_b.nw_train,
+                        "nw_val": mae_dl_b.nw_val,
+                        "prefetch_train": mae_dl_b.prefetch_train,
+                        "prefetch_val": mae_dl_b.prefetch_val,
+                        "iters_per_epoch": mae_iters,
+                        "val_iters": args.val_iters,
+                        "preprocessed_dir": pp,
+                        "mae_resume": mae_fit_ckpt,
+                        "persistent_workers": False,
+                    },
+                )
             tr_pre, va_pre = build_pretrain_dataloaders(
                 ds,
                 args.fold,
@@ -157,8 +187,11 @@ def main() -> None:
                 args.val_iters,
                 args.fold + 5000 * mae_iters,
                 args.fold + 6000,
-                dl_b,
+                mae_dl_b,
+                mem_diag_dir=mem_dir,
             )
+            if mem_diag_enabled():
+                log_snapshot("mae_dataloaders_built", pre_out)
             pre_lm = NanoMAELM(
                 plans_path,
                 dj_path,
@@ -192,6 +225,8 @@ def main() -> None:
             del pre_lm, tr_pre, va_pre, pre_trnr
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+            if mem_diag_enabled():
+                log_snapshot("mae_teardown", pre_out)
 
     if sup_resume:
         pl_ckpt_assert_epochs_match(sup_resume, args.epochs)
@@ -209,6 +244,7 @@ def main() -> None:
         args.batch_size,
         args.iters_per_epoch,
         args.val_iters,
+        mem_diag_dir=out if mem_diag_enabled() else None,
     )
     lm = NanoUNetLM(
         plans_path,

@@ -10,6 +10,15 @@ import torch
 from batchgenerators.utilities.file_and_folder_operations import load_json
 from torch import autocast
 
+from nanounet.dataloader_prefs import mae_keep_workers
+from nanounet.mem_diag import (
+    cgroup_epoch_deltas,
+    cgroup_mem_bytes,
+    log_snapshot,
+    log_wandb_scalars,
+    mem_diag_enabled,
+    purge_torch_tmp,
+)
 from nanounet.model.lr_schedule import PolyLRScheduler
 from nanounet.model.network import build_net
 from nanounet.plan.plans import Plans, determine_num_input_channels
@@ -48,6 +57,8 @@ class NanoMAELM(pl.LightningModule):
         )
         p = np.vstack(self.cm.pool_op_kernel_sizes)
         self.total_stride = tuple(np.prod(p, axis=0).astype(int).tolist())
+        self._prev_cgroup_file: int | None = None
+        self._prev_cgroup_shmem: int | None = None
 
     def forward(self, x: torch.Tensor):
         return self.net(x)
@@ -73,6 +84,10 @@ class NanoMAELM(pl.LightningModule):
 
     def on_train_epoch_start(self) -> None:
         self._epoch_t0 = time.perf_counter()
+        if mae_keep_workers():
+            purge_torch_tmp()
+        if mem_diag_enabled() and torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
 
     def on_validation_epoch_end(self) -> None:
         if (
@@ -81,6 +96,27 @@ class NanoMAELM(pl.LightningModule):
         ):
             return
         self.log("epoch_wall_time_sec", float(time.perf_counter() - self._epoch_t0))
+        if mem_diag_enabled():
+            ep = int(self.current_epoch)
+            fd, sd = cgroup_epoch_deltas(self._prev_cgroup_file, self._prev_cgroup_shmem)
+            cg = cgroup_mem_bytes()
+            self._prev_cgroup_file = cg.get("file")
+            self._prev_cgroup_shmem = cg.get("shmem")
+            extra: dict = {"epoch": ep, "stage": "mae"}
+            if fd is not None:
+                extra["cgroup_file_delta_bytes"] = fd
+            if sd is not None:
+                extra["cgroup_shmem_delta_bytes"] = sd
+            row = log_snapshot(f"mae_epoch_{ep}", self.output_dir, extra=extra)
+            log_wandb_scalars(self, row)
+
+    def on_exception(self, exception: BaseException) -> None:
+        if mem_diag_enabled():
+            log_snapshot(
+                "mae_exception",
+                self.output_dir,
+                extra={"epoch": int(self.current_epoch), "error": type(exception).__name__},
+            )
 
     def configure_optimizers(self):
         opt = torch.optim.SGD(

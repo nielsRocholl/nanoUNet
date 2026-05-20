@@ -14,6 +14,7 @@ from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from torch import autocast
 
 from nanounet.config import RoiPromptConfig, load_config, save_config
+from nanounet.mem_diag import log_snapshot, log_wandb_scalars, mem_diag_enabled
 from nanounet.model.dice_helpers import get_tp_fp_fn_tn
 from nanounet.model.losses import build_loss
 from nanounet.model.lr_schedule import PolyLRScheduler, StretchedTailPolyLRScheduler
@@ -139,6 +140,22 @@ class NanoUNetLM(pl.LightningModule):
         self.log("val_loss", float(np.mean([v["loss"] for v in self._val_buf])), prog_bar=False)
 
     def configure_optimizers(self):
+        if mem_diag_enabled():
+            ep = int(self.current_epoch)
+            row = log_snapshot(
+                f"sup_epoch_{ep}",
+                self.output_dir,
+                extra={"epoch": ep, "stage": "supervised"},
+            )
+            log_wandb_scalars(self, row)
+
+    def on_exception(self, exception: BaseException) -> None:
+        if mem_diag_enabled():
+            log_snapshot(
+                "sup_exception",
+                self.output_dir,
+                extra={"epoch": int(self.current_epoch), "error": type(exception).__name__},
+            )
         opt = torch.optim.SGD(
             self.net.parameters(),
             lr=self.initial_lr,

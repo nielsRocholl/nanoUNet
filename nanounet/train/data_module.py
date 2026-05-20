@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from typing import List
 
 import numpy as np
@@ -21,11 +22,16 @@ from nanounet.data import augment
 from nanounet.data.blosc2_dataset import Blosc2Folder
 from nanounet.data.sampling import build_patch
 from nanounet.dataloader_prefs import DataloaderBucket
+from nanounet.mem_diag import log_snapshot, mem_diag_enabled, worker_diag_init, worker_diag_tick
 from nanounet.plan.plans import Plans
 from nanounet.plan.splits import fold_keys, load_or_create_splits
 from nanounet.train.patch_size import get_patch_size
 
 setup_logging()
+
+
+def _worker_init(worker_id: int, out_dir: str) -> None:
+    worker_diag_init(worker_id, out_dir)
 
 
 def _ds_scales(cm, enable: bool):
@@ -64,6 +70,7 @@ class _PatchIterable(IterableDataset):
         num_batches: int,
         batch_size: int,
         base_seed: int,
+        mem_diag_dir: str | None = None,
     ):
         self.folder = folder
         self.keys = keys
@@ -76,6 +83,7 @@ class _PatchIterable(IterableDataset):
         self.num_batches = num_batches
         self.batch_size = batch_size
         self.base_seed = base_seed
+        self.mem_diag_dir = mem_diag_dir
 
     def __len__(self) -> int:
         return self.num_batches * self.batch_size
@@ -90,10 +98,20 @@ class _PatchIterable(IterableDataset):
         rng = np.random.default_rng(seed)
         ds = Blosc2Folder(self.folder, identifiers=self.keys)
         remaining = n_here
+        opens = 0
+        patches = 0
+        if mem_diag_enabled() and self.mem_diag_dir:
+            log_snapshot(
+                f"worker_{wid}_iter_start",
+                self.mem_diag_dir,
+                extra={"worker_id": wid, "n_here": n_here, "num_keys": len(self.keys), "batch_size": self.batch_size},
+                filename=f"mem_diag_worker_{wid}.jsonl",
+            )
         while remaining > 0:
             cid = self.keys[int(rng.integers(0, len(self.keys)))]
             k = min(self.batch_size, remaining)
-            with ds.open_case(cid) as (data, seg, _, prop):
+            with ds.open_case(cid, need_seg=True) as (data, seg, _, prop):
+                opens += 1
                 for _ in range(k):
                     raw = build_patch(
                         data,
@@ -112,6 +130,9 @@ class _PatchIterable(IterableDataset):
                         o = self.tf(**{"image": im, "segmentation": se})
                     yield {"data": o["image"], "target": o["segmentation"]}
                     remaining -= 1
+                    patches += 1
+            if mem_diag_enabled() and self.mem_diag_dir:
+                worker_diag_tick(wid, {"opens": opens, "patches": patches, "worker_id": wid})
 
 
 def _collate(batch: list) -> dict:
@@ -138,6 +159,7 @@ class NanoDataModule(pl.LightningDataModule):
         oversample_foreground: float = 0.33,
         enable_deep_supervision: bool = True,
         pin_memory: bool | None = None,
+        mem_diag_dir: str | None = None,
     ):
         super().__init__()
         self.dataset_name = dataset_name
@@ -150,6 +172,7 @@ class NanoDataModule(pl.LightningDataModule):
         self.num_val_iterations = num_val_iterations
         self.oversample_foreground = oversample_foreground
         self.enable_ds = enable_deep_supervision
+        self.mem_diag_dir = mem_diag_dir
         if pin_memory is None:
             pin_memory = torch.cuda.is_available()
         self.pin_memory = pin_memory
@@ -199,9 +222,11 @@ class NanoDataModule(pl.LightningDataModule):
             self.num_iterations_per_epoch,
             self.batch_size,
             self.fold + 1000 * self.num_iterations_per_epoch,
+            self.mem_diag_dir,
         )
         b = self.dl_bucket
         nw = b.nw_train
+        winit = partial(_worker_init, out_dir=self.mem_diag_dir or ".") if mem_diag_enabled() and self.mem_diag_dir and nw else None
         return DataLoader(
             it,
             batch_size=self.batch_size,
@@ -210,6 +235,7 @@ class NanoDataModule(pl.LightningDataModule):
             persistent_workers=False,  # mmap IterableDataset: persistent workers leak host RAM on cluster
             prefetch_factor=b.prefetch_train if nw else None,
             collate_fn=_collate,
+            worker_init_fn=winit,
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -225,9 +251,11 @@ class NanoDataModule(pl.LightningDataModule):
             self.num_val_iterations,
             self.batch_size,
             self.fold + 2000,
+            self.mem_diag_dir,
         )
         b = self.dl_bucket
         nw = b.nw_val
+        winit = partial(_worker_init, out_dir=self.mem_diag_dir or ".") if mem_diag_enabled() and self.mem_diag_dir and nw else None
         return DataLoader(
             it,
             batch_size=self.batch_size,
@@ -236,4 +264,5 @@ class NanoDataModule(pl.LightningDataModule):
             persistent_workers=False,
             prefetch_factor=b.prefetch_val if nw else None,
             collate_fn=_collate,
+            worker_init_fn=winit,
         )

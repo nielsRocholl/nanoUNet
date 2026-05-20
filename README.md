@@ -80,9 +80,27 @@ Supervised training on one fold; optional integrated MAE then supervised. Defaul
 | `--mae-lr` | `1e-2` | MAE initial LR |
 | `--mae-mask-ratio` | `0.75` | MAE mask ratio |
 | `--mae-iters-per-epoch` | same as `--iters-per-epoch` | MAE batches per epoch |
-| `--dl-bucket` | `m` | DataLoader preset: `s` (low RAM) \| `m` \| `l` (workers + prefetch). Loaders use case-sticky Blosc2 I/O (`K=batch_size` patches per open) and non-persistent workers to limit Slurm host RAM. |
+| `--dl-bucket` | `m` | DataLoader preset: `s` (low RAM) \| `m` \| `l` (workers + prefetch). Loaders use case-sticky Blosc2 I/O (`K=batch_size` patches per open), **no mmap** (avoids Slurm page-cache OOM), and non-persistent workers. |
+| `--mem-diag` | off (flag) | Log Slurm-cgroup and process RAM to `<run>/mem_diag.jsonl` and W&B `mem/*` metrics. Also set `NANOUNET_MEM_DIAG=1`. |
 
 Checkpoints: `<run>/checkpoints/last.ckpt` (supervised); `<run>/mae_pretrain/checkpoints/` (integrated MAE). Re-running without `--resume` / `--mae-resume` trains from scratch and may overwrite those paths.
+
+#### Memory diagnostics (Slurm host-RAM OOM)
+
+On shared GPU nodes, W&B **system** panels show **node-wide** memory — not your job. Use job-scoped logs instead:
+
+| File | Contents |
+|------|----------|
+| `<run>/mae_pretrain/mem_diag.jsonl` | MAE epoch snapshots: cgroup `current/anon/file`, process RSS, GPU bytes |
+| `<run>/mem_diag.jsonl` | Supervised epoch snapshots |
+| `<run>/mae_pretrain/mem_diag_worker_*.jsonl` | Per-DataLoader-worker I/O + RSS every 100 case opens |
+| `<run>/mem_diag_cgroup.log` | Bash sidecar: cgroup memory every 30s (survives Python SIGKILL) |
+
+**Interpretation:** monotonic growth in `cgroup_file_bytes` → kernel page cache (usually from mmap’d Blosc2 I/O). Training now opens `.b2nd` without mmap and MAE skips unused `_seg` volumes; growth in `cgroup_anon_bytes` → heap/worker copies. After each epoch, healthy runs show `cgroup_file` stable or recovering, not climbing toward the Slurm `--mem` limit.
+
+Optional: `NANOUNET_MEM_LOG_EVERY=N` logs worker I/O every N case opens (default 100).
+
+Slurm train example: [`scripts/slurm_nanounet_train_mae_999.sh`](scripts/slurm_nanounet_train_mae_999.sh) — reads preprocessed data from storage (no rclone), `--mem=250G`, `--mem-diag`.
 
 ---
 
@@ -149,7 +167,7 @@ nanounet_preprocess -d 001 --planner nnUNetPlannerResEncTiny --patch-vol small -
 
 Cluster example (CPU preprocess, large GPU train): add `--gpu-memory-gb 80 --patch-vol medium`. See CLI table for `--skip-fingerprint`, `--skip-plan`, `--resume`.
 
-On Slurm, prefer `--dl-bucket s` if host RAM is tight; MAE and supervised training close mmap’d cases after each sticky batch and restart DataLoader workers each epoch.
+On Slurm, prefer `--dl-bucket s` if host RAM is tight. Training reads Blosc2 via chunk decompress (no mmap) so random patch sampling does not fill the cgroup page cache; MAE opens data volumes only (not seg). DataLoader workers restart each epoch (`persistent_workers=False`).
 
 **2 — Train**
 

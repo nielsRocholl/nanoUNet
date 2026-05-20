@@ -1,0 +1,7 @@
+We've been debugging host-RAM OOM on a large NanoUNet/nnUNet MAE run (Dataset999, ~545 GB preprocessed Blosc2, --mem=250G). Not GPU OOM — process RSS stays ~5–10 GB. The growth is in cgroup file (+ shmem), i.e. page cache from random .b2nd reads, not a Python heap leak.
+
+Training does random case sampling → open .b2nd → random crop → close. With a corpus >> job RAM, the kernel keeps caching touched file pages. Under cgroup v2 that cache counts toward --mem. We saw ~1.5 GB/epoch file growth until Slurm OOM-kill (no traceback). Disabling mmap helped startup but didn't stop sustained growth — buffered chunk reads still populate cache.
+
+Why the whole node slows down: (1) the job drives memory pressure → direct reclaim / cache churn affects other cgroups on the node; (2) random I/O across thousands of cases × DataLoader workers saturates local or shared storage — high iowait for everyone on that filesystem. OOM-restart loops make it worse (cold cache → read burst).
+
+So it's the interaction of nnUNet's random patch I/O pattern + Blosc2 on-disk layout + Linux page cache accounting — not the training loop itself. Fixes we're looking at: per-case posix_fadvise, tighter worker/prefetch settings, possibly local NVMe staging of the fold. Happy to share mem_diag.jsonl if useful

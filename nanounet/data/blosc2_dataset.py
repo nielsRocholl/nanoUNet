@@ -1,4 +1,7 @@
-"""Blosc2 preprocessed cases: open_case context manager, save_case, identifiers."""
+"""Blosc2 preprocessed cases: open_case context manager, save_case, identifiers.
+
+Training opens without mmap (chunk decompress) to avoid Slurm page-cache OOM.
+"""
 
 from __future__ import annotations
 
@@ -13,10 +16,41 @@ import blosc2
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import isfile, join, load_pickle, write_pickle
 
+from nanounet.mem_diag import b2_close_inc, mem_diag_enabled
+
 
 def _close_b2(arr) -> None:
     if arr is not None and hasattr(arr, "close"):
         arr.close()
+
+
+def _fadvise_dontneed(path: str) -> None:
+    if not hasattr(os, "posix_fadvise"):
+        return
+    try:
+        fd = os.open(path, os.O_RDONLY)
+        try:
+            os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)
+        finally:
+            os.close(fd)
+    except OSError:
+        pass
+
+
+def _open_b2(path: str, mmap: bool):
+    dparams = {"nthreads": 1}
+    kw = {"mmap_mode": "r"} if mmap and os.name != "nt" else {}
+    return blosc2.open(urlpath=path, mode="r", dparams=dparams, **kw)
+
+
+def case_spatial_shape(folder: str, identifier: str) -> tuple[int, int, int]:
+    path = join(folder, identifier + ".b2nd")
+    data = _open_b2(path, mmap=False)
+    shp = tuple(int(x) for x in data.shape[1:])
+    _close_b2(data)
+    del data
+    _fadvise_dontneed(path)
+    return shp
 
 
 class Blosc2Folder:
@@ -27,24 +61,17 @@ class Blosc2Folder:
         blosc2.set_nthreads(1)
 
     @contextmanager
-    def open_case(self, identifier: str) -> Iterator[tuple]:
-        dparams = {"nthreads": 1}
-        mmap_kwargs = {} if os.name == "nt" else {"mmap_mode": "r"}
-        data = blosc2.open(
-            urlpath=join(self.source_folder, identifier + ".b2nd"), mode="r", dparams=dparams, **mmap_kwargs
+    def open_case(self, identifier: str, *, need_seg: bool = True, mmap: bool = False) -> Iterator[tuple]:
+        data_path = join(self.source_folder, identifier + ".b2nd")
+        seg_path = join(self.source_folder, identifier + "_seg.b2nd") if need_seg else None
+        seg_prev_path = (
+            join(self.folder_with_segs_from_previous_stage, identifier + ".b2nd")
+            if need_seg and self.folder_with_segs_from_previous_stage is not None
+            else None
         )
-        seg = blosc2.open(
-            urlpath=join(self.source_folder, identifier + "_seg.b2nd"), mode="r", dparams=dparams, **mmap_kwargs
-        )
-        if self.folder_with_segs_from_previous_stage is not None:
-            seg_prev = blosc2.open(
-                urlpath=join(self.folder_with_segs_from_previous_stage, identifier + ".b2nd"),
-                mode="r",
-                dparams=dparams,
-                **mmap_kwargs,
-            )
-        else:
-            seg_prev = None
+        data = _open_b2(data_path, mmap)
+        seg = _open_b2(seg_path, mmap) if seg_path else None
+        seg_prev = _open_b2(seg_prev_path, mmap) if seg_prev_path else None
         try:
             properties = load_pickle(join(self.source_folder, identifier + ".pkl"))
             cj = join(self.source_folder, identifier + "_centroids.json")
@@ -56,6 +83,13 @@ class Blosc2Folder:
             _close_b2(data)
             _close_b2(seg)
             _close_b2(seg_prev)
+            _fadvise_dontneed(data_path)
+            if seg_path:
+                _fadvise_dontneed(seg_path)
+            if seg_prev_path:
+                _fadvise_dontneed(seg_prev_path)
+            if mem_diag_enabled():
+                b2_close_inc()
 
     @staticmethod
     def save_case(data: np.ndarray, seg: np.ndarray, properties: dict, output_filename_truncated: str, chunks=None, blocks=None, chunks_seg=None, blocks_seg=None, clevel: int = 8, codec=blosc2.Codec.ZSTD):
