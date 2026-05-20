@@ -16,7 +16,7 @@ import blosc2
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import isfile, join, load_pickle, write_pickle
 
-from nanounet.mem_diag import b2_close_inc, mem_diag_enabled
+from nanounet.mem_diag import b2_close_inc, fadvise_inc, mem_diag_enabled
 
 
 def _close_b2(arr) -> None:
@@ -33,6 +33,7 @@ def _fadvise_dontneed(path: str) -> None:
             os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)
         finally:
             os.close(fd)
+        fadvise_inc()
     except OSError:
         pass
 
@@ -40,7 +41,17 @@ def _fadvise_dontneed(path: str) -> None:
 def _open_b2(path: str, mmap: bool):
     dparams = {"nthreads": 1}
     kw = {"mmap_mode": "r"} if mmap and os.name != "nt" else {}
-    return blosc2.open(urlpath=path, mode="r", dparams=dparams, **kw)
+    arr = blosc2.open(urlpath=path, mode="r", dparams=dparams, **kw)
+    if hasattr(os, "posix_fadvise") and hasattr(arr, "urlpath"):
+        try:
+            fd = os.open(arr.urlpath, os.O_RDONLY)
+            try:
+                os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_RANDOM)
+            finally:
+                os.close(fd)
+        except OSError:
+            pass
+    return arr
 
 
 def case_spatial_shape(folder: str, identifier: str) -> tuple[int, int, int]:

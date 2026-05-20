@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from nanounet.runtime import set_safe_tmpdir
+
+set_safe_tmpdir()
+
 import argparse
 import os
 import shutil
@@ -21,6 +25,7 @@ from nanounet.common import (
     sync_nnunet_env,
 )
 from nanounet.mem_diag import log_snapshot, mem_diag_enabled, set_mem_diag
+from nanounet.runtime import assert_mem_diag_cgroup, runtime_banner
 
 quiet_lightning_runtime()
 
@@ -28,7 +33,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
-from nanounet.dataloader_prefs import dataloader_bucket, mae_dataloader_bucket
+from nanounet.dataloader_prefs import dataloader_bucket, init_dataloader_ipc, mae_dataloader_bucket
 from nanounet.lightning_ckpt import (
     pl_ckpt_assert_epochs_match,
     pl_ckpt_epoch_and_target,
@@ -111,6 +116,7 @@ def main() -> None:
     args.roi_cfg = resolve_user_config_path(args.roi_cfg)
     set_mem_diag(args.mem_diag)
     setup_logging()
+    init_dataloader_ipc()
     dl_b = dataloader_bucket(args.dl_bucket)
     mae_dl_b = mae_dataloader_bucket(args.dl_bucket)
 
@@ -121,8 +127,11 @@ def main() -> None:
     plans_path = join(pp, ds, args.plans_identifier + ".json")
     dj_path = join(rw, ds, "dataset.json")
     out = args.out or join(results_dir(), "nanounet", f"{ds}_{args.plans_identifier}_f{args.fold}")
+    set_safe_tmpdir(results_tmp=join(out, ".tmp"))
     maybe_mkdir_p(out)
     os.makedirs(join(out, "checkpoints"), exist_ok=True)
+    assert_mem_diag_cgroup()
+    runtime_banner(join(out, "mae_pretrain") if args.mae_pretrain else out)
 
     loggers = []
     if not args.no_wandb:

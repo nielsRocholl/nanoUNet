@@ -21,8 +21,14 @@ from nanounet.config import RoiPromptConfig, load_config
 from nanounet.data import augment
 from nanounet.data.blosc2_dataset import Blosc2Folder
 from nanounet.data.sampling import build_patch
-from nanounet.dataloader_prefs import DataloaderBucket
-from nanounet.mem_diag import log_snapshot, mem_diag_enabled, worker_diag_init, worker_diag_tick
+from nanounet.dataloader_prefs import DataloaderBucket, build_iter_dataloader, init_dataloader_ipc
+from nanounet.mem_diag import (
+    log_snapshot,
+    mem_diag_enabled,
+    worker_diag_init,
+    worker_diag_iter_end,
+    worker_diag_tick,
+)
 from nanounet.plan.plans import Plans
 from nanounet.plan.splits import fold_keys, load_or_create_splits
 from nanounet.train.patch_size import get_patch_size
@@ -133,6 +139,11 @@ class _PatchIterable(IterableDataset):
                     patches += 1
             if mem_diag_enabled() and self.mem_diag_dir:
                 worker_diag_tick(wid, {"opens": opens, "patches": patches, "worker_id": wid})
+        if mem_diag_enabled() and self.mem_diag_dir:
+            worker_diag_iter_end(
+                wid,
+                {"opens": opens, "patches": patches, "worker_id": wid, "n_here": n_here},
+            )
 
 
 def _collate(batch: list) -> dict:
@@ -210,6 +221,7 @@ class NanoDataModule(pl.LightningDataModule):
         self.init_patch_size = np.array(init_ps)
 
     def train_dataloader(self) -> DataLoader:
+        init_dataloader_ipc()
         it = _PatchIterable(
             self.case_folder,
             self.tr_keys,
@@ -227,18 +239,19 @@ class NanoDataModule(pl.LightningDataModule):
         b = self.dl_bucket
         nw = b.nw_train
         winit = partial(_worker_init, out_dir=self.mem_diag_dir or ".") if mem_diag_enabled() and self.mem_diag_dir and nw else None
-        return DataLoader(
+        return build_iter_dataloader(
             it,
             batch_size=self.batch_size,
-            num_workers=nw,
-            pin_memory=self.pin_memory,
-            persistent_workers=False,  # mmap IterableDataset: persistent workers leak host RAM on cluster
-            prefetch_factor=b.prefetch_train if nw else None,
+            bucket=b,
+            nw=nw,
+            prefetch=b.prefetch_train,
             collate_fn=_collate,
+            pin_memory=self.pin_memory,
             worker_init_fn=winit,
         )
 
     def val_dataloader(self) -> DataLoader:
+        init_dataloader_ipc()
         it = _PatchIterable(
             self.case_folder,
             self.val_keys,
@@ -256,13 +269,13 @@ class NanoDataModule(pl.LightningDataModule):
         b = self.dl_bucket
         nw = b.nw_val
         winit = partial(_worker_init, out_dir=self.mem_diag_dir or ".") if mem_diag_enabled() and self.mem_diag_dir and nw else None
-        return DataLoader(
+        return build_iter_dataloader(
             it,
             batch_size=self.batch_size,
-            num_workers=nw,
-            pin_memory=self.pin_memory,
-            persistent_workers=False,
-            prefetch_factor=b.prefetch_val if nw else None,
+            bucket=b,
+            nw=nw,
+            prefetch=b.prefetch_val,
             collate_fn=_collate,
+            pin_memory=self.pin_memory,
             worker_init_fn=winit,
         )

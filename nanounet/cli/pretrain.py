@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from nanounet.runtime import set_safe_tmpdir
+
+set_safe_tmpdir()
+
 import argparse
 import os
 import shutil
@@ -31,8 +35,10 @@ from nanounet.lightning_ckpt import (
     pl_ckpt_stage_done,
 )
 from nanounet.plan.dataset_id import convert_id_to_dataset_name
+from nanounet.mem_diag import mem_diag_enabled, set_mem_diag
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
 from nanounet.pretrain.module import NanoMAELM
+from nanounet.runtime import assert_mem_diag_cgroup, runtime_banner
 
 
 def main() -> None:
@@ -70,7 +76,13 @@ def main() -> None:
         choices=("auto", "cpu", "cuda", "gpu", "mps"),
         help="Training device.",
     )
+    ap.add_argument(
+        "--mem-diag",
+        action="store_true",
+        help="Log cgroup/process RAM to OUT/mem_diag.jsonl.",
+    )
     args = ap.parse_args()
+    set_mem_diag(args.mem_diag)
 
     dl_b = dataloader_bucket(args.dl_bucket)
     ds = convert_id_to_dataset_name(args.dataset_id)
@@ -80,8 +92,11 @@ def main() -> None:
     plans_path = join(pp, ds, args.plans_identifier + ".json")
     dj_path = join(rw, ds, "dataset.json")
     out = args.out or join(results_dir(), "nanounet", f"{ds}_{args.plans_identifier}_mae_pretrain_f{args.fold}")
+    set_safe_tmpdir(results_tmp=join(out, ".tmp"))
     maybe_mkdir_p(out)
     os.makedirs(join(out, "checkpoints"), exist_ok=True)
+    assert_mem_diag_cgroup()
+    runtime_banner(out)
     shutil.copyfile(plans_path, join(out, "plans.json"))
     shutil.copyfile(dj_path, join(out, "dataset.json"))
 

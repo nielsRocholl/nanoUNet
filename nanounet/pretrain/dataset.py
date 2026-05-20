@@ -15,7 +15,7 @@ from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from torch.utils.data import DataLoader, IterableDataset
 
 from nanounet.common import preprocessed_dir, print0, raw_dir
-from nanounet.dataloader_prefs import DataloaderBucket, mae_keep_workers
+from nanounet.dataloader_prefs import DataloaderBucket, build_iter_dataloader, init_dataloader_ipc
 from nanounet.data.blosc2_dataset import Blosc2Folder, case_spatial_shape
 from nanounet.mem_diag import (
     log_snapshot,
@@ -165,35 +165,21 @@ def build_pretrain_dataloaders(
             "MAE pretrain needs at least one case per split with spatial shape >= patch; "
             f"patch={tuple(ps.tolist())} train_ok={len(tr_k)} val_ok={len(va_k)}"
         )
-    if mae_keep_workers():
-        import torch.multiprocessing as tmp
-
-        if tmp.get_sharing_strategy() != "file_system":
-            tmp.set_sharing_strategy("file_system")
-
-    nw_tr = bucket.nw_train
-    nw_va = bucket.nw_val
-    pin_mem = False if nw_tr == 0 else (pin_memory if pin_memory is not None else False)
+    init_dataloader_ipc()
+    nw_tr, nw_va = bucket.nw_train, bucket.nw_val
+    pin_mem = pin_memory if pin_memory is not None else False
     tr_it = PretrainPatchIterable(
         case_dir, tr_k, ps, num_iterations_per_epoch, batch_size, base_seed_train, mem_diag_dir
     )
     va_it = PretrainPatchIterable(case_dir, va_k, ps, num_val_iterations, batch_size, base_seed_val, mem_diag_dir)
     winit_tr = partial(_worker_init, out_dir=mem_diag_dir or ".") if mem_diag_enabled() and mem_diag_dir and nw_tr else None
     winit_va = partial(_worker_init, out_dir=mem_diag_dir or ".") if mem_diag_enabled() and mem_diag_dir and nw_va else None
-
-    def _dl(it, nw, pf, winit, pin):
-        kw: dict = {
-            "batch_size": batch_size,
-            "num_workers": nw,
-            "pin_memory": pin,
-            "collate_fn": _pretrain_collate,
-        }
-        if nw:
-            kw["persistent_workers"] = False
-            kw["prefetch_factor"] = pf
-            kw["worker_init_fn"] = winit
-        return DataLoader(it, **kw)
-
-    tr = _dl(tr_it, nw_tr, bucket.prefetch_train if nw_tr else None, winit_tr, pin_mem)
-    va = _dl(va_it, nw_va, bucket.prefetch_val if nw_va else None, winit_va, False if nw_va == 0 else pin_mem)
+    tr = build_iter_dataloader(
+        tr_it, batch_size=batch_size, bucket=bucket, nw=nw_tr, prefetch=bucket.prefetch_train,
+        collate_fn=_pretrain_collate, pin_memory=pin_mem, worker_init_fn=winit_tr,
+    )
+    va = build_iter_dataloader(
+        va_it, batch_size=batch_size, bucket=bucket, nw=nw_va, prefetch=bucket.prefetch_val,
+        collate_fn=_pretrain_collate, pin_memory=pin_mem, worker_init_fn=winit_va,
+    )
     return tr, va

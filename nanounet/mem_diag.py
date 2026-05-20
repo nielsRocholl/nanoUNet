@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import multiprocessing as mp
 import os
+import re
 import threading
 import time
 from datetime import datetime, timezone
@@ -14,6 +16,10 @@ from typing import Any
 _MEM_DIAG = False
 _B2_CLOSES = threading.local()
 _WORKER_LOG_DIR: str | None = None
+_B2_GLOBAL: mp.sharedctypes.Synchronized | None = None
+_FADV_GLOBAL: mp.sharedctypes.Synchronized | None = None
+_PK_MAGIC = b"PK\x03\x04"
+_TMPFILE_RE = re.compile(r"^tmp[a-zA-Z0-9_]{8}$")
 
 
 def set_mem_diag(enabled: bool) -> None:
@@ -39,14 +45,40 @@ def worker_log_dir() -> str | None:
     return _WORKER_LOG_DIR
 
 
+def _b2_global() -> mp.sharedctypes.Synchronized:
+    global _B2_GLOBAL
+    if _B2_GLOBAL is None:
+        _B2_GLOBAL = mp.Value("Q", 0)
+    return _B2_GLOBAL
+
+
+def _fadv_global() -> mp.sharedctypes.Synchronized:
+    global _FADV_GLOBAL
+    if _FADV_GLOBAL is None:
+        _FADV_GLOBAL = mp.Value("Q", 0)
+    return _FADV_GLOBAL
+
+
 def b2_close_inc() -> int:
-    n = getattr(_B2_CLOSES, "n", 0) + 1
-    _B2_CLOSES.n = n
-    return n
+    v = _b2_global()
+    with v.get_lock():
+        v.value += 1
+        return int(v.value)
 
 
 def b2_close_count() -> int:
-    return getattr(_B2_CLOSES, "n", 0)
+    return int(_b2_global().value)
+
+
+def fadvise_inc() -> int:
+    v = _fadv_global()
+    with v.get_lock():
+        v.value += 1
+        return int(v.value)
+
+
+def fadvise_count() -> int:
+    return int(_fadv_global().value)
 
 
 def _read_kv(path: Path, key: str) -> int | None:
@@ -88,6 +120,39 @@ def _cgroup_dir(pid: int | None = None) -> Path | None:
     except OSError:
         pass
     return None
+
+
+def cgroup_path(pid: int | None = None) -> str | None:
+    cg = _cgroup_dir(pid)
+    return str(cg) if cg else None
+
+
+def cgroup_scope(pid: int | None = None) -> str:
+    if os.environ.get("SLURM_JOB_ID"):
+        return "slurm"
+    cg = _cgroup_dir(pid)
+    if cg is None:
+        return "other"
+    if cg == Path("/sys/fs/cgroup"):
+        return "root"
+    return "other"
+
+
+def tmp_fs_type(path: str) -> str | None:
+    try:
+        target = str(Path(path).resolve())
+        best_mp, best_fst = "", None
+        for line in Path("/proc/mounts").read_text().splitlines():
+            parts = line.split()
+            if len(parts) < 3:
+                continue
+            mp, fst = parts[1], parts[2]
+            if target == mp or target.startswith(mp + "/"):
+                if len(mp) >= len(best_mp):
+                    best_mp, best_fst = mp, fst
+        return best_fst
+    except OSError:
+        return None
 
 
 def _read_int(path: Path) -> int | None:
@@ -141,6 +206,9 @@ def snapshot(tag: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
         "tag": tag,
         "pid": os.getpid(),
         "slurm_job_id": os.environ.get("SLURM_JOB_ID"),
+        "cgroup_path": cgroup_path(),
+        "cgroup_scope": cgroup_scope(),
+        "tmpdir": os.environ.get("TMPDIR"),
         "proc_rss_kb": proc_rss_kb(),
         "proc_fds": proc_fds(),
         "cgroup_current_bytes": cg["current"],
@@ -152,6 +220,7 @@ def snapshot(tag: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
         "gpu_reserved_bytes": gpu["reserved"],
         "gpu_max_allocated_bytes": gpu["max_allocated"],
         "b2_closes": b2_close_count(),
+        "fadvise_calls": fadvise_count(),
     }
     if extra:
         row.update(extra)
@@ -190,9 +259,49 @@ def cgroup_epoch_deltas(
     return fd, sd
 
 
-def purge_torch_tmp(max_age_sec: float = 30.0) -> int:
+def _is_pytorch_zip_stage(path: str) -> bool:
+    try:
+        with open(path, "rb") as f:
+            return f.read(4) == _PK_MAGIC
+    except OSError:
+        return False
+
+
+def _purge_ckpt_stage_files(max_age_sec: float) -> int:
+    if tmp_fs_type("/tmp") != "tmpfs":
+        return 0
     now = time.time()
+    uid = os.getuid()
     n = 0
+    try:
+        names = os.listdir("/tmp")
+    except OSError:
+        return 0
+    for name in names:
+        if not _TMPFILE_RE.fullmatch(name):
+            continue
+        p = os.path.join("/tmp", name)
+        try:
+            st = os.stat(p, follow_symlinks=False)
+        except OSError:
+            continue
+        if not os.path.isfile(p) or st.st_uid != uid:
+            continue
+        if st.st_size < 64 * 1024 * 1024 or now - st.st_mtime < max_age_sec:
+            continue
+        if not _is_pytorch_zip_stage(p):
+            continue
+        try:
+            os.unlink(p)
+            n += 1
+        except OSError:
+            pass
+    return n
+
+
+def purge_torch_tmp(max_age_sec: float = 60.0) -> int:
+    now = time.time()
+    n = _purge_ckpt_stage_files(max_age_sec)
     for pat in ("/tmp/torch_*", "/tmp/pymp-*"):
         for p in glob(pat):
             try:

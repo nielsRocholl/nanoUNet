@@ -14,7 +14,14 @@ from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from torch import autocast
 
 from nanounet.config import RoiPromptConfig, load_config, save_config
-from nanounet.mem_diag import log_snapshot, log_wandb_scalars, mem_diag_enabled
+from nanounet.mem_diag import (
+    cgroup_epoch_deltas,
+    cgroup_mem_bytes,
+    log_snapshot,
+    log_wandb_scalars,
+    mem_diag_enabled,
+    purge_torch_tmp,
+)
 from nanounet.model.dice_helpers import get_tp_fp_fn_tn
 from nanounet.model.losses import build_loss
 from nanounet.model.lr_schedule import PolyLRScheduler, StretchedTailPolyLRScheduler
@@ -63,6 +70,8 @@ class NanoUNetLM(pl.LightningModule):
         self.stretched_exp = stretched_exp
         self.enable_deep_supervision = enable_deep_supervision
         self._val_buf: List[Dict[str, Any]] = []
+        self._prev_cgroup_file: int | None = None
+        self._prev_cgroup_shmem: int | None = None
 
     def forward(self, x: torch.Tensor):
         return self.net(x)
@@ -78,6 +87,7 @@ class NanoUNetLM(pl.LightningModule):
 
     def on_train_epoch_start(self) -> None:
         self._epoch_t0 = time.perf_counter()
+        purge_torch_tmp()
 
     def training_step(self, batch: dict, _bidx: int):
         x = batch["data"].to(self.device, non_blocking=True)
@@ -138,24 +148,21 @@ class NanoUNetLM(pl.LightningModule):
         dg = np.array([2 * float(a) / (2 * a + b + c) if (2 * a + b + c) > 0 else np.nan for a, b, c in zip(tg, pg, ng)])
         self.log("val_dice", float(np.nanmean(dg)), prog_bar=True)
         self.log("val_loss", float(np.mean([v["loss"] for v in self._val_buf])), prog_bar=False)
-
-    def configure_optimizers(self):
         if mem_diag_enabled():
             ep = int(self.current_epoch)
-            row = log_snapshot(
-                f"sup_epoch_{ep}",
-                self.output_dir,
-                extra={"epoch": ep, "stage": "supervised"},
-            )
+            fd, sd = cgroup_epoch_deltas(self._prev_cgroup_file, self._prev_cgroup_shmem)
+            cg = cgroup_mem_bytes()
+            self._prev_cgroup_file = cg.get("file")
+            self._prev_cgroup_shmem = cg.get("shmem")
+            extra: dict = {"epoch": ep, "stage": "supervised"}
+            if fd is not None:
+                extra["cgroup_file_delta_bytes"] = fd
+            if sd is not None:
+                extra["cgroup_shmem_delta_bytes"] = sd
+            row = log_snapshot(f"sup_epoch_{ep}", self.output_dir, extra=extra)
             log_wandb_scalars(self, row)
 
-    def on_exception(self, exception: BaseException) -> None:
-        if mem_diag_enabled():
-            log_snapshot(
-                "sup_exception",
-                self.output_dir,
-                extra={"epoch": int(self.current_epoch), "error": type(exception).__name__},
-            )
+    def configure_optimizers(self):
         opt = torch.optim.SGD(
             self.net.parameters(),
             lr=self.initial_lr,
@@ -175,3 +182,11 @@ class NanoUNetLM(pl.LightningModule):
         else:
             sched = PolyLRScheduler(opt, self.initial_lr, self.num_epochs)
         return {"optimizer": opt, "lr_scheduler": {"scheduler": sched, "interval": "epoch"}}
+
+    def on_exception(self, exception: BaseException) -> None:
+        if mem_diag_enabled():
+            log_snapshot(
+                "sup_exception",
+                self.output_dir,
+                extra={"epoch": int(self.current_epoch), "error": type(exception).__name__},
+            )

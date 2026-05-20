@@ -10,7 +10,6 @@ import torch
 from batchgenerators.utilities.file_and_folder_operations import load_json
 from torch import autocast
 
-from nanounet.dataloader_prefs import mae_keep_workers
 from nanounet.mem_diag import (
     cgroup_epoch_deltas,
     cgroup_mem_bytes,
@@ -84,8 +83,7 @@ class NanoMAELM(pl.LightningModule):
 
     def on_train_epoch_start(self) -> None:
         self._epoch_t0 = time.perf_counter()
-        if mae_keep_workers():
-            purge_torch_tmp()
+        purge_torch_tmp()
         if mem_diag_enabled() and torch.cuda.is_available():
             torch.cuda.reset_peak_memory_stats()
 
