@@ -84,7 +84,8 @@ Supervised training on one fold; optional integrated MAE then supervised. Defaul
 | `--mae-lr` | `1e-2` | MAE initial LR |
 | `--mae-mask-ratio` | `0.75` | MAE mask ratio |
 | `--mae-iters-per-epoch` | same as `--iters-per-epoch` | MAE batches per epoch |
-| `--dl-bucket` | `m` | `s`: 2/1 workers when TMPDIR is off tmpfs, else 0. `m`/`l`: more workers. Case-sticky Blosc2 I/O, no mmap, non-persistent workers. |
+| `--dl-bucket` | `m` | `s`: 2/1 workers when TMPDIR is off tmpfs, else 0. `m`: 4/2. `l`: 8/4. Case-sticky Blosc2 I/O, no mmap. |
+| `--dl-persistent-workers` | off (flag) | Keep DataLoader workers between epochs (recommended for long MAE with workers). |
 | `--mem-diag` | off (flag) | Log cgroup/process RAM to `<run>/mem_diag.jsonl` and W&B `mem/*`. Requires `NANOUNET_ALLOW_ROOT_CGROUP=1` on interactive nodes. See [docs/cgroup_memory.md](docs/cgroup_memory.md). |
 
 Checkpoints: `<run>/checkpoints/last.ckpt` (supervised); `<run>/mae_pretrain/checkpoints/` (integrated MAE). Re-running without `--resume` / `--mae-resume` trains from scratch and may overwrite those paths.
@@ -93,7 +94,7 @@ Checkpoints: `<run>/checkpoints/last.ckpt` (supervised); `<run>/mae_pretrain/che
 
 Long MAE runs were killed by cgroup OOM from **checkpoint temp files on RAM-backed `/tmp`**, not GPU or Python heap. Full write-up: **[docs/cgroup_memory.md](docs/cgroup_memory.md)**.
 
-**MAE long runs (recommended):** Use `NANOUNET_DL_FORCE_NO_WORKERS=1` for MAE pretrain to keep cgroup shmem flat (~0 GB/ep). Training is slower (~3–4 min/epoch vs ~100 s with workers) but avoids the residual ~98 MB/epoch DataLoader leak. Supervised `--dl-bucket s` can still use workers when TMPDIR is on local disk.
+**MAE long runs (recommended):** Set `NANOUNET_TMPDIR` to local disk (not tmpfs/CIFS), use `--dl-bucket m` or `l` with workers, and add `--dl-persistent-workers` to avoid respawning workers each epoch. Expect ~98 MB/epoch cgroup shmem growth with workers; monitor with `--mem-diag`. Escape hatch: `NANOUNET_DL_FORCE_NO_WORKERS=1` forces `num_workers=0` (~0 shmem/ep, ~3–4 min/epoch).
 
 Quick checks with `--mem-diag`: `cgroup_shmem_delta` ≈ 0 per epoch, `fadvise_calls` rising, `/tmp` and TMPDIR not accumulating orphan ~779 MB files. Set `NANOUNET_TMPDIR=/root/.cache/nanounet_tmp` (local zfs; not `$HOME` or CIFS).
 
@@ -121,7 +122,8 @@ Standalone MAE only (no prompts). Default out: `$NANOUNET_RESULTS/nanounet/<Data
 | `--no-wandb` | off (flag) | Disable W&B |
 | `--wandb-project` | `nanounet-mae` | W&B project |
 | `--wandb-name` | auto | W&B run name |
-| `--dl-bucket` | `m` | `s` \| `m` \| `l` |
+| `--dl-bucket` | `m` | `s`: 2/1 workers when TMPDIR is off tmpfs, else 0. `m`: 4/2. `l`: 8/4. |
+| `--dl-persistent-workers` | off (flag) | Keep DataLoader workers between epochs (recommended for long MAE with workers). |
 | `--resume` | none | MAE Lightning ckpt; must exist. No auto `last.ckpt`. Epoch target must match `--epochs` |
 | `--precision` | `16-mixed` | Lightning precision |
 | `--accelerator` | `auto` | `auto` \| `cpu` \| `cuda` \| `gpu` \| `mps` |
@@ -164,7 +166,7 @@ nanounet_preprocess -d 001 --planner nnUNetPlannerResEncTiny --patch-vol small -
 
 Cluster example (CPU preprocess, large GPU train): add `--gpu-memory-gb 80 --patch-vol medium`. See CLI table for `--skip-fingerprint`, `--skip-plan`, `--resume`.
 
-Set `NANOUNET_TMPDIR` (see Environment). For long MAE runs, add `NANOUNET_DL_FORCE_NO_WORKERS=1` (see Host RAM above). Use `--dl-bucket s` and `--mem-diag` on long runs; see [docs/cgroup_memory.md](docs/cgroup_memory.md).
+Set `NANOUNET_TMPDIR` (see Environment). For long MAE runs use `--dl-persistent-workers` and `--mem-diag`; see [docs/cgroup_memory.md](docs/cgroup_memory.md).
 
 **2 — Train**
 

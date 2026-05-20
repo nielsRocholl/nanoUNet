@@ -64,7 +64,12 @@ def main() -> None:
         "--dl-bucket",
         choices=("s", "m", "l"),
         default="m",
-        help="DataLoader workers+prefetch: s low RAM (e.g. Slurm --mem), m default, l high RAM.",
+        help="DataLoader workers: s=2/1 if TMPDIR off tmpfs else 0, m=4/2, l=8/4.",
+    )
+    ap.add_argument(
+        "--dl-persistent-workers",
+        action="store_true",
+        help="Keep DataLoader workers alive between epochs (recommended for long MAE with workers).",
     )
     ap.add_argument(
         "--resume",
@@ -126,6 +131,7 @@ def main() -> None:
         args.fold + 3000 * args.iters_per_epoch,
         args.fold + 4000,
         dl_b,
+        persistent_workers=args.dl_persistent_workers,
     )
     lm = NanoMAELM(
         plans_path,

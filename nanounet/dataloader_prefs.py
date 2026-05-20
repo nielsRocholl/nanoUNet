@@ -53,14 +53,6 @@ def dataloader_bucket(name: Literal["s", "m", "l"]) -> DataloaderBucket:
     return DataloaderBucket(0, 0, 0, 0)
 
 
-def mae_dataloader_bucket(name: Literal["s", "m", "l"]) -> DataloaderBucket:
-    return dataloader_bucket(name)
-
-
-def mae_keep_workers() -> bool:
-    return dl_keep_workers()
-
-
 def init_dataloader_ipc() -> None:
     import torch.multiprocessing as tmp
 
@@ -78,6 +70,7 @@ def build_iter_dataloader(
     collate_fn: Callable,
     pin_memory: bool,
     worker_init_fn: Callable | None,
+    persistent_workers: bool = False,
 ) -> DataLoader:
     pin = False if nw == 0 else pin_memory
     kw: dict[str, Any] = {
@@ -87,7 +80,7 @@ def build_iter_dataloader(
         "collate_fn": collate_fn,
     }
     if nw:
-        kw["persistent_workers"] = False
+        kw["persistent_workers"] = persistent_workers
         kw["prefetch_factor"] = prefetch
         kw["worker_init_fn"] = worker_init_fn
     return DataLoader(dataset, **kw)

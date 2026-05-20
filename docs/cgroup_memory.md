@@ -53,7 +53,7 @@ On VS Code / interactive sessions, `/proc/self/cgroup` is often `0::/` (root cgr
 
 ## What we tried (short history)
 
-1. **Handle hygiene** — context managers, case-sticky I/O, `persistent_workers=False`, small dl bucket. OOM continued.
+1. **Handle hygiene** — context managers, case-sticky I/O, small dl bucket. OOM continued.
 2. **`--mem-diag`** — confirmed growth in `cgroup_file` + `cgroup_shmem`, flat `cgroup_anon`.
 3. **Disable mmap** — helped micro-benchmarks; full training still grew.
 4. **`posix_fadvise` + `num_workers=0`** — shmem still climbed until we moved TMPDIR off tmpfs.
@@ -70,7 +70,7 @@ Rejected as fixes: raising `--mem`, splitting MAE into multiple jobs, job-only w
 | [`nanounet/runtime.py`](../nanounet/runtime.py) | `set_safe_tmpdir()` — TMPDIR on disk, not tmpfs; prefers `$NANOUNET_TMPDIR`, `<run>/.tmp`, `$NANOUNET_RESULTS/.nanounet_tmp`; warns if under `$HOME` |
 | [`nanounet/mem_diag.py`](../nanounet/mem_diag.py) | Per-epoch cgroup snapshots; purge stale checkpoint temps on `/tmp` + `TMPDIR`, `/dev/shm` torch IPC (uid + age); `cgroup_scope` |
 | [`nanounet/data/blosc2_dataset.py`](../nanounet/data/blosc2_dataset.py) | `fadvise` after close; `POSIX_FADV_RANDOM` on open |
-| [`nanounet/dataloader_prefs.py`](../nanounet/dataloader_prefs.py) | `--dl-bucket s` → 2/1 workers when TMPDIR is off tmpfs; `file_system` IPC strategy; `NANOUNET_DL_FORCE_NO_WORKERS=1` to force slow safe mode |
+| [`nanounet/dataloader_prefs.py`](../nanounet/dataloader_prefs.py) | `--dl-bucket` s/m/l (2/1, 4/2, 8/4 train/val when TMPDIR off tmpfs); `--dl-persistent-workers`; `file_system` IPC; `NANOUNET_DL_FORCE_NO_WORKERS=1` escape hatch |
 
 Each epoch: `purge_torch_tmp()` removes stale checkpoint stage files under `/tmp` (if tmpfs), `TMPDIR`, and stale `/dev/shm/torch_*` owned by your uid (belt-and-suspenders).
 
@@ -96,10 +96,11 @@ The **~1.6 GB/epoch tmpfs checkpoint leak is fixed** (`/tmp` clean, TMPDIR on lo
 
 | Priority | Action | Effect |
 |----------|--------|--------|
-| 1 | **MAE: `num_workers=0`** (`NANOUNET_DL_FORCE_NO_WORKERS=1`) | Shmem delta → ~0 |
+| 1 | **`NANOUNET_TMPDIR` on local disk** + `--dl-bucket m`/`l` + **`--dl-persistent-workers`** | Fast MAE; avoids per-epoch worker respawn; ~98 MB/ep shmem (monitor) |
 | 2 | **Extended purge** (TMPDIR + `/dev/shm`) | Stops disk orphans; trims IPC debris |
 | 3 | Optional: single MAE `ModelCheckpoint` | Halves stage-file churn (future) |
 | 4 | Slurm validation (`cgroup_scope=slurm`) | Authoritative metrics vs interactive root cgroup |
+| — | Escape: `NANOUNET_DL_FORCE_NO_WORKERS=1` | Shmem delta → ~0; ~3–4 min/epoch |
 
 ### Purge safety (Docker / shared node)
 
@@ -161,17 +162,16 @@ Logs: `<run>/mae_pretrain/mem_diag.jsonl` (and W&B `mem/*` if enabled).
 **Fix is holding if:**
 
 - Startup banner: `tmpdir=...` on **local zfs** (e.g. `/root/.cache/nanounet_tmp`), not `/tmp` or CIFS
-- `cgroup_shmem_delta_bytes` ≈ 0 per epoch (use `NANOUNET_DL_FORCE_NO_WORKERS=1` for MAE if needed)
 - `fadvise_calls` increases each epoch
 - `du -sh /tmp` stays small; TMPDIR stage orphans not accumulating without bound
-- For MAE with workers: expect ~98 MB/ep shmem unless you force `nw=0`
+- For MAE with workers + `--dl-persistent-workers`: expect ~98 MB/ep shmem (acceptable on 250G jobs); use `NANOUNET_DL_FORCE_NO_WORKERS=1` only if shmem must stay flat
 
 **Optional env vars:**
 
 | Variable | Purpose |
 |----------|---------|
 | `NANOUNET_MEM_DIAG=1` | Same as `--mem-diag` |
-| `NANOUNET_DL_FORCE_NO_WORKERS=1` | Force `num_workers=0` (slow, extra safe) |
+| `NANOUNET_DL_FORCE_NO_WORKERS=1` | Escape hatch: force `num_workers=0` (slow, ~0 shmem/ep) |
 | `NANOUNET_DL_KEEP_WORKERS=1` | Legacy: keep workers even on tmpfs (not recommended) |
 
 Validation script: [`scripts/interactive_validate_mem.sh`](../scripts/interactive_validate_mem.sh).

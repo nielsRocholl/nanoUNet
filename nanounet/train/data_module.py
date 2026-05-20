@@ -174,6 +174,7 @@ class NanoDataModule(pl.LightningDataModule):
         enable_deep_supervision: bool = True,
         pin_memory: bool | None = None,
         mem_diag_dir: str | None = None,
+        persistent_workers: bool = False,
     ):
         super().__init__()
         self.dataset_name = dataset_name
@@ -187,6 +188,7 @@ class NanoDataModule(pl.LightningDataModule):
         self.oversample_foreground = oversample_foreground
         self.enable_ds = enable_deep_supervision
         self.mem_diag_dir = mem_diag_dir
+        self.persistent_workers = persistent_workers
         if pin_memory is None:
             pin_memory = torch.cuda.is_available()
         self.pin_memory = pin_memory
@@ -251,6 +253,7 @@ class NanoDataModule(pl.LightningDataModule):
             collate_fn=_collate,
             pin_memory=self.pin_memory,
             worker_init_fn=winit,
+            persistent_workers=self.persistent_workers,
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -281,4 +284,5 @@ class NanoDataModule(pl.LightningDataModule):
             collate_fn=_collate,
             pin_memory=self.pin_memory,
             worker_init_fn=winit,
+            persistent_workers=self.persistent_workers,
         )

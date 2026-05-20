@@ -139,6 +139,7 @@ def build_pretrain_dataloaders(
     bucket: DataloaderBucket,
     pin_memory: bool | None = None,
     mem_diag_dir: str | None = None,
+    persistent_workers: bool = False,
 ) -> tuple[DataLoader, DataLoader]:
     pp = preprocessed_dir()
     raw = raw_dir()
@@ -180,9 +181,11 @@ def build_pretrain_dataloaders(
     tr = build_iter_dataloader(
         tr_it, batch_size=batch_size, bucket=bucket, nw=nw_tr, prefetch=bucket.prefetch_train,
         collate_fn=_pretrain_collate, pin_memory=pin_mem, worker_init_fn=winit_tr,
+        persistent_workers=persistent_workers,
     )
     va = build_iter_dataloader(
         va_it, batch_size=batch_size, bucket=bucket, nw=nw_va, prefetch=bucket.prefetch_val,
         collate_fn=_pretrain_collate, pin_memory=pin_mem, worker_init_fn=winit_va,
+        persistent_workers=persistent_workers,
     )
     return tr, va

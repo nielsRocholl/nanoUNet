@@ -35,7 +35,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
-from nanounet.dataloader_prefs import dataloader_bucket, init_dataloader_ipc, mae_dataloader_bucket
+from nanounet.dataloader_prefs import dataloader_bucket, init_dataloader_ipc
 from nanounet.lightning_ckpt import (
     pl_ckpt_assert_epochs_match,
     pl_ckpt_epoch_and_target,
@@ -106,6 +106,11 @@ def main() -> None:
         help="DataLoader workers: s=2/1 if TMPDIR off tmpfs else 0, m=4/2, l=8/4.",
     )
     ap.add_argument(
+        "--dl-persistent-workers",
+        action="store_true",
+        help="Keep DataLoader workers alive between epochs (recommended for long MAE with workers).",
+    )
+    ap.add_argument(
         "--mem-diag",
         action="store_true",
         help="Log cgroup/process RAM to OUT/mem_diag.jsonl and W&B mem/* metrics.",
@@ -120,7 +125,6 @@ def main() -> None:
     setup_logging()
     init_dataloader_ipc()
     dl_b = dataloader_bucket(args.dl_bucket)
-    mae_dl_b = mae_dataloader_bucket(args.dl_bucket)
 
     ds = convert_id_to_dataset_name(args.dataset_id)
     nano_header(f"nanoUNet train  {ds}  fold {args.fold}", color="green")
@@ -178,15 +182,15 @@ def main() -> None:
                         "batch_size": batch_mae,
                         "patch_size": list(pm0.get_configuration("3d_fullres").patch_size),
                         "dl_bucket": args.dl_bucket,
-                        "nw_train": mae_dl_b.nw_train,
-                        "nw_val": mae_dl_b.nw_val,
-                        "prefetch_train": mae_dl_b.prefetch_train,
-                        "prefetch_val": mae_dl_b.prefetch_val,
+                        "nw_train": dl_b.nw_train,
+                        "nw_val": dl_b.nw_val,
+                        "prefetch_train": dl_b.prefetch_train,
+                        "prefetch_val": dl_b.prefetch_val,
                         "iters_per_epoch": mae_iters,
                         "val_iters": args.val_iters,
                         "preprocessed_dir": pp,
                         "mae_resume": mae_fit_ckpt,
-                        "persistent_workers": False,
+                        "persistent_workers": args.dl_persistent_workers,
                     },
                 )
             tr_pre, va_pre = build_pretrain_dataloaders(
@@ -198,8 +202,9 @@ def main() -> None:
                 args.val_iters,
                 args.fold + 5000 * mae_iters,
                 args.fold + 6000,
-                mae_dl_b,
+                dl_b,
                 mem_diag_dir=mem_dir,
+                persistent_workers=args.dl_persistent_workers,
             )
             if mem_diag_enabled():
                 log_snapshot("mae_dataloaders_built", pre_out)
@@ -256,6 +261,7 @@ def main() -> None:
         args.iters_per_epoch,
         args.val_iters,
         mem_diag_dir=out if mem_diag_enabled() else None,
+        persistent_workers=args.dl_persistent_workers,
     )
     lm = NanoUNetLM(
         plans_path,
