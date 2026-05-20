@@ -33,6 +33,9 @@ def _pretrain_collate(batch: list) -> dict:
 
 
 def _worker_init(worker_id: int, out_dir: str) -> None:
+    from nanounet.runtime import set_safe_tmpdir
+
+    set_safe_tmpdir()
     worker_diag_init(worker_id, out_dir)
 
 

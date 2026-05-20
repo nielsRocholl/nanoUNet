@@ -15,13 +15,10 @@ from nanounet.mem_diag import cgroup_scope, log_snapshot, mem_diag_enabled, purg
 def _is_tmpfs(path: str) -> bool:
     p = Path(path).resolve()
     while p != p.parent:
-        try:
-            if tmp_fs_type(str(p)) == "tmpfs":
-                return True
-        except OSError:
-            pass
+        if tmp_fs_type(str(p)) == "tmpfs":
+            return True
         p = p.parent
-    return tmp_fs_type("/tmp") == "tmpfs"
+    return False
 
 
 def _writable_dir(path: str) -> bool:
@@ -36,13 +33,24 @@ def _writable_dir(path: str) -> bool:
         return False
 
 
+def _results_scratch() -> str:
+    try:
+        from nanounet.common import results_dir
+
+        return join_safe(results_dir(), ".nanounet_tmp")
+    except OSError:
+        return ""
+
+
 def set_safe_tmpdir(*, results_tmp: str | None = None) -> str:
-    """Point TMPDIR/TMP/TEMP at first writable non-tmpfs path."""
+    """Point TMPDIR/TMP/TEMP at first writable non-tmpfs path (never prefer $HOME/.cache)."""
     home = os.environ.get("HOME") or "/tmp"
     cands = [
         os.environ.get("NANOUNET_TMPDIR", "").strip(),
-        join_safe(home, ".cache", "nanounet_tmp"),
         results_tmp or "",
+        _results_scratch(),
+        "/root/.cache/nanounet_tmp",
+        join_safe(home, ".cache", "nanounet_tmp"),
     ]
     chosen = ""
     for c in cands:
@@ -52,9 +60,7 @@ def set_safe_tmpdir(*, results_tmp: str | None = None) -> str:
             chosen = str(Path(c).resolve())
             break
     if not chosen:
-        fallback = str(Path(home) / ".cache" / "nanounet_tmp")
-        _writable_dir(fallback)
-        chosen = str(Path(fallback).resolve())
+        raise OSError("no writable non-tmpfs TMPDIR candidate (set NANOUNET_TMPDIR)")
     for k in ("TMPDIR", "TMP", "TEMP"):
         os.environ[k] = chosen
     tempfile.tempdir = chosen
@@ -98,6 +104,13 @@ def runtime_banner(out_dir: str | None = None) -> dict[str, Any]:
         row["purged_tmp_files"] = n
     if mem_diag_enabled() and out_dir:
         log_snapshot("runtime_banner", out_dir, extra=row)
+    home = os.environ.get("HOME", "")
+    if home and tmp.startswith(home):
+        print(
+            f"[nanounet] WARNING: TMPDIR under $HOME ({tmp}) — checkpoint staging needs ~800MB free; "
+            "prefer NANOUNET_TMPDIR=/nnunet_data/.nanounet_tmp",
+            file=sys.stderr,
+        )
     print(
         f"[nanounet] tmpdir={tmp} fs={row['tmpdir_fs']} cgroup={row['cgroup_scope']} "
         f"git={row['git_head'] or '?'}",

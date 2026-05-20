@@ -101,7 +101,7 @@ def main() -> None:
         "--dl-bucket",
         choices=("s", "m", "l"),
         default="m",
-        help="DataLoader workers+prefetch: s low RAM (e.g. Slurm --mem), m default, l high RAM.",
+        help="DataLoader workers: s=2/1 if TMPDIR off tmpfs else 0, m=4/2, l=8/4.",
     )
     ap.add_argument(
         "--mem-diag",

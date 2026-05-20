@@ -1,7 +1,8 @@
 """Fixed DataLoader presets: worker count and prefetch per train/val.
 
-Bucket ``s`` defaults to zero workers (Slurm cgroup-safe). Set NANOUNET_DL_KEEP_WORKERS=1
-(or legacy NANOUNET_MAE_KEEP_WORKERS=1) to restore 2/1 workers for ``s``."""
+Bucket ``s`` uses 2/1 workers when TMPDIR is not tmpfs (safe after runtime redirect).
+Falls back to 0 workers on tmpfs. Override: NANOUNET_DL_FORCE_NO_WORKERS=1 or
+NANOUNET_DL_KEEP_WORKERS=1 (legacy: force workers even on tmpfs — not recommended)."""
 from __future__ import annotations
 
 import os
@@ -9,6 +10,8 @@ from dataclasses import dataclass
 from typing import Any, Callable, Literal
 
 from torch.utils.data import DataLoader
+
+from nanounet.mem_diag import tmp_fs_type
 
 
 @dataclass(frozen=True)
@@ -26,6 +29,15 @@ def dl_keep_workers() -> bool:
     return False
 
 
+def dl_force_no_workers() -> bool:
+    return os.environ.get("NANOUNET_DL_FORCE_NO_WORKERS", "").strip() in ("1", "true", "yes")
+
+
+def tmpdir_off_tmpfs() -> bool:
+    tmp = os.environ.get("TMPDIR", "/tmp")
+    return tmp_fs_type(tmp) != "tmpfs"
+
+
 def _bucket_workers(name: Literal["s", "m", "l"]) -> DataloaderBucket:
     if name == "s":
         return DataloaderBucket(2, 1, 2, 2)
@@ -37,9 +49,13 @@ def _bucket_workers(name: Literal["s", "m", "l"]) -> DataloaderBucket:
 
 
 def dataloader_bucket(name: Literal["s", "m", "l"]) -> DataloaderBucket:
-    if name == "s" and not dl_keep_workers():
+    if name != "s":
+        return _bucket_workers(name)
+    if dl_force_no_workers():
         return DataloaderBucket(0, 0, 0, 0)
-    return _bucket_workers(name)
+    if dl_keep_workers() or tmpdir_off_tmpfs():
+        return _bucket_workers("s")
+    return DataloaderBucket(0, 0, 0, 0)
 
 
 def mae_dataloader_bucket(name: Literal["s", "m", "l"]) -> DataloaderBucket:
@@ -51,8 +67,6 @@ def mae_keep_workers() -> bool:
 
 
 def init_dataloader_ipc() -> None:
-    if not dl_keep_workers():
-        return
     import torch.multiprocessing as tmp
 
     if tmp.get_sharing_strategy() != "file_system":
