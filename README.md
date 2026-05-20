@@ -16,7 +16,7 @@ export NANOUNET_PREPROCESSED="/path/to/nnUNet_preprocessed"
 export NANOUNET_RESULTS="/path/to/nnUNet_results"
 
 # Host-RAM / checkpoint staging (see docs/cgroup_memory.md)
-export NANOUNET_TMPDIR=/nnunet_data/.nanounet_tmp   # avoids /tmp tmpfs OOM and $HOME quota
+export NANOUNET_TMPDIR=/root/.cache/nanounet_tmp   # local disk; not /tmp (tmpfs) or CIFS (breaks workers)
 export NANOUNET_ALLOW_ROOT_CGROUP=1                 # only if using --mem-diag on interactive node
 ```
 
@@ -93,7 +93,9 @@ Checkpoints: `<run>/checkpoints/last.ckpt` (supervised); `<run>/mae_pretrain/che
 
 Long MAE runs were killed by cgroup OOM from **checkpoint temp files on RAM-backed `/tmp`**, not GPU or Python heap. Full write-up: **[docs/cgroup_memory.md](docs/cgroup_memory.md)**.
 
-Quick checks with `--mem-diag`: `cgroup_shmem_delta` ≈ 0 per epoch, `fadvise_calls` rising, `/tmp` not accumulating ~779 MB files. Set `NANOUNET_TMPDIR` to NFS or local disk (not `$HOME` if quota is small).
+**MAE long runs (recommended):** Use `NANOUNET_DL_FORCE_NO_WORKERS=1` for MAE pretrain to keep cgroup shmem flat (~0 GB/ep). Training is slower (~3–4 min/epoch vs ~100 s with workers) but avoids the residual ~98 MB/epoch DataLoader leak. Supervised `--dl-bucket s` can still use workers when TMPDIR is on local disk.
+
+Quick checks with `--mem-diag`: `cgroup_shmem_delta` ≈ 0 per epoch, `fadvise_calls` rising, `/tmp` and TMPDIR not accumulating orphan ~779 MB files. Set `NANOUNET_TMPDIR=/root/.cache/nanounet_tmp` (local zfs; not `$HOME` or CIFS).
 
 Slurm example: [`scripts/slurm_nanounet_train_mae_999.sh`](scripts/slurm_nanounet_train_mae_999.sh).
 
@@ -162,7 +164,7 @@ nanounet_preprocess -d 001 --planner nnUNetPlannerResEncTiny --patch-vol small -
 
 Cluster example (CPU preprocess, large GPU train): add `--gpu-memory-gb 80 --patch-vol medium`. See CLI table for `--skip-fingerprint`, `--skip-plan`, `--resume`.
 
-Set `NANOUNET_TMPDIR` (see Environment). Training reads Blosc2 without mmap; MAE opens data only (not seg). Use `--dl-bucket s` and `--mem-diag` on long runs; see [docs/cgroup_memory.md](docs/cgroup_memory.md).
+Set `NANOUNET_TMPDIR` (see Environment). For long MAE runs, add `NANOUNET_DL_FORCE_NO_WORKERS=1` (see Host RAM above). Use `--dl-bucket s` and `--mem-diag` on long runs; see [docs/cgroup_memory.md](docs/cgroup_memory.md).
 
 **2 — Train**
 

@@ -68,11 +68,56 @@ Rejected as fixes: raising `--mem`, splitting MAE into multiple jobs, job-only w
 | Component | What it does |
 |-----------|----------------|
 | [`nanounet/runtime.py`](../nanounet/runtime.py) | `set_safe_tmpdir()` — TMPDIR on disk, not tmpfs; prefers `$NANOUNET_TMPDIR`, `<run>/.tmp`, `$NANOUNET_RESULTS/.nanounet_tmp`; warns if under `$HOME` |
-| [`nanounet/mem_diag.py`](../nanounet/mem_diag.py) | Per-epoch cgroup snapshots; purge stale checkpoint temps on `/tmp`; `cgroup_scope` (`slurm` / `root` / `other`) |
+| [`nanounet/mem_diag.py`](../nanounet/mem_diag.py) | Per-epoch cgroup snapshots; purge stale checkpoint temps on `/tmp` + `TMPDIR`, `/dev/shm` torch IPC (uid + age); `cgroup_scope` |
 | [`nanounet/data/blosc2_dataset.py`](../nanounet/data/blosc2_dataset.py) | `fadvise` after close; `POSIX_FADV_RANDOM` on open |
 | [`nanounet/dataloader_prefs.py`](../nanounet/dataloader_prefs.py) | `--dl-bucket s` → 2/1 workers when TMPDIR is off tmpfs; `file_system` IPC strategy; `NANOUNET_DL_FORCE_NO_WORKERS=1` to force slow safe mode |
 
-Each epoch: `purge_torch_tmp()` removes stale `/tmp` checkpoint stage files (belt-and-suspenders).
+Each epoch: `purge_torch_tmp()` removes stale checkpoint stage files under `/tmp` (if tmpfs), `TMPDIR`, and stale `/dev/shm/torch_*` owned by your uid (belt-and-suspenders).
+
+---
+
+## Residual leak after primary fix (epochs 431+)
+
+The **~1.6 GB/epoch tmpfs checkpoint leak is fixed** (`/tmp` clean, TMPDIR on local zfs). A smaller steady-state growth appeared once workers were re-enabled.
+
+### What we still see (with DataLoader workers)
+
+| Metric | Rate | Cause |
+|--------|------|--------|
+| `cgroup_shmem_delta` | **~98 MB/epoch** (constant) | One leaked prefetched batch in `/dev/shm` (~93.75 MiB for batch 10 × `96×160×160`); PyTorch worker IPC uses tmpfs despite `file_system` strategy |
+| `cgroup_file_delta` | **~80–110 MB/epoch** | Residual Blosc2 page cache; `fadvise` active (~300 calls/epoch) but not zero |
+| TMPDIR disk | **~1.6 GB/epoch** | Orphan ~816 MB checkpoint stage files (two `ModelCheckpoint` callbacks); old purge only scanned `/tmp` |
+
+**Slurm projection (with workers):** ~98 MB/ep × 570 remaining epochs ≈ **56 GB** shmem — much safer than the old ~900 GB path, but not zero.
+
+**With `num_workers=0`:** `cgroup_shmem_delta` ≈ 0 (proven in logs). Tradeoff: ~3–4 min/epoch vs ~100 s with workers.
+
+### Recommendations
+
+| Priority | Action | Effect |
+|----------|--------|--------|
+| 1 | **MAE: `num_workers=0`** (`NANOUNET_DL_FORCE_NO_WORKERS=1`) | Shmem delta → ~0 |
+| 2 | **Extended purge** (TMPDIR + `/dev/shm`) | Stops disk orphans; trims IPC debris |
+| 3 | Optional: single MAE `ModelCheckpoint` | Halves stage-file churn (future) |
+| 4 | Slurm validation (`cgroup_scope=slurm`) | Authoritative metrics vs interactive root cgroup |
+
+### Purge safety (Docker / shared node)
+
+Purge only deletes files that match **all** of:
+
+- **Your uid** (`st_uid == os.getuid()`)
+- **Age** > 60 s (not in active use)
+- **Specific patterns** (checkpoint stage `tmpXXXXXXXX` with zip header; `/dev/shm/torch_*`, `pymp-*`)
+
+| Target | Safe for other users? |
+|--------|------------------------|
+| `TMPDIR` (e.g. `/root/.cache/nanounet_tmp`) | Yes — other uids skipped |
+| `/dev/shm` | Yes — other uids skipped; does not wipe all of `/dev/shm` |
+| `/tmp` (tmpfs) | Yes — same uid + pattern guards |
+
+**Caveat:** Two jobs under the **same uid** in one container could delete each other's **stale** (>60 s) torch IPC files. Run one training job at a time.
+
+**Not purged:** Final checkpoints under `$NANOUNET_RESULTS/.../checkpoints/`.
 
 ---
 
@@ -80,7 +125,7 @@ Each epoch: `purge_torch_tmp()` removes stale `/tmp` checkpoint stage files (bel
 
 ```bash
 export NANOUNET_ALLOW_ROOT_CGROUP=1   # only for --mem-diag on interactive (root cgroup)
-export NANOUNET_TMPDIR=/nnunet_data/.nanounet_tmp   # checkpoint staging; avoids /tmp tmpfs and $HOME quota
+export NANOUNET_TMPDIR=/root/.cache/nanounet_tmp   # local disk; CIFS/NFS breaks DataLoader workers
 ```
 
 Also set the usual paths:
@@ -115,11 +160,11 @@ Logs: `<run>/mae_pretrain/mem_diag.jsonl` (and W&B `mem/*` if enabled).
 
 **Fix is holding if:**
 
-- Startup banner: `tmpdir=...` **not** `/tmp` and **not** under `$HOME` unless you intend that
-- `cgroup_shmem_delta_bytes` ≈ 0 per epoch (not ~1.6 GB)
+- Startup banner: `tmpdir=...` on **local zfs** (e.g. `/root/.cache/nanounet_tmp`), not `/tmp` or CIFS
+- `cgroup_shmem_delta_bytes` ≈ 0 per epoch (use `NANOUNET_DL_FORCE_NO_WORKERS=1` for MAE if needed)
 - `fadvise_calls` increases each epoch
-- `du -sh /tmp` stays small during training
-- Epoch time ~100 s with `--dl-bucket s` (workers on), not ~3–4 min
+- `du -sh /tmp` stays small; TMPDIR stage orphans not accumulating without bound
+- For MAE with workers: expect ~98 MB/ep shmem unless you force `nw=0`
 
 **Optional env vars:**
 
@@ -135,4 +180,4 @@ Validation script: [`scripts/interactive_validate_mem.sh`](../scripts/interactiv
 
 ## Home disk quota
 
-If `TMPDIR` points at `$HOME/.cache`, each checkpoint save needs **~800 MB free**. A 10 GB home quota can fail with `OSError: [Errno 122] Disk quota exceeded` even when NFS results have space. Use `NANOUNET_TMPDIR=/nnunet_data/.nanounet_tmp` instead.
+If `TMPDIR` points at `$HOME/.cache`, each checkpoint save needs **~800 MB free**. A 10 GB home quota can fail with `OSError: [Errno 122] Disk quota exceeded` even when NFS results have space. Use `/root/.cache/nanounet_tmp` (local zfs). **Do not** use CIFS/NFS for TMPDIR — breaks DataLoader workers (`torch_shm_manager: Operation not permitted`).

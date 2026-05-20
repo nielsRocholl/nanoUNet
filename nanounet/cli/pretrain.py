@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from nanounet.dataloader_prefs import init_dataloader_ipc
 from nanounet.runtime import set_safe_tmpdir
 
 set_safe_tmpdir()
+init_dataloader_ipc()
 
 import argparse
 import os

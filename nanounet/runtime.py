@@ -21,6 +21,20 @@ def _is_tmpfs(path: str) -> bool:
     return False
 
 
+def _fs_type(path: str) -> str | None:
+    return tmp_fs_type(path)
+
+
+def _ipc_fs_ok(path: str) -> bool:
+    """DataLoader file_system IPC needs a local-ish FS (not tmpfs/cifs/nfs)."""
+    fst = _fs_type(path) or ""
+    return fst not in ("tmpfs", "cifs", "nfs", "nfs4", "smbfs")
+
+
+def tmpdir_supports_workers() -> bool:
+    return _ipc_fs_ok(os.environ.get("TMPDIR", "/tmp"))
+
+
 def _writable_dir(path: str) -> bool:
     try:
         p = Path(path)
@@ -43,13 +57,15 @@ def _results_scratch() -> str:
 
 
 def set_safe_tmpdir(*, results_tmp: str | None = None) -> str:
-    """Point TMPDIR/TMP/TEMP at first writable non-tmpfs path (never prefer $HOME/.cache)."""
+    """TMPDIR off tmpfs; prefer local disk so DataLoader workers + checkpoint staging work."""
     home = os.environ.get("HOME") or "/tmp"
+    explicit = os.environ.get("NANOUNET_TMPDIR", "").strip()
     cands = [
-        os.environ.get("NANOUNET_TMPDIR", "").strip(),
-        results_tmp or "",
-        _results_scratch(),
         "/root/.cache/nanounet_tmp",
+        results_tmp or "",
+        explicit if explicit and _ipc_fs_ok(explicit) else "",
+        _results_scratch() if _ipc_fs_ok(_results_scratch() or "") else "",
+        explicit,
         join_safe(home, ".cache", "nanounet_tmp"),
     ]
     chosen = ""
