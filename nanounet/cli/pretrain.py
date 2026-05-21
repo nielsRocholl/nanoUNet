@@ -51,6 +51,10 @@ def main() -> None:
     ap.add_argument("--plans", dest="plans_identifier", required=True)
     ap.add_argument("--epochs", type=int, default=1000)
     ap.add_argument("--lr", type=float, default=1e-2)
+    ap.add_argument("--lr-schedule", choices=("cosine_warm_restarts", "poly"), default="cosine_warm_restarts")
+    ap.add_argument("--cosine-t0", type=int, default=250)
+    ap.add_argument("--cosine-t-mult", type=int, default=1)
+    ap.add_argument("--cosine-eta-min", type=float, default=0.0)
     ap.add_argument("--wd", type=float, default=3e-5)
     ap.add_argument("--mask-ratio", type=float, default=0.75)
     ap.add_argument("--batch-size", type=int, default=None)
@@ -141,6 +145,10 @@ def main() -> None:
         initial_lr=args.lr,
         weight_decay=args.wd,
         num_epochs=args.epochs,
+        lr_schedule=args.lr_schedule,
+        cosine_t0=args.cosine_t0,
+        cosine_t_mult=args.cosine_t_mult,
+        cosine_eta_min=args.cosine_eta_min,
     )
     ck = [
         ModelCheckpoint(dirpath=join(out, "checkpoints"), save_last=True),

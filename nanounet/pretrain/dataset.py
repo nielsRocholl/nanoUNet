@@ -1,8 +1,4 @@
-"""MAE pretrain patches: random crop from b2nd, mirror aug, no prompts.
-
-Cases with spatial shape smaller than the plan 3d_fullres patch on any axis are excluded;
-build raises if train or val has no qualifying case after that filter.
-"""
+"""MAE pretrain patches: random crop, optional spatial aug, persistent worker RNG."""
 
 from __future__ import annotations
 
@@ -12,6 +8,7 @@ from typing import List
 import numpy as np
 import torch
 from batchgenerators.utilities.file_and_folder_operations import join, load_json
+from batchgeneratorsv2.transforms.base.basic_transform import BasicTransform
 from torch.utils.data import DataLoader, IterableDataset
 
 from nanounet.common import preprocessed_dir, print0, raw_dir
@@ -26,6 +23,7 @@ from nanounet.mem_diag import (
 )
 from nanounet.plan.plans import Plans
 from nanounet.plan.splits import fold_keys, load_or_create_splits
+from nanounet.pretrain.augment import apply_spatial_tf, train_spatial_tf
 
 
 def _pretrain_collate(batch: list) -> dict:
@@ -48,6 +46,7 @@ class PretrainPatchIterable(IterableDataset):
         num_batches: int,
         batch_size: int,
         base_seed: int,
+        spatial_tf: BasicTransform | None = None,
         mem_diag_dir: str | None = None,
     ):
         self.folder = folder
@@ -56,7 +55,9 @@ class PretrainPatchIterable(IterableDataset):
         self.num_batches = num_batches
         self.batch_size = batch_size
         self.base_seed = base_seed
+        self.spatial_tf = spatial_tf
         self.mem_diag_dir = mem_diag_dir
+        self._rng = None
 
     def __len__(self) -> int:
         return self.num_batches * self.batch_size
@@ -67,8 +68,9 @@ class PretrainPatchIterable(IterableDataset):
         wid = 0 if wi is None else wi.id
         total = self.num_batches * self.batch_size
         n_here = total // nw + (1 if wid < (total % nw) else 0)
-        seed = self.base_seed + wid * 10007
-        rng = np.random.default_rng(seed)
+        if self._rng is None:
+            self._rng = np.random.default_rng(self.base_seed + wid * 10007)
+        rng = self._rng
         ds = Blosc2Folder(self.folder, identifiers=self.keys)
         ps = self.patch_size
         remaining = n_here
@@ -99,9 +101,8 @@ class PretrainPatchIterable(IterableDataset):
                         ],
                         dtype=np.float32,
                     )
-                    for ax in (0, 1, 2):
-                        if rng.random() < 0.5:
-                            patch = np.flip(patch, axis=ax + 1).copy()
+                    if self.spatial_tf is not None:
+                        patch = apply_spatial_tf(self.spatial_tf, patch)
                     yield {"data": torch.from_numpy(patch).float()}
                     remaining -= 1
                     patches += 1
@@ -117,11 +118,7 @@ class PretrainPatchIterable(IterableDataset):
 def _keys_fit_patch(case_dir: str, keys: List[str], ps: np.ndarray, mem_diag_dir: str | None, tag: str) -> List[str]:
     if mem_diag_enabled() and mem_diag_dir:
         log_snapshot(f"keys_fit_patch_before_{tag}", mem_diag_dir, extra={"n_keys": len(keys)})
-    out: List[str] = []
-    for k in keys:
-        shp = case_spatial_shape(case_dir, k)
-        if all(int(shp[i]) >= int(ps[i]) for i in range(3)):
-            out.append(k)
+    out = [k for k in keys if all(int(case_spatial_shape(case_dir, k)[i]) >= int(ps[i]) for i in range(3))]
     if mem_diag_enabled() and mem_diag_dir:
         log_snapshot(f"keys_fit_patch_after_{tag}", mem_diag_dir, extra={"n_keys": len(out)})
     return out
@@ -171,11 +168,19 @@ def build_pretrain_dataloaders(
         )
     init_dataloader_ipc()
     nw_tr, nw_va = bucket.nw_train, bucket.nw_val
+    if (nw_tr > 0 or nw_va > 0) and not persistent_workers:
+        print0(
+            "[yellow]MAE pretrain: use --dl-persistent-workers with num_workers>0 "
+            "or patch draws may repeat across epochs.[/yellow]"
+        )
     pin_mem = pin_memory if pin_memory is not None else False
+    tr_tf = train_spatial_tf(ps)
     tr_it = PretrainPatchIterable(
-        case_dir, tr_k, ps, num_iterations_per_epoch, batch_size, base_seed_train, mem_diag_dir
+        case_dir, tr_k, ps, num_iterations_per_epoch, batch_size, base_seed_train, tr_tf, mem_diag_dir
     )
-    va_it = PretrainPatchIterable(case_dir, va_k, ps, num_val_iterations, batch_size, base_seed_val, mem_diag_dir)
+    va_it = PretrainPatchIterable(
+        case_dir, va_k, ps, num_val_iterations, batch_size, base_seed_val, None, mem_diag_dir
+    )
     winit_tr = partial(_worker_init, out_dir=mem_diag_dir or ".") if mem_diag_enabled() and mem_diag_dir and nw_tr else None
     winit_va = partial(_worker_init, out_dir=mem_diag_dir or ".") if mem_diag_enabled() and mem_diag_dir and nw_va else None
     tr = build_iter_dataloader(

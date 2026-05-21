@@ -97,6 +97,10 @@ def main() -> None:
     )
     ap.add_argument("--mae-epochs", type=int, default=1000)
     ap.add_argument("--mae-lr", type=float, default=1e-2)
+    ap.add_argument("--mae-lr-schedule", choices=("cosine_warm_restarts", "poly"), default="cosine_warm_restarts")
+    ap.add_argument("--mae-cosine-t0", type=int, default=250)
+    ap.add_argument("--mae-cosine-t-mult", type=int, default=1)
+    ap.add_argument("--mae-cosine-eta-min", type=float, default=0.0)
     ap.add_argument("--mae-mask-ratio", type=float, default=0.75)
     ap.add_argument("--mae-iters-per-epoch", type=int, default=None, help="Default: same as --iters-per-epoch.")
     ap.add_argument(
@@ -216,6 +220,10 @@ def main() -> None:
                 initial_lr=args.mae_lr,
                 weight_decay=args.wd,
                 num_epochs=args.mae_epochs,
+                lr_schedule=args.mae_lr_schedule,
+                cosine_t0=args.mae_cosine_t0,
+                cosine_t_mult=args.mae_cosine_t_mult,
+                cosine_eta_min=args.mae_cosine_eta_min,
             )
             pre_cb = [
                 ModelCheckpoint(dirpath=join(pre_out, "checkpoints"), save_last=True),

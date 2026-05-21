@@ -1,4 +1,4 @@
-"""MAE Lightning module: same ResEnc, masked-only L2 reconstruction, SGD + poly LR."""
+"""MAE Lightning module: same ResEnc, masked-only L2, SGD + cosine warm-restart LR (default)."""
 
 from __future__ import annotations
 
@@ -34,6 +34,10 @@ class NanoMAELM(pl.LightningModule):
         initial_lr: float = 1e-2,
         weight_decay: float = 3e-5,
         num_epochs: int = 1000,
+        lr_schedule: str = "cosine_warm_restarts",
+        cosine_t0: int = 250,
+        cosine_t_mult: int = 1,
+        cosine_eta_min: float = 0.0,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["plans_path", "dataset_json_path"])
@@ -86,6 +90,9 @@ class NanoMAELM(pl.LightningModule):
         purge_torch_tmp()
         if mem_diag_enabled() and torch.cuda.is_available():
             torch.cuda.reset_peak_memory_stats()
+        opt = self.optimizers()
+        if opt is not None:
+            self.log("lr", float(opt.param_groups[0]["lr"]), prog_bar=False)
 
     def on_validation_epoch_end(self) -> None:
         if (
@@ -124,5 +131,13 @@ class NanoMAELM(pl.LightningModule):
             momentum=0.99,
             nesterov=True,
         )
-        sched = PolyLRScheduler(opt, self.hparams.initial_lr, self.hparams.num_epochs)
+        if self.hparams.lr_schedule == "cosine_warm_restarts":
+            sched = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                opt,
+                T_0=self.hparams.cosine_t0,
+                T_mult=self.hparams.cosine_t_mult,
+                eta_min=self.hparams.cosine_eta_min,
+            )
+        else:
+            sched = PolyLRScheduler(opt, self.hparams.initial_lr, self.hparams.num_epochs)
         return {"optimizer": opt, "lr_scheduler": {"scheduler": sched, "interval": "epoch"}}
