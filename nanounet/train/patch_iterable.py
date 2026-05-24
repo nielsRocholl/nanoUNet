@@ -41,7 +41,7 @@ class CaseMetaCache:
         return prop
 
 
-def _worker_init(worker_id: int, out_dir: str) -> None:
+def worker_init(worker_id: int, out_dir: str) -> None:
     from nanounet.runtime import set_safe_tmpdir
 
     set_safe_tmpdir()
