@@ -1,7 +1,7 @@
 """Fixed DataLoader presets: worker count and prefetch per train/val.
 
-Bucket ``s`` uses 2/1 workers when TMPDIR is not tmpfs (safe after runtime redirect).
-Falls back to 0 workers on tmpfs. Override: NANOUNET_DL_FORCE_NO_WORKERS=1 or
+Buckets: s=2/1, m=4/2, l=8/4, xl=16/8 (train/val workers). Prefetch scales with bucket.
+Bucket ``s`` falls back to 0 workers on tmpfs. Override: NANOUNET_DL_FORCE_NO_WORKERS=1 or
 NANOUNET_DL_KEEP_WORKERS=1 (legacy: force workers even on tmpfs — not recommended)."""
 from __future__ import annotations
 
@@ -33,17 +33,19 @@ def dl_force_no_workers() -> bool:
     return os.environ.get("NANOUNET_DL_FORCE_NO_WORKERS", "").strip() in ("1", "true", "yes")
 
 
-def _bucket_workers(name: Literal["s", "m", "l"]) -> DataloaderBucket:
+def _bucket_workers(name: Literal["s", "m", "l", "xl"]) -> DataloaderBucket:
     if name == "s":
         return DataloaderBucket(2, 1, 2, 2)
     elif name == "m":
         return DataloaderBucket(4, 2, 4, 2)
     elif name == "l":
         return DataloaderBucket(8, 4, 4, 2)
+    elif name == "xl":
+        return DataloaderBucket(16, 8, 6, 4)
     raise ValueError(f"unknown dataloader bucket {name!r}")
 
 
-def dataloader_bucket(name: Literal["s", "m", "l"]) -> DataloaderBucket:
+def dataloader_bucket(name: Literal["s", "m", "l", "xl"]) -> DataloaderBucket:
     if name != "s":
         return _bucket_workers(name)
     if dl_force_no_workers():

@@ -66,9 +66,9 @@ def main() -> None:
     ap.add_argument("--wandb-name", default=None)
     ap.add_argument(
         "--dl-bucket",
-        choices=("s", "m", "l"),
+        choices=("s", "m", "l", "xl"),
         default="m",
-        help="DataLoader workers: s=2/1 if TMPDIR off tmpfs else 0, m=4/2, l=8/4.",
+        help="DataLoader workers: s=2/1 if TMPDIR off tmpfs else 0, m=4/2, l=8/4, xl=16/8.",
     )
     ap.add_argument(
         "--dl-persistent-workers",
