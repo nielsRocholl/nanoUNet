@@ -1,4 +1,4 @@
-"""Iterable patch dataset + LightningDataModule (prefetch, pin_memory)."""
+"""LightningDataModule for supervised training (prefetch, pin_memory)."""
 
 from __future__ import annotations
 
@@ -9,38 +9,20 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 from batchgenerators.utilities.file_and_folder_operations import join, load_json
-from torch.utils.data import DataLoader, IterableDataset
+from torch.utils.data import DataLoader
 
-from nanounet.common import (
-    ANISO_THRESHOLD,
-    preprocessed_dir,
-    raw_dir,
-    setup_logging,
-)
-from nanounet.config import RoiPromptConfig, load_config
+from nanounet.common import ANISO_THRESHOLD, preprocessed_dir, raw_dir, setup_logging
+from nanounet.config import load_config
 from nanounet.data import augment
 from nanounet.data.blosc2_dataset import Blosc2Folder
-from nanounet.data.sampling import build_patch
 from nanounet.dataloader_prefs import DataloaderBucket, build_iter_dataloader, init_dataloader_ipc
-from nanounet.mem_diag import (
-    log_snapshot,
-    mem_diag_enabled,
-    worker_diag_init,
-    worker_diag_iter_end,
-    worker_diag_tick,
-)
+from nanounet.mem_diag import mem_diag_enabled
 from nanounet.plan.plans import Plans
 from nanounet.plan.splits import fold_keys, load_or_create_splits
+from nanounet.train.patch_iterable import PatchIterable, collate_patches, worker_init
 from nanounet.train.patch_size import get_patch_size
 
 setup_logging()
-
-
-def _worker_init(worker_id: int, out_dir: str) -> None:
-    from nanounet.runtime import set_safe_tmpdir
-
-    set_safe_tmpdir()
-    worker_diag_init(worker_id, out_dir)
 
 
 def _ds_scales(cm, enable: bool):
@@ -63,100 +45,6 @@ def _rotation_dummy_mirroring(patch_size: List[int]):
     if do_dummy:
         initial_patch_size[0] = patch_size[0]
     return rotation_for_DA, do_dummy, tuple(initial_patch_size), mirror_axes
-
-
-class _PatchIterable(IterableDataset):
-    def __init__(
-        self,
-        folder: str,
-        keys: List[str],
-        roi_cfg: RoiPromptConfig,
-        patch_size: np.ndarray,
-        final_patch_size: np.ndarray,
-        annotated_key,
-        tf,
-        force_zero_prompt: bool,
-        num_batches: int,
-        batch_size: int,
-        base_seed: int,
-        mem_diag_dir: str | None = None,
-    ):
-        self.folder = folder
-        self.keys = keys
-        self.roi_cfg = roi_cfg
-        self.patch_size = patch_size
-        self.final_patch_size = final_patch_size
-        self.annotated_key = annotated_key
-        self.tf = tf
-        self.force_zero_prompt = force_zero_prompt
-        self.num_batches = num_batches
-        self.batch_size = batch_size
-        self.base_seed = base_seed
-        self.mem_diag_dir = mem_diag_dir
-
-    def __len__(self) -> int:
-        return self.num_batches * self.batch_size
-
-    def __iter__(self):
-        wi = torch.utils.data.get_worker_info()
-        nw = 1 if wi is None else wi.num_workers
-        wid = 0 if wi is None else wi.id
-        total = self.num_batches * self.batch_size
-        n_here = total // nw + (1 if wid < (total % nw) else 0)
-        seed = self.base_seed + wid * 10007
-        rng = np.random.default_rng(seed)
-        ds = Blosc2Folder(self.folder, identifiers=self.keys)
-        remaining = n_here
-        opens = 0
-        patches = 0
-        if mem_diag_enabled() and self.mem_diag_dir:
-            log_snapshot(
-                f"worker_{wid}_iter_start",
-                self.mem_diag_dir,
-                extra={"worker_id": wid, "n_here": n_here, "num_keys": len(self.keys), "batch_size": self.batch_size},
-                filename=f"mem_diag_worker_{wid}.jsonl",
-            )
-        while remaining > 0:
-            cid = self.keys[int(rng.integers(0, len(self.keys)))]
-            k = min(self.batch_size, remaining)
-            with ds.open_case(cid, need_seg=True) as (data, seg, _, prop):
-                opens += 1
-                for _ in range(k):
-                    raw = build_patch(
-                        data,
-                        seg,
-                        prop,
-                        self.roi_cfg,
-                        self.patch_size,
-                        self.final_patch_size,
-                        self.annotated_key,
-                        self.force_zero_prompt,
-                        rng,
-                    )
-                    im = torch.from_numpy(raw["image"]).float()
-                    se = torch.from_numpy(raw["segmentation"]).short()
-                    with torch.no_grad():
-                        o = self.tf(**{"image": im, "segmentation": se})
-                    yield {"data": o["image"], "target": o["segmentation"]}
-                    remaining -= 1
-                    patches += 1
-            if mem_diag_enabled() and self.mem_diag_dir:
-                worker_diag_tick(wid, {"opens": opens, "patches": patches, "worker_id": wid})
-        if mem_diag_enabled() and self.mem_diag_dir:
-            worker_diag_iter_end(
-                wid,
-                {"opens": opens, "patches": patches, "worker_id": wid, "n_here": n_here},
-            )
-
-
-def _collate(batch: list) -> dict:
-    data = torch.stack([b["data"] for b in batch])
-    t0 = batch[0]["target"]
-    if isinstance(t0, list):
-        target = [torch.stack([b["target"][i] for b in batch], dim=0) for i in range(len(t0))]
-    else:
-        target = torch.stack([b["target"] for b in batch])
-    return {"data": data, "target": target}
 
 
 class NanoDataModule(pl.LightningDataModule):
@@ -227,7 +115,7 @@ class NanoDataModule(pl.LightningDataModule):
 
     def train_dataloader(self) -> DataLoader:
         init_dataloader_ipc()
-        it = _PatchIterable(
+        it = PatchIterable(
             self.case_folder,
             self.tr_keys,
             self.roi_cfg,
@@ -243,14 +131,14 @@ class NanoDataModule(pl.LightningDataModule):
         )
         b = self.dl_bucket
         nw = b.nw_train
-        winit = partial(_worker_init, out_dir=self.mem_diag_dir or ".") if mem_diag_enabled() and self.mem_diag_dir and nw else None
+        winit = partial(worker_init, out_dir=self.mem_diag_dir or ".") if nw else None
         return build_iter_dataloader(
             it,
             batch_size=self.batch_size,
             bucket=b,
             nw=nw,
             prefetch=b.prefetch_train,
-            collate_fn=_collate,
+            collate_fn=collate_patches,
             pin_memory=self.pin_memory,
             worker_init_fn=winit,
             persistent_workers=self.persistent_workers,
@@ -258,7 +146,7 @@ class NanoDataModule(pl.LightningDataModule):
 
     def val_dataloader(self) -> DataLoader:
         init_dataloader_ipc()
-        it = _PatchIterable(
+        it = PatchIterable(
             self.case_folder,
             self.val_keys,
             self.roi_cfg,
@@ -274,14 +162,14 @@ class NanoDataModule(pl.LightningDataModule):
         )
         b = self.dl_bucket
         nw = b.nw_val
-        winit = partial(_worker_init, out_dir=self.mem_diag_dir or ".") if mem_diag_enabled() and self.mem_diag_dir and nw else None
+        winit = partial(worker_init, out_dir=self.mem_diag_dir or ".") if nw else None
         return build_iter_dataloader(
             it,
             batch_size=self.batch_size,
             bucket=b,
             nw=nw,
             prefetch=b.prefetch_val,
-            collate_fn=_collate,
+            collate_fn=collate_patches,
             pin_memory=self.pin_memory,
             worker_init_fn=winit,
             persistent_workers=self.persistent_workers,

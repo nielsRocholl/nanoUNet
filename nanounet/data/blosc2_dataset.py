@@ -54,6 +54,15 @@ def _open_b2(path: str, mmap: bool):
     return arr
 
 
+def load_case_properties(folder: str, identifier: str) -> dict:
+    properties = load_pickle(join(folder, identifier + ".pkl"))
+    cj = join(folder, identifier + "_centroids.json")
+    if isfile(cj):
+        with open(cj, encoding="utf-8") as f:
+            properties = {**properties, **json.load(f)}
+    return properties
+
+
 def case_spatial_shape(folder: str, identifier: str) -> tuple[int, int, int]:
     path = join(folder, identifier + ".b2nd")
     data = _open_b2(path, mmap=False)
@@ -84,11 +93,7 @@ class Blosc2Folder:
         seg = _open_b2(seg_path, mmap) if seg_path else None
         seg_prev = _open_b2(seg_prev_path, mmap) if seg_prev_path else None
         try:
-            properties = load_pickle(join(self.source_folder, identifier + ".pkl"))
-            cj = join(self.source_folder, identifier + "_centroids.json")
-            if isfile(cj):
-                with open(cj, encoding="utf-8") as f:
-                    properties = {**properties, **json.load(f)}
+            properties = load_case_properties(self.source_folder, identifier)
             yield data, seg, seg_prev, properties
         finally:
             _close_b2(data)

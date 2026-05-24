@@ -53,6 +53,17 @@ def dataloader_bucket(name: Literal["s", "m", "l"]) -> DataloaderBucket:
     return DataloaderBucket(0, 0, 0, 0)
 
 
+def pin_worker_threads() -> None:
+    for k in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+        os.environ.setdefault(k, "1")
+    try:
+        import threadpoolctl
+
+        threadpoolctl.threadpool_limits(1)
+    except ImportError:
+        pass
+
+
 def init_dataloader_ipc() -> None:
     import torch.multiprocessing as tmp
 
