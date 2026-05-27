@@ -7,6 +7,7 @@ from pathlib import Path
 import torch
 from torch_geometric.data import Batch
 
+from tracking.data.features import add_feat_args, feat_from_args
 from tracking.data.graph import GraphConfig
 from tracking.data.masks import build_mask_graph
 from tracking.decode import decode_sinkhorn_hungarian
@@ -27,16 +28,24 @@ ap.add_argument("--sinkhorn-iters", type=int, default=20)
 ap.add_argument("--sinkhorn-tau", type=float, default=0.2)
 ap.add_argument("--tta-n", type=int, default=5, help="TTA jitter passes; 0 disables")
 ap.add_argument("--no-ema", action="store_true", help="use training weights instead of EMA shadow")
+add_feat_args(ap)
 args = ap.parse_args()
 
+feat = feat_from_args(args)
+mae = None
+if feat.mode == "mae":
+    from tracking.data.mae import MaeExtractor
+
+    mae = MaeExtractor(feat)
 data = build_mask_graph(
     Path(args.bl_img),
     Path(args.bl_mask),
     Path(args.fu_img),
     Path(args.fu_mask),
     Path(args.propagated),
-    GraphConfig(k_intra=args.k_intra),
+    GraphConfig(k_intra=args.k_intra, feat=feat),
     args.default_lesion_type,
+    mae=mae,
 )
 mod = MatcherModule.load_from_checkpoint(args.ckpt, map_location="cpu")
 mod.eval()

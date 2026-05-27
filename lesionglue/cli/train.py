@@ -15,6 +15,7 @@ import torch
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, TQDMProgressBar
 
 from tracking.common import CACHE_ROOT, DATASET_ROOT, seed_all
+from tracking.data.features import add_feat_args, desc_dim, feat_from_args
 from tracking.train.datamodule import MatcherDataModule
 from tracking.train.module import MatcherModule
 
@@ -114,8 +115,10 @@ if __name__ == "__main__":
     ap.add_argument("--wandb", action="store_true", help="log to W&B (also on if --wandb-run-name is set)")
     ap.add_argument("--wandb-project", default="lesion-tracking")
     ap.add_argument("--wandb-run-name", default="", type=str)
+    add_feat_args(ap)
     args = ap.parse_args()
 
+    feat = feat_from_args(args)
     cfg = TrainConfig(
         epochs=args.epochs,
         lr=args.lr,
@@ -152,6 +155,7 @@ if __name__ == "__main__":
     dm = MatcherDataModule(
         cache_root=Path(args.cache),
         dataset_root=Path(args.root),
+        feat=feat,
         batch_size=cfg.batch_size,
         num_workers=cfg.num_workers,
         fu_jitter_scale=cfg.fu_jitter,
@@ -186,10 +190,24 @@ if __name__ == "__main__":
         k_intra=8,
         fu_jitter_scale=cfg.fu_jitter,
         desc_jitter_frac=cfg.desc_jitter_frac,
+        desc_dim=desc_dim(feat),
         sinkhorn_uniform_fu=cfg.sinkhorn_uniform_fu,
     )
-    Path(args.out).mkdir(parents=True, exist_ok=True)
-    ckpt = ModelCheckpoint(dirpath=args.out, monitor="val_match_score", save_top_k=3, mode="max")
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    for p in out.glob("*.ckpt"):
+        if p.name not in ("best.ckpt", "last.ckpt"):
+            p.unlink(missing_ok=True)
+    ckpt = ModelCheckpoint(
+        dirpath=str(out),
+        monitor="val_match_score",
+        mode="max",
+        save_top_k=1,
+        save_last=True,
+        filename="best",
+        auto_insert_metric_name=False,
+        enable_version_counter=False,
+    )
     callbacks = [ckpt, TQDMProgressBar()]
     if not args.no_early_stop:
         callbacks.insert(1, EarlyStopping(monitor="val_match_score", mode="max", patience=cfg.early_stop_patience))

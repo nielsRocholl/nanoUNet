@@ -9,8 +9,8 @@ from torch_geometric.data import HeteroData
 
 from tracking.common import LESION_TYPES
 from tracking.data.dataset import LesionDataset
+from tracking.data.features import FeatConfig, feat_dim, feat_layout
 
-FEAT_DIM = 1387
 _UI_FG = "#e6edf3"
 _UI_FG_DIM = "#b7c0ca"
 _PRE = {"margin": 0, "fontSize": 13, "whiteSpace": "pre-wrap", "color": _UI_FG}
@@ -74,10 +74,12 @@ def _spread_xy(xy: np.ndarray, mind: float = 56.0, iters: int = 160) -> np.ndarr
     q[:, 1] = np.clip(q[:, 1], 28, 972)
     return q
 
-def _node_dict(x: np.ndarray, pos_mm: np.ndarray, side: str, lid: int) -> dict:
-    d = x[:1372].astype(np.float64)
-    lv = float(x[1372])
-    lt_i = int(round(float(x[1386])))
+def _node_dict(x: np.ndarray, pos_mm: np.ndarray, side: str, lid: int, fc: FeatConfig) -> dict:
+    layout = feat_layout(fc)
+    desc_off, desc_end, stat_off, _, lt_idx = layout
+    d = x[desc_off:desc_end].astype(np.float64)
+    lv = float(x[stat_off])
+    lt_i = int(round(float(x[lt_idx])))
     ant = LESION_TYPES[lt_i] if 0 <= lt_i < len(LESION_TYPES) else f"idx_{lt_i}"
     return {
         "id": f"{side}-{lid}",
@@ -88,8 +90,8 @@ def _node_dict(x: np.ndarray, pos_mm: np.ndarray, side: str, lid: int) -> dict:
         "lesion_type_idx": lt_i,
         "volume_mm3": float(np.expm1(lv * 10.0)),
         "log1p_volume_mm3": lv * 10.0,
-        "mean_hu": float(x[1373] * 1000.0),
-        "sphericity": float(x[1374]),
+        "mean_hu": float(x[stat_off + 1] * 1000.0),
+        "sphericity": float(x[stat_off + 2]),
         "pos_mm_zyx": pos_mm.tolist(),
         "descriptor_min": float(d.min()),
         "descriptor_max": float(d.max()),
@@ -106,6 +108,7 @@ def _append_intra(out: list[dict], ei: torch.Tensor, ea: torch.Tensor, ids: list
         out.append({"data": {"id": f"i{tag}-{k}-{ids[s]}-{ids[t]}", "source": f"{tag}-{ids[s]}", "target": f"{tag}-{ids[t]}", "etype": et, "distance_mm": dmm}})
 
 def hetero_to_elements(data: HeteroData) -> list[dict]:
+    fc = FeatConfig(mode=str(getattr(data, "feat_mode", "l0")))
     bl = data["bl"].lesion_id.detach().cpu().numpy().tolist()
     fu = data["fu"].lesion_id.detach().cpu().numpy().tolist()
     xb, xf = data["bl"].x.detach().cpu().numpy(), data["fu"].x.detach().cpu().numpy()
@@ -115,9 +118,9 @@ def hetero_to_elements(data: HeteroData) -> list[dict]:
     yb, yf = stacked[: len(bl)], stacked[len(bl) :]
     out: list[dict] = []
     for i, lid in enumerate(bl):
-        out.append({"data": _node_dict(xb[i], pb[i], "bl", int(lid)), "position": {"x": float(yb[i, 0]), "y": float(yb[i, 1])}})
+        out.append({"data": _node_dict(xb[i], pb[i], "bl", int(lid), fc), "position": {"x": float(yb[i, 0]), "y": float(yb[i, 1])}})
     for j, lid in enumerate(fu):
-        out.append({"data": _node_dict(xf[j], pf[j], "fu", int(lid)), "position": {"x": float(yf[j, 0]), "y": float(yf[j, 1])}})
+        out.append({"data": _node_dict(xf[j], pf[j], "fu", int(lid), fc), "position": {"x": float(yf[j, 0]), "y": float(yf[j, 1])}})
     _append_intra(out, data["bl", "intra", "bl"].edge_index, data["bl", "intra", "bl"].edge_attr, bl, "bl")
     _append_intra(out, data["fu", "intra", "fu"].edge_index, data["fu", "intra", "fu"].edge_attr, fu, "fu")
     ei = data["bl", "cross", "fu"].edge_index
@@ -139,7 +142,10 @@ def tap_payload(prop) -> dict | None:
         return x if isinstance(x, dict) else None
     return None
 
-def format_detail(nd: dict | None, ed: dict | None, pid: str, img_fu: int) -> html.Pre:
+def format_detail(nd: dict | None, ed: dict | None, pid: str, img_fu: int, fc: FeatConfig | None = None) -> html.Pre:
+    fc = fc or FeatConfig()
+    fd = feat_dim(fc)
+    desc_end = feat_layout(fc)[1]
     h = f"pid={pid}  img_id_fu_used={img_fu}\n---\n"
     if ed:
         et = str(ed.get("etype", ""))
@@ -158,8 +164,8 @@ def format_detail(nd: dict | None, ed: dict | None, pid: str, img_fu: int) -> ht
             f"  log1p(vol_mm3)= {lv:.6g}   volume_mm3(expm1)= {nd['volume_mm3']:.6g}\n"
             f"  mean_hu= {nd['mean_hu']:.6g}   sphericity= {nd['sphericity']:.6g}\n"
             f"  pos_mm z,y,x (graph.pos): {nd.get('pos_mm_zyx')}\n"
-            f"  descriptor L0 [0:1372]: min={nd['descriptor_min']:.6g} max={nd['descriptor_max']:.6g} mean={nd['descriptor_mean']:.6g} std={nd['descriptor_std']:.6g}\n"
-            f"  full x length {FEAT_DIM}\n"
+            f"  descriptor [{feat_layout(fc)[0]}:{desc_end}]: min={nd['descriptor_min']:.6g} max={nd['descriptor_max']:.6g} mean={nd['descriptor_mean']:.6g} std={nd['descriptor_std']:.6g}\n"
+            f"  full x length {fd}\n"
         )
         return html.Pre(s, style=_PRE)
     return html.Pre(h + "Tap a node or edge.", style=_PRE)

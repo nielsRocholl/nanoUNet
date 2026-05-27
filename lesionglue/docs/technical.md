@@ -65,11 +65,11 @@ Labels are **0/1** stored as `data['bl','cross','fu'].edge_label`. Baseline/foll
 
 ## Node features (`appearance.py` + packing in `graph.py`)
 
-Per-node vector dimension **1379**, with descriptor/HU clipped to `[-1000, 1000] / 1000`, `log1p(volume_mm³) / 10`, and sphericity clipped to `[0, 2]`:
+Per-node vector dimension depends on `--feat` (`l0`: **1387**, `mae`: **335**, `yerebakan`: **6875**), with descriptor/HU clipped to `[-1000, 1000] / 1000` for hand-crafted modes, `log1p(volume_mm³) / 10`, and sphericity clipped to `[0, 2]`:
 
-| Block | Size | Meaning |
+| Block | Size (l0) | Meaning |
 |-------|------|---------|
-| Descriptor | 1372 | L0 **Yerebakan-style** multi-scale intensity samples (fixed offsets in **world mm**, trilinear sampling back into index space). Same spirit as Yerebakan et al.; we only use hierarchy level 0. |
+| Descriptor | 1372 | L0 **Yerebakan-style** multi-scale intensity samples (fixed offsets in **world mm**, trilinear sampling back into index space). `yerebakan` mode concatenates 5 hierarchy levels (6860-D). `mae` mode uses 320-D masked encoder pool. |
 | Mask stats | 3 | `log1p(volume_mm³)`, mean HU inside lesion mask, sphericity from voxel-face surface area. |
 | Anatomy index | 1 | Integer index into fixed `LESION_TYPES` vocabulary (embedded in the encoder). |
 | Position | 3 | Normalized follow-up-space coordinates: COG / `(shape − 1)` per axis (baseline uses **propagated** COG here). |

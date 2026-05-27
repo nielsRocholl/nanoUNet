@@ -10,6 +10,7 @@ from torch import nn
 from torch_geometric.data import HeteroData
 from torch_geometric.nn import HeteroConv, TransformerConv
 
+from tracking.data.features import STAT_DIM
 from tracking.data.pairs import CROSS_DIM
 from tracking.set_attn import SetAttn
 
@@ -22,6 +23,7 @@ class ModelConfig:
     lt_vocab: int = 12
     lt_embed: int = 8
     dropout: float = 0.2
+    desc_dim: int = 1372
     use_dust_pair_summary: bool = True
     dust_legacy_linear: bool = False
     set_attn_blocks: int = 0
@@ -39,14 +41,17 @@ class MatcherOutput:
 class NodeEncoder(nn.Module):
     def __init__(self, cfg: ModelConfig):
         super().__init__()
+        self.desc_dim = cfg.desc_dim
+        self.stat_off = cfg.desc_dim
+        self.lt_idx = cfg.desc_dim + STAT_DIM
         self.emb = nn.Embedding(cfg.lt_vocab, cfg.lt_embed)
-        inn = 1372 + 14 + cfg.lt_embed
+        inn = cfg.desc_dim + STAT_DIM + cfg.lt_embed
         self.net = nn.Sequential(nn.Linear(inn, 256), nn.ReLU(inplace=True), nn.Linear(256, cfg.d))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        desc = x[:, :1372]
-        st = x[:, 1372:1386]
-        ti = x[:, 1386].long()
+        desc = x[:, : self.desc_dim]
+        st = x[:, self.stat_off : self.lt_idx]
+        ti = x[:, self.lt_idx].long()
         return self.net(torch.cat([desc, st, self.emb(ti)], dim=1))
 
 

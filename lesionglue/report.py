@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import gc
 import numpy as np
 import torch
+from rich.progress import track
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
 from baselines.nearest_mask.baseline import NearestMaskIndex
 from baselines.nearest_mask.io import load_fu_mask
 from tracking.data.dataset import LesionDataset
+from tracking.data.features import FeatConfig
 from tracking.data.meta import V2Paths, parse_meta_csv
 from tracking.decode import decode_sinkhorn_hungarian
 from tracking.train.match_utils import split_per_graph
@@ -108,14 +111,60 @@ def _add_graph(root: Path, g, dec: np.ndarray, c: dict[str, object]) -> None:
     c["patient_edge_acc"].append((tp + tn) / max(tp + fp + tn + fn, 1))
 
 
-def eval_gnn(ckpt: Path, root: Path, cache: Path, split: str, batch_size: int, num_workers: int, tta_n: int, use_ema: bool) -> dict[str, object]:
-    ds = LesionDataset(root=cache, split=split, dataset_root=root)
-    dl = PyGDataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-    dev = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+def _eval_device(preference: str) -> torch.device:
+    p = preference.lower().strip()
+    if p == "cpu":
+        return torch.device("cpu")
+    if p == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError("--eval-device cuda but CUDA not available")
+        return torch.device("cuda")
+    if p == "mps":
+        if not torch.backends.mps.is_available():
+            raise RuntimeError("--eval-device mps but MPS not available")
+        return torch.device("mps")
+    if p == "auto":
+        if torch.cuda.is_available():
+            return torch.device("cuda")
+        if torch.backends.mps.is_available():
+            return torch.device("mps")
+        return torch.device("cpu")
+    raise ValueError(f"unknown device preference: {preference!r}")
+
+
+def eval_gnn(
+    ckpt: Path,
+    root: Path,
+    cache: Path,
+    split: str,
+    batch_size: int,
+    num_workers: int,
+    tta_n: int,
+    use_ema: bool,
+    *,
+    eval_device: str = "auto",
+    show_progress: bool = True,
+    cuda_gc_each_batch: bool = True,
+    feat: FeatConfig | None = None,
+) -> dict[str, object]:
+    dev = _eval_device(eval_device)
+    fc = feat or FeatConfig()
+    ds = LesionDataset(root=cache, split=split, dataset_root=root, feat=fc)
+    dl = PyGDataLoader(
+        ds,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=False,
+        persistent_workers=False,
+    )
     mod = MatcherModule.load_from_checkpoint(str(ckpt), map_location=dev).to(dev).eval()
     c = _zero()
+    it = dl
+    if show_progress:
+        it = track(dl, description=f"GNN {split}", total=len(dl))
     with torch.no_grad():
-        for batch in dl:
+        for batch in it:
             batch = batch.to(dev)
             out = mod.predict_batch(batch, tta_n=tta_n, use_ema=use_ema)
             graphs, pp, db, df = split_per_graph(batch, out)
@@ -123,18 +172,31 @@ def eval_gnn(ckpt: Path, root: Path, cache: Path, split: str, batch_size: int, n
                 n_bl, n_fu = len(g["bl"].lesion_id), len(g["fu"].lesion_id)
                 dec = decode_sinkhorn_hungarian(p.detach(), b.detach(), f.detach(), n_bl, n_fu, iters=mod.hparams.sinkhorn_iters, tau=float(mod.hparams.dust_tau))
                 _add_graph(root, g.cpu(), dec, c)
+            del batch, out, graphs, pp, db, df
+            if cuda_gc_each_batch and dev.type == "cuda":
+                torch.cuda.empty_cache()
+    del mod
+    gc.collect()
+    if dev.type == "cuda":
+        torch.cuda.empty_cache()
     return _finish(c)
 
 
-def eval_baseline(root: Path, cache: Path, split: str) -> dict[str, object]:
-    ds = LesionDataset(root=cache, split=split, dataset_root=root)
+def eval_baseline(root: Path, cache: Path, split: str, *, feat: FeatConfig | None = None, show_progress: bool = True, one_mask_cache: bool = True) -> dict[str, object]:
+    fc = feat or FeatConfig()
+    ds = LesionDataset(root=cache, split=split, dataset_root=root, feat=fc)
     idx_cache: dict[tuple[str, int], NearestMaskIndex] = {}
     c = _zero()
-    for g in ds:
+    graphs = ds
+    if show_progress:
+        graphs = track(ds, description=f"Baseline {split}", total=len(ds))
+    for g in graphs:
         pid = str(g.pid)
         img = int(torch.as_tensor(g.img_id_fu_used).reshape(-1)[0].item())
         key = (pid, img)
         if key not in idx_cache:
+            if one_mask_cache and idx_cache:
+                idx_cache.clear()
             mask, sp = load_fu_mask(V2Paths(root, pid).fu_mask(img))
             idx_cache[key] = NearestMaskIndex(mask, sp)
         rows = {r.lesion_id: r for r in parse_meta_csv(V2Paths(root, pid).meta) if r.img_id_fu == img}

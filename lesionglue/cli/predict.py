@@ -10,6 +10,7 @@ from torch_geometric.loader import DataLoader as PyGDataLoader
 
 from tracking.common import CACHE_ROOT, DATASET_ROOT
 from tracking.data.dataset import LesionDataset
+from tracking.data.features import add_feat_args, desc_dim, feat_from_args
 from tracking.decode import decode_sinkhorn_hungarian
 from tracking.train.module import MatcherModule
 
@@ -27,14 +28,18 @@ if __name__ == "__main__":
     ap.add_argument("--no-ema", action="store_true", help="use training weights instead of EMA shadow")
     ap.add_argument("--dump-all", action="store_true")
     ap.add_argument("--strict", action="store_true")
+    add_feat_args(ap)
     args = ap.parse_args()
+    feat = feat_from_args(args)
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     mod = MatcherModule.load_from_checkpoint(args.ckpt, map_location="cpu")
+    ck_desc = int(mod.hparams.get("desc_dim", desc_dim(feat)))
+    assert ck_desc == desc_dim(feat), f"ckpt desc_dim {ck_desc} != --feat {feat.mode} ({desc_dim(feat)})"
     mod.eval()
     dev = mod.device
-    ds = LesionDataset(root=args.cache, split=args.split, dataset_root=Path(args.root))
+    ds = LesionDataset(root=args.cache, split=args.split, dataset_root=Path(args.root), feat=feat)
     loader = PyGDataLoader(ds, batch_size=1, shuffle=False)
     with torch.no_grad():
         for batch in loader:

@@ -7,11 +7,8 @@ import torch.nn.functional as F
 from torch import nn
 from torch_geometric.data import Batch, HeteroData
 
-from tracking.data.graph import FEAT_DIM
 from tracking.decode import decode_sinkhorn_hungarian
 from tracking.matcher import MatcherOutput
-
-LT_IDX = FEAT_DIM - 1
 
 
 def focal_bce_with_logits(
@@ -50,8 +47,9 @@ def infonce_batch(
     pos = edge_label > 0.5
     if not pos.any():
         return z_bl.sum() * 0.0
-    lt_bl = batch["bl"].x[:, LT_IDX].long()
-    lt_fu = batch["fu"].x[:, LT_IDX].long()
+    lt_idx = batch["bl"].x.shape[1] - 1
+    lt_bl = batch["bl"].x[:, lt_idx].long()
+    lt_fu = batch["fu"].x[:, lt_idx].long()
     same = lt_bl[:, None] == lt_fu[None, :]
     bi, fj = edge_index[0, pos], edge_index[1, pos]
     sort_idx = torch.argsort(bi)

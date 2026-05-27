@@ -47,6 +47,7 @@ class MatcherModule(pl.LightningModule):
         k_intra: int = 8,
         fu_jitter_scale: float = 0.3,
         desc_jitter_frac: float = 0.0,
+        desc_dim: int = 1372,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -56,6 +57,7 @@ class MatcherModule(pl.LightningModule):
                 layers=layers,
                 heads=heads,
                 dropout=dropout,
+                desc_dim=desc_dim,
                 use_dust_pair_summary=dust_pair_summary,
                 dust_legacy_linear=dust_legacy_linear,
                 set_attn_blocks=set_attn_blocks,
@@ -126,7 +128,9 @@ class MatcherModule(pl.LightningModule):
             F.binary_cross_entropy_with_logits(out.dust_bl, tgt_b, pos_weight=pw)
             + F.binary_cross_entropy_with_logits(out.dust_fu, tgt_f, pos_weight=pw)
         )
-        dust_w_eff = self.hparams.dust_w * min(1.0, float(self.current_epoch) / 20.0)
+        _ep_ov = getattr(self, "_dust_ramp_epoch_override", None)
+        _ep = int(_ep_ov) if _ep_ov is not None else int(self.current_epoch)
+        dust_w_eff = self.hparams.dust_w * min(1.0, float(_ep) / 20.0)
         total = (
             self.hparams.sinkhorn_w * sk_loss
             + self.hparams.pair_w * pair_focal

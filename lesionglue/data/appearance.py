@@ -1,39 +1,10 @@
-"""L0 Yerebakan descriptor (1372-D) + pose-invariant mask radiomics (14 scalars)."""
+"""Pose-invariant mask radiomics (14 scalars per lesion)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 import numpy as np
-from scipy.ndimage import map_coordinates
-
-DESC_DIM = 1372
-SCALES_MM = (8.0, 20.0, 48.0, 128.0)
-GRID = 7
-
-
-def _build_offsets() -> np.ndarray:
-    out = []
-    for d in SCALES_MM:
-        for i in range(GRID):
-            for j in range(GRID):
-                for k in range(GRID):
-                    out.append(((i - 3) * d, (j - 3) * d, (k - 3) * d))
-    arr = np.asarray(out, dtype=np.float64)
-    assert arr.shape == (DESC_DIM, 3)
-    return arr
-
-
-OFFSETS_MM = _build_offsets()
-
-
-def descriptor_l0(vol: np.ndarray, affine: np.ndarray, center_ijk: np.ndarray) -> np.ndarray:
-    R, t = affine[:3, :3], affine[:3, 3]
-    c = np.asarray(center_ijk, dtype=np.float64).reshape(3)
-    samps_w = OFFSETS_MM + (R @ c + t)
-    inv = np.linalg.inv(affine)
-    ijk = (inv[:3, :3] @ samps_w.T).T + inv[:3, 3]
-    return map_coordinates(vol, ijk.T, order=1, mode="constant", cval=0.0).astype(np.float32)
 
 
 @dataclass

@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from torch_geometric.data import Batch
 
+from tracking.data.features import FeatConfig
 from tracking.data.augment import jitter_both
 from tracking.matcher import MatcherOutput
 
@@ -33,6 +34,7 @@ def matcher_tta_forward(
                 sigma_fu_scale=fu_jitter,
                 rng=np.random.default_rng(),
                 desc_jitter_frac=desc_jitter_frac,
+                feat=FeatConfig(mode=str(getattr(gc, "feat_mode", "l0"))),
             )
             gl.append(gc)
         b2 = Batch.from_data_list(gl).to(dev)

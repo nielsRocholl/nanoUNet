@@ -21,6 +21,7 @@ from tracking.cli.qc_view import (
 )
 from tracking.common import CACHE_ROOT, DATASET_ROOT, print0
 from tracking.data.dataset import LesionDataset
+from tracking.data.features import add_feat_args, feat_from_args
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
@@ -29,9 +30,11 @@ if __name__ == "__main__":
     ap.add_argument("--cache", default=str(CACHE_ROOT))
     ap.add_argument("--root", default=str(DATASET_ROOT))
     ap.add_argument("--port", type=int, default=8050)
+    add_feat_args(ap)
     args = ap.parse_args()
+    feat = feat_from_args(args)
     pid = normalize_case(args.case)
-    ds = LesionDataset(root=Path(args.cache), split=args.split, dataset_root=Path(args.root))
+    ds = LesionDataset(root=Path(args.cache), split=args.split, dataset_root=Path(args.root), feat=feat)
     hetero = pick_hetero(ds, pid)
     elems = hetero_to_elements(hetero)
     img_fu = int(torch.as_tensor(hetero.img_id_fu_used).reshape(-1)[0].item())

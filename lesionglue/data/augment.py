@@ -7,12 +7,12 @@ import torch
 from torch_geometric.data import HeteroData
 
 from tracking.common import PROP_SIGMA
+from tracking.data.features import FeatConfig, feat_layout
 from tracking.data.graph import intra_knn
 from tracking.data.pairs import cross_attr, dense_pair_index, reverse_cross_attr
 
 
 def _desc_noise_scale(block: torch.Tensor, frac: float) -> torch.Tensor:
-    # unbiased std with N=1 is NaN (ddof=1); that poisons features and Hungarian cost.
     if block.size(0) < 2:
         return torch.full((1, block.size(1)), 1e-3 * frac, device=block.device, dtype=block.dtype)
     return block.std(dim=0, keepdim=True, unbiased=False).clamp(min=1e-3) * frac
@@ -23,11 +23,13 @@ def drop_nodes(
     p_drop_fu: float,
     p_drop_bl: float,
     k_intra: int,
+    feat: FeatConfig,
     rng: np.random.Generator | None = None,
 ) -> HeteroData:
     if p_drop_fu <= 0.0 and p_drop_bl <= 0.0:
         return data
     rng = rng or np.random.default_rng()
+    layout = feat_layout(feat)
     n_bl = int(data["bl"].num_nodes)
     n_fu = int(data["fu"].num_nodes)
     keep_bl = rng.random(n_bl) >= p_drop_bl
@@ -66,7 +68,7 @@ def drop_nodes(
         data["fu"].lesion_id = data["fu"].lesion_id[kf]
     lab_s = lab[kb][:, kf]
     ei = dense_pair_index(int(lab_s.shape[0]), int(lab_s.shape[1]), dev=data["bl"].pos.device)
-    ea = cross_attr(data["bl"].pos, data["fu"].pos, data["bl"].x, data["fu"].x, ei)
+    ea = cross_attr(data["bl"].pos, data["fu"].pos, data["bl"].x, data["fu"].x, ei, layout)
     data["bl", "cross", "fu"].edge_index = ei
     data["bl", "cross", "fu"].edge_attr = ea
     data["bl", "cross", "fu"].edge_label = lab_s.reshape(-1)
@@ -83,6 +85,7 @@ def jitter_both(
     sigma_fu_scale: float = 0.3,
     rng: np.random.Generator | None = None,
     desc_jitter_frac: float = 0.0,
+    feat: FeatConfig | None = None,
 ) -> HeteroData:
     if rng is None:
         rng = np.random.default_rng()
@@ -94,16 +97,25 @@ def jitter_both(
     dev, dt = data["bl"].pos.device, data["bl"].pos.dtype
     data["bl"].pos = data["bl"].pos + torch.from_numpy(nb).to(device=dev, dtype=dt)
     data["fu"].pos = data["fu"].pos + torch.from_numpy(nf).to(device=dev, dtype=dt)
+    fc = feat or FeatConfig(mode=str(getattr(data, "feat_mode", "l0")))
+    if fc.mode == "mae":
+        desc_jitter_frac = 0.0
+    layout = feat_layout(fc)
+    desc_off, desc_end = layout[0], layout[1]
     if desc_jitter_frac > 0.0:
-        db = _desc_noise_scale(data["bl"].x[:, :1372], desc_jitter_frac)
-        data["bl"].x[:, :1372] = data["bl"].x[:, :1372] + torch.randn_like(data["bl"].x[:, :1372]) * db
+        db = _desc_noise_scale(data["bl"].x[:, desc_off:desc_end], desc_jitter_frac)
+        data["bl"].x[:, desc_off:desc_end] = data["bl"].x[:, desc_off:desc_end] + torch.randn_like(
+            data["bl"].x[:, desc_off:desc_end]
+        ) * db
         fu_frac = desc_jitter_frac * sigma_fu_scale
-        df = _desc_noise_scale(data["fu"].x[:, :1372], fu_frac)
-        data["fu"].x[:, :1372] = data["fu"].x[:, :1372] + torch.randn_like(data["fu"].x[:, :1372]) * df
+        df = _desc_noise_scale(data["fu"].x[:, desc_off:desc_end], fu_frac)
+        data["fu"].x[:, desc_off:desc_end] = data["fu"].x[:, desc_off:desc_end] + torch.randn_like(
+            data["fu"].x[:, desc_off:desc_end]
+        ) * df
     data["bl", "intra", "bl"].edge_index, data["bl", "intra", "bl"].edge_attr = intra_knn(data["bl"].pos, k_intra)
     data["fu", "intra", "fu"].edge_index, data["fu", "intra", "fu"].edge_attr = intra_knn(data["fu"].pos, k_intra)
     ei = data["bl", "cross", "fu"].edge_index
-    ea = cross_attr(data["bl"].pos, data["fu"].pos, data["bl"].x, data["fu"].x, ei)
+    ea = cross_attr(data["bl"].pos, data["fu"].pos, data["bl"].x, data["fu"].x, ei, layout)
     data["bl", "cross", "fu"].edge_attr = ea
     data["fu", "cross", "bl"].edge_attr = reverse_cross_attr(ea)
     return data
