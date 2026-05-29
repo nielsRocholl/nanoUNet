@@ -9,8 +9,10 @@ import torch
 from acvl_utils.cropping_and_padding.bounding_boxes import insert_crop_into_image
 
 
-def _softmax_dim1(x: torch.Tensor) -> torch.Tensor:
-    return torch.softmax(x, 1)
+def _softmax_class_dim(x: torch.Tensor) -> torch.Tensor:
+    # (C, spatial) or (B, C, spatial): class axis is 0 or 1 respectively
+    d = 1 if x.ndim >= 5 else 0
+    return torch.softmax(x, d)
 
 
 def filter_background(classes_or_regions: List):
@@ -76,7 +78,7 @@ class Labels:
         return tuple([-1] + list(self._all_labels))
 
     def _infer_nonlin(self, logits: torch.Tensor) -> torch.Tensor:
-        return _softmax_dim1(logits.float())
+        return _softmax_class_dim(logits.float())
 
     @torch.inference_mode()
     def convert_logits_to_segmentation(self, predicted_logits: np.ndarray | torch.Tensor):
@@ -84,10 +86,17 @@ class Labels:
             logits_t = torch.from_numpy(predicted_logits)
         else:
             logits_t = predicted_logits
+        # nnUNet: argmax on logits is equivalent to argmax on softmax for non-region heads
+        if not self.has_regions:
+            ax = 1 if logits_t.ndim >= 5 else 0
+            if isinstance(predicted_logits, np.ndarray):
+                return logits_t.argmax(ax).cpu().numpy()
+            return logits_t.argmax(ax)
         probs = self._infer_nonlin(logits_t)
+        ax = 1 if probs.ndim >= 5 else 0
         if isinstance(predicted_logits, np.ndarray):
-            return probs.argmax(0).cpu().numpy()
-        return probs.argmax(0)
+            return probs.argmax(ax).cpu().numpy()
+        return probs.argmax(ax)
 
     @torch.inference_mode()
     def convert_probabilities_to_segmentation(self, predicted_probabilities: np.ndarray | torch.Tensor):

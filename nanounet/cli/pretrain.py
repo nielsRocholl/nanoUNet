@@ -21,7 +21,6 @@ from nanounet.common import (
     quiet_lightning_runtime,
     raw_dir,
     results_dir,
-    sync_nnunet_env,
 )
 
 quiet_lightning_runtime()
@@ -44,7 +43,6 @@ from nanounet.runtime import assert_mem_diag_cgroup, runtime_banner
 
 
 def main() -> None:
-    sync_nnunet_env()
     ap = argparse.ArgumentParser()
     ap.add_argument("-d", "--dataset_id", type=int, required=True)
     ap.add_argument("-f", "--fold", type=int, default=0)

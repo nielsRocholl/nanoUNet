@@ -36,7 +36,7 @@ def _strip_pl_state(sd: dict) -> dict:
 def _acc_dtype(dev: torch.device) -> torch.dtype:
     if dev.type == "cpu":
         return torch.float32
-    r = (os.environ.get("NNUNET_SINGLE_PATCH_ACCUM_DTYPE") or "").lower()
+    r = (os.environ.get("NANOUNET_SINGLE_PATCH_ACCUM_DTYPE") or "").lower()
     if r in ("half", "float16", "fp16"):
         return torch.float16
     return torch.float32

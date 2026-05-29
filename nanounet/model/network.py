@@ -61,7 +61,7 @@ def estimate_conv_feature_map_size(
     import os
 
     a = torch.get_num_threads()
-    t = int(os.environ.get("nnUNet_n_proc_DA", "12"))
+    t = int(os.environ.get("NANOUNET_N_PROC_DA", "12"))
     t = max(1, min(t, os.cpu_count() or 1))
     torch.set_num_threads(t)
     kw = deepcopy(arch_kwargs)

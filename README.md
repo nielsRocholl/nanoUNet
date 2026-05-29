@@ -8,12 +8,12 @@ Minimal prompt-aware 3D ResEnc nnU-Net with PyTorch Lightning and optional MAE p
 python -m pip install -e .
 ```
 
-Environment (same as nnU-Net; `NANOUNET_*` aliases are synced to `nnUNet_*`):
+Environment:
 
 ```bash
-export NANOUNET_RAW="/path/to/nnUNet_raw"
-export NANOUNET_PREPROCESSED="/path/to/nnUNet_preprocessed"
-export NANOUNET_RESULTS="/path/to/nnUNet_results"
+export NANOUNET_RAW="/path/to/NanoUNet_raw"
+export NANOUNET_PREPROCESSED="/path/to/NanoUNet_preprocessed"
+export NANOUNET_RESULTS="/path/to/NanoUNet_results"
 
 # Host-RAM / checkpoint staging (see docs/cgroup_memory.md)
 export NANOUNET_TMPDIR=/root/.cache/nanounet_tmp   # local disk; not /tmp (tmpfs) or CIFS (breaks workers)
@@ -73,7 +73,7 @@ Supervised training on one fold; optional integrated MAE then supervised. Defaul
 | `--no-wandb` | off (flag) | Disable W&B logger |
 | `--wandb-project` | `nanounet` | W&B project name |
 | `--wandb-name` | auto | W&B run name |
-| `--loss`, `-loss` | `dc_ce` | `dc_ce` \| `cc_dc_ce` (CC-DiceCE; see [docs/losses.md](docs/losses.md)) |
+| `--loss`, `-loss` | `dc_ce` | `dc_ce` \| `cc_dc_ce` (CC-DiceCE is much slower; see [docs/losses.md](docs/losses.md)) |
 | `--resume` | none | Supervised Lightning checkpoint path; must exist. No auto `last.ckpt`. If set and ckpt already finished `epochs`, exits cleanly after checks |
 | `--precision` | `16-mixed` | Passed to Lightning (e.g. `32-true`) |
 | `--accelerator` | `auto` | `auto` \| `cpu` \| `cuda` \| `gpu` \| `mps` (`gpu` normalized to `cuda`) |
@@ -89,6 +89,10 @@ Supervised training on one fold; optional integrated MAE then supervised. Defaul
 | `--mem-diag` | off (flag) | Log cgroup/process RAM to `<run>/mem_diag.jsonl` and W&B `mem/*`. Requires `NANOUNET_ALLOW_ROOT_CGROUP=1` on interactive nodes. See [docs/cgroup_memory.md](docs/cgroup_memory.md). |
 
 Checkpoints: `<run>/checkpoints/last.ckpt` (supervised); `<run>/mae_pretrain/checkpoints/` (integrated MAE). Re-running without `--resume` / `--mae-resume` trains from scratch and may overwrite those paths.
+
+#### Loss throughput warning
+
+Use `--loss dc_ce` for normal long supervised training. `--loss cc_dc_ce` runs CPU connected components plus SciPy Euclidean-distance Voronoi inside the training loss and can make epochs roughly 4x slower on A100/H200 nodes. Treat CC-DiceCE as an opt-in experiment or short fine-tuning objective after validating the speed/quality trade-off.
 
 #### Host RAM / cgroup OOM
 

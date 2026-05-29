@@ -24,7 +24,6 @@ from nanounet.common import (
     resolve_user_config_path,
     results_dir,
     setup_logging,
-    sync_nnunet_env,
 )
 from nanounet.mem_diag import log_snapshot, mem_diag_enabled, set_mem_diag
 from nanounet.runtime import assert_mem_diag_cgroup, runtime_banner
@@ -50,7 +49,6 @@ from nanounet.train.lightning_module import NanoUNetLM
 
 
 def main() -> None:
-    sync_nnunet_env()
     ap = argparse.ArgumentParser()
     ap.add_argument("-d", "--dataset_id", type=int, required=True)
     ap.add_argument("-f", "--fold", type=int, default=0)

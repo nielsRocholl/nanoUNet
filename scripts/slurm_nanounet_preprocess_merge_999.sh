@@ -21,15 +21,11 @@ NP=25
 export PIP_CACHE_DIR=/root/.pip-cache
 mkdir -p "$PIP_CACHE_DIR"
 
-export nnUNet_raw=/nnunet_data/nnUNet_raw
-export nnUNet_preprocessed=/nnunet_data/NanoUNet_preprocessed
-export nnUNet_results=/nnunet_data/NanoUNet_results
-
-mkdir -p "$nnUNet_preprocessed" "$nnUNet_results"
-
-export NANOUNET_RAW="$nnUNet_raw"
-export NANOUNET_PREPROCESSED="$nnUNet_preprocessed"
-export NANOUNET_RESULTS="$nnUNet_results"
+STORAGE=/nnunet_data
+export NANOUNET_RAW="${STORAGE}/NanoUNet_raw"
+export NANOUNET_PREPROCESSED="${STORAGE}/NanoUNet_preprocessed"
+export NANOUNET_RESULTS="${STORAGE}/NanoUNet_results"
+mkdir -p "$NANOUNET_PREPROCESSED" "$NANOUNET_RESULTS"
 
 IDS=(10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 27)
 

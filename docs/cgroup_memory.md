@@ -132,9 +132,9 @@ export NANOUNET_TMPDIR=/root/.cache/nanounet_tmp   # local disk; CIFS/NFS breaks
 Also set the usual paths:
 
 ```bash
-export NANOUNET_RAW=/nnunet_data/nnUNet_raw
+export NANOUNET_RAW=/data/NanoUNet_raw
 export NANOUNET_PREPROCESSED=/path/to/NanoUNet_preprocessed
-export NANOUNET_RESULTS=/nnunet_data/NanoUNet_results
+export NANOUNET_RESULTS=/data/NanoUNet_results
 ```
 
 On Slurm you typically **do not** need `NANOUNET_ALLOW_ROOT_CGROUP` (step cgroup is correct). Still set `NANOUNET_TMPDIR` to a path with space (not `$HOME` if quota is 10 GB).

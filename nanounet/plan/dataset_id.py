@@ -6,11 +6,10 @@ import os
 import re
 from batchgenerators.utilities.file_and_folder_operations import isdir, join, load_json, subdirs, subfiles
 
-from nanounet.common import preprocessed_dir, raw_dir, results_dir, sync_nnunet_env
+from nanounet.common import preprocessed_dir, raw_dir, results_dir
 
 
 def convert_id_to_dataset_name(dataset_id: int) -> str:
-    sync_nnunet_env()
     prefix = f"Dataset{dataset_id:03d}"
     found: list[str] = []
     for base in (preprocessed_dir(), raw_dir(), results_dir()):

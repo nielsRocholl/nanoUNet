@@ -1,4 +1,4 @@
-"""nnUNet path env sync, Rich rank-0 UI (`print0`, headers, progress), logging.
+"""NANOUNET_* path env, Rich rank-0 UI (`print0`, headers, progress), logging.
 
 `quiet_lightning_runtime`: call once before importing pytorch_lightning — warning filters,
 rank_zero_info shim (litlogger noise), CUDA matmul precision high.
@@ -25,7 +25,7 @@ _CONSOLE = Console(stderr=True)
 _LIGHTNING_QUIET = False
 
 ANISO_THRESHOLD = 3
-DEFAULT_NUM_PROCESSES = 8 if "nnUNet_def_n_proc" not in os.environ else int(os.environ["nnUNet_def_n_proc"])
+DEFAULT_NUM_PROCESSES = 8 if "NANOUNET_DEF_N_PROC" not in os.environ else int(os.environ["NANOUNET_DEF_N_PROC"])
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -99,39 +99,23 @@ def _rank0() -> bool:
     return int(os.environ.get("LOCAL_RANK", "0")) == 0
 
 
-def sync_nnunet_env() -> None:
-    for a, b in (
-        ("NANOUNET_RAW", "nnUNet_raw"),
-        ("NANOUNET_PREPROCESSED", "nnUNet_preprocessed"),
-        ("NANOUNET_RESULTS", "nnUNet_results"),
-    ):
-        v = os.environ.get(a) or os.environ.get(b)
-        if v:
-            os.environ[b] = v
+def _env_path(name: str) -> str:
+    d = os.environ.get(name)
+    if not d:
+        raise EnvironmentError(f"Set {name}")
+    return d
 
 
 def raw_dir() -> str:
-    sync_nnunet_env()
-    d = os.environ.get("nnUNet_raw")
-    if not d:
-        raise EnvironmentError("Set nnUNet_raw or NANOUNET_RAW")
-    return d
+    return _env_path("NANOUNET_RAW")
 
 
 def preprocessed_dir() -> str:
-    sync_nnunet_env()
-    d = os.environ.get("nnUNet_preprocessed")
-    if not d:
-        raise EnvironmentError("Set nnUNet_preprocessed or NANOUNET_PREPROCESSED")
-    return d
+    return _env_path("NANOUNET_PREPROCESSED")
 
 
 def results_dir() -> str:
-    sync_nnunet_env()
-    d = os.environ.get("nnUNet_results")
-    if not d:
-        raise EnvironmentError("Set nnUNet_results or NANOUNET_RESULTS")
-    return d
+    return _env_path("NANOUNET_RESULTS")
 
 
 def cprint(msg: str, **kw: Any) -> None:

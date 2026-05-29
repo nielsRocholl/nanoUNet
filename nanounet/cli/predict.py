@@ -6,7 +6,7 @@ import argparse
 
 from batchgenerators.utilities.file_and_folder_operations import join, load_json
 
-from nanounet.common import cprint, nano_header, sync_nnunet_env
+from nanounet.common import cprint, nano_header
 from nanounet.infer.border_expand import DEFAULT_MAX_BORDER_EXPAND_EXTRA
 from nanounet.infer.export import export_prediction_from_logits
 from nanounet.infer.predictor import pick_checkpoint, predict_logits_preprocessed
@@ -14,7 +14,6 @@ from nanounet.plan.plans import Plans
 
 
 def main() -> None:
-    sync_nnunet_env()
     ap = argparse.ArgumentParser()
     ap.add_argument("-i", "--images", nargs="+", required=True)
     ap.add_argument("-o", "--output", required=True, help="output path (.nii.gz or base without suffix)")

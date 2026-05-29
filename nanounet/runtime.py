@@ -124,7 +124,7 @@ def runtime_banner(out_dir: str | None = None) -> dict[str, Any]:
     if home and tmp.startswith(home):
         print(
             f"[nanounet] WARNING: TMPDIR under $HOME ({tmp}) — checkpoint staging needs ~800MB free; "
-            "prefer NANOUNET_TMPDIR=/nnunet_data/.nanounet_tmp",
+            "prefer NANOUNET_TMPDIR=/data/.nanounet_tmp",
             file=sys.stderr,
         )
     print(

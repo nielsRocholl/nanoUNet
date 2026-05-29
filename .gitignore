@@ -62,10 +62,10 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Optional: nnUNet-style trees if cloned inside the repo
-# nnUNet_raw/
-# nnUNet_preprocessed/
-# nnUNet_results/
+# Optional: data trees if cloned inside the repo
+# NanoUNet_raw/
+# NanoUNet_preprocessed/
+# NanoUNet_results/
 
 wandb/
 scripts/

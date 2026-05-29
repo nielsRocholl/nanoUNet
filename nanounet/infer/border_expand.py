@@ -7,6 +7,12 @@ from typing import List, Optional, Set, Tuple
 import cc3d
 import numpy as np
 import torch
+
+from nanounet.infer.roi_slices import (
+    centered_spatial_slices_at_point,
+    shift_spatial_slices,
+    spatial_slices_to_tuple,
+)
 from nanounet.plan.labels import Labels
 
 

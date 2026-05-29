@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from nanounet.common import nano_header, nano_rule, sync_nnunet_env
+from nanounet.common import nano_header, nano_rule
 from nanounet.plan.fingerprint import run_fingerprint
 from nanounet.plan.merge import build_merged_raw
 from nanounet.plan.planner import run_plan
@@ -14,7 +14,6 @@ PATCH_VOL = {"small": 128, "medium": 192, "large": 256, "xlarge": 320}
 
 
 def main() -> None:
-    sync_nnunet_env()
     ap = argparse.ArgumentParser()
     ap.add_argument("-d", "--dataset_id", type=int, nargs="+", required=True)
     ap.add_argument("--merged-id", type=int, default=999)

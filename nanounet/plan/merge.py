@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from batchgenerators.utilities.file_and_folder_operations import isdir, join, load_json, maybe_mkdir_p, save_json, subdirs
 
-from nanounet.common import preprocessed_dir, raw_dir, results_dir, sync_nnunet_env
+from nanounet.common import preprocessed_dir, raw_dir, results_dir
 from nanounet.plan.dataset_id import convert_id_to_dataset_name, get_filenames_of_train_images_and_targets
 
 
 def _folders_for_id(dataset_id: int) -> list[str]:
-    sync_nnunet_env()
     prefix = f"Dataset{dataset_id:03d}"
     out: list[str] = []
     for base in (raw_dir(), preprocessed_dir(), results_dir()):
@@ -40,7 +39,6 @@ def build_merged_raw(source_ids: list[int], merged_id: int, merged_name: str) ->
         raise RuntimeError("duplicate source dataset ids")
     if merged_id in sid_set:
         raise RuntimeError("--merged-id must not appear in source -d list")
-    sync_nnunet_env()
     target = f"Dataset{merged_id:03d}_{merged_name}"
     present = _folders_for_id(merged_id)
     if len(present) > 1:

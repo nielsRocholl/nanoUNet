@@ -2,6 +2,12 @@
 
 nanoUNet defaults to standard nnU-Net **Dice + cross-entropy (DC+CE)** with optional deep supervision, matching the standard compound objective for voxel overlap plus calibration.
 
+## Throughput warning
+
+Use **`--loss dc_ce`** for normal long supervised training. `--loss cc_dc_ce` is much slower because it runs CPU connected components and SciPy Euclidean-distance Voronoi in the synchronous training loss. On the Dataset999 supervised A/B check, switching from `cc_dc_ce` to `dc_ce` removed the severe GPU starvation and cut epoch time by roughly 4x.
+
+Treat CC-DiceCE as an opt-in experiment or a short fine-tuning objective, not the default for 2000-epoch runs, unless its quality gain clearly pays for the wall-clock cost.
+
 ## CC-DiceCE (opt-in)
 
 **When:** Multi-instance lesion problems with a heavy-tailed size distribution (many small lesions mixed with occasional large blobs). Rarely worthwhile for single-object tasks (whole organs or one tumour per patient).
@@ -44,7 +50,7 @@ Blob loss masks other instances and averages per blob; Voronoi CC-DiceCE assigns
 
 ## Cost / deps
 
-Connected components + Euclidean distance Voronoi run on CPU with `connected-components-3d` and `scipy`; forward/backprop still execute on GPU. Expect roughly tens of milliseconds per crop for typical prompt-centred patches (`cc3d` + EDT dominates). No CuPy dependency.
+Connected components + Euclidean distance Voronoi run on CPU with `connected-components-3d` and `scipy`; forward/backprop still execute on GPU. This work happens in the main training step, so the DataLoader can look healthy while the GPU still waits. With deep supervision, the CC term is evaluated for every nonzero supervised output scale, multiplying the cost. No CuPy dependency.
 
 ## Caveats
 
