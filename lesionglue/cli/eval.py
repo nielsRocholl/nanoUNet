@@ -35,6 +35,7 @@ if __name__ == "__main__":
     ap.add_argument("--root", default=str(DATASET_ROOT))
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--num-workers", type=int, default=2)
+    ap.add_argument("--dust-tau", type=float, default=None, help="override checkpoint decode threshold for tau sweeps")
     ap.add_argument(
         "--dust-ramp-epoch",
         type=int,
@@ -59,6 +60,9 @@ if __name__ == "__main__":
     assert ck_desc == desc_dim(feat), f"ckpt desc_dim {ck_desc} != --feat {feat.mode} ({desc_dim(feat)})"
     if args.dust_ramp_epoch >= 0:
         mod._dust_ramp_epoch_override = args.dust_ramp_epoch
+        mod._dust_ramp_step_override = 1_000_000_000
+    if args.dust_tau is not None:
+        mod.hparams.dust_tau = args.dust_tau
     acc = "gpu" if torch.cuda.is_available() else "cpu"
     trainer = pl.Trainer(
         accelerator=acc,

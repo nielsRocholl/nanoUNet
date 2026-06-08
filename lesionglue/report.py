@@ -17,7 +17,10 @@ from tracking.data.features import FeatConfig
 from tracking.data.meta import V2Paths, parse_meta_csv
 from tracking.decode import decode_sinkhorn_hungarian
 from tracking.train.match_utils import split_per_graph
+from tracking.data.splits import aggregate_cv_folds, load_cv_summary
 from tracking.train.module import MatcherModule
+
+__all__ = ["aggregate_cv_folds", "load_cv_summary", "eval_gnn", "eval_baseline"]
 
 
 def _zero() -> dict[str, object]:
