@@ -18,7 +18,7 @@ from nanounet.data.blosc2_dataset import Blosc2Folder
 from nanounet.dataloader_prefs import DataloaderBucket, build_iter_dataloader, init_dataloader_ipc
 from nanounet.mem_diag import mem_diag_enabled
 from nanounet.plan.plans import Plans
-from nanounet.plan.splits import fold_keys, load_or_create_splits
+from nanounet.plan.splits import fold_keys, fold_seed, load_or_create_splits
 from nanounet.train.patch_iterable import PatchIterable, collate_patches, worker_init
 from nanounet.train.patch_size import get_patch_size
 
@@ -51,7 +51,7 @@ class NanoDataModule(pl.LightningDataModule):
     def __init__(
         self,
         dataset_name: str,
-        fold: int,
+        fold: int | str,
         plans_identifier: str,
         roi_cfg_path: str,
         dl_bucket: DataloaderBucket,
@@ -126,7 +126,7 @@ class NanoDataModule(pl.LightningDataModule):
             False,
             self.num_iterations_per_epoch,
             self.batch_size,
-            self.fold + 1000 * self.num_iterations_per_epoch,
+            fold_seed(self.fold) + 1000 * self.num_iterations_per_epoch,
             self.mem_diag_dir,
         )
         b = self.dl_bucket
@@ -157,7 +157,7 @@ class NanoDataModule(pl.LightningDataModule):
             not self.roi_cfg.prompt.validation_use_prompt,
             self.num_val_iterations,
             self.batch_size,
-            self.fold + 2000,
+            fold_seed(self.fold) + 2000,
             self.mem_diag_dir,
         )
         b = self.dl_bucket

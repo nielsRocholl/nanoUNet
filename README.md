@@ -56,7 +56,7 @@ Supervised training on one fold; optional integrated MAE then supervised. Defaul
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `-d`, `--dataset_id` | (required) | Dataset id (folder must exist under raw/preprocessed as `DatasetXXX_*`) |
-| `-f`, `--fold` | `0` | Fold index (0–4 with default 5-fold split) |
+| `-f`, `--fold` | `0` | Fold index 0–4 (default 5-fold split), or `all` for full-data training (val set = train set, in-sample metrics) |
 | `--plans` | (required) | Plans basename without `.json` (must exist in preprocessed dataset dir) |
 | `--config` | `configs/default.json` | ROI / prompt JSON (relative resolves from cwd, then repo root) |
 | `--epochs` | `1000` | Supervised epoch budget |
@@ -113,7 +113,7 @@ Standalone MAE only (no prompts). Default out: `$NANOUNET_RESULTS/nanounet/<Data
 | Argument | Default | Description |
 |----------|---------|-------------|
 | `-d`, `--dataset_id` | (required) | Dataset id |
-| `-f`, `--fold` | `0` | Fold |
+| `-f`, `--fold` | `0` | Fold index 0–4, or `all` for full-data training (val set = train set, in-sample metrics) |
 | `--plans` | (required) | Plans basename (no `.json`) |
 | `--epochs` | `1000` | MAE epoch budget |
 | `--lr` | `1e-2` | Initial LR |
@@ -178,7 +178,7 @@ Set `NANOUNET_TMPDIR` (see Environment). For long MAE runs use `--dl-persistent-
 nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/default.json
 ```
 
-First run writes `splits_final.json` (5-fold, fixed seed). MAE options: `--mae-pretrain` / `--mae-ckpt`, standalone `nanounet_pretrain`, encoder transfer ([Wald et al.](https://arxiv.org/abs/2410.23132)). Resume flags: **CLI reference** (`--resume`, `--mae-resume`). On Slurm, prefer `--dl-bucket s` if host RAM is tight.
+First run writes `splits_final.json` (5-fold, fixed seed). Use `-f all` to train on every case (no holdout); val metrics are in-sample, so use `checkpoints/last.ckpt` for deployment, not `best-*`. MAE options: `--mae-pretrain` / `--mae-ckpt`, standalone `nanounet_pretrain`, encoder transfer ([Wald et al.](https://arxiv.org/abs/2410.23132)). Resume flags: **CLI reference** (`--resume`, `--mae-resume`). On Slurm, prefer `--dl-bucket s` if host RAM is tight.
 
 Tiny laptop smoke:
 

@@ -36,6 +36,7 @@ from nanounet.lightning_ckpt import (
     pl_ckpt_stage_done,
 )
 from nanounet.plan.dataset_id import convert_id_to_dataset_name
+from nanounet.plan.splits import fold_seed, parse_fold
 from nanounet.mem_diag import mem_diag_enabled, set_mem_diag
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
 from nanounet.pretrain.module import NanoMAELM
@@ -45,7 +46,13 @@ from nanounet.runtime import assert_mem_diag_cgroup, runtime_banner
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("-d", "--dataset_id", type=int, required=True)
-    ap.add_argument("-f", "--fold", type=int, default=0)
+    ap.add_argument(
+        "-f",
+        "--fold",
+        type=parse_fold,
+        default=0,
+        help="Fold index 0-4, or 'all' for full-data training (val=train).",
+    )
     ap.add_argument("--plans", dest="plans_identifier", required=True)
     ap.add_argument("--epochs", type=int, default=1000)
     ap.add_argument("--lr", type=float, default=1e-2)
@@ -130,8 +137,8 @@ def main() -> None:
         bs,
         args.iters_per_epoch,
         args.val_iters,
-        args.fold + 3000 * args.iters_per_epoch,
-        args.fold + 4000,
+        fold_seed(args.fold) + 3000 * args.iters_per_epoch,
+        fold_seed(args.fold) + 4000,
         dl_b,
         persistent_workers=args.dl_persistent_workers,
     )

@@ -42,6 +42,7 @@ from nanounet.lightning_ckpt import (
 )
 from nanounet.plan.dataset_id import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
+from nanounet.plan.splits import fold_seed, parse_fold
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
 from nanounet.pretrain.module import NanoMAELM
 from nanounet.train.data_module import NanoDataModule
@@ -51,7 +52,13 @@ from nanounet.train.lightning_module import NanoUNetLM
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("-d", "--dataset_id", type=int, required=True)
-    ap.add_argument("-f", "--fold", type=int, default=0)
+    ap.add_argument(
+        "-f",
+        "--fold",
+        type=parse_fold,
+        default=0,
+        help="Fold index 0-4, or 'all' for full-data training (val=train).",
+    )
     ap.add_argument("--plans", dest="plans_identifier", required=True)
     ap.add_argument(
         "--config",
@@ -202,8 +209,8 @@ def main() -> None:
                 batch_mae,
                 mae_iters,
                 args.val_iters,
-                args.fold + 5000 * mae_iters,
-                args.fold + 6000,
+                fold_seed(args.fold) + 5000 * mae_iters,
+                fold_seed(args.fold) + 6000,
                 dl_b,
                 mem_diag_dir=mem_dir,
                 persistent_workers=args.dl_persistent_workers,

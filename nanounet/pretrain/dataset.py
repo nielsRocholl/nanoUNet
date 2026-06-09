@@ -126,7 +126,7 @@ def _keys_fit_patch(case_dir: str, keys: List[str], ps: np.ndarray, mem_diag_dir
 
 def build_pretrain_dataloaders(
     dataset_name: str,
-    fold: int,
+    fold: int | str,
     plans_identifier: str,
     batch_size: int,
     num_iterations_per_epoch: int,
