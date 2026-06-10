@@ -9,7 +9,6 @@ from torchmetrics.classification import BinaryAUROC, BinaryAveragePrecision
 
 from tracking.common import CACHE_ROOT, DATASET_ROOT
 from tracking.data.dataset import LesionDataset
-from tracking.data.features import add_feat_args, feat_from_args
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
@@ -17,10 +16,8 @@ if __name__ == "__main__":
     ap.add_argument("--root", default=str(DATASET_ROOT))
     ap.add_argument("--split", default="val", choices=["val", "test"])
     ap.add_argument("--batch-size", type=int, default=8)
-    add_feat_args(ap)
     args = ap.parse_args()
-    feat = feat_from_args(args)
-    ds = LesionDataset(root=args.cache, split=args.split, dataset_root=Path(args.root), feat=feat)
+    ds = LesionDataset(root=args.cache, split=args.split, dataset_root=Path(args.root))
     loader = PyGDataLoader(ds, batch_size=args.batch_size, shuffle=False)
     ap_m = BinaryAveragePrecision()
     roc = BinaryAUROC()

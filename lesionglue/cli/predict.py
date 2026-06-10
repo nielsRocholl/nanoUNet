@@ -4,13 +4,11 @@ import argparse
 import csv
 from pathlib import Path
 
-import numpy as np
 import torch
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
 from tracking.common import CACHE_ROOT, DATASET_ROOT
 from tracking.data.dataset import LesionDataset
-from tracking.data.features import add_feat_args, desc_dim, feat_from_args
 from tracking.decode import decode_sinkhorn_hungarian
 from tracking.train.module import MatcherModule
 
@@ -24,27 +22,22 @@ if __name__ == "__main__":
     ap.add_argument("--thresh", type=float, default=0.5)
     ap.add_argument("--sinkhorn-iters", type=int, default=20)
     ap.add_argument("--sinkhorn-tau", type=float, default=0.2)
-    ap.add_argument("--tta-n", type=int, default=5, help="TTA jitter passes; 0 disables")
     ap.add_argument("--no-ema", action="store_true", help="use training weights instead of EMA shadow")
     ap.add_argument("--dump-all", action="store_true")
     ap.add_argument("--strict", action="store_true")
-    add_feat_args(ap)
     args = ap.parse_args()
-    feat = feat_from_args(args)
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     mod = MatcherModule.load_from_checkpoint(args.ckpt, map_location="cpu")
-    ck_desc = int(mod.hparams.get("desc_dim", desc_dim(feat)))
-    assert ck_desc == desc_dim(feat), f"ckpt desc_dim {ck_desc} != --feat {feat.mode} ({desc_dim(feat)})"
     mod.eval()
     dev = mod.device
-    ds = LesionDataset(root=args.cache, split=args.split, dataset_root=Path(args.root), feat=feat)
+    ds = LesionDataset(root=args.cache, split=args.split, dataset_root=Path(args.root))
     loader = PyGDataLoader(ds, batch_size=1, shuffle=False)
     with torch.no_grad():
         for batch in loader:
             batch = batch.to(dev)
-            outp = mod.predict_batch(batch, tta_n=args.tta_n, use_ema=not args.no_ema)
+            outp = mod.predict_batch(batch, use_ema=not args.no_ema)
             prob = torch.sigmoid(outp.pair).cpu().numpy()
             data = batch.to_data_list()[0]
             pid = data.pid
@@ -53,19 +46,11 @@ if __name__ == "__main__":
             fu_ids = data["fu"].lesion_id.cpu().numpy()
             n_bl = data["bl"].num_nodes
             n_fu = data["fu"].num_nodes
-            pm = np.zeros((n_bl, n_fu), dtype=np.float64)
-            for k in range(ei.shape[1]):
-                pm[ei[0, k], ei[1, k]] = prob[k]
             dec_arr = None
             if args.strict:
                 dec_arr = decode_sinkhorn_hungarian(
-                    outp.pair.cpu(),
-                    outp.dust_bl.cpu(),
-                    outp.dust_fu.cpu(),
-                    n_bl,
-                    n_fu,
-                    iters=args.sinkhorn_iters,
-                    tau=args.sinkhorn_tau,
+                    outp.pair.cpu(), outp.dust_bl.cpu(), outp.dust_fu.cpu(),
+                    n_bl, n_fu, iters=args.sinkhorn_iters, tau=args.sinkhorn_tau,
                 )
             rows = []
             for k in range(ei.shape[1]):

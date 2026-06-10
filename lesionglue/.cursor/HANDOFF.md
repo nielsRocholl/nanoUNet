@@ -1,87 +1,156 @@
-# Handoff — Round 9 (CV harness + matcher/dustbin)
+# Handoff — r9_base frozen, cleanup done
 
-Date: 2026-06-08. Plan: `.cursor/plans/round9_cv_matcher_dustbin_c68d185b.plan.md`.
+Date: 2026-06-09.
 
 ## TL;DR
-R9 **code is done + smoke-verified**. Remaining work is **GPU runs**: the 5-fold CV ablation
-sweep, then threshold freeze + a single test-set gate. Driver script:
-`scripts/round9.sh`. Run from repo root, always `PYTHONPATH=.`, interpreter is `python3`
-(no `python` in the container).
+**Phase:** Round 9 closed. **r9_base** frozen winner (~0.946 `val_match_score_ema`). Major cleanup refactor done — config-driven, L0-only, nanochat-style. **README** current; **technical.md** stale (not updated this session). **No more matcher ablations.**
 
-## Why R9 exists (diagnosis)
-- R6->R8 net gain (~1pp) is **inside the noise floor** of the tiny fixed val set, so single-split
-  deltas are untrustworthy. -> Phase 0 introduces patient-level k-fold CV (mean±std).
-- Two R8 knobs were shipped without ablation and are suspected harmful -> Phase 1 rolls them back.
-- Two real ceilings: dustbin overfits late (`disappeared`/`newly` decay during training) and
-  `unchanged_split` stuck ~0.90 (same-anatomy discrimination) -> Phase 2 matcher/dustbin changes.
-- Stay on L0 descriptor (MAE/yerebakan underperform). No cache rebuild.
+**Next:** `RUN_FINAL=1 bash scripts/round9.sh` on cluster for honest held-out test. Round 10 pivots to **data** (harder same-anatomy pairs, data quality), not architecture.
 
-## What changed this session (all uncommitted)
-New files:
-- `tracking/data/splits.py` — seeded patient-level fold map (no BL/FU leakage), `aggregate_cv_folds` (mean±std).
-- `tracking/matchability.py` — `RowMatchability` (LightGlue-style dustbin head) + `row_dust_marginals`.
-- `tracking/cli/cv.py` — procedural k-fold loop -> per-fold `fold_metrics.json` -> `cv_summary.json`. Per-fold resume (skips folds with `fold_metrics.json`).
-- `scripts/round9.sh` — full ablation sweep + ranking; `RUN_FINAL=1` does retrain best + dust_tau sweep + test gate.
+---
 
-Modified:
-- `tracking/cli/train.py` — `--fold/--n-folds/--cv-seed`, `CKPT_MONITOR=val_match_score_ema`, writes `fold_metrics.json`.
-  **Rollback defaults**: `hard_pair_w=0.0` (was 0.2), `desc_norm=False` (was True).
-  **Ablation-speed defaults**: `max_steps=8000` (was 40000), `val_check_steps=250` (was 500), `early_stop_patience=8` (was 20).
-- `tracking/train/datamodule.py` — fold-aware: pools cached train+val, splits by patient; train-only augment.
-- `tracking/train/module.py` — logs `val_match_score_ema` (EWMA over val checks), tracks peak-raw + best sub-accs at best-EMA.
-- `tracking/matcher.py` — `RowMatchability` dustbin, `nn.Bilinear` identity term in the pair head, `edge_cross_attn` flag (default OFF), `ModelConfig.desc_norm=False`.
-- `tracking/cli/report.py` — defaults synced (`hard_pair_w=0.0`, `desc_norm=False`).
-- `tracking/report.py` — re-exports `aggregate_cv_folds`/`load_cv_summary`.
-- `tracking/cli/eval.py` — `--dust-tau` override (already existed) used by the tau sweep.
+## Current status
 
-## Contracts to respect
-- `MatcherOutput(pair, dust_bl, dust_fu, z_bl, z_fu)` is unchanged. Keep it that way.
-- Checkpoint monitor metric is `val_match_score_ema` (max). Best ckpt = `<out>/best.ckpt`.
-- Held-out **test** split is the final gate — touch ONCE, only in the `RUN_FINAL` stage.
-- nanochat-style is law: `.cursor/rules/nanochat-style.mdc`. `module.py` is at the 200-LOC ceiling — if you edit it, split on a concept boundary, don't blow the cap.
+| Area | State |
+|------|-------|
+| Model | r9_base — L0 descriptors, RowMatchability dustbin, bilinear matcher |
+| Config | `configs/base.json` + `tracking/config.py` (`Config`, `load_config`, `dump_config`, `CKPT_MONITOR`) |
+| Features | L0 only: `CACHE_TAG=v5_l0`, `DESC_DIM=1372` — no cache rebuild needed |
+| R9 CV | 24/25 folds completed before crash; analysis done; all configs within noise |
+| Code audit | `cli/`, `data/` clean; refactor goals met |
+| Docs | `README.md` updated; `technical.md` significantly outdated |
 
-## Step clock (so estimates make sense)
-- ~25 steps/epoch (216-patient train pool, bs 8). `max_steps=8000` ≈ 320 epochs.
-- R8 overfit by ~200 epochs (~5k steps); 8k gives buffer + early stop. EMA-best ckpt captures the peak.
-- 3080 Ti: ~30–42 min/fold -> 5-fold/config ~2.5–3.5 h -> full 5-config sweep ~13–17 h.
-  NOTE: new R9 dustbin may overfit slower; if `val_match_score_ema` still climbing at 8k in `r9_base`, bump `max_steps`.
+---
 
-## Experiment matrix (scripts/round9.sh)
-Configs (5-fold each, rolled-back R9 defaults unless noted):
-- `r8_baseline` = `--hard-pair-w 0.2 --desc-norm` (Phase-0 reference + Phase-1 bundle-ON arm)
-- `r9_base` = defaults (rollback OFF + new matcher) — Phase-1 OFF arm
-- `r9_nce_0.1 / r9_nce_0.2 / r9_nce_0.5` = `--nce-w` sweep (Phase-2c; 0.3 == r9_base)
-Then it ranks by mean `val_match_score_ema` and writes `runs/round9/best_config.txt`.
+## Frozen / decided
 
-## How to run (cluster, in-container)
+- **Winner:** `r9_base` = values in `configs/base.json` (rollback defaults: `nce_w=0.3`, `dust_w=0.3`, `dust_pos_w=1.0`, etc.)
+- **No more matcher knob sweeps** — deltas unmeasurable at current data scale (~0.3pp within fold noise)
+- **Single model path:** `module_from_config(cfg)` in `tracking/train/module.py`; no alternate architectures
+- **Round 10 direction:** data — more/harder same-anatomy pairs, label/graph quality — **not** matcher tweaks
+
+---
+
+## Cleanup refactor (done)
+
+**Added**
+- `tracking/config.py`, `configs/base.json`
+- `module_from_config(cfg)` — sole entry to `MatcherModule`
+- CLIs `train`, `cv`, `report` take `--config`; training dumps `{out}/config.json`
+- `scripts/round9.sh`, `scripts/lesion-round9-cv.sh`
+- `predict_masks.py` has `__main__` guard
+
+**Deleted**
+- `tracking/set_attn.py`, `tracking/data/mae.py`, `tracking/train/tta.py`
+- `scripts/profile_mae.py`
+- `FeatConfig`, `add_feat_args`, old `TrainConfig` flag soup, `hard_pair` path
+
+**Unchanged invariants**
+- Preprocess cache tag `v5_l0` — existing `.pt` files still valid
+- Step-clock training, EMA-by-update-count, patient-level 5-fold CV
+
+---
+
+## R9 CV summary (reference)
+
+- **Best:** `r9_base` ~**0.946** mean `val_match_score_ema`
+- **Fold identity dominates** variance; config gaps ~**0.3pp** — within noise
+- Rollback knobs (`nce_w` flat 0.1–0.3, dust weights) confirmed safe
+- Full analysis in W&B project `lesion-tracking`; judge **peaks not finals**
+
+Configs compared (all tied within noise): `r9_base` plus ablations — no further sweeps planned.
+
+---
+
+## How to run
+
+Repo root, `PYTHONPATH=.`, interpreter `python3` (no `python` on cluster).
+
 ```bash
-cd /home/nielsrocholl/projects/git_projects/lesion-tracking
-export PYTHONPATH=.
-export RUNS=/nnunet_data/lesion_tracking/runs/round9   # persistent mounted dir -> resumable across jobs
-bash scripts/round9.sh                                  # CV sweep + ranking (stops before test gate)
-# after inspecting the ranking:
-RUN_FINAL=1 bash scripts/round9.sh                      # retrain best + dust_tau sweep + TEST gate (once)
+# preprocess (once; skip if cache exists)
+python3 tracking/cli/preprocess.py --split all --jobs 4
+
+# train
+python3 tracking/cli/train.py --config configs/base.json --out runs/my_run --wandb
+
+# 5-fold CV
+python3 tracking/cli/cv.py --config configs/base.json --out runs/cv --wandb
+
+# eval / predict
+python3 tracking/cli/eval.py --ckpt runs/my_run/best.ckpt --split val
+python3 tracking/cli/predict.py --ckpt runs/my_run/best.ckpt --split val --out preds
+
+# report (train or --checkpoint)
+python3 tracking/cli/report.py --config configs/base.json --out runs/report
 ```
-SLURM wrapper resources: `--qos=high --gpus-per-task=1 --cpus-per-task=12 --mem-per-gpu=24G --time=07:00:00`,
-container image `dockerdex.umcn.nl:5005/nielsrocholl/nnunet-v2-pro-sol-docker:latest`,
-mount `/data/oncology/experiments/universal-lesion-segmentation:/nnunet_data`.
-7h < full sweep -> just resubmit the same job; `cv.py` skips finished folds. Keep `RUNS` on `/nnunet_data`.
 
-## Acceptance / targets
-- R9 5-fold mean `val_match_score` with CI separated above `r8_baseline`.
-- `unchanged_split` mean +>=2pp.
-- `disappeared`/`newly` stop decaying during training (peak ≈ near-final) — the dustbin fix working.
+**Round 9 pipeline** (`scripts/round9.sh`):
+```bash
+export RUNS=runs/round9          # default
+export CONFIG=configs/base.json  # default
+bash scripts/round9.sh           # CV only; skips if cv_summary.json exists
+RUN_FINAL=1 bash scripts/round9.sh   # retrain → dust_tau sweep on val → test ONCE
+```
 
-## Open risks / gotchas
-- `dust_tau` sweep in `RUN_FINAL` uses the original static val split (eval.py has no `--fold`), not per-fold CV val.
-  Fine for a threshold pick; if you want strict CV-tau, add `--fold` support to `eval.py`.
-- The `edge_cross_attn` branch uses a global softmax over all edges (not per-receiving-node) — questionable
-  semantics, default OFF, experimental. Only enable if 2b alone underwhelms, and fix the masking first.
-- Nothing is committed. `git status` lists all R9 changes. Decide commit vs keep-dirty.
+**Cluster:** `scripts/lesion-round9-cv.sh` — SLURM, `RUNS=/nnunet_data/lesion_tracking/runs/round9`.
 
-## Pending todos (from the plan)
-- `baseline_cv` (run `r8_baseline` 5-fold) — pending
-- `rollback_knobs` (confirm `r9_base` vs `r8_baseline` on CV) — pending
-- `nce_recheck` (nce_w sweep) — pending
-- `tau_freeze_test` (dust_tau argmax -> retrain -> test once) — pending
-Code todos (`kfold_splits`, `ema_best_monitor`, `dustbin_matchability`, `matching_bilinear`) — done.
+Env overrides: `RUNS`, `CONFIG`, `WANDB_PROJECT` (default `lesion-tracking`).
+
+---
+
+## Carry-overs (never drop)
+
+1. **Batch-size independence:** step clock + EMA-by-update-count (R8 keeper)
+2. **Patient-level 5-fold CV:** mean±std CIs; monitor `val_match_score_ema` (`CKPT_MONITOR`)
+3. **Peaks not finals:** heavy overfitting — best ≠ last logged step
+4. **Test split touched once:** only via `RUN_FINAL=1` in `scripts/round9.sh`
+5. **nanochat-style:** read `.cursor/rules/nanochat-style.mdc` before editing code
+
+---
+
+## Pending
+
+| Priority | Action | Notes |
+|----------|--------|-------|
+| **GPU** | `RUN_FINAL=1 bash scripts/round9.sh` on cluster | Honest held-out test number; **not run locally yet** |
+| Optional | Rewrite `technical.md` | Audit found it stale; README is source for pipeline |
+| Round 10 | Data-focused plan | Harder same-anatomy pairs, QC — not matcher architecture |
+
+---
+
+## Key paths
+
+| Path | Role |
+|------|------|
+| `configs/base.json` | Canonical r9_base hyperparams |
+| `tracking/config.py` | `Config` dataclass, load/dump, `CKPT_MONITOR` |
+| `tracking/train/module.py` | `module_from_config`, `MatcherModule` |
+| `tracking/data/features.py` | `DESC_DIM`, `CACHE_TAG` |
+| `tracking/cli/{train,cv,report,eval,predict}.py` | Pipeline entry points |
+| `scripts/round9.sh` | CV → optional final + tau sweep + test gate |
+| `scripts/lesion-round9-cv.sh` | Cluster SLURM wrapper |
+| `.cursor/rules/nanochat-style.mdc` | Coding philosophy (HARD RULE) |
+| `README.md` | Current pipeline docs |
+
+---
+
+## Repo hygiene
+
+- Uncommitted changes may exist from cleanup refactor — **do not commit unless asked**
+- W&B: project `lesion-tracking` (or `hyper-alignment/lesion-tracking` in MCP)
+
+---
+
+## Do NOT
+
+- Edit `.cursor/plans/` or plan files unless explicitly tasked
+- Rerun 10h matcher ablation sweeps — R9 closed that question
+- Touch **test** split before `RUN_FINAL=1`
+- Reintroduce `FeatConfig`, MAE, TTA, set_attn, or multi-feature modes
+- Assume `technical.md` is current — use `README.md` + code
+
+---
+
+## New-agent bootstrap
+
+Use Block A in `.cursor/agent_prompt_template.md`. Read this file first, then nanochat rules. Confirm state before changing anything.

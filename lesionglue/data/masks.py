@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -12,13 +11,10 @@ from torch_geometric.data import HeteroData
 
 from tracking.common import LESION_TYPES
 from tracking.data.appearance import mask_stats
-from tracking.data.descriptor import descriptor_l0, descriptor_yerebakan
-from tracking.data.features import FeatConfig, feat_layout, pack_node
+from tracking.data.descriptor import descriptor_l0
+from tracking.data.features import feat_layout, pack_node
 from tracking.data.graph import GraphConfig, intra_knn, _load_vol
 from tracking.data.pairs import cross_attr, dense_pair_index, reverse_cross_attr
-
-if TYPE_CHECKING:
-    from tracking.data.mae import MaeExtractor
 
 
 def _labels(mask: np.ndarray) -> list[int]:
@@ -68,7 +64,6 @@ def build_mask_graph(
     propagated_csv: Path,
     cfg: GraphConfig,
     default_lesion_type: str | None = None,
-    mae: MaeExtractor | None = None,
 ) -> HeteroData:
     ct_bl, aff_bl, sp_bl = _load_vol(bl_img)
     mk_bl, _, _ = _load_vol(bl_mask)
@@ -77,49 +72,21 @@ def build_mask_graph(
     bl_ids, fu_ids = _labels(mk_bl), _labels(mk_fu)
     c_bl, c_fu = _centroids(mk_bl, bl_ids), _centroids(mk_fu, fu_ids)
     prop, bl_types = _propagated(propagated_csv, bl_ids)
-    feat = cfg.feat
-    layout = feat_layout(feat)
+    layout = feat_layout()
 
     xb, pb = [], []
-    if feat.mode == "mae":
-        assert mae is not None
-        mae.clear_cache()
-        for lid in bl_ids:
-            pb.append(prop[lid] * sp_fu)
-        pooled = mae.pool_lesions(ct_bl, mk_bl, sp_bl, bl_ids, c_bl)
-        for lid in bl_ids:
-            mf_b = mask_stats(mk_bl, lid, sp_bl, ct_bl)
-            xb.append(pack_node(pooled[lid], mf_b, _lt(lid, bl_types, default_lesion_type), feat))
-    else:
-        for lid in bl_ids:
-            mf_b = mask_stats(mk_bl, lid, sp_bl, ct_bl)
-            center = c_bl[lid]
-            if feat.mode == "yerebakan":
-                desc = descriptor_yerebakan(ct_bl, aff_bl, center)
-            else:
-                desc = descriptor_l0(ct_bl, aff_bl, center)
-            xb.append(pack_node(desc, mf_b, _lt(lid, bl_types, default_lesion_type), feat))
-            pb.append(prop[lid] * sp_fu)
+    for lid in bl_ids:
+        mf_b = mask_stats(mk_bl, lid, sp_bl, ct_bl)
+        center = c_bl[lid]
+        xb.append(pack_node(descriptor_l0(ct_bl, aff_bl, center), mf_b, _lt(lid, bl_types, default_lesion_type)))
+        pb.append(prop[lid] * sp_fu)
 
     xf, pf = [], []
-    if feat.mode == "mae":
-        assert mae is not None
-        mae.clear_cache()
-        pooled = mae.pool_lesions(ct_fu, mk_fu, sp_fu, fu_ids, c_fu)
-        for lid in fu_ids:
-            mf_f = mask_stats(mk_fu, lid, sp_fu, ct_fu)
-            xf.append(pack_node(pooled[lid], mf_f, _lt(lid, {}, default_lesion_type), feat))
-            pf.append(c_fu[lid] * sp_fu)
-    else:
-        for lid in fu_ids:
-            mf_f = mask_stats(mk_fu, lid, sp_fu, ct_fu)
-            center = c_fu[lid]
-            if feat.mode == "yerebakan":
-                desc = descriptor_yerebakan(ct_fu, aff_fu, center)
-            else:
-                desc = descriptor_l0(ct_fu, aff_fu, center)
-            xf.append(pack_node(desc, mf_f, _lt(lid, {}, default_lesion_type), feat))
-            pf.append(c_fu[lid] * sp_fu)
+    for lid in fu_ids:
+        mf_f = mask_stats(mk_fu, lid, sp_fu, ct_fu)
+        center = c_fu[lid]
+        xf.append(pack_node(descriptor_l0(ct_fu, aff_fu, center), mf_f, _lt(lid, {}, default_lesion_type)))
+        pf.append(center * sp_fu)
 
     data = HeteroData()
     data["bl"].x, data["fu"].x = torch.tensor(np.stack(xb)), torch.tensor(np.stack(xf))
@@ -139,5 +106,5 @@ def build_mask_graph(
     data.pid = "mask_graph"
     data.img_id_fu_used = 0
     data.sp_fu = torch.tensor(sp_fu.astype(np.float32))
-    data.feat_mode = feat.mode
+    data.feat_mode = "l0"
     return data

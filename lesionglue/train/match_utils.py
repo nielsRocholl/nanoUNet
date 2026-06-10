@@ -1,4 +1,4 @@
-"""Focal BCE, graph splits, InfoNCE scopes, hard pairs, validation metrics."""
+"""Focal BCE, graph splits, graph-scope InfoNCE, validation metrics."""
 
 from __future__ import annotations
 
@@ -68,18 +68,6 @@ def _infonce(
     return 0.5 * (la + F.cross_entropy(sim_t[fj_u], bi_u))
 
 
-def infonce_batch(
-    z_bl: torch.Tensor,
-    z_fu: torch.Tensor,
-    proj: nn.Module,
-    edge_index: torch.Tensor,
-    edge_label: torch.Tensor,
-    tau: float,
-    batch: Batch,
-) -> torch.Tensor:
-    return _infonce(z_bl, z_fu, batch["bl"].x, batch["fu"].x, proj, edge_index, edge_label, tau)
-
-
 def infonce_graphs(graphs: list[HeteroData], z_bl: torch.Tensor, z_fu: torch.Tensor, proj: nn.Module, tau: float) -> torch.Tensor:
     nb = [g["bl"].num_nodes for g in graphs]
     nf = [g["fu"].num_nodes for g in graphs]
@@ -89,30 +77,6 @@ def infonce_graphs(graphs: list[HeteroData], z_bl: torch.Tensor, z_fu: torch.Ten
         for g, zb, zf in zip(graphs, zbs, zfs)
     ]
     return torch.stack(losses).mean() if losses else z_bl.sum() * 0.0
-
-
-def hard_pair_bce(graphs: list[HeteroData], pair_parts: list[torch.Tensor], hard_k: int) -> torch.Tensor:
-    losses = []
-    for g, p in zip(graphs, pair_parts):
-        n_bl, n_fu = g["bl"].num_nodes, g["fu"].num_nodes
-        lab = g["bl", "cross", "fu"].edge_label.to(p.device).reshape(n_bl, n_fu)
-        ea = g["bl", "cross", "fu"].edge_attr.to(p.device).reshape(n_bl, n_fu, -1)
-        pick = lab > 0.5
-        dist, same = ea[:, :, 3], ea[:, :, 10] > 0.5
-        for i in range(n_bl):
-            row = torch.zeros(n_fu, dtype=torch.bool, device=p.device)
-            neg = ~pick[i]
-            for cand in (neg & same[i], neg):
-                if int(row.sum()) >= hard_k:
-                    break
-                ids = torch.where(cand & ~row)[0]
-                if ids.numel():
-                    k = min(hard_k - int(row.sum()), ids.numel())
-                    row[ids[dist[i, ids].topk(k, largest=False).indices]] = True
-            pick[i] |= row
-        if pick.any():
-            losses.append(F.binary_cross_entropy_with_logits(p.reshape(n_bl, n_fu)[pick], lab[pick]))
-    return torch.stack(losses).mean() if losses else pair_parts[0].sum() * 0.0
 
 
 def sinkhorn_edge_scores(data: HeteroData, pair_log: torch.Tensor, dust_bl: torch.Tensor, dust_fu: torch.Tensor, iters: int) -> torch.Tensor:

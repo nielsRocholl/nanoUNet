@@ -1,6 +1,4 @@
-"""Per-patient preprocess staging until collated {split}_v5_{feat}.pt is written.
-
-staging/{split}_v5_{feat}/{pid}.pt survives interrupts; --resume skips files already there."""
+"""Per-patient preprocess staging until collated {split}_v5_l0.pt is written."""
 
 from __future__ import annotations
 
@@ -9,11 +7,11 @@ from pathlib import Path
 import torch
 from torch_geometric.data import HeteroData
 
-from tracking.data.features import FeatConfig, cache_tag
+from tracking.data.features import CACHE_TAG
 
 
-def dir(processed_dir: Path, split: str, feat: FeatConfig) -> Path:
-    return processed_dir / "staging" / f"{split}_{cache_tag(feat)}"
+def dir(processed_dir: Path, split: str) -> Path:
+    return processed_dir / "staging" / f"{split}_{CACHE_TAG}"
 
 
 def clear(staging: Path) -> None:
