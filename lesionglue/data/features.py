@@ -1,4 +1,4 @@
-"""L0 node feature layout: pack_node, cache tag v5_l0."""
+"""L0 node feature layout: pack_node, cache tag v6_geo."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from tracking.data.appearance import MaskFeats
 DESC_DIM = 1372
 STAT_DIM = 14
 FEAT_DIM = DESC_DIM + STAT_DIM + 1
-CACHE_TAG = "v5_l0"
+CACHE_TAG = "v6_geo"
 
 
 def feat_layout() -> tuple[int, int, int, int, int]:
@@ -23,6 +23,8 @@ def assert_graph_feat(g) -> None:
     assert g["bl"].x.shape[1] == FEAT_DIM
     assert g["fu"].x.shape[1] == FEAT_DIM
     assert g["bl", "cross", "fu"].edge_attr.shape[1] == CROSS_DIM
+    assert g["bl"].pos_bl.shape == (g["bl"].num_nodes, 3)
+    assert g["bl"].img_bl.shape[0] == g["bl"].num_nodes
 
 
 def pack_node(desc: np.ndarray, mf: MaskFeats, lt_i: int) -> np.ndarray:

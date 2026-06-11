@@ -13,7 +13,7 @@ from torch_geometric.nn import HeteroConv, TransformerConv
 from tracking.data.features import DESC_DIM, STAT_DIM
 from tracking.data.pairs import CROSS_DIM
 from tracking.matchability import RowMatchability, row_dust_marginals
-from tracking.refine import MatchRefine, assignment_logp
+from tracking.consistency import GeoConsistency, soft_assignment
 
 
 @dataclass
@@ -25,8 +25,8 @@ class ModelConfig:
     lt_vocab: int = 12
     lt_embed: int = 8
     sinkhorn_iters: int = 20
-    refine_blocks: int = 1
-    refine_drop: float = 0.3
+    geo: bool = True
+    geo_knn: int = 3
 
 
 @dataclass
@@ -93,22 +93,25 @@ class Matcher(nn.Module):
         )
         self.bilin = nn.Bilinear(cfg.d, cfg.d, 1, bias=False)
         self.dust_enc = RowMatchability(cfg.d)
-        self.refine = (
-            MatchRefine(cfg.d, cfg.heads, CROSS_DIM, cfg.refine_drop) if cfg.refine_blocks else None
-        )
+        self.geo = GeoConsistency(cfg.geo_knn) if cfg.geo else None
 
-    def _refine_logp(self, pair0: torch.Tensor, data: HeteroData) -> torch.Tensor:
+    def _geo_logit(self, pair0: torch.Tensor, data: HeteroData) -> torch.Tensor:
         iters = self.cfg.sinkhorn_iters
+        pos_bl, pos_fu, img_bl = data["bl"].pos_bl, data["fu"].pos, data["bl"].img_bl
         if hasattr(data["bl"], "batch") and data["bl"].batch is not None:
             ng = int(data.num_graphs)
             nb = torch.bincount(data["bl"].batch, minlength=ng)
             nf = torch.bincount(data["fu"].batch, minlength=ng)
-            parts = torch.split(pair0, (nb * nf).tolist())
-            return torch.cat(
-                [assignment_logp(p, nbg, nfg, iters) for p, nbg, nfg in zip(parts, nb.tolist(), nf.tolist())]
-            )
+            pp = torch.split(pair0, (nb * nf).tolist())
+            pbs, ibs = torch.split(pos_bl, nb.tolist()), torch.split(img_bl, nb.tolist())
+            pfs = torch.split(pos_fu, nf.tolist())
+            outs = [
+                self.geo(pb, pf, ib, soft_assignment(p, nbg, nfg, iters))
+                for p, pb, ib, pf, nbg, nfg in zip(pp, pbs, ibs, pfs, nb.tolist(), nf.tolist())
+            ]
+            return torch.cat(outs)
         n_bl, n_fu = int(data["bl"].num_nodes), int(data["fu"].num_nodes)
-        return assignment_logp(pair0, n_bl, n_fu, iters)
+        return self.geo(pos_bl, pos_fu, img_bl, soft_assignment(pair0, n_bl, n_fu, iters))
 
     def _dust_graph(
         self, pair: torch.Tensor, data: HeteroData, z_bl: torch.Tensor, z_fu: torch.Tensor
@@ -141,9 +144,7 @@ class Matcher(nn.Module):
         h = torch.cat([z["bl"][ei[0]], z["fu"][ei[1]], ea], dim=1)
         pair0 = self.head(h).squeeze(-1) + self.bilin(z["bl"][ei[0]], z["fu"][ei[1]]).squeeze(-1)
         pair = pair0
-        if self.refine is not None:
-            logp = self._refine_logp(pair0.detach(), data)
-            rl, _ = self.refine(z["bl"], z["fu"], ei, ea, logp)
-            pair = pair0 + rl
+        if self.geo is not None:
+            pair = pair0 + self._geo_logit(pair0.detach(), data)
         dust_bl, dust_fu = self._dust_graph(pair.detach(), data, z["bl"], z["fu"])
         return MatcherOutput(pair, dust_bl, dust_fu, z["bl"], z["fu"])

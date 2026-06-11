@@ -46,14 +46,14 @@ class MatcherModule(pl.LightningModule):
         ema_start_step: int = 1000,
         dust_tau: float = 0.2,
         val_score_ema_beta: float = 0.3,
-        refine_blocks: int = 0,
-        refine_drop: float = 0.3,
+        geo: bool = True,
+        geo_knn: int = 3,
     ):
         super().__init__()
         self.save_hyperparameters()
         mc = ModelConfig(
             d=d, layers=layers, heads=heads, dropout=dropout, sinkhorn_iters=sinkhorn_iters,
-            refine_blocks=refine_blocks, refine_drop=refine_drop,
+            geo=geo, geo_knn=geo_knn,
         )
         self.matcher = Matcher(mc)
         self._val_score_ewma = None
@@ -177,6 +177,5 @@ def module_from_config(cfg: Config) -> MatcherModule:
         dust_w=cfg.dust_w, dust_pos_w=cfg.dust_pos_w, nce_tau=cfg.nce_tau,
         sinkhorn_iters=cfg.sinkhorn_iters, max_steps=cfg.max_steps, warmup_steps=cfg.warmup_steps,
         ema_decay=cfg.ema_decay, ema_start_step=cfg.ema_start_step, dust_tau=cfg.dust_tau,
-        val_score_ema_beta=cfg.val_score_ema_beta, refine_blocks=cfg.refine_blocks,
-        refine_drop=cfg.refine_drop,
+        val_score_ema_beta=cfg.val_score_ema_beta, geo=cfg.geo, geo_knn=cfg.geo_knn,
     )
