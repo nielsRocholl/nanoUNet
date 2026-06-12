@@ -25,8 +25,6 @@ class Config:
     d: int = 128
     layers: int = 4
     heads: int = 4
-    geo: bool = True
-    geo_knn: int = 3
     dropout: float = 0.2
     sinkhorn_w: float = 1.0
     pair_w: float = 0.1

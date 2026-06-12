@@ -51,8 +51,6 @@ def drop_nodes(
             nm_fu[j] = 1.0
     data["bl"].x = data["bl"].x[kb]
     data["bl"].pos = data["bl"].pos[kb]
-    data["bl"].pos_bl = data["bl"].pos_bl[kb]
-    data["bl"].img_bl = data["bl"].img_bl[kb]
     data["bl"].no_match_label = nm_bl[kb]
     if hasattr(data["bl"], "lesion_id") and data["bl"].lesion_id is not None:
         data["bl"].lesion_id = data["bl"].lesion_id[kb]

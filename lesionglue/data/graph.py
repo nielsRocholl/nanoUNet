@@ -113,7 +113,7 @@ def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> HeteroData | No
         bl_cache[k] = (cb, ab, sb, mb)
 
     layout = feat_layout()
-    xb, pb, pbl, ibl = [], [], [], []
+    xb, pb = [], []
     for lid in bl_ids:
         r = bl_rep[lid]
         assert r.cog_bl is not None
@@ -122,8 +122,6 @@ def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> HeteroData | No
         c = np.asarray(r.cog_bl, dtype=np.float64)
         xb.append(pack_node(descriptor_l0(cb, ab, c), mf_b, LESION_TYPES.index(r.lesion_type)))
         pb.append(np.asarray(r.cog_propagated, dtype=np.float64) * sp_fu)
-        pbl.append(c * sb)
-        ibl.append(int(r.img_id_bl))
 
     xf, pf = [], []
     for lid in fu_ids:
@@ -137,8 +135,6 @@ def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> HeteroData | No
     data["bl"].x, data["fu"].x = torch.tensor(np.stack(xb)), torch.tensor(np.stack(xf))
     data["bl"].pos = torch.tensor(np.stack(pb), dtype=torch.float32)
     data["fu"].pos = torch.tensor(np.stack(pf), dtype=torch.float32)
-    data["bl"].pos_bl = torch.tensor(np.stack(pbl), dtype=torch.float32)
-    data["bl"].img_bl = torch.tensor(ibl, dtype=torch.long)
     data["bl"].lesion_id, data["fu"].lesion_id = torch.tensor(bl_ids), torch.tensor(fu_ids)
     bi, fj = {lid: i for i, lid in enumerate(bl_ids)}, {lid: j for j, lid in enumerate(fu_ids)}
     lab = _positive_matrix(rows, bi, fj)
