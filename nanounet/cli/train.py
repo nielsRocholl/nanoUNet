@@ -69,6 +69,13 @@ def main() -> None:
     ap.add_argument("--epochs", type=int, default=1000)
     ap.add_argument("--lr", type=float, default=0.01)
     ap.add_argument("--wd", type=float, default=3e-5)
+    ap.add_argument("--optimizer", choices=("sgd", "adamw"), default="sgd")
+    ap.add_argument(
+        "--grad-clip",
+        type=float,
+        default=0.0,
+        help="Max grad norm; 0 disables. AdamW finetune commonly uses 1.0.",
+    )
     ap.add_argument("--batch-size", type=int, default=None)
     ap.add_argument("--iters-per-epoch", type=int, default=250)
     ap.add_argument("--val-iters", type=int, default=50)
@@ -309,6 +316,7 @@ def main() -> None:
         stretched_ref=args.stretched_ref,
         stretched_exp=args.stretched_exp,
         loss_type=args.loss,
+        optimizer=args.optimizer,
         mae_ckpt=None if sup_resume or args.init_weights else mae_ckpt_arg,
         init_weights=args.init_weights,
     )
@@ -327,6 +335,7 @@ def main() -> None:
         accelerator=accel,
         devices=1,
         precision=args.precision,
+        gradient_clip_val=args.grad_clip or None,
         callbacks=cb,
         logger=loggers or False,
         default_root_dir=out,

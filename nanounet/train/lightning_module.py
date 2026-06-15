@@ -45,6 +45,7 @@ class NanoUNetLM(pl.LightningModule):
         stretched_exp: float = 0.9,
         enable_deep_supervision: bool = True,
         loss_type: str = "dc_ce",
+        optimizer: str = "sgd",
         mae_ckpt: str | None = None,
         init_weights: str | None = None,
     ):
@@ -66,6 +67,7 @@ class NanoUNetLM(pl.LightningModule):
         self.loss = build_loss(self.cm, self.label_manager, enable_deep_supervision, loss_type=loss_type, is_ddp=False)
         self.initial_lr = initial_lr
         self.weight_decay = weight_decay
+        self.optimizer = optimizer
         self.num_epochs = num_epochs
         self.lr_schedule = lr_schedule
         self.stretched_k = stretched_k
@@ -166,13 +168,16 @@ class NanoUNetLM(pl.LightningModule):
             log_wandb_scalars(self, row)
 
     def configure_optimizers(self):
-        opt = torch.optim.SGD(
-            self.net.parameters(),
-            lr=self.initial_lr,
-            weight_decay=self.weight_decay,
-            momentum=0.99,
-            nesterov=True,
-        )
+        if self.optimizer == "adamw":
+            opt = torch.optim.AdamW(self.net.parameters(), lr=self.initial_lr, weight_decay=self.weight_decay)
+        else:
+            opt = torch.optim.SGD(
+                self.net.parameters(),
+                lr=self.initial_lr,
+                weight_decay=self.weight_decay,
+                momentum=0.99,
+                nesterov=True,
+            )
         if self.lr_schedule == "stretched_tail_poly":
             sched = StretchedTailPolyLRScheduler(
                 opt,
