@@ -63,6 +63,7 @@ class NanoDataModule(pl.LightningDataModule):
         pin_memory: bool | None = None,
         mem_diag_dir: str | None = None,
         persistent_workers: bool = False,
+        only_prefix: str | None = None,
     ):
         super().__init__()
         self.dataset_name = dataset_name
@@ -77,6 +78,7 @@ class NanoDataModule(pl.LightningDataModule):
         self.enable_ds = enable_deep_supervision
         self.mem_diag_dir = mem_diag_dir
         self.persistent_workers = persistent_workers
+        self.only_prefix = only_prefix
         if pin_memory is None:
             pin_memory = torch.cuda.is_available()
         self.pin_memory = pin_memory
@@ -99,6 +101,10 @@ class NanoDataModule(pl.LightningDataModule):
         sp = join(fold_dir, "splits_final.json")
         spl = load_or_create_splits(sp, tr_keys, 5, 12345)
         self.tr_keys, self.val_keys = fold_keys(spl, self.fold)
+        if self.only_prefix:
+            self.tr_keys = [k for k in self.tr_keys if k.startswith(self.only_prefix)]
+            self.val_keys = [k for k in self.val_keys if k.startswith(self.only_prefix)]
+            assert self.tr_keys and self.val_keys, self.only_prefix
         self.case_folder = case_dir
         ps = np.array(self.cm.patch_size)
         dss = _ds_scales(self.cm, self.enable_ds)

@@ -86,6 +86,16 @@ def main() -> None:
         default=None,
         help="Resume supervised from this Lightning ckpt; omit for scratch (no auto last.ckpt).",
     )
+    ap.add_argument(
+        "--init-weights",
+        default=None,
+        help="Load full net weights from a supervised Lightning ckpt; fresh optimizer and LR schedule.",
+    )
+    ap.add_argument(
+        "--only-prefix",
+        default=None,
+        help="Train/val only case keys with this prefix, e.g. d013_ on a merged dataset.",
+    )
     ap.add_argument("--precision", default="16-mixed")
     ap.add_argument(
         "--accelerator",
@@ -129,6 +139,15 @@ def main() -> None:
         raise ValueError("--mae-resume requires --mae-pretrain")
     if args.mae_resume and args.mae_ckpt:
         raise ValueError("--mae-resume conflicts with --mae-ckpt")
+    if args.init_weights:
+        if not os.path.isfile(args.init_weights):
+            raise ValueError(args.init_weights)
+        if args.resume:
+            raise ValueError("--init-weights conflicts with --resume")
+        if args.mae_ckpt:
+            raise ValueError("--init-weights conflicts with --mae-ckpt")
+        if args.mae_pretrain:
+            raise ValueError("--init-weights conflicts with --mae-pretrain")
     args.roi_cfg = resolve_user_config_path(args.roi_cfg)
     set_mem_diag(args.mem_diag)
     setup_logging()
@@ -275,6 +294,7 @@ def main() -> None:
         args.val_iters,
         mem_diag_dir=out if mem_diag_enabled() else None,
         persistent_workers=args.dl_persistent_workers,
+        only_prefix=args.only_prefix,
     )
     lm = NanoUNetLM(
         plans_path,
@@ -289,7 +309,8 @@ def main() -> None:
         stretched_ref=args.stretched_ref,
         stretched_exp=args.stretched_exp,
         loss_type=args.loss,
-        mae_ckpt=None if sup_resume else mae_ckpt_arg,
+        mae_ckpt=None if sup_resume or args.init_weights else mae_ckpt_arg,
+        init_weights=args.init_weights,
     )
     cb = [
         ModelCheckpoint(

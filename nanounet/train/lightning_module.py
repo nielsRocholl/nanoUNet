@@ -25,7 +25,7 @@ from nanounet.mem_diag import (
 from nanounet.model.dice_helpers import get_tp_fp_fn_tn
 from nanounet.model.losses import build_loss
 from nanounet.model.lr_schedule import PolyLRScheduler, StretchedTailPolyLRScheduler
-from nanounet.model.mae_transfer import load_mae_encoder
+from nanounet.model.mae_transfer import load_full_net, load_mae_encoder
 from nanounet.model.network import build_net
 from nanounet.plan.plans import Plans
 
@@ -46,6 +46,7 @@ class NanoUNetLM(pl.LightningModule):
         enable_deep_supervision: bool = True,
         loss_type: str = "dc_ce",
         mae_ckpt: str | None = None,
+        init_weights: str | None = None,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -58,7 +59,9 @@ class NanoUNetLM(pl.LightningModule):
         self.dj = load_json(dataset_json_path)
         self.label_manager = self.pm.get_label_manager(self.dj)
         self.net = build_net(self.cm, self.label_manager, self.dj, enable_deep_supervision)
-        if mae_ckpt is not None:
+        if init_weights is not None:
+            load_full_net(self.net, init_weights)
+        elif mae_ckpt is not None:
             load_mae_encoder(self.net, mae_ckpt)
         self.loss = build_loss(self.cm, self.label_manager, enable_deep_supervision, loss_type=loss_type, is_ddp=False)
         self.initial_lr = initial_lr

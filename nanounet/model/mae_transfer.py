@@ -1,4 +1,4 @@
-"""Load MAE Lightning checkpoint into supervised ResEnc: encoder-only, stem zero-pad for prompts."""
+"""Lightning checkpoint loaders: MAE encoder-only (stem zero-pad) or full supervised net."""
 
 from __future__ import annotations
 
@@ -37,4 +37,20 @@ def load_mae_encoder(seg_net: torch.nn.Module, ckpt_path: str) -> dict:
     merged = {**sd_seg, **new}
     miss, unex = seg_net.load_state_dict(merged, strict=False)
     _LOG.info("[MAE] loaded %d encoder tensors; missing %d unexpected %d", len(new), len(miss), len(unex))
+    return {"loaded": list(new.keys()), "missing": miss, "unexpected": unex}
+
+
+def load_full_net(seg_net: torch.nn.Module, ckpt_path: str) -> dict:
+    try:
+        ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    except TypeError:
+        ck = torch.load(ckpt_path, map_location="cpu")
+    raw = ck["state_dict"] if isinstance(ck, dict) and "state_dict" in ck else ck
+    if not isinstance(raw, dict):
+        raise TypeError(ckpt_path)
+    sd_pre = {k[4:]: v for k, v in raw.items() if k.startswith("net.") and isinstance(v, torch.Tensor)}
+    sd_seg = seg_net.state_dict()
+    new = {k: v for k, v in sd_pre.items() if k in sd_seg and sd_seg[k].shape == v.shape}
+    miss, unex = seg_net.load_state_dict({**sd_seg, **new}, strict=False)
+    _LOG.info("[init] loaded %d net tensors; missing %d unexpected %d", len(new), len(miss), len(unex))
     return {"loaded": list(new.keys()), "missing": miss, "unexpected": unex}
