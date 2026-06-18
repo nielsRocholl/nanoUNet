@@ -168,9 +168,10 @@ def main() -> None:
     plans_path = join(pp, ds, args.plans_identifier + ".json")
     dj_path = join(rw, ds, "dataset.json")
     out = args.out or join(results_dir(), "nanounet", f"{ds}_{args.plans_identifier}_f{args.fold}")
+    ckpt_dir = "finetune" if args.init_weights else "checkpoints"
     set_safe_tmpdir(results_tmp=join(out, ".tmp"))
     maybe_mkdir_p(out)
-    os.makedirs(join(out, "checkpoints"), exist_ok=True)
+    os.makedirs(join(out, ckpt_dir), exist_ok=True)
     assert_mem_diag_cgroup()
     runtime_banner(join(out, "mae_pretrain") if args.mae_pretrain else out)
 
@@ -322,13 +323,13 @@ def main() -> None:
     )
     cb = [
         ModelCheckpoint(
-            dirpath=join(out, "checkpoints"),
+            dirpath=join(out, ckpt_dir),
             filename="best-{epoch}-{val_dice:.4f}",
             monitor="val_dice",
             mode="max",
             save_top_k=2,
         ),
-        ModelCheckpoint(dirpath=join(out, "checkpoints"), save_last=True),
+        ModelCheckpoint(dirpath=join(out, ckpt_dir), save_last=True),
     ]
     tr = Trainer(
         max_epochs=args.epochs,

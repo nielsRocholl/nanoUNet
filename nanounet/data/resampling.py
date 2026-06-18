@@ -9,11 +9,43 @@ from typing import List, Tuple, Union
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from batchgenerators.augmentations.utils import resize_segmentation
 from scipy.ndimage import map_coordinates
 from skimage.transform import resize
 
 from nanounet.common import ANISO_THRESHOLD
+
+# Inference (viewer) routes resampling to GPU via set_resample_device(); training leaves this
+# None so preprocessing stays on the exact order=3 cubic path used to build the trained data.
+RESAMPLE_DEVICE = None
+# large CT + interpolate workspace can OOM 8GB unified-memory Macs
+RESAMPLE_MAX_VOXELS = 256_000_000
+
+
+def set_resample_device(device: "torch.device | None") -> None:
+    global RESAMPLE_DEVICE
+    RESAMPLE_DEVICE = device
+
+
+def resample_torch_to_shape(data, new_shape, is_seg: bool, device) -> np.ndarray:
+    in_sp = tuple(int(x) for x in data.shape[1:])
+    out_sp = tuple(int(x) for x in new_shape)
+    in_vox = in_sp[0] * in_sp[1] * in_sp[2]
+    out_vox = out_sp[0] * out_sp[1] * out_sp[2]
+    t = torch.as_tensor(np.ascontiguousarray(data), device=device).float()
+    if is_seg:
+        out = F.interpolate(t[None], size=out_sp, mode="nearest-exact")[0]
+    elif max(in_vox, out_vox) > RESAMPLE_MAX_VOXELS:
+        c, z, y, x = data.shape[0], *in_sp
+        zt, yt, xt = out_sp
+        t2 = F.interpolate(t.reshape(c * z, 1, y, x), size=(yt, xt), mode="bilinear", align_corners=False)
+        t2 = t2.reshape(c, z, yt, xt)
+        out = F.interpolate(t2[None], size=(zt, yt, xt), mode="trilinear", align_corners=False)[0]
+    else:
+        # half-pixel centers match skimage resize(mode='edge'); align_corners=True would shift the grid
+        out = F.interpolate(t[None], size=out_sp, mode="trilinear", align_corners=False)[0]
+    return out.to(torch.float32).cpu().numpy().astype(data.dtype, copy=False)
 
 
 def get_do_separate_z(spacing: Union[Tuple[float, ...], List[float], np.ndarray], anisotropy_threshold=ANISO_THRESHOLD):
@@ -152,6 +184,12 @@ def resample_data_or_seg_to_shape(
     force_separate_z: bool | None = False,
     separate_z_anisotropy_threshold: float = ANISO_THRESHOLD,
 ):
+    if RESAMPLE_DEVICE is not None:
+        if isinstance(data, torch.Tensor):
+            data = data.numpy()
+        if tuple(new_shape) == tuple(data.shape[1:]):
+            return data
+        return resample_torch_to_shape(data, new_shape, is_seg, RESAMPLE_DEVICE)
     if isinstance(data, torch.Tensor):
         data = data.numpy()
     do_sep, axis = determine_do_sep_z_and_axis(force_separate_z, current_spacing, new_spacing, separate_z_anisotropy_threshold)

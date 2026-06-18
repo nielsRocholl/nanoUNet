@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__wandb__get_run_history_tool"
+    ]
+  }
+}
