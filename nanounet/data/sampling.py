@@ -30,6 +30,7 @@ def _lbs_ubs(
 def _sample_bbox(
     shape: np.ndarray,
     centroids_global: List[Tuple[int, int, int]],
+    weights,
     fg_patch_prob: float,
     patch_size: np.ndarray,
     need_to_pad: np.ndarray,
@@ -39,7 +40,11 @@ def _sample_bbox(
     dim = len(shape)
     force_fg = rng.random() < fg_patch_prob
     if force_fg and centroids_global:
-        c = centroids_global[int(rng.integers(len(centroids_global)))]
+        if weights is None:
+            j = int(rng.integers(len(centroids_global)))
+        else:
+            j = int(rng.choice(len(centroids_global), p=weights))
+        c = centroids_global[j]
         bbox_lbs: List[int] = []
         for i in range(dim):
             v = int(c[i])
@@ -95,11 +100,21 @@ def build_patch(
     if raw_c is None:
         raise KeyError("centroids_zyx required; no seg-derived fallback (R12)")
     cts_global = [tuple(int(x) for x in c) for c in raw_c]
+    # Per-case-normalised hard-type boost; absent => uniform centroid pick.
+    w = properties.get("centroid_weights")
+    if w is not None:
+        assert len(w) == len(cts_global), (len(w), len(cts_global))
+        w = np.asarray(w, dtype=np.float64)
+        s = w.sum()
+        weights = w / s if s > 0 else None
+    else:
+        weights = None
     need_to_pad = (patch_size - final_patch_size).astype(int)
     shape = np.array(data.shape[1:])
     bbox_lbs, bbox_ubs = _sample_bbox(
         shape,
         cts_global,
+        weights,
         cfg.sampling.fg_patch_prob,
         patch_size,
         need_to_pad,

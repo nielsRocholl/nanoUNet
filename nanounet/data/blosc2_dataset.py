@@ -60,6 +60,11 @@ def load_case_properties(folder: str, identifier: str) -> dict:
     if isfile(cj):
         with open(cj, encoding="utf-8") as f:
             properties = {**properties, **json.load(f)}
+    # Optional per-centroid sampling weights (hard-type oversampling); absent => uniform pick.
+    wj = join(folder, identifier + "_weights.json")
+    if isfile(wj):
+        with open(wj, encoding="utf-8") as f:
+            properties = {**properties, **json.load(f)}
     return properties
 
 
