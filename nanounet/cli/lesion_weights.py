@@ -14,7 +14,7 @@ from collections import Counter
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import isfile, join
 
-from nanounet.common import cprint, nano_header, preprocessed_dir
+from nanounet.common import cprint, nano_header, nano_progress, preprocessed_dir
 from nanounet.data.blosc2_dataset import Blosc2Folder, case_spatial_shape, load_case_properties
 from nanounet.plan.dataset_id import convert_id_to_dataset_name
 from nanounet.plan.lesion_types import (
@@ -54,30 +54,32 @@ def main() -> None:
     n_matched = 0
     per_case_med: list[float] = []
     type_counts: Counter = Counter()
-    for cid in ids:
-        props = load_case_properties(case_dir, cid)
-        pre_shape = case_spatial_shape(case_dir, cid)
-        bbox = props["bbox_used_for_cropping"]
-        shape_after_crop = props["shape_after_cropping_and_before_resampling"]
+    with nano_progress(len(ids), "lesion-weights") as advance:
+        for cid in ids:
+            props = load_case_properties(case_dir, cid)
+            pre_shape = case_spatial_shape(case_dir, cid)
+            bbox = props["bbox_used_for_cropping"]
+            shape_after_crop = props["shape_after_cropping_and_before_resampling"]
 
-        hash_, tp = case_to_csv(cid)
-        csv_path = join(args.meta_dir, hash_ + ".csv")
-        assert isfile(csv_path), csv_path  # required input, no fallback (R12)
-        lesions = load_lesions(csv_path, tp)
-        mapped = [
-            (cog_to_preprocessed(cog, tf, bbox, shape_after_crop, pre_shape, args.cog_axis_order), t)
-            for cog, t in lesions
-        ]
+            hash_, tp = case_to_csv(cid)
+            csv_path = join(args.meta_dir, hash_ + ".csv")
+            assert isfile(csv_path), csv_path  # required input, no fallback (R12)
+            lesions = load_lesions(csv_path, tp)
+            mapped = [
+                (cog_to_preprocessed(cog, tf, bbox, shape_after_crop, pre_shape, args.cog_axis_order), t)
+                for cog, t in lesions
+            ]
 
-        weights, stats = build_case_weights(props["centroids_zyx"], mapped, HARD_TYPE_BOOST, args.max_match_dist)
-        with open(join(case_dir, cid + "_weights.json"), "w", encoding="utf-8") as f:
-            json.dump({"centroid_weights": weights}, f)
+            weights, stats = build_case_weights(props["centroids_zyx"], mapped, HARD_TYPE_BOOST, args.max_match_dist)
+            with open(join(case_dir, cid + "_weights.json"), "w", encoding="utf-8") as f:
+                json.dump({"centroid_weights": weights}, f)
 
-        n_centroids += stats["n_centroids"]
-        n_matched += stats["n_matched"]
-        type_counts.update(stats["matched_types"])
-        if stats["n_centroids"] > 0:
-            per_case_med.append(stats["median_match_dist"])
+            n_centroids += stats["n_centroids"]
+            n_matched += stats["n_matched"]
+            type_counts.update(stats["matched_types"])
+            if stats["n_centroids"] > 0:
+                per_case_med.append(stats["median_match_dist"])
+            advance(1)
 
     overall_med = float(np.median([m for m in per_case_med if np.isfinite(m)])) if per_case_med else float("inf")
     pct = 100.0 * n_matched / n_centroids if n_centroids else 0.0
