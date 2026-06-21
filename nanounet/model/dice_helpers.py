@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Callable
 
+import numpy as np
 import torch
 from torch import nn
 
@@ -42,6 +43,36 @@ def get_tp_fp_fn_tn(net_output, gt, axes=None, mask=None, square=False):
         fn = fn.sum(dim=axes, keepdim=False, dtype=torch.float32)
         tn = tn.sum(dim=axes, keepdim=False, dtype=torch.float32)
     return tp, fp, fn, tn
+
+
+def pooled_fg_dice(buf) -> float:
+    """nnU-Net global pseudo-Dice: pool per-class fg tp/fp/fn over the whole val buffer."""
+    tg = torch.stack([v["tp"] for v in buf]).sum(0).numpy()
+    pg = torch.stack([v["fp"] for v in buf]).sum(0).numpy()
+    ng = torch.stack([v["fn"] for v in buf]).sum(0).numpy()
+    dg = [2 * a / (2 * a + b + c) if (2 * a + b + c) > 0 else np.nan for a, b, c in zip(tg, pg, ng)]
+    return float(np.nanmean(dg))
+
+
+def val_split_metrics(tp, fp, fn, y, output_seg):
+    """Split a val batch into the two prompted-test cases by GT foreground presence.
+
+    Returns global per-class fg sums (tp/fp/fn pooled over the batch) plus per-patch
+    macro fg Dice on lesion patches (A) and predicted-fg fraction on no-lesion patches
+    (B). tp/fp/fn are the foreground slices, shape [B, Cfg].
+    """
+    has_fg = (y > 0).flatten(1).any(1)
+    tps, fps, fns = tp.sum(1), fp.sum(1), fn.sum(1)
+    den = 2 * tps + fps + fns
+    dice_s = torch.where(den > 0, 2 * tps / den, torch.zeros_like(den))
+    pred_fg = (output_seg > 0).float().flatten(1).mean(1)
+    return (
+        tp.sum(0).detach().cpu(),
+        fp.sum(0).detach().cpu(),
+        fn.sum(0).detach().cpu(),
+        dice_s[has_fg].detach().cpu(),
+        pred_fg[~has_fg].detach().cpu(),
+    )
 
 
 class MemoryEfficientSoftDiceLoss(nn.Module):

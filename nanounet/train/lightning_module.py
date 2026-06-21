@@ -22,7 +22,7 @@ from nanounet.mem_diag import (
     mem_diag_enabled,
     purge_torch_tmp,
 )
-from nanounet.model.dice_helpers import get_tp_fp_fn_tn
+from nanounet.model.dice_helpers import get_tp_fp_fn_tn, pooled_fg_dice, val_split_metrics
 from nanounet.model.losses import build_loss
 from nanounet.model.lr_schedule import PolyLRScheduler, StretchedTailPolyLRScheduler
 from nanounet.model.mae_transfer import load_full_net, load_mae_encoder
@@ -131,10 +131,10 @@ class NanoUNetLM(pl.LightningModule):
         else:
             mask = None
         tp, fp, fn, _ = get_tp_fp_fn_tn(oh, y, axes=axes, mask=mask)
-        tp = tp[:, 1:].detach().cpu()
-        fp = fp[:, 1:].detach().cpu()
-        fn = fn[:, 1:].detach().cpu()
-        self._val_buf.append({"tp": tp, "fp": fp, "fn": fn, "loss": float(loss.detach())})
+        tg, pg, ng, da, fb = val_split_metrics(tp[:, 1:], fp[:, 1:], fn[:, 1:], y, output_seg)
+        self._val_buf.append(
+            {"tp": tg, "fp": pg, "fn": ng, "dice_a": da, "fp_b": fb, "loss": float(loss.detach())}
+        )
 
     def on_validation_epoch_start(self) -> None:
         self._val_buf.clear()
@@ -144,14 +144,13 @@ class NanoUNetLM(pl.LightningModule):
             self.log("epoch_wall_time_sec", float(time.perf_counter() - self._epoch_t0))
         if not self._val_buf:
             return
-        tp = torch.cat([v["tp"] for v in self._val_buf], dim=0)
-        fp = torch.cat([v["fp"] for v in self._val_buf], dim=0)
-        fn = torch.cat([v["fn"] for v in self._val_buf], dim=0)
-        tg = tp.sum(0).numpy()
-        pg = fp.sum(0).numpy()
-        ng = fn.sum(0).numpy()
-        dg = np.array([2 * float(a) / (2 * a + b + c) if (2 * a + b + c) > 0 else np.nan for a, b, c in zip(tg, pg, ng)])
-        self.log("val_dice", float(np.nanmean(dg)), prog_bar=True)
+        da = torch.cat([v["dice_a"] for v in self._val_buf])
+        fb = torch.cat([v["fp_b"] for v in self._val_buf])
+        self.log("val_dice", pooled_fg_dice(self._val_buf), prog_bar=True)
+        self.log("val_dice_macro", float(da.mean()) if da.numel() else float("nan"), prog_bar=True)
+        self.log("val_fp", float(fb.mean()) if fb.numel() else 0.0, prog_bar=False)
+        self.log("val_n_a", float(da.numel()))
+        self.log("val_n_b", float(fb.numel()))
         self.log("val_loss", float(np.mean([v["loss"] for v in self._val_buf])), prog_bar=False)
         if mem_diag_enabled():
             ep = int(self.current_epoch)

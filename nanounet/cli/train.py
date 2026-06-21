@@ -321,11 +321,14 @@ def main() -> None:
         mae_ckpt=None if sup_resume or args.init_weights else mae_ckpt_arg,
         init_weights=args.init_weights,
     )
+    # finetune optimizes hard small lesions + FP suppression; select on macro Dice, not the
+    # big-lesion-dominated global val_dice that the base run uses.
+    mon = "val_dice_macro" if args.init_weights else "val_dice"
     cb = [
         ModelCheckpoint(
             dirpath=join(out, ckpt_dir),
-            filename="best-{epoch}-{val_dice:.4f}",
-            monitor="val_dice",
+            filename=f"best-{{epoch}}-{{{mon}:.4f}}",
+            monitor=mon,
             mode="max",
             save_top_k=2,
         ),

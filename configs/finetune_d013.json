@@ -35,5 +35,8 @@
   "inference": {
     "tile_step_size": 0.75,
     "disable_tta_default": false
+  },
+  "validation": {
+    "no_lesion_frac": 0.3
   }
 }

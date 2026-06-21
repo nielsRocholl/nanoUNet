@@ -6,7 +6,7 @@ from typing import List, Tuple
 
 import numpy as np
 from acvl_utils.cropping_and_padding.bounding_boxes import crop_and_pad_nd
-from scipy.ndimage import distance_transform_edt
+from scipy.spatial import cKDTree
 
 from nanounet.config import RoiPromptConfig
 from nanounet.prompt.centroids import filter_centroids_in_patch
@@ -63,23 +63,35 @@ def _sample_bbox(
 def _sample_false_pos(
     seg_crop: np.ndarray, n: int, min_dist_vox: int, rng: np.random.Generator
 ) -> list[tuple[int, int, int]]:
-    """Random background voxels for positive-channel clicks ≥ min_dist away from foreground."""
+    """Random background voxels for positive-channel clicks ≥ min_dist from foreground.
+
+    KD-tree rejection sampling over the sparse foreground coords. A full-volume EDT
+    here dominated dataloader CPU and starved the GPU (~60% util); foreground is
+    sparse so candidate rejection against a cKDTree is far cheaper.
+    """
     if n <= 0:
         return []
     s = np.asarray(seg_crop)
     if s.ndim == 4:
         s = s[0]
-    pos = s > 0
-    if not pos.any():
-        allowed = ~pos
-    else:
-        allowed = distance_transform_edt(~pos) > float(min_dist_vox)
-    coords = np.argwhere(allowed)
-    if len(coords) == 0:
-        return []
-    k = min(n, len(coords))
-    idx = rng.choice(len(coords), k, replace=False)
-    return [tuple(int(v) for v in coords[i]) for i in idx]
+    shape = s.shape
+    fg = np.argwhere(s > 0)
+    if len(fg) == 0:
+        cand = np.stack([rng.integers(0, d, size=n) for d in shape], axis=1)
+        return [tuple(int(v) for v in c) for c in cand]
+    tree = cKDTree(fg)
+    md = float(min_dist_vox)
+    out: list[tuple[int, int, int]] = []
+    # oversample candidates; a few rounds suffice unless the patch is nearly all foreground
+    for _ in range(8):
+        m = 8 * (n - len(out)) + 64
+        cand = np.stack([rng.integers(0, d, size=m) for d in shape], axis=1)
+        dist, _ = tree.query(cand, k=1)
+        for c in cand[dist > md]:
+            out.append(tuple(int(v) for v in c))
+            if len(out) >= n:
+                return out
+    return out
 
 
 def build_patch(

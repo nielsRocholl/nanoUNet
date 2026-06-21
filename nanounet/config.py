@@ -54,10 +54,16 @@ class InferenceConfig:
 
 
 @dataclass(frozen=True)
+class ValidationConfig:
+    no_lesion_frac: float
+
+
+@dataclass(frozen=True)
 class RoiPromptConfig:
     prompt: PromptConfig
     sampling: SamplingConfig
     inference: InferenceConfig
+    validation: ValidationConfig
 
 
 def _require(d: dict, key: str) -> object:
@@ -155,6 +161,13 @@ def _load_inf(d: dict | None) -> InferenceConfig:
     )
 
 
+def _load_validation(d: dict | None) -> ValidationConfig:
+    f = float(d.get("no_lesion_frac", 0.3)) if isinstance(d, dict) else 0.3
+    if not 0.0 <= f <= 1.0:
+        raise ValueError("validation.no_lesion_frac must be in [0, 1]")
+    return ValidationConfig(no_lesion_frac=f)
+
+
 def load_config(path: str | Path) -> RoiPromptConfig:
     p = Path(path)
     d = json.loads(p.read_text(encoding="utf-8"))
@@ -167,6 +180,7 @@ def load_config(path: str | Path) -> RoiPromptConfig:
         prompt=_load_prompt(pr),
         sampling=_load_sampling(sa),
         inference=_load_inf(d.get("inference")),
+        validation=_load_validation(d.get("validation")),
     )
 
 

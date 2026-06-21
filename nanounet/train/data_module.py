@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from functools import partial
 from typing import List
 
@@ -70,6 +71,14 @@ class NanoDataModule(pl.LightningDataModule):
         self.fold = fold
         self.plans_identifier = plans_identifier
         self.roi_cfg = load_config(roi_cfg_path)
+        # Val mirrors test: a fraction of patches are background+prompt (no lesion). Force a
+        # false-positive click on every such patch so "prompt + no lesion" is always realized.
+        val_sampling = replace(
+            self.roi_cfg.sampling,
+            fg_patch_prob=1.0 - self.roi_cfg.validation.no_lesion_frac,
+            false_pos_probability=1.0,
+        )
+        self.val_cfg = replace(self.roi_cfg, sampling=val_sampling)
         self.batch_size = batch_size
         self.dl_bucket = dl_bucket
         self.num_iterations_per_epoch = num_iterations_per_epoch
@@ -155,12 +164,12 @@ class NanoDataModule(pl.LightningDataModule):
         it = PatchIterable(
             self.case_folder,
             self.val_keys,
-            self.roi_cfg,
+            self.val_cfg,
             self.final_ps,
             self.final_ps,
             self.label_manager.annotated_classes_key,
             self.val_tf,
-            not self.roi_cfg.prompt.validation_use_prompt,
+            False,
             self.num_val_iterations,
             self.batch_size,
             fold_seed(self.fold) + 2000,
