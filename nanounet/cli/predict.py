@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import os
 import time
 from collections import deque
@@ -22,6 +23,18 @@ from nanounet.plan.case_pp import run_case
 from nanounet.plan.labels import labels_from_dataset_json
 from nanounet.plan.plans import Plans
 from nanounet.prompt.coords import load_points_xyz
+
+
+def _patient_ids_from_csv(path: str) -> set[str]:
+    with open(path, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    if not rows:
+        raise ValueError(f"empty patients csv: {path}")
+    col = "patient" if "patient" in rows[0] else next(iter(rows[0]))
+    out = {r[col].strip() for r in rows if r[col].strip()}
+    if not out:
+        raise ValueError(f"no patient ids in {path}")
+    return out
 
 
 def _preprocess_case(scan: str, json_path: str, pl, cm, dj):
@@ -50,6 +63,7 @@ def main() -> None:
     ap.add_argument("--device", choices=("cuda", "cpu", "mps"), default="cuda")
     ap.add_argument("--no-amp", action="store_true")
     ap.add_argument("--overwrite", action="store_true")
+    ap.add_argument("--patients-csv", default=None, help="CSV with patient column; keep cases whose id prefix matches")
     args = ap.parse_args()
 
     nano_header("nanoUNet predict", color="blue")
@@ -74,6 +88,11 @@ def main() -> None:
     if not single_mode:
         case_files = sorted(f for f in os.listdir(args.input) if f.endswith(end))
         cases = [(f[:-len(end)], join(args.input, f), join(args.input, f[:-len(end)] + ".json"), None) for f in case_files]
+        if args.patients_csv:
+            pids = _patient_ids_from_csv(args.patients_csv)
+            cases = [(cid, scan, jp, ot) for cid, scan, jp, ot in cases if cid.split("_", 1)[0] in pids]
+            if not cases:
+                raise SystemExit(f"no cases match --patients-csv {args.patients_csv}")
         missing = [cid for cid, _, jp, _ in cases if not os.path.isfile(jp)]
         if missing:
             raise FileNotFoundError(f"missing points JSON for: {', '.join(missing)}")
