@@ -136,21 +136,35 @@ Standalone MAE only (no prompts). Default out: `$NANOUNET_RESULTS/nanounet/<Data
 
 ### `nanounet_predict`
 
-Segment from preprocessed-space point prompt; TTA on by default.
+Prompt-driven GPU-batched inference over a **dataset folder** or a **single case**. Points come
+from JSON (native scanner voxel `(x,y,z)`). All of a case's points are clustered ("infer all") and
+each cluster is one batched seed forward. TTA on by default (from `nano_config.json`).
+
+**Dataset mode** (`-i` is a folder): segments every `*.nii.gz`, each paired with a sibling
+`<name>.json` (same basename). Writes `<name>.nii.gz` to `-o`. Missing JSON for any scan → error.
+
+**Single mode** (`-i` is a `.nii.gz`): requires `--points`; writes the single `-o`.
+
+Points JSON ("Points of interest" format): `{"points": [{"name": "1", "point": [x, y, z]}, ...]}`,
+voxel `(x,y,z)` in the scan's own grid. Empty `points` → all-background output.
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `-i`, `--images` | (required) | One or more input image paths (channels) |
-| `-o`, `--output` | (required) | Output `.nii.gz` or base path (suffix from `dataset.json`) |
-| `-m`, `--model-dir` | (required) | Training run directory (with `plans.json`, `dataset.json`, `checkpoints/`) |
-| `--ckpt` | auto | Checkpoint name/path; default picks from `checkpoints/` via [predictor](nanounet/infer/predictor.py) |
-| `--point-zyx` | (required) | Comma-separated `z,y,x` in **preprocessed** voxels |
-| `--seg` | none | Optional segmentation input for predictor |
-| `--no-prompt-encode` | off (flag) | Skip prompt encoding |
-| `--border-expand` | off (flag) | BFS hull-shell merge (see [infer/border_expand.py](nanounet/infer/border_expand.py)) |
-| `--max-border-extra` | library default | Max extra voxels for border expand |
-| `--disable-tta` | off (flag) | Disable test-time augmentation |
-| `--device` | `cuda` | Torch device string for inference |
+| `-i`, `--input` | (required) | Folder (dataset) **or** single `.nii.gz` |
+| `-o`, `--output` | (required) | Output folder (dataset) **or** single `.nii.gz` |
+| `-m`, `--model-dir` | (required) | Run dir with `plans.json`, `dataset.json`, `nano_config.json`, checkpoint |
+| `--ckpt` | auto | Checkpoint name/path; `auto` → `checkpoints/last.ckpt`. Pass `last.ckpt` if it sits in the run-dir root |
+| `--points` | none | Points JSON (**single mode only**) |
+| `--no-prompt-encode` | off (flag) | Zero the 2 prompt channels (point encoding off) |
+| `--border-expand` | off (flag) | Large-lesion extra border patches (per-cluster BFS, [infer/border_expand.py](nanounet/infer/border_expand.py)) |
+| `--max-border-extra` | `16` | Max extra patches per cluster for border expand |
+| `--tta` / `--disable-tta` | from `nano_config` | Force test-time augmentation on / off |
+| `--batch-size` | `8` | GPU seed mini-batch (patches per forward) |
+| `--num-workers` | `4` | CPU preprocess prefetch threads (dataset mode) |
+| `--cluster-margin-frac` | `0.1` | Cluster bbox margin as fraction of patch size |
+| `--device` | `cuda` | `cuda` \| `cpu` \| `mps` (falls back to `cpu` if unavailable) |
+| `--no-amp` | off (flag) | Disable autocast (exact fp32; CUDA AMP is on by default) |
+| `--overwrite` | off (flag) | Re-run cases whose output exists (default: skip = resume) |
 
 ---
 
@@ -190,10 +204,15 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetTinyPlans --config configs/de
 **3 — Predict**
 
 ```bash
-nanounet_predict -i case_0000.nii.gz -o seg.nii.gz -m /path/to/run --point-zyx 48,120,95
+# Dataset: folder of *.nii.gz + sibling *.json -> one seg per case
+nanounet_predict -i /path/to/scans -o /path/to/out -m /path/to/run \
+  --ckpt last.ckpt --border-expand --batch-size 8 --device cuda
+
+# Single case
+nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json -m /path/to/run --ckpt last.ckpt
 ```
 
-`--point-zyx` is in **preprocessed** space, not original scanner space.
+Points are native scanner voxels `(x,y,z)`; mapping to preprocessed space is automatic.
 
 ---
 
