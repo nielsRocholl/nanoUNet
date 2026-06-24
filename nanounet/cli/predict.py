@@ -112,10 +112,16 @@ def main() -> None:
 
     n = len(cases)
 
+    def out_trunc_for(ot: str | None, case_id: str) -> str:
+        return ot if ot is not None else join(out_dir, case_id)
+
+    def skip_case(case_id: str, idx: int, out_trunc: str) -> bool:
+        if args.overwrite or not os.path.isfile(out_trunc + end):
+            return False
+        cprint(f"[dim][{idx}/{n}] skip {case_id} (exists)[/dim]")
+        return True
+
     def gpu_export(case_id: str, idx: int, out_trunc: str, pad_cpu, slicer_revert, props, points_xyz) -> None:
-        if not args.overwrite and os.path.isfile(out_trunc + end):
-            cprint(f"[dim][{idx}/{n}] skip {case_id} (exists)[/dim]")
-            return
         t0 = time.perf_counter()
         logits = predict_case_logits(
             net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dj=dj, dev=dev,
@@ -133,13 +139,19 @@ def main() -> None:
 
     if n == 1 or args.num_workers <= 0:
         for i, (cid, scan, jp, ot) in enumerate(cases, 1):
-            consume(i, cid, ot or join(out_dir, cid), _preprocess_case(scan, jp, pl, cm, dj))
+            out = out_trunc_for(ot, cid)
+            if skip_case(cid, i, out):
+                continue
+            consume(i, cid, out, _preprocess_case(scan, jp, pl, cm, dj))
         return
 
     pool = ThreadPoolExecutor(max_workers=args.num_workers)
     inflight: deque = deque()
-    for i, (cid, scan, jp, _) in enumerate(cases, 1):
-        inflight.append((i, cid, join(out_dir, cid), pool.submit(_preprocess_case, scan, jp, pl, cm, dj)))
+    for i, (cid, scan, jp, ot) in enumerate(cases, 1):
+        out = out_trunc_for(ot, cid)
+        if skip_case(cid, i, out):
+            continue
+        inflight.append((i, cid, out, pool.submit(_preprocess_case, scan, jp, pl, cm, dj)))
         if len(inflight) > args.num_workers:
             idx, case_id, ot, fut = inflight.popleft()
             consume(idx, case_id, ot, fut.result())
