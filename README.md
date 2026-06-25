@@ -140,6 +140,12 @@ Prompt-driven GPU-batched inference over a **dataset folder** or a **single case
 from JSON (native scanner voxel `(x,y,z)`). All of a case's points are clustered ("infer all") and
 each cluster is one batched seed forward. TTA on by default (from `nano_config.json`).
 
+Per-patch predictions are combined with `--merge max` (default): each voxel takes the logits of the
+patch most confident it is foreground (a **union** of the per-patch segmentations). This matches
+running the model once per click and unioning the results. The legacy `--merge average` (gaussian
+mean) silently erased lesions when many patches overlapped — the patch that owned a lesion was
+outvoted by the dozens of neighbouring patches that (correctly) predict background there.
+
 **Dataset mode** (`-i` is a folder): segments every `*.nii.gz`, each paired with a sibling
 `<name>.json` (same basename). Writes `<name>.nii.gz` to `-o`. Missing JSON for any scan → error.
 
@@ -163,6 +169,7 @@ voxel `(x,y,z)` in the scan's own grid. Empty `points` → all-background output
 | `--num-workers` | `4` | CPU preprocess prefetch threads (dataset mode) |
 | `--cluster-margin-frac` | `0.1` | Cluster bbox margin as fraction of patch size |
 | `--inference-mode` | `clustered` | `clustered` \| `centered` — patch placement (one patch per click in centered mode) |
+| `--merge` | `max` | Cross-patch merge. `max` = union: each voxel takes the logits of the patch most confident it is foreground, so a lesion segmented by its own patch is never overvoted by neighbouring background-predicting patches (reproduces interactive single-click per point). `average` = legacy gaussian-weighted mean (suffers cross-patch washout when many patches overlap) |
 | `--device` | `cuda` | `cuda` \| `cpu` \| `mps` (falls back to `cpu` if unavailable) |
 | `--no-amp` | off (flag) | Disable autocast (exact fp32; CUDA AMP is on by default) |
 | `--overwrite` | off (flag) | Re-run cases whose output exists (default: skip = resume) |

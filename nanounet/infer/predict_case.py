@@ -91,8 +91,10 @@ def predict_case_logits(
     use_amp: bool,
     cluster_margin_frac: float = 0.1,
     mode: str = "clustered",
+    merge: str = "max",
 ) -> torch.Tensor:
     assert mode in ("clustered", "centered")
+    assert merge in ("max", "average")
     patch_size = tuple(cm.patch_size)
     padded_shape = tuple(pad.shape[1:])
     unpadded_shape = tuple(s.stop - s.start for s in slicer_revert[1:])
@@ -150,11 +152,33 @@ def predict_case_logits(
         for j in range(out.shape[0]):
             seed_raw.append(out[j])
 
-    logits_acc = torch.zeros((nh, *padded_shape), dtype=acc_dtype, device=dev)
-    n_pred = torch.zeros(padded_shape, dtype=acc_dtype, device=dev)
+    # merge="max": per voxel keep the logits of the patch most confident it is foreground
+    # (union of per-patch argmax). Avoids the cross-patch washout where many overlapping
+    # background-predicting patches outvote the single patch that owns a lesion. merge="average"
+    # is the legacy gaussian-weighted mean.
+    use_max = merge == "max"
+    if use_max:
+        neg = torch.finfo(acc_dtype).min
+        margin_buf = torch.full(padded_shape, neg, dtype=acc_dtype, device=dev)
+        logits_acc = bg_vec.view(-1, 1, 1, 1).to(acc_dtype).expand(nh, *padded_shape).contiguous()
+    else:
+        logits_acc = torch.zeros((nh, *padded_shape), dtype=acc_dtype, device=dev)
+        n_pred = torch.zeros(padded_shape, dtype=acc_dtype, device=dev)
+
+    def accumulate(raw: torch.Tensor, sz: slice, sy: slice, sx: slice) -> None:
+        if use_max:
+            m = (raw[1:].amax(0) - raw[0]).to(acc_dtype)
+            sub_m = margin_buf[sz, sy, sx]
+            keep = m > sub_m
+            sub_l = logits_acc[:, sz, sy, sx]
+            logits_acc[:, sz, sy, sx] = torch.where(keep.unsqueeze(0), raw.to(acc_dtype), sub_l)
+            margin_buf[sz, sy, sx] = torch.where(keep, m, sub_m)
+        else:
+            logits_acc[:, sz, sy, sx] += (raw * gaussian).to(acc_dtype)
+            n_pred[sz, sy, sx] += gaussian_acc
+
     for i, (sz, sy, sx) in enumerate(seed_slices):
-        logits_acc[:, sz, sy, sx] += (seed_raw[i] * gaussian).to(acc_dtype)
-        n_pred[sz, sy, sx] += gaussian_acc
+        accumulate(seed_raw[i], sz, sy, sx)
 
     if border_expand:
         for i, cl in enumerate(seeds_pts):
@@ -179,8 +203,7 @@ def predict_case_logits(
                 _encode_row(workon[0], pad, sze, sye, sxe, n_img, cl, encode_prompt, cfg, patch_size, dev)
                 with autocast(dev.type, enabled=amp_on):
                     raw_e = predict_batch_with_tta(net, workon, use_mirroring)[0].float()
-                logits_acc[:, sze, sye, sxe] += (raw_e * gaussian).to(acc_dtype)
-                n_pred[sze, sye, sxe] += gaussian_acc
+                accumulate(raw_e, sze, sye, sxe)
                 done += 1
                 bud = max_border_expand_extra - done
                 if bud > 0:
@@ -189,6 +212,7 @@ def predict_case_logits(
                     ):
                         q.append(c)
 
-    safe_divide_merged_logits(logits_acc, n_pred, bg_vec)
+    if not use_max:
+        safe_divide_merged_logits(logits_acc, n_pred, bg_vec)
     logits_acc = logits_acc[(slice(None), *slicer_revert[1:])]
     return logits_acc.float().cpu()
