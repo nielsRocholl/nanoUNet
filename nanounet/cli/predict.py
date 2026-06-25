@@ -60,6 +60,8 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--num-workers", type=int, default=4)
     ap.add_argument("--cluster-margin-frac", type=float, default=0.1)
+    ap.add_argument("--inference-mode", choices=("clustered", "centered"), default="clustered",
+                    help="patch placement: 'clustered' packs clicks, 'centered' = one patch per click")
     ap.add_argument("--device", choices=("cuda", "cpu", "mps"), default="cuda")
     ap.add_argument("--no-amp", action="store_true")
     ap.add_argument("--overwrite", action="store_true")
@@ -130,6 +132,7 @@ def main() -> None:
             border_expand=args.border_expand, max_border_expand_extra=args.max_border_extra,
             batch_size=args.batch_size, use_amp=not args.no_amp,
             cluster_margin_frac=args.cluster_margin_frac,
+            mode=args.inference_mode,
         )
         export_prediction_from_logits(logits, props, cm, pl, dj, out_trunc)
         cprint(f"[bold green][{idx}/{n}] {case_id} ({time.perf_counter() - t0:.1f}s)[/bold green]")

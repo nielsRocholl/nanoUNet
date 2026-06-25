@@ -162,6 +162,7 @@ voxel `(x,y,z)` in the scan's own grid. Empty `points` → all-background output
 | `--batch-size` | `8` | GPU seed mini-batch (patches per forward) |
 | `--num-workers` | `4` | CPU preprocess prefetch threads (dataset mode) |
 | `--cluster-margin-frac` | `0.1` | Cluster bbox margin as fraction of patch size |
+| `--inference-mode` | `clustered` | `clustered` \| `centered` — patch placement (one patch per click in centered mode) |
 | `--device` | `cuda` | `cuda` \| `cpu` \| `mps` (falls back to `cpu` if unavailable) |
 | `--no-amp` | off (flag) | Disable autocast (exact fp32; CUDA AMP is on by default) |
 | `--overwrite` | off (flag) | Re-run cases whose output exists (default: skip = resume) |
@@ -210,6 +211,10 @@ nanounet_predict -i /path/to/scans -o /path/to/out -m /path/to/run \
 
 # Single case
 nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json -m /path/to/run --ckpt last.ckpt
+
+# centered: one patch per click, each prompt = its own click (lesion-centered)
+nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
+  -m /path/to/run --ckpt last.ckpt --inference-mode centered --border-expand
 ```
 
 Points are native scanner voxels `(x,y,z)`; mapping to preprocessed space is automatic.

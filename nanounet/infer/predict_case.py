@@ -90,7 +90,9 @@ def predict_case_logits(
     batch_size: int,
     use_amp: bool,
     cluster_margin_frac: float = 0.1,
+    mode: str = "clustered",
 ) -> torch.Tensor:
+    assert mode in ("clustered", "centered")
     patch_size = tuple(cm.patch_size)
     padded_shape = tuple(pad.shape[1:])
     unpadded_shape = tuple(s.stop - s.start for s in slicer_revert[1:])
@@ -117,13 +119,25 @@ def predict_case_logits(
         voxel_coordinate_frame="full",
     )
     pts_pad = map_points_zyx_unpadded_to_padded(pre, slicer_revert)
-    clusters = cluster_points_for_patch_size(pts_pad, patch_size, cluster_margin_frac)
-    cluster_slices = [
-        spatial_slices_covering_points(cl, patch_size, padded_shape) for cl in clusters
-    ]
+    if mode == "clustered":
+        seeds_pts = cluster_points_for_patch_size(pts_pad, patch_size, cluster_margin_frac)
+        seed_slices = [
+            spatial_slices_covering_points(cl, patch_size, padded_shape) for cl in seeds_pts
+        ]
+    else:  # centered: one patch per click, prompt = that single click only
+        seen: set = set()
+        seeds_pts, seed_slices = [], []
+        for p in pts_pad:
+            sl = centered_spatial_slices_at_point(p[0], p[1], p[2], patch_size, padded_shape)
+            key = (spatial_slices_to_tuple(*sl), p)
+            if key in seen:  # exact-duplicate input clicks only
+                continue
+            seen.add(key)
+            seeds_pts.append([p])
+            seed_slices.append(sl)
 
     rows: list[torch.Tensor] = []
-    for cl, (sz, sy, sx) in zip(clusters, cluster_slices):
+    for cl, (sz, sy, sx) in zip(seeds_pts, seed_slices):
         row = torch.empty((n_img + 2, *patch_size), device=dev, dtype=torch.float32)
         _encode_row(row, pad, sz, sy, sx, n_img, cl, encode_prompt, cfg, patch_size, dev)
         rows.append(row)
@@ -138,13 +152,13 @@ def predict_case_logits(
 
     logits_acc = torch.zeros((nh, *padded_shape), dtype=acc_dtype, device=dev)
     n_pred = torch.zeros(padded_shape, dtype=acc_dtype, device=dev)
-    for i, (sz, sy, sx) in enumerate(cluster_slices):
+    for i, (sz, sy, sx) in enumerate(seed_slices):
         logits_acc[:, sz, sy, sx] += (seed_raw[i] * gaussian).to(acc_dtype)
         n_pred[sz, sy, sx] += gaussian_acc
 
     if border_expand:
-        for i, cl in enumerate(clusters):
-            sz, sy, sx = cluster_slices[i]
+        for i, cl in enumerate(seeds_pts):
+            sz, sy, sx = seed_slices[i]
             raw = seed_raw[i]
             seed_key = spatial_slices_to_tuple(sz, sy, sx)
             vis = {seed_key}
