@@ -146,6 +146,20 @@ running the model once per click and unioning the results. The legacy `--merge a
 mean) silently erased lesions when many patches overlapped — the patch that owned a lesion was
 outvoted by the dozens of neighbouring patches that (correctly) predict background there.
 
+**Recommended inference config:** `--inference-mode clustered --merge max --border-expand` (TTA stays
+on from `nano_config.json`). On the autoPET-IV longitudinal val set this is best on nearly every
+lesion type.
+
+**Checkpoint choice matters for holdout finetunes.** `--ckpt auto` resolves to `last.ckpt`, which is
+right for `-f all` runs (in-sample val) but *not* necessarily for a finetune with a real holdout
+(e.g. `f0`): there `last` can be mildly overfit, and an earlier validation-best checkpoint can win.
+For the `d013` longitudinal finetune, `best-epoch=412` beats `last` (epoch 499) by **+1.3 per-lesion
+DSC** on the followup (propagated-prompt) set and is neutral on baseline — so pass it explicitly:
+`--ckpt finetune/best-epoch=412-val_dice_macro=0.6649.ckpt`. Note the validation-`dice_macro` selector
+that ranks checkpoints does **not** perfectly track per-lesion DSC (it ranked epoch 425 above 412, but
+412 scores higher on the task metric), and a logit-ensemble of the three saved checkpoints is *worse*
+than 412 alone — so select the single best checkpoint empirically, don't ensemble.
+
 **Dataset mode** (`-i` is a folder): segments every `*.nii.gz`, each paired with a sibling
 `<name>.json` (same basename). Writes `<name>.nii.gz` to `-o`. Missing JSON for any scan → error.
 
