@@ -112,6 +112,19 @@ Regenerated prediction sets (clustered, the best mode) with `best-epoch=412`:
 - `predictions/val_FU_clustered_412/` (67 cases)
 - `predictions/val_BL_clustered_412/` (68 cases)
 
+Final stratified numbers (DSC ×100):
+
+| set | per-lesion DSC | LDR | detected DSC | case DSC | n lesions |
+|---|---|---|---|---|---|
+| FU clustered — `last` (before) | 62.6 | 87.7 | 71.4 | 63.7 | 820 |
+| **FU clustered — `412` (deliverable)** | **63.9** | **88.3** | **72.4** | **64.1** | 820 |
+| BL centered — `last` (ref) | 64.3 | 88.9 | 72.4 | 75.6 | 854 |
+| **BL clustered — `412` (deliverable)** | **68.6** | **94.1** | **72.9** | **77.3** | 854 |
+
+FU before/after is the clean checkpoint A/B (same mode): **+1.3 per-lesion DSC, +0.6 LDR, +0.4 case
+DSC**. BL clustered-412 is also the first *full* BL-clustered set (the prior one had only 16 cases)
+and is the strongest BL result.
+
 Stratified results JSON (per-lesion DSC / LDR / case DSC, per lesion type) regenerated at:
 `/nnunet_data/unprocessed-universal-lesion-segmentation/results/lesion_type_stratified_results.json`
 (contains the `*_412` deliverable sets plus the `last`-checkpoint sets for the before/after).
