@@ -65,6 +65,7 @@ class NanoDataModule(pl.LightningDataModule):
         mem_diag_dir: str | None = None,
         persistent_workers: bool = False,
         only_prefix: str | None = None,
+        longi: bool = False,
     ):
         super().__init__()
         self.dataset_name = dataset_name
@@ -88,6 +89,7 @@ class NanoDataModule(pl.LightningDataModule):
         self.mem_diag_dir = mem_diag_dir
         self.persistent_workers = persistent_workers
         self.only_prefix = only_prefix
+        self.longi = longi
         if pin_memory is None:
             pin_memory = torch.cuda.is_available()
         self.pin_memory = pin_memory
@@ -143,6 +145,7 @@ class NanoDataModule(pl.LightningDataModule):
             self.batch_size,
             fold_seed(self.fold) + 1000 * self.num_iterations_per_epoch,
             self.mem_diag_dir,
+            self.longi,
         )
         b = self.dl_bucket
         nw = b.nw_train
@@ -174,6 +177,7 @@ class NanoDataModule(pl.LightningDataModule):
             self.batch_size,
             fold_seed(self.fold) + 2000,
             self.mem_diag_dir,
+            self.longi,
         )
         b = self.dl_bucket
         nw = b.nw_val

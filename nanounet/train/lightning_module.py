@@ -26,7 +26,7 @@ from nanounet.model.dice_helpers import get_tp_fp_fn_tn, pooled_fg_dice, val_spl
 from nanounet.model.losses import build_loss
 from nanounet.model.lr_schedule import PolyLRScheduler, StretchedTailPolyLRScheduler
 from nanounet.model.mae_transfer import load_full_net, load_mae_encoder
-from nanounet.model.network import build_net
+from nanounet.model.network import build_net, build_net_longi
 from nanounet.plan.plans import Plans
 
 class NanoUNetLM(pl.LightningModule):
@@ -48,6 +48,7 @@ class NanoUNetLM(pl.LightningModule):
         optimizer: str = "sgd",
         mae_ckpt: str | None = None,
         init_weights: str | None = None,
+        longi: bool = False,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -59,7 +60,8 @@ class NanoUNetLM(pl.LightningModule):
         self.cm = self.pm.get_configuration("3d_fullres")
         self.dj = load_json(dataset_json_path)
         self.label_manager = self.pm.get_label_manager(self.dj)
-        self.net = build_net(self.cm, self.label_manager, self.dj, enable_deep_supervision)
+        build = build_net_longi if longi else build_net
+        self.net = build(self.cm, self.label_manager, self.dj, enable_deep_supervision)
         if init_weights is not None:
             load_full_net(self.net, init_weights)
         elif mae_ckpt is not None:

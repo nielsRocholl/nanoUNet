@@ -103,6 +103,11 @@ def main() -> None:
         default=None,
         help="Train/val only case keys with this prefix, e.g. d013_ on a merged dataset.",
     )
+    ap.add_argument(
+        "--longi",
+        action="store_true",
+        help="Two-stream BL+FU encoder with Difference Weighting at skips (finetune stage 3).",
+    )
     ap.add_argument("--precision", default="16-mixed")
     ap.add_argument(
         "--accelerator",
@@ -155,6 +160,8 @@ def main() -> None:
             raise ValueError("--init-weights conflicts with --mae-ckpt")
         if args.mae_pretrain:
             raise ValueError("--init-weights conflicts with --mae-pretrain")
+    if args.longi and not args.init_weights:
+        raise ValueError("--longi requires --init-weights (warm-start from stage-2 supervised net)")
     args.roi_cfg = resolve_user_config_path(args.roi_cfg)
     set_mem_diag(args.mem_diag)
     setup_logging()
@@ -303,6 +310,7 @@ def main() -> None:
         mem_diag_dir=out if mem_diag_enabled() else None,
         persistent_workers=args.dl_persistent_workers,
         only_prefix=args.only_prefix,
+        longi=args.longi,
     )
     lm = NanoUNetLM(
         plans_path,
@@ -320,6 +328,7 @@ def main() -> None:
         optimizer=args.optimizer,
         mae_ckpt=None if sup_resume or args.init_weights else mae_ckpt_arg,
         init_weights=args.init_weights,
+        longi=args.longi,
     )
     # finetune optimizes hard small lesions + FP suppression; select on macro Dice, not the
     # big-lesion-dominated global val_dice that the base run uses.

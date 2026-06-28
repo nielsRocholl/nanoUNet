@@ -10,9 +10,12 @@ import numpy as np
 import torch
 from torch.utils.data import IterableDataset
 
+from contextlib import contextmanager
+
 from nanounet.config import RoiPromptConfig
 from nanounet.data.blosc2_dataset import Blosc2Folder, load_case_properties
 from nanounet.data.sampling import build_patch
+from nanounet.data.sampling_longi import bl_case_opener, build_patch_longi
 from nanounet.dataloader_prefs import pin_worker_threads
 from nanounet.mem_diag import (
     log_snapshot,
@@ -64,6 +67,7 @@ class PatchIterable(IterableDataset):
         batch_size: int,
         base_seed: int,
         mem_diag_dir: str | None = None,
+        longi: bool = False,
     ):
         self.folder = folder
         self.keys = keys
@@ -77,6 +81,7 @@ class PatchIterable(IterableDataset):
         self.batch_size = batch_size
         self.base_seed = base_seed
         self.mem_diag_dir = mem_diag_dir
+        self.longi = longi
 
     def __len__(self) -> int:
         return self.num_batches * self.batch_size
@@ -101,17 +106,36 @@ class PatchIterable(IterableDataset):
                     prop = meta.put(cid, load_case_properties(ds.source_folder, cid))
                 with ds.open_case(cid, need_seg=True) as (data, seg, _, _):
                     stats["opens"] += 1
-                    raw = build_patch(
-                        data,
-                        seg,
-                        prop,
-                        self.roi_cfg,
-                        self.patch_size,
-                        self.final_patch_size,
-                        self.annotated_key,
-                        self.force_zero_prompt,
-                        rng,
-                    )
+                    if self.longi:
+
+                        @contextmanager
+                        def open_bl(bl_id: str):
+                            with bl_case_opener(ds, bl_id) as pack:
+                                yield pack
+
+                        raw = build_patch_longi(
+                            data,
+                            seg,
+                            prop,
+                            open_bl,
+                            self.roi_cfg,
+                            self.patch_size,
+                            self.final_patch_size,
+                            self.force_zero_prompt,
+                            rng,
+                        )
+                    else:
+                        raw = build_patch(
+                            data,
+                            seg,
+                            prop,
+                            self.roi_cfg,
+                            self.patch_size,
+                            self.final_patch_size,
+                            self.annotated_key,
+                            self.force_zero_prompt,
+                            rng,
+                        )
                 q.put((raw["image"], raw["segmentation"]))
         except Exception as e:
             q.put(e)

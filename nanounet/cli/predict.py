@@ -25,6 +25,26 @@ from nanounet.plan.plans import Plans
 from nanounet.prompt.coords import load_points_xyz
 
 
+def _load_bl_points(json_path: str) -> list[tuple[float, float, float] | None]:
+    import json
+    with open(json_path, encoding="utf-8") as f:
+        data = json.load(f)
+    pts = data.get("points")
+    if pts is None:
+        raise KeyError(f"'points' missing in {json_path}")
+    out: list[tuple[float, float, float] | None] = []
+    for item in pts:
+        if item is None:
+            out.append(None)
+            continue
+        p = item.get("point") if isinstance(item, dict) else item
+        if p is None:
+            out.append(None)
+            continue
+        out.append((float(p[0]), float(p[1]), float(p[2])))
+    return out
+
+
 def _patient_ids_from_csv(path: str) -> set[str]:
     with open(path, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
@@ -37,11 +57,20 @@ def _patient_ids_from_csv(path: str) -> set[str]:
     return out
 
 
-def _preprocess_case(scan: str, json_path: str, pl, cm, dj):
+def _preprocess_case(scan: str, json_path: str, pl, cm, dj, bl_scan: str | None = None, bl_json: str | None = None):
     data, _seg, props = run_case([scan], None, pl, cm, dj, verbose=False)
     data_t = torch.from_numpy(data).float()
     pad, slicer_revert = pad_nd_image(data_t, tuple(cm.patch_size), "constant", {"value": 0}, True, None)
-    return pad, slicer_revert, props, load_points_xyz(json_path)
+    points = load_points_xyz(json_path)
+    bl_pack = None
+    if bl_scan is not None:
+        bl_data, _bl_seg, bl_props = run_case([bl_scan], None, pl, cm, dj, verbose=False)
+        bl_t = torch.from_numpy(bl_data).float()
+        pad_bl, bl_slicer = pad_nd_image(bl_t, tuple(cm.patch_size), "constant", {"value": 0}, True, None)
+        bl_pts = _load_bl_points(bl_json) if bl_json else [None] * len(points)
+        assert len(bl_pts) == len(points), (len(bl_pts), len(points))
+        bl_pack = (pad_bl, bl_slicer, bl_props, bl_pts)
+    return pad, slicer_revert, props, points, bl_pack
 
 
 def main() -> None:
@@ -51,6 +80,9 @@ def main() -> None:
     ap.add_argument("-m", "--model-dir", required=True)
     ap.add_argument("--ckpt", default=None)
     ap.add_argument("--points", default=None, help="points JSON (single mode)")
+    ap.add_argument("--baseline-image", default=None, help="sibling BL .nii.gz for two-stream longi inference")
+    ap.add_argument("--baseline-points", default=None, help="BL partner points JSON, parallel to --points")
+    ap.add_argument("--longi", action="store_true", help="force two-stream net build (else auto-detect from ckpt)")
     ap.add_argument("--no-prompt-encode", action="store_true")
     ap.add_argument("--border-expand", action="store_true")
     ap.add_argument("--max-border-extra", type=int, default=DEFAULT_MAX_BORDER_EXPAND_EXTRA)
@@ -79,13 +111,18 @@ def main() -> None:
     cfg = load_config(join(md, "nano_config.json"))
     labels_from_dataset_json(dj)
 
+    if args.baseline_points and not args.baseline_image:
+        raise SystemExit("--baseline-points requires --baseline-image")
+    if args.baseline_image and not args.baseline_points:
+        raise SystemExit("--baseline-image requires --baseline-points")
+
     d = args.device
     if d == "cuda" and not torch.cuda.is_available():
         d = "cpu"
     if d == "mps" and not torch.backends.mps.is_available():
         d = "cpu"
     dev = torch.device(d)
-    net, lm = load_net_from_ckpt(pick_checkpoint(md, args.ckpt), cm, dj, dev)
+    net, lm = load_net_from_ckpt(pick_checkpoint(md, args.ckpt), cm, dj, dev, longi=args.longi)
     use_tta = (not cfg.inference.disable_tta_default) if args.tta_flag is None else args.tta_flag
 
     end = dj["file_ending"]
@@ -126,9 +163,10 @@ def main() -> None:
         cprint(f"[dim][{idx}/{n}] skip {case_id} (exists)[/dim]")
         return True
 
-    def gpu_export(case_id: str, idx: int, out_trunc: str, pad_cpu, slicer_revert, props, points_xyz) -> None:
+    def gpu_export(case_id: str, idx: int, out_trunc: str, pack) -> None:
         t0 = time.perf_counter()
-        logits = predict_case_logits(
+        pad_cpu, slicer_revert, props, points_xyz, bl_pack = pack
+        kw = dict(
             net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dj=dj, dev=dev,
             pad=pad_cpu.to(dev), slicer_revert=slicer_revert, props=props, points_xyz=points_xyz,
             encode_prompt=not args.no_prompt_encode, use_tta=use_tta,
@@ -138,18 +176,25 @@ def main() -> None:
             mode=args.inference_mode,
             merge=args.merge,
         )
+        if bl_pack is not None:
+            pad_bl, bl_slicer, bl_props, bl_pts = bl_pack
+            kw.update(pad_bl=pad_bl.to(dev), bl_points_xyz=bl_pts, bl_props=bl_props, bl_slicer_revert=bl_slicer)
+        logits = predict_case_logits(**kw)
         export_prediction_from_logits(logits, props, cm, pl, dj, out_trunc)
         cprint(f"[bold green][{idx}/{n}] {case_id} ({time.perf_counter() - t0:.1f}s)[/bold green]")
 
     def consume(idx: int, case_id: str, out_trunc: str, pack) -> None:
-        gpu_export(case_id, idx, out_trunc, *pack)
+        gpu_export(case_id, idx, out_trunc, pack)
+
+    bl_scan = args.baseline_image
+    bl_json = args.baseline_points
 
     if n == 1 or args.num_workers <= 0:
         for i, (cid, scan, jp, ot) in enumerate(cases, 1):
             out = out_trunc_for(ot, cid)
             if skip_case(cid, i, out):
                 continue
-            consume(i, cid, out, _preprocess_case(scan, jp, pl, cm, dj))
+            consume(i, cid, out, _preprocess_case(scan, jp, pl, cm, dj, bl_scan, bl_json))
         return
 
     pool = ThreadPoolExecutor(max_workers=args.num_workers)
@@ -158,7 +203,7 @@ def main() -> None:
         out = out_trunc_for(ot, cid)
         if skip_case(cid, i, out):
             continue
-        inflight.append((i, cid, out, pool.submit(_preprocess_case, scan, jp, pl, cm, dj)))
+        inflight.append((i, cid, out, pool.submit(_preprocess_case, scan, jp, pl, cm, dj, bl_scan, bl_json)))
         if len(inflight) > args.num_workers:
             idx, case_id, ot, fut = inflight.popleft()
             consume(idx, case_id, ot, fut.result())

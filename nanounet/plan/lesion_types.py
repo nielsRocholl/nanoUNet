@@ -33,6 +33,22 @@ def case_to_csv(case_id: str) -> tuple[str, str]:
     return s.split("_FU_img")[0], "FU"
 
 
+def load_lesion_pairs(csv_path: str) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Parse CSV rows where both cog_bl and cog_fu are present."""
+    out: list[tuple[np.ndarray, np.ndarray]] = []
+    with open(csv_path, encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            bl = row["cog_bl"].strip()
+            fu = row["cog_fu"].strip()
+            if not bl or not fu:
+                continue
+            cog_bl = np.array([float(x) for x in bl.split()], dtype=float)
+            cog_fu = np.array([float(x) for x in fu.split()], dtype=float)
+            assert cog_bl.shape == (3,) and cog_fu.shape == (3,), (bl, fu)
+            out.append((cog_bl, cog_fu))
+    return out
+
+
 def load_lesions(csv_path: str, timepoint: str) -> list[tuple[np.ndarray, str]]:
     """Parse the per-patient CSV; return (cog_raw, lesion_type) for lesions present at this timepoint."""
     assert timepoint in ("BL", "FU")

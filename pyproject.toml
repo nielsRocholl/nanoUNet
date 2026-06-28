@@ -29,6 +29,7 @@ nanounet_train = "nanounet.cli.train:main"
 nanounet_pretrain = "nanounet.cli.pretrain:main"
 nanounet_predict = "nanounet.cli.predict:main"
 nanounet_lesion_weights = "nanounet.cli.lesion_weights:main"
+nanounet_longi_pairs = "nanounet.cli.longi_pairs:main"
 
 [build-system]
 requires = ["setuptools>=67.8.0"]

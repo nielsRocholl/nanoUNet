@@ -11,6 +11,7 @@ import torch
 
 from nanounet.plan.labels import Labels
 from nanounet.plan.plans import Config3d, determine_num_input_channels
+from nanounet.model.dwb import LongiResEncUNet
 
 
 def _build_class(network_class: str, arch_kwargs: dict, req: list | tuple):
@@ -47,6 +48,25 @@ def build_net(
     if hasattr(net, "initialize"):
         net.apply(net.initialize)
     return net
+
+
+def build_net_longi(
+    cm: Config3d,
+    lm: Labels,
+    dataset_json: dict,
+    enable_deep_supervision: bool,
+    num_classes_override: int | None = None,
+):
+    base = build_net(
+        cm,
+        lm,
+        dataset_json,
+        enable_deep_supervision,
+        n_extra_in=2,
+        num_classes_override=num_classes_override,
+    )
+    n_stream = determine_num_input_channels(cm, dataset_json) + 2
+    return LongiResEncUNet(base, n_stream)
 
 
 def estimate_conv_feature_map_size(
