@@ -18,6 +18,7 @@ dependencies = [
     "scikit-image>=0.19.3",
     "connected-components-3d>=3.12",
     "SimpleITK>=2.2.1",
+    "itk-elastix>=0.25",
     "blosc2>=3.0.0b1",
     "scikit-learn",
     "rich>=13.0",
