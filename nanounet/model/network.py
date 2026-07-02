@@ -34,8 +34,9 @@ def build_net(
     enable_deep_supervision: bool,
     n_extra_in: int = 2,
     num_classes_override: int | None = None,
+    n_in_override: int | None = None,
 ):
-    n_in = determine_num_input_channels(cm, dataset_json)
+    n_in = n_in_override if n_in_override is not None else determine_num_input_channels(cm, dataset_json)
     nw, kwargs = _build_class(
         cm.network_arch_class_name,
         cm.network_arch_init_kwargs,
@@ -57,6 +58,9 @@ def build_net_longi(
     enable_deep_supervision: bool,
     num_classes_override: int | None = None,
 ):
+    # The longi dataset stores 2 CT channels (FU, BL). Each DWB stream sees only 1 CT + 2 prompt
+    # channels; the BL channel is consumed into the second encoder pass, not stacked onto the first.
+    assert determine_num_input_channels(cm, dataset_json) == 2, "longi dataset must have 2 CT channels"
     base = build_net(
         cm,
         lm,
@@ -64,8 +68,9 @@ def build_net_longi(
         enable_deep_supervision,
         n_extra_in=2,
         num_classes_override=num_classes_override,
+        n_in_override=1,
     )
-    n_stream = determine_num_input_channels(cm, dataset_json) + 2
+    n_stream = 1 + 2  # per stream: 1 CT modality + 2 prompt channels
     return LongiResEncUNet(base, n_stream)
 
 

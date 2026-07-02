@@ -43,8 +43,8 @@ if ! nanounet_train --help &>/dev/null; then
   exit 1
 fi
 
-# Step 0: build BL↔FU pairing sidecars on shared storage
-nanounet_longi_pairs -d "$DATASET_ID" --plans "$PLANS_NAME" --meta-dir "$META_DIR" --only-prefix "$ONLY_PREFIX"
+# Step 0: expect 2-channel longi dataset preprocessed on shared storage with _bl_clicks.json sidecars.
+# Build: register_longi → longi_build → (patch plans ch0→ch1) → nanounet_preprocess → longi_clicks
 
 LOCAL_PREP=/root/NanoUNet_preprocessed
 CASE_ID=$(python3 -c "import json; print(json.load(open('${STORAGE}/NanoUNet_preprocessed/${DS_FOLDER}/${PLANS_NAME}.json'))['configurations']['3d_fullres']['data_identifier'])")
@@ -55,7 +55,7 @@ shopt -s nullglob
 for f in "${REMOTE_CASE}/${ONLY_PREFIX}"*; do
   base=$(basename "$f")
   case "$base" in
-    *.b2nd|*.pkl|*_centroids.json|*_weights.json|*_baseline.json)
+    *.b2nd|*.pkl|*_centroids.json|*_weights.json|*_bl_clicks.json)
       rclone copyto "$f" "$LOCAL_PREP/${DS_FOLDER}/${CASE_ID}/$base" \
         --retries 5 --copy-links
       ;;
@@ -65,10 +65,11 @@ shopt -u nullglob
 
 shopt -s nullglob
 missing=0
-for b2 in "$LOCAL_PREP/${DS_FOLDER}/${CASE_ID}/${ONLY_PREFIX}"*_FU_img.b2nd; do
+for b2 in "$LOCAL_PREP/${DS_FOLDER}/${CASE_ID}/${ONLY_PREFIX}"*.b2nd; do
+  [[ "$b2" == *_seg.b2nd ]] && continue
   id=$(basename "$b2" .b2nd)
-  if [[ ! -f "$LOCAL_PREP/${DS_FOLDER}/${CASE_ID}/${id}_baseline.json" ]]; then
-    echo "FATAL: missing ${id}_baseline.json (run nanounet_longi_pairs)"
+  if [[ ! -f "$LOCAL_PREP/${DS_FOLDER}/${CASE_ID}/${id}_bl_clicks.json" ]]; then
+    echo "FATAL: missing ${id}_bl_clicks.json (run longi_clicks after preprocess)"
     missing=1
   fi
   if [[ ! -f "$LOCAL_PREP/${DS_FOLDER}/${CASE_ID}/${id}_weights.json" ]]; then

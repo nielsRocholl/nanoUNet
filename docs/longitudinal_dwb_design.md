@@ -59,6 +59,9 @@ multiply by.
 
 ## 3. What is implemented now (the "anchor-coloc" baseline)
 
+**Superseded by §12** — the warp-based two-stream design replaces anchor-coloc, separate BL-case
+pairing, and co-location shift.
+
 Files: `nanounet/model/dwb.py` (`LongiResEncUNet`), `nanounet/model/network.py` (`build_net_longi`),
 `nanounet/data/sampling_longi.py` (`build_patch_longi`), `nanounet/plan/longi_pairs.py` +
 `nanounet/cli/longi_pairs.py` (offline pairing), `nanounet/data/blosc2_dataset.py`
@@ -193,6 +196,8 @@ its OOD cost is too high.
 
 ## 7. Main contender: `coloc` + all prompts + calibrated crop jitter
 
+**Superseded by §12** — warp BL→FU in a shared 2-channel case supersedes coloc + crop jitter.
+
 The pragmatic, artifact-free design, generalizing LongiSeg's single-lesion VOI to the multi-lesion
 patch:
 
@@ -254,15 +259,91 @@ prompt. If/when warp is added, clustered becomes valid again because the whole p
 
 ## 10. Concrete next steps
 
-- [ ] Change `build_patch_longi`: (a) encode **all** paired in-patch BL prompts (not just the
-      anchor); (b) draw a propagation offset (existing σ/τ) and apply it to the **BL crop window**
-      so the anchor is ε-misaligned in training (fix §5.5). Keep null-baseline = duplicate FU.
-- [ ] Add the **null-baseline ablation** switch (force duplicate-FU everywhere) for §8.1.
+- [x] Change `build_patch_longi`: encode **all** in-patch BL prompts from warped clicks (not just the
+      anchor). Co-location shift and separate-BL-case pairing removed — warp keeps channels aligned.
+- [x] Add the **null-baseline ablation** switch (`--longi-null`, force duplicate-FU everywhere) for §8.1.
+- [x] **Dense φ warp** of baseline into FU space via `register_longi` → `longi_build` (2-channel case).
 - [ ] Log the **DWB gate magnitude** during validation for §8.2.
 - [ ] Force `mode="centered"` in the longi predict path; run the per-lesion eval on the paired
       subset, by lesion type (§8.3).
-- [ ] Only if drift is shown to matter: scope **dense φ warp** of the baseline into FU space
-      (artifact-free path to clustered + full alignment).
+
+---
+
+## 12. Warp-based two-stream (implemented — supersedes S3/S7)
+
+The production longitudinal finetune uses **warped baseline images + warped clickpoints** from
+`register_longi`, not anchor-coloc on separate BL cases.
+
+### Data layout
+
+- **Raw:** `longi_build` assembles a 2-channel nnUNet-raw dataset (`DatasetNNN_longi`):
+  `_0000` = FU CT, `_0001` = warped BL CT (FU coordinate frame, identical grid), label = FU seg.
+  Warped BL clicks live in `clicksTr/<case>.json` (copied from register output).
+- **Preprocessed:** each blosc2 case has `data.shape == (2, Z, Y, X)` — voxel-aligned FU + warped BL.
+- **Sidecars:** `longi_clicks` writes `<case>_bl_clicks.json` = `{bl_clicks_zyx, has_baseline}` next
+  to each preprocessed case.
+
+### Critical invariant
+
+**Warped BL only stays voxel-aligned to FU because it rides through preprocessing as a second
+channel of the *same* case.** `case_pp.run_case_npy` (`nanounet/plan/case_pp.py:44`) crops each case
+to its own nonzero bbox via `crop_to_nonzero`, whose `_nonzero_mask` unions the mask across **all
+channels** (`nanounet/data/crop.py:12-14`). So a 2-channel case `[FU_CT, warpedBL_CT]` gets **one
+shared crop bbox and one shared resample** → the channels stay voxel-aligned in blosc2 space. If
+warped BL were a *separate* case, its independent nonzero crop would differ from FU's and destroy the
+alignment the warp created. That is why the BL crop in `build_patch_longi` uses the **same bbox** as
+FU (no co-location shift).
+
+### Patch construction (`build_patch_longi`)
+
+1. Sample FU patch bbox from FU centroids (unchanged stratified sampling).
+2. Crop **both** channels with the **same bbox** — no co-location shift.
+3. FU stream: ch0 + all in-patch FU centroids (jittered prompts, unchanged).
+4. BL stream: ch1 + **all** in-patch warped BL clicks (positives only, no jitter, no spurious).
+5. Null baseline (`has_baseline` false, `force_zero_prompt`, or `--longi-null`): duplicate FU →
+   identity DWB.
+6. Output: 6-channel tensor `[FU_CT, FU_hm+, FU_hm−, BL_CT, BL_hm+, BL_hm−]`.
+
+### Network
+
+The longi dataset stores 2 CT channels, but each DWB stream sees 1 CT + 2 prompt channels.
+`build_net_longi` uses `n_in_override=1` so the base ResEncUNet has `input_channels=3` — the stage-2
+single-stream `--init-weights` checkpoint loads verbatim. `LongiResEncUNet` splits the 6-channel
+input at `n=3`; `dwb.py` is unchanged.
+
+### Null-baseline ablation
+
+`--longi-null` on `nanounet_train` forces duplicate-FU baseline for **all** patches (§8.1 collapse
+control), wired through `NanoDataModule.longi_null` → `PatchIterable.force_null_baseline`.
+
+### End-to-end command sequence
+
+```bash
+# 1. Register (warp BL → FU frame)
+python -m nanounet.cli.register_longi --out <regout> ...
+
+# 2. Build 2-channel raw dataset
+python -m nanounet.cli.longi_build --register-out <regout> \
+    --template-dj <dataset.json> --out <nnUNet_raw>/DatasetNNN_longi
+
+# 3. Copy existing plans into preprocessed dir; duplicate channel-0 norm stats → channel 1.
+#    Place dataset.json in preprocessed dir. Then:
+nanounet_preprocess -d NNN --plans <plans>
+
+# 4. Map warped clicks to preprocessed voxels
+python -m nanounet.cli.longi_clicks -d NNN --plans <plans> \
+    --clicks-dir <nnUNet_raw>/DatasetNNN_longi/clicksTr
+
+# 5. Finetune
+nanounet_train -d NNN --plans <plans> --longi --init-weights <stage2.ckpt> ...
+# Ablation: add --longi-null
+```
+
+### Removed (anchor-coloc era)
+
+- `nanounet/plan/longi_pairs.py`, `nanounet/cli/longi_pairs.py`
+- `<id>_baseline.json` sidecars (`baseline_case_id`, `pairs_zyx`)
+- Separate BL case loading, co-location shift, anchor-only BL prompt
 
 ---
 

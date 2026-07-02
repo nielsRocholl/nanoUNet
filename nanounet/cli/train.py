@@ -108,6 +108,11 @@ def main() -> None:
         action="store_true",
         help="Two-stream BL+FU encoder with Difference Weighting at skips (finetune stage 3).",
     )
+    ap.add_argument(
+        "--longi-null",
+        action="store_true",
+        help="S8.1 ablation: force duplicate-FU baseline for all patches (collapse control).",
+    )
     ap.add_argument("--precision", default="16-mixed")
     ap.add_argument(
         "--accelerator",
@@ -162,6 +167,8 @@ def main() -> None:
             raise ValueError("--init-weights conflicts with --mae-pretrain")
     if args.longi and not args.init_weights:
         raise ValueError("--longi requires --init-weights (warm-start from stage-2 supervised net)")
+    if args.longi_null and not args.longi:
+        raise ValueError("--longi-null requires --longi")
     args.roi_cfg = resolve_user_config_path(args.roi_cfg)
     set_mem_diag(args.mem_diag)
     setup_logging()
@@ -311,6 +318,7 @@ def main() -> None:
         persistent_workers=args.dl_persistent_workers,
         only_prefix=args.only_prefix,
         longi=args.longi,
+        longi_null=args.longi_null,
     )
     lm = NanoUNetLM(
         plans_path,
