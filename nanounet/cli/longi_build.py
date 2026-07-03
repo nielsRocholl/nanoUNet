@@ -51,10 +51,11 @@ for stem in stems:
     assert os.path.isfile(clk), clk
     # FU-frame warp => identical sampling grid; assert so a bad warp fails loudly, not silently misaligned.
     assert sitk.ReadImage(fu).GetSize() == sitk.ReadImage(bl).GetSize(), stem
-    shutil.copy2(fu, os.path.join(img_out, f"{stem}_0000.nii.gz"))
-    shutil.copy2(bl, os.path.join(img_out, f"{stem}_0001.nii.gz"))
-    shutil.copy2(seg, os.path.join(lab_out, f"{stem}.nii.gz"))
-    shutil.copy2(clk, os.path.join(clk_out, f"{stem}.json"))
+    # copy2's copystat/utime raises PermissionError on the CIFS mount; copyfile copies data only.
+    shutil.copyfile(fu, os.path.join(img_out, f"{stem}_0000.nii.gz"))
+    shutil.copyfile(bl, os.path.join(img_out, f"{stem}_0001.nii.gz"))
+    shutil.copyfile(seg, os.path.join(lab_out, f"{stem}.nii.gz"))
+    shutil.copyfile(clk, os.path.join(clk_out, f"{stem}.json"))
     n += 1
 
 with open(args.template_dj, encoding="utf-8") as f:
