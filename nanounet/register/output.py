@@ -32,7 +32,9 @@ def _copy_if_exists(src: str, dst: str) -> str | None:
     if not os.path.isfile(src):
         return None
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.copy2(src, dst)
+    # copy2 (and its copystat/utime call) raises PermissionError on the CIFS mount;
+    # copyfile copies only file data, which is all we need here.
+    shutil.copyfile(src, dst)
     return dst
 
 
