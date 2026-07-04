@@ -131,7 +131,10 @@ class NanoUNetLM(pl.LightningModule):
             y = y.clone()
             y[y == self.label_manager.ignore_label] = 0
         else:
+            # Out-of-FOV voxels are -1 (crop_to_nonzero) with no ignore label -> background;
+            # clamp so the metric one-hot scatter stays in bounds (no-op without -1).
             mask = None
+            y = y.clamp_min(0)
         tp, fp, fn, _ = get_tp_fp_fn_tn(oh, y, axes=axes, mask=mask)
         tg, pg, ng, da, fb = val_split_metrics(tp[:, 1:], fp[:, 1:], fn[:, 1:], y, output_seg)
         self._val_buf.append(

@@ -31,6 +31,11 @@ class DC_and_CE_loss(nn.Module):
             target_dice = torch.where(mask, target, 0)
             num_fg = mask.sum()
         else:
+            # crop_to_nonzero marks out-of-FOV voxels as -1 (nonzero_label). Datasets without an
+            # explicit ignore label (e.g. the registered 2-channel longi set, whose warped-BL
+            # padding produces large -1 regions) treat those voxels as background; clamp so the
+            # Dice one-hot scatter and CE indexing stay in bounds. No-op when target has no -1.
+            target = target.clamp_min(0)
             target_dice = target
             mask = None
         dc_loss = self.dc(net_output, target_dice, loss_mask=mask) if self.weight_dice != 0 else 0
