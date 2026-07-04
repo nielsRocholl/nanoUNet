@@ -16,8 +16,8 @@
 set -euo pipefail
 
 FOLD=0
-DATASET_ID=13
-DS_FOLDER=Dataset013_Longitudinal_CT_registered
+DATASET_ID=113
+DS_FOLDER=Dataset113_Longitudinal_CT_registered
 PLANS_NAME=nnUNetResEncUNetLPlans_h200_smallpv
 BASE_DS_FOLDER=Dataset999_Merged          # warm-start (stage-2 single-stream) checkpoint lives here
 FT_EPOCHS=500
