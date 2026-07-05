@@ -131,10 +131,14 @@ class NanoUNetLM(pl.LightningModule):
             y = y.clone()
             y[y == self.label_manager.ignore_label] = 0
         else:
-            # Out-of-FOV voxels are -1 (crop_to_nonzero) with no ignore label -> background;
-            # clamp so the metric one-hot scatter stays in bounds (no-op without -1).
+            # Instance-labeled targets (each lesion a distinct id) / out-of-FOV -1 vs a binary
+            # head: collapse positives to foreground for a 2-class head, else just drop -1. Keeps
+            # the metric one-hot scatter in bounds; no-op for {0,1} data.
             mask = None
-            y = y.clamp_min(0)
+            if out.shape[1] == 2:
+                y = (y > 0).to(y.dtype)
+            else:
+                y = y.clamp_min(0)
         tp, fp, fn, _ = get_tp_fp_fn_tn(oh, y, axes=axes, mask=mask)
         tg, pg, ng, da, fb = val_split_metrics(tp[:, 1:], fp[:, 1:], fn[:, 1:], y, output_seg)
         self._val_buf.append(

@@ -31,11 +31,16 @@ class DC_and_CE_loss(nn.Module):
             target_dice = torch.where(mask, target, 0)
             num_fg = mask.sum()
         else:
-            # crop_to_nonzero marks out-of-FOV voxels as -1 (nonzero_label). Datasets without an
-            # explicit ignore label (e.g. the registered 2-channel longi set, whose warped-BL
-            # padding produces large -1 regions) treat those voxels as background; clamp so the
-            # Dice one-hot scatter and CE indexing stay in bounds. No-op when target has no -1.
-            target = target.clamp_min(0)
+            # crop_to_nonzero marks out-of-FOV voxels as -1 (nonzero_label), and the registered
+            # longi segs are instance-labeled (each lesion a distinct id 1..N) while the net is a
+            # binary bg/lesion head. For a 2-class head collapse every positive id to foreground
+            # (semantically correct: class_locations is already keyed by label 1); otherwise just
+            # drop the -1 crop marker. Both keep the Dice one-hot scatter / CE indexing in bounds
+            # and are a no-op for data already stored as {0,1}.
+            if net_output.shape[1] == 2:
+                target = (target > 0).to(target.dtype)
+            else:
+                target = target.clamp_min(0)
             target_dice = target
             mask = None
         dc_loss = self.dc(net_output, target_dice, loss_mask=mask) if self.weight_dice != 0 else 0
