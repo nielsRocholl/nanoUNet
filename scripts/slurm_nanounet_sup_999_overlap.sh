@@ -1,14 +1,9 @@
 #!/bin/bash
-# Supervised resume with IO/aug overlap pipeline (bucket l, thread pin, mem-diag).
+# Supervised resume with IO/aug overlap pipeline (bucket l, thread pin).
 #
 # Validation gate (run once before full 2000-epoch commit):
 #   1. Submit this script; stop after ~20 epochs or set SUP_EPOCHS=$((EPOCH_RESUME+20)).
-#   2. Check OUT/mem_diag.jsonl epochs 5-20:
-#      - cgroup_shmem_delta_bytes mean <= 20 MB/ep (if > 50 MB/ep, switch --dl-bucket m)
-#      - cgroup_file_delta_bytes mean <= 150 MB/ep
-#      - fadvise_calls strictly increasing
-#      - epoch_wall_time_sec (W&B) <= 320 s
-#      - mem_diag_worker_*.jsonl: opens_per_epoch ~= patches_per_epoch ~= n_here
+#   2. Check epoch_wall_time_sec (W&B) <= 320 s over epochs 5-20.
 #   3. If gate passes, re-submit with SUP_EPOCHS=2000 for the long run.
 
 #SBATCH --qos=vram
@@ -88,7 +83,6 @@ if ! nanounet_train \
   --dl-persistent-workers \
   --accelerator cuda \
   --precision 16-mixed \
-  --mem-diag \
   --resume "$SUP_CKP"; then
   rm -rf "$LOCAL_PREP/${DS_FOLDER}"
   exit 1

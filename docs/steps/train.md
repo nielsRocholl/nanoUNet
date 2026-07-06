@@ -14,7 +14,7 @@ Integrated MAE then supervised:
 
 ```bash
 nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/default.json \
-  --mae-pretrain --dl-persistent-workers --mem-diag
+  --mae-pretrain --dl-persistent-workers
 ```
 
 ## Arguments
@@ -62,7 +62,6 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/defau
 | `--mae-iters-per-epoch` | int | same as train | MAE batches per epoch |
 | `--dl-bucket` | choice | `m` | DataLoader worker preset: `s` / `m` / `l` / `xl` |
 | `--dl-persistent-workers` | flag | off | Keep workers between epochs |
-| `--mem-diag` | flag | off | Log RAM to `<run>/mem_diag.jsonl` and W&B `mem/*` |
 
 Checkpoints: `<run>/checkpoints/` (supervised); `<run>/mae_pretrain/checkpoints/` (integrated MAE). Finetune with `--init-weights` writes to `<run>/finetune/`.
 
@@ -74,7 +73,7 @@ Use `--loss dc_ce` for normal long supervised training. `--loss cc_dc_ce` runs C
 
 Long MAE runs were killed by cgroup OOM from **checkpoint temp files on RAM-backed `/tmp`**, not GPU or Python heap.
 
-**Recommended for long MAE:** set `NANOUNET_TMPDIR` to local disk (not tmpfs/CIFS), use `--dl-bucket m` or `l` with workers, and `--dl-persistent-workers`. Monitor with `--mem-diag`. Escape hatch: `NANOUNET_DL_FORCE_NO_WORKERS=1` forces `num_workers=0`.
+**Recommended for long MAE:** set `NANOUNET_TMPDIR` to local disk (not tmpfs/CIFS), use `--dl-bucket m` or `l` with workers, and `--dl-persistent-workers`. Escape hatch: `NANOUNET_DL_FORCE_NO_WORKERS=1` forces `num_workers=0`.
 
 Full write-up: [dev-notes/cgroup_memory.md](../dev-notes/cgroup_memory.md).
 

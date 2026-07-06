@@ -67,7 +67,6 @@ fi
 
 # Fresh supervised run, keeping mae_pretrain/.
 rm -rf "${OUT}/checkpoints"
-rm -f "${OUT}/mem_diag.jsonl"
 
 echo "MAE ckpt: $MAE_CKP"
 echo "batch_size in plans: $(python3 -c "import json; print(json.load(open('${LOCAL_PREP}/${DS_FOLDER}/${PLANS_NAME}.json'))['configurations']['3d_fullres']['batch_size'])")"

@@ -14,7 +14,7 @@ Long run with stable workers:
 
 ```bash
 nanounet_pretrain -d 001 -f 0 --plans nnUNetResEncUNetLPlans \
-  --dl-bucket m --dl-persistent-workers --mem-diag
+  --dl-bucket m --dl-persistent-workers
 ```
 
 ## Arguments
@@ -44,7 +44,6 @@ nanounet_pretrain -d 001 -f 0 --plans nnUNetResEncUNetLPlans \
 | `--resume` | str | none | MAE Lightning checkpoint; must exist; epoch target must match `--epochs` |
 | `--precision` | str | `16-mixed` | Lightning precision (e.g. `32-true`) |
 | `--accelerator` | choice | `auto` | `auto` \| `cpu` \| `cuda` \| `gpu` \| `mps` |
-| `--mem-diag` | flag | off | Log cgroup/process RAM to `<out>/mem_diag.jsonl` |
 
 ## Inputs / outputs
 

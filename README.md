@@ -17,7 +17,6 @@ export NANOUNET_RESULTS="/path/to/NanoUNet_results"
 
 # Host-RAM / checkpoint staging (see docs/dev-notes/cgroup_memory.md)
 export NANOUNET_TMPDIR=/root/.cache/nanounet_tmp
-export NANOUNET_ALLOW_ROOT_CGROUP=1   # only if using --mem-diag on interactive node
 ```
 
 Quote paths that contain spaces.
