@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from functools import partial
 from typing import List
 
 import numpy as np
@@ -17,7 +16,6 @@ from nanounet.config import load_config
 from nanounet.data import augment
 from nanounet.data.blosc2_dataset import Blosc2Folder
 from nanounet.dataloader_prefs import DataloaderBucket, build_iter_dataloader, init_dataloader_ipc
-from nanounet.mem_diag import mem_diag_enabled
 from nanounet.plan.plans import Plans
 from nanounet.plan.splits import fold_keys, fold_seed, load_or_create_splits
 from nanounet.train.patch_iterable import PatchIterable, collate_patches, worker_init
@@ -62,7 +60,6 @@ class NanoDataModule(pl.LightningDataModule):
         oversample_foreground: float = 0.33,
         enable_deep_supervision: bool = True,
         pin_memory: bool | None = None,
-        mem_diag_dir: str | None = None,
         persistent_workers: bool = False,
         only_prefix: str | None = None,
         longi: bool = False,
@@ -87,7 +84,6 @@ class NanoDataModule(pl.LightningDataModule):
         self.num_val_iterations = num_val_iterations
         self.oversample_foreground = oversample_foreground
         self.enable_ds = enable_deep_supervision
-        self.mem_diag_dir = mem_diag_dir
         self.persistent_workers = persistent_workers
         self.only_prefix = only_prefix
         self.longi = longi
@@ -146,13 +142,12 @@ class NanoDataModule(pl.LightningDataModule):
             self.num_iterations_per_epoch,
             self.batch_size,
             fold_seed(self.fold) + 1000 * self.num_iterations_per_epoch,
-            self.mem_diag_dir,
             self.longi,
             self.longi_null,
         )
         b = self.dl_bucket
         nw = b.nw_train
-        winit = partial(worker_init, out_dir=self.mem_diag_dir or ".") if nw else None
+        winit = worker_init if nw else None
         return build_iter_dataloader(
             it,
             batch_size=self.batch_size,
@@ -179,13 +174,12 @@ class NanoDataModule(pl.LightningDataModule):
             self.num_val_iterations,
             self.batch_size,
             fold_seed(self.fold) + 2000,
-            self.mem_diag_dir,
             self.longi,
             self.longi_null,
         )
         b = self.dl_bucket
         nw = b.nw_val
-        winit = partial(worker_init, out_dir=self.mem_diag_dir or ".") if nw else None
+        winit = worker_init if nw else None
         return build_iter_dataloader(
             it,
             batch_size=self.batch_size,

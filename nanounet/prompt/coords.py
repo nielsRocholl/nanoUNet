@@ -107,7 +107,11 @@ def load_points_xyz(json_path: str) -> list[tuple[float, float, float]]:
     Missing file or 'points' not a list -> raise (R12: no silent fallback).
     """
     if not os.path.isfile(json_path):
-        raise FileNotFoundError(json_path)
+        raise FileNotFoundError(
+            f"Points JSON not found: {json_path}\n"
+            f"Each case needs a sibling <case>.json with a 'points' list (voxel x,y,z).\n"
+            f"Fix: provide --points <file>.json (single) or place <case>.json beside each scan. See docs/steps/predict.md"
+        )
     with open(json_path, encoding="utf-8") as f:
         data = json.load(f)
     pts = data.get("points")

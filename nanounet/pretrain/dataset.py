@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader, IterableDataset
 from nanounet.common import preprocessed_dir, print0, raw_dir
 from nanounet.dataloader_prefs import DataloaderBucket, build_iter_dataloader, init_dataloader_ipc
 from nanounet.data.blosc2_dataset import Blosc2Folder, case_spatial_shape
-from nanounet.mem_diag import (
+from nanounet.diag import (
     log_snapshot,
     mem_diag_enabled,
     worker_diag_init,

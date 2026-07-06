@@ -6,10 +6,10 @@ This note ties together what the **patch size** knobs in nanoUNet do, what the l
 
 - Training patch spatial extent gates **effective field-of-view** seen per gradient step, together with anatomy context for large structures.
 - It trades off against **batch size**, **VRAM**, and residual **spatial resolution** (how many pooling stages you tolerate before bottleneck).
-- In nanoUNet you influence this through preprocessor flags documented in the main [README](../README.md):
+- In nanoUNet you influence this through preprocessor flags documented in [preprocess](../steps/preprocess.md) and [plan](../steps/plan.md):
   - `--patch-vol small|medium|large|xlarge` — starting isotropic edge before the VRAM shrink loop.
   - `--gpu-memory-gb` — VRAM budget the planner targets (use the **GPU you train on**, not a random CPU node).
-- The ResEnc planner implementation is in [`nanounet/plan/planner_resenc.py`](../nanounet/plan/planner_resenc.py): it may **shrink** the patch further if footprint × network width exceeds VRAM **or** enlarge if memory allows starting from `--patch-vol`.
+- The ResEnc planner implementation is in [`planner_resenc.py`](../../nanounet/plan/resenc/planner_resenc.py): it may **shrink** the patch further if footprint × network width exceeds VRAM **or** enlarge if memory allows starting from `--patch-vol`.
 - Inference **sliding-window** spacing (`tile_step_size` in `configs/default.json`) interacts with patch size — smaller footprints mean more sliding tiles and higher compute cost for the same overlap policy.
 
 Empirically patch size couples **everything**: "larger everywhere" rarely holds; you optimise the quadruple (FOV × memory × batch × pyramid depth).
@@ -44,7 +44,7 @@ Prioritise empirical measurement over doctrine:
 2. If **p95** fits inside planner patch extents with comfortably **≥ ~20 % axial margin**, a **single-stage** `--patch-vol large` (256³-ish start) backbone is reasonable when VRAM permits — it aligns with classical nnU-Net defaults and keeps large tumour context sane.
 3. If **mega lesions** truncate across many cases even after raising `--gpu-memory-gb`: either **train a second specialised model** on larger footprints (`xlarge` starter + maximal VRAM) or split workflow (whole-tumour model vs nodular refinement). Ensemble or cascade by lesion bounding-box volume inferred from prompts.
 4. If the cohort is dominated by **sub-centimetre** metastases/micro bleeds/etc., freeing memory via `--patch-vol medium` (192³-ish) frequently improves **effective batch size**, stabilising gradients from auxiliary objectives like CC-DiceCE without sacrificing lesion-centred coverage.
-5. Never assume `--patch-vol small` nails a literal small patch blindly — presets only initialise the shrink loop; finalisation still obeys [`planner_resenc.py`](../nanounet/plan/planner_resenc.py) feasibility checks.
+5. Never assume `--patch-vol small` nails a literal small patch blindly — presets only initialise the shrink loop; finalisation still obeys [`planner_resenc.py`](../../nanounet/plan/resenc/planner_resenc.py) feasibility checks.
 6. Compare runs using tracked validation metric (`val_dice`) alongside qualitative mega-lesion scans before locking production footprints.
 
 Universal lesion segmentation seldom has one magic patch; expect **dual-scale thinking** unless your dataset concentrates in one tumour size bracket.

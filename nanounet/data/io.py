@@ -126,4 +126,8 @@ def reader_writer_class_from_dataset(dataset_json: dict, example_file: str | Non
         except Exception:
             if verbose:
                 traceback.print_exc()
-    raise RuntimeError(f"no reader for {fe} {example_file}")
+    raise RuntimeError(
+        f"No image reader for file ending {fe!r} (example: {example_file}).\n"
+        f"nanoUNet reads NIfTI (.nii.gz) and the readers registered in data/io.py.\n"
+        f"Fix: convert inputs to .nii.gz, or set dataset.json 'file_ending' to a supported type. See docs/steps/preprocess.md"
+    )

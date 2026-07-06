@@ -1,4 +1,4 @@
-"""NANOUNET_* path env, Rich rank-0 UI (`print0`, headers, progress), logging.
+"""NANOUNET_* path env, Rich rank-0 UI (`cprint`, headers, `config_table`, progress), logging.
 
 `quiet_lightning_runtime`: call once before importing pytorch_lightning — warning filters,
 rank_zero_info shim (litlogger noise), CUDA matmul precision high.
@@ -86,13 +86,21 @@ def resolve_user_config_path(path_str: str) -> str:
     p = Path(path_str).expanduser()
     if p.is_absolute():
         if not p.is_file():
-            raise FileNotFoundError(path_str)
+            raise FileNotFoundError(
+                f"Config file not found: {path_str}\n"
+                f"Looked as absolute, then under cwd and the nanoUNet repo root.\n"
+                f"Fix: pass --config configs/default.json (or an absolute path). See docs/reference/config.md"
+            )
         return str(p.resolve())
     for base in (Path.cwd(), _REPO_ROOT):
         cand = (base / p).resolve()
         if cand.is_file():
             return str(cand)
-    raise FileNotFoundError(path_str)
+    raise FileNotFoundError(
+        f"Config file not found: {path_str}\n"
+        f"Looked as absolute, then under cwd and the nanoUNet repo root.\n"
+        f"Fix: pass --config configs/default.json (or an absolute path). See docs/reference/config.md"
+    )
 
 
 def _rank0() -> bool:
@@ -102,7 +110,11 @@ def _rank0() -> bool:
 def _env_path(name: str) -> str:
     d = os.environ.get(name)
     if not d:
-        raise EnvironmentError(f"Set {name}")
+        raise EnvironmentError(
+            f"Required environment variable {name} is not set.\n"
+            f"nanoUNet resolves dataset paths from {name}.\n"
+            f"Fix: export {name}=/path/to/{name.replace('NANOUNET_','').lower()}   (see docs/index.md)"
+        )
     return d
 
 
@@ -134,6 +146,21 @@ def nano_rule() -> None:
 def nano_header(title: str, color: str = "cyan") -> None:
     if _rank0():
         _CONSOLE.print(Panel(f"[bold {color}]{title}[/bold {color}]", border_style=color))
+
+
+def config_table(rows: list[tuple[str, Any, str]], title: str = "config") -> None:
+    """Render resolved config as a rich Table: (argument, value, source: cli/config/default)."""
+    if not _rank0():
+        return
+    from rich.table import Table
+
+    t = Table(title=title, box=None, padding=(0, 2))
+    t.add_column("argument", style="cyan")
+    t.add_column("value")
+    t.add_column("source", style="dim")
+    for name, value, source in rows:
+        t.add_row(str(name), str(value), source)
+    _CONSOLE.print(t)
 
 
 @contextmanager

@@ -18,13 +18,11 @@ import glob
 import os
 import shutil
 
+from rich.table import Table
+
+from nanounet.common import cprint, nano_header
 from nanounet.register.landmarks import read_pairs
 from nanounet.register.output import write_points
-
-ap = argparse.ArgumentParser(description="Repair FU/meta sidecars for cases whose BL registration already succeeded")
-ap.add_argument("--data-root", required=True)
-ap.add_argument("--out", required=True)
-args = ap.parse_args()
 
 
 def _paths(out: str, stem: str, pid: str) -> dict[str, str]:
@@ -77,13 +75,30 @@ def _repair_case(data_root: str, out: str, pid: str, idx: str) -> str:
     return "repaired" if all(os.path.isfile(v) for v in p.values()) else "still_incomplete"
 
 
-counts: dict[str, int] = {}
-for bl in sorted(glob.glob(os.path.join(args.out, "inputsTrBL", "*.nii.gz"))):
-    stem = os.path.basename(bl)[: -len(".nii.gz")]
-    pid, idx = stem.rsplit("_", 1)
-    status = _repair_case(args.data_root, args.out, pid, idx)
-    counts[status] = counts.get(status, 0) + 1
-    if status not in ("complete", "repaired"):
-        print(f"{stem}\t{status}")
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Repair FU/meta sidecars for cases whose BL registration already succeeded")
+    ap.add_argument("--data-root", required=True)
+    ap.add_argument("--out", required=True)
+    args = ap.parse_args()
 
-print(counts)
+    nano_header("nanoUNet repair-longi-fu", color="yellow")
+
+    counts: dict[str, int] = {}
+    for bl in sorted(glob.glob(os.path.join(args.out, "inputsTrBL", "*.nii.gz"))):
+        stem = os.path.basename(bl)[: -len(".nii.gz")]
+        pid, idx = stem.rsplit("_", 1)
+        status = _repair_case(args.data_root, args.out, pid, idx)
+        counts[status] = counts.get(status, 0) + 1
+        if status not in ("complete", "repaired"):
+            cprint(f"[red]{stem}[/red]\t{status}")
+
+    t = Table(title="repair summary", box=None, padding=(0, 2))
+    t.add_column("status", style="cyan")
+    t.add_column("count", justify="right")
+    for k, v in sorted(counts.items()):
+        t.add_row(k, str(v))
+    cprint(t)
+
+
+if __name__ == "__main__":
+    main()

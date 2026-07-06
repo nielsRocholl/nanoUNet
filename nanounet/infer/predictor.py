@@ -44,4 +44,8 @@ def pick_checkpoint(model_dir: str, ckpt: str | None) -> str:
     fin = join(model_dir, "finetune", "last.ckpt")
     if os.path.isfile(fin):
         return fin
-    raise FileNotFoundError(f"no checkpoint in {cdir} or finetune/")
+    raise FileNotFoundError(
+        f"No checkpoint found in {cdir} or {cdir}/finetune/.\n"
+        f"nanounet_predict needs a Lightning .ckpt from a completed train run.\n"
+        f"Fix: pass --ckpt <name>.ckpt, or point -m at a run dir containing checkpoints/. See docs/steps/predict.md"
+    )

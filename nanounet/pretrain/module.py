@@ -10,7 +10,7 @@ import torch
 from batchgenerators.utilities.file_and_folder_operations import load_json
 from torch import autocast
 
-from nanounet.mem_diag import (
+from nanounet.diag import (
     cgroup_epoch_deltas,
     cgroup_mem_bytes,
     log_snapshot,

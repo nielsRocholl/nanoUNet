@@ -37,7 +37,7 @@ from nanounet.lightning_ckpt import (
 )
 from nanounet.plan.dataset_id import convert_id_to_dataset_name
 from nanounet.plan.splits import fold_seed, parse_fold
-from nanounet.mem_diag import mem_diag_enabled, set_mem_diag
+from nanounet.diag import mem_diag_enabled, set_mem_diag
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
 from nanounet.pretrain.module import NanoMAELM
 from nanounet.runtime import assert_mem_diag_cgroup, runtime_banner

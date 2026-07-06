@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 from typing import Any
 
-from nanounet.mem_diag import cgroup_scope, log_snapshot, mem_diag_enabled, purge_torch_tmp, tmp_fs_type
+from nanounet.common import cprint
+from nanounet.diag import cgroup_scope, purge_torch_tmp, tmp_fs_type
 
 
 def _is_tmpfs(path: str) -> bool:
@@ -103,7 +103,7 @@ def _git_head() -> str | None:
     return None
 
 
-def runtime_banner(out_dir: str | None = None) -> dict[str, Any]:
+def runtime_banner() -> dict[str, Any]:
     import nanounet
 
     tmp = os.environ.get("TMPDIR", "")
@@ -118,30 +118,14 @@ def runtime_banner(out_dir: str | None = None) -> dict[str, Any]:
     n = purge_torch_tmp()
     if n:
         row["purged_tmp_files"] = n
-    if mem_diag_enabled() and out_dir:
-        log_snapshot("runtime_banner", out_dir, extra=row)
     home = os.environ.get("HOME", "")
     if home and tmp.startswith(home):
-        print(
-            f"[nanounet] WARNING: TMPDIR under $HOME ({tmp}) — checkpoint staging needs ~800MB free; "
-            "prefer NANOUNET_TMPDIR=/data/.nanounet_tmp",
-            file=sys.stderr,
+        cprint(
+            f"[yellow]WARNING: TMPDIR under $HOME ({tmp}) — checkpoint staging needs ~800MB free; "
+            "prefer NANOUNET_TMPDIR=/data/.nanounet_tmp[/yellow]"
         )
-    print(
-        f"[nanounet] tmpdir={tmp} fs={row['tmpdir_fs']} cgroup={row['cgroup_scope']} "
-        f"git={row['git_head'] or '?'}",
-        file=sys.stderr,
+    cprint(
+        f"[dim][nanounet] tmpdir={tmp} fs={row['tmpdir_fs']} cgroup={row['cgroup_scope']} "
+        f"git={row['git_head'] or '?'}[/dim]"
     )
     return row
-
-
-def assert_mem_diag_cgroup() -> None:
-    if not mem_diag_enabled():
-        return
-    if os.environ.get("NANOUNET_ALLOW_ROOT_CGROUP", "").strip() in ("1", "true", "yes"):
-        return
-    if cgroup_scope() == "root" and not os.environ.get("SLURM_JOB_ID"):
-        raise RuntimeError(
-            "mem-diag on root cgroup (0::/) measures node-wide RAM, not this process. "
-            "Submit via Slurm or set NANOUNET_ALLOW_ROOT_CGROUP=1 to override."
-        )

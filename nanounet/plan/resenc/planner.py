@@ -14,8 +14,8 @@ from nanounet.data.io import reader_writer_class_from_dataset
 from nanounet.data.normalization import normalization_class_for_channel
 from nanounet.data.resampling import compute_new_shape
 from nanounet.plan.dataset_id import convert_id_to_dataset_name, get_filenames_of_train_images_and_targets
-from nanounet.plan.json_export import recursive_fix_for_json_export
-from nanounet.plan.planner_resenc import PRESETS, resenc_3d_fullres_plan
+from nanounet.plan.dataset_id import recursive_fix_for_json_export
+from nanounet.plan.resenc.planner_resenc import PRESETS, resenc_3d_fullres_plan
 
 
 def _maybe_copy_splits(raw_folder: str, pre_folder: str) -> None:
@@ -98,12 +98,20 @@ def run_plan(
     rf = join(raw_dir(), dn)
     pf = join(preprocessed_dir(), dn)
     if not isfile(join(pf, "dataset_fingerprint.json")):
-        raise RuntimeError("fingerprint missing; run fingerprint step first")
+        raise RuntimeError(
+            f"No dataset fingerprint for this dataset.\n"
+            f"The plan step reads dataset_fingerprint.json produced by fingerprinting.\n"
+            f"Fix: run nanounet_preprocess -d <id> without --skip-fingerprint   (see docs/steps/preprocess.md)"
+        )
     dj = load_json(join(rf, "dataset.json"))
     fp = load_json(join(pf, "dataset_fingerprint.json"))
     preset = PRESETS.get(planner_class_name)
     if preset is None:
-        raise RuntimeError(f"unknown planner {planner_class_name!r}; use one of {sorted(PRESETS)}")
+        raise RuntimeError(
+            f"Unknown planner {planner_class_name!r}.\n"
+            f"Choose one of: {sorted(PRESETS)}.\n"
+            f"Fix: nanounet_preprocess -d <id> --planner nnUNetPlannerResEncL   (see docs/steps/plan.md)"
+        )
     ident = plans_name_override or preset.plans_identifier
     if plans_name_override:
         preset = replace(preset, plans_identifier=ident)

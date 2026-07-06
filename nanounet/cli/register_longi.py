@@ -23,16 +23,13 @@ import sys
 import time
 
 import itk
-from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 
+from nanounet.common import _CONSOLE, cprint, nano_header
 from nanounet.register.output import qc_png, write_dataset
 from nanounet.register.resources import apply_threads, resolve_threads
 from nanounet.register.warp_case import warp_case
-
-# bind to the live stderr so the progress bar survives the _quiet_stderr redirect below
-_CONSOLE = Console(file=sys.stderr)
 
 
 @contextlib.contextmanager
@@ -101,54 +98,61 @@ def _results_table(rows: list[tuple[str, str, str]]) -> Table:
     return t
 
 
-ap = argparse.ArgumentParser(description="Warp BL→FU frame (itk-elastix) for one or many longitudinal pairs")
-ap.add_argument("--data-root", required=True)
-ap.add_argument("--out", required=True)
-ap.add_argument("--pid", help="single case: patient id (with --idx)")
-ap.add_argument("--idx", help="single case: timepoint index (with --pid)")
-ap.add_argument("--sample", type=int, help="process N random BL/FU pairs")
-ap.add_argument("--all", action="store_true", help="process every BL/FU pair")
-ap.add_argument("--seed", type=int, default=0, help="rng seed for --sample")
-ap.add_argument("--qc", action="store_true", help="write axial QC montage PNG")
-ap.add_argument("--no-body-mask", action="store_true", help="disable body-masked metric")
-ap.add_argument("--no-refine", action="store_true", help="disable per-lesion VOI refinement")
-ap.add_argument("--threads", default="auto", help="ITK threads: auto, all, integer, or NANOUNET_REG_THREADS env")
-ap.add_argument("--verbose", action="store_true", help="show elastix/transformix console log")
-args = ap.parse_args()
-assert (args.pid and args.idx) or args.sample or args.all, "pass --pid/--idx, --sample N, or --all"
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Warp BL→FU frame (itk-elastix) for one or many longitudinal pairs")
+    ap.add_argument("--data-root", required=True)
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--pid", help="single case: patient id (with --idx)")
+    ap.add_argument("--idx", help="single case: timepoint index (with --pid)")
+    ap.add_argument("--sample", type=int, help="process N random BL/FU pairs")
+    ap.add_argument("--all", action="store_true", help="process every BL/FU pair")
+    ap.add_argument("--seed", type=int, default=0, help="rng seed for --sample")
+    ap.add_argument("--qc", action="store_true", help="write axial QC montage PNG")
+    ap.add_argument("--no-body-mask", action="store_true", help="disable body-masked metric")
+    ap.add_argument("--no-refine", action="store_true", help="disable per-lesion VOI refinement")
+    ap.add_argument("--threads", default="auto", help="ITK threads: auto, all, integer, or NANOUNET_REG_THREADS env")
+    ap.add_argument("--verbose", action="store_true", help="show elastix/transformix console log")
+    args = ap.parse_args()
+    assert (args.pid and args.idx) or args.sample or args.all, "pass --pid/--idx, --sample N, or --all"
 
-threads = apply_threads(resolve_threads(args.threads))
-cases = _select_cases(args)
-os.makedirs(args.out, exist_ok=True)
-rows: list[tuple[str, str, str]] = []
+    nano_header("nanoUNet register-longi", color="magenta")
 
-with _quiet_stderr(args.verbose), Progress(
-    SpinnerColumn(),
-    TextColumn("[progress.description]{task.description}"),
-    BarColumn(bar_width=32),
-    TaskProgressColumn(),
-    TimeElapsedColumn(),
-    console=_CONSOLE,
-) as prog:
-    task = prog.add_task("cases", total=len(cases))
-    for pid, idx in cases:
-        case_id = f"{pid}_{idx}"
+    threads = apply_threads(resolve_threads(args.threads))
+    cases = _select_cases(args)
+    os.makedirs(args.out, exist_ok=True)
+    rows: list[tuple[str, str, str]] = []
 
-        def on_step(name: str) -> None:
-            prog.update(task, description=f"{case_id}  {name}")
+    with _quiet_stderr(args.verbose), Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(bar_width=32),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+        console=_CONSOLE,
+    ) as prog:
+        task = prog.add_task("cases", total=len(cases))
+        for pid, idx in cases:
+            case_id = f"{pid}_{idx}"
 
-        t0 = time.monotonic()
-        try:
-            n_clicks, warped_vox, _ = _process(args, pid, idx, threads, on_step)
-        except (AssertionError, RuntimeError) as e:
-            rows.append((case_id, "skip", str(e).splitlines()[-1][:120]))
-        else:
-            dt = time.monotonic() - t0
-            rows.append((case_id, "ok", f"{n_clicks} clicks, {warped_vox:,} vox, {dt:.1f}s"))
-        prog.advance(task)
+            def on_step(name: str) -> None:
+                prog.update(task, description=f"{case_id}  {name}")
 
-_CONSOLE.print(_results_table(rows))
-n_skip = sum(1 for _, s, _ in rows if s != "ok")
-if n_skip:
-    _CONSOLE.print(f"[red]{n_skip}/{len(rows)} case(s) skipped[/red]")
-    sys.exit(1)
+            t0 = time.monotonic()
+            try:
+                n_clicks, warped_vox, _ = _process(args, pid, idx, threads, on_step)
+            except (AssertionError, RuntimeError) as e:
+                rows.append((case_id, "skip", str(e).splitlines()[-1][:120]))
+            else:
+                dt = time.monotonic() - t0
+                rows.append((case_id, "ok", f"{n_clicks} clicks, {warped_vox:,} vox, {dt:.1f}s"))
+            prog.advance(task)
+
+    cprint(_results_table(rows))
+    n_skip = sum(1 for _, s, _ in rows if s != "ok")
+    if n_skip:
+        cprint(f"[red]{n_skip}/{len(rows)} case(s) skipped[/red]")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

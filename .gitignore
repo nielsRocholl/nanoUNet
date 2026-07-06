@@ -68,5 +68,7 @@ Thumbs.db
 # NanoUNet_results/
 
 wandb/
+graphify-out/
+_attic/
 arXiv-2605.23118v1/
 scripts/arXiv-2605.23118v1/

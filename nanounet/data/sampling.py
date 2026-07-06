@@ -9,9 +9,7 @@ from acvl_utils.cropping_and_padding.bounding_boxes import crop_and_pad_nd
 from scipy.spatial import cKDTree
 
 from nanounet.config import RoiPromptConfig
-from nanounet.prompt.centroids import filter_centroids_in_patch
-from nanounet.prompt.encoding import encode_points_to_heatmap_pair
-from nanounet.prompt.propagation import apply_propagation_offset
+from nanounet.prompt.centroids import apply_propagation_offset, filter_centroids_in_patch
 
 
 def _lbs_ubs(

@@ -16,8 +16,7 @@ import torch.nn as nn
 from scipy.ndimage import distance_transform_edt
 
 from nanounet.model.dice_helpers import get_tp_fp_fn_tn, softmax_helper_dim1
-from nanounet.model.losses import DC_and_CE_loss
-from nanounet.model.robust_ce import RobustCrossEntropyLoss
+from nanounet.model.losses import DC_and_CE_loss, RobustCrossEntropyLoss
 
 
 def _cc_voronoi(seg_bin: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
