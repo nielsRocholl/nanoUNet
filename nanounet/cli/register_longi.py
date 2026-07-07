@@ -1,4 +1,4 @@
-"""Warp BL/FU pairs into the FU frame (itk-elastix) and write a mini dataset + optional QC.
+"""Warp BL/FU pairs into the FU frame (itk-elastix or uniGradICON) and write a mini dataset + QC.
 
   # one pair
   python -m nanounet.cli.register_longi --data-root <DIR> --out <DIR> --pid 006f52e910 --idx 00 --qc
@@ -6,9 +6,11 @@
   python -m nanounet.cli.register_longi --data-root <DIR> --out <DIR> --sample 5 --qc
   # every pair
   python -m nanounet.cli.register_longi --data-root <DIR> --out <DIR> --all --qc
+  # deep-learning backend with native instance optimization
+  python -m nanounet.cli.register_longi --data-root <DIR> --out <DIR> --all --backend unigradicon --io-iterations 50
 
 Per case writes inputsTrBL/targetsTrBL (warped BL CT/mask + clicks in FU frame) plus copied FU + meta.
-Cases that cannot register (missing BL, elastix failure, all lesions vanished) are skipped with a
+Cases that cannot register (missing BL, registration failure, all lesions vanished) are skipped with a
 reason and do not abort the batch; exit code is nonzero if any case skipped.
 """
 
@@ -23,12 +25,14 @@ import sys
 import time
 
 import itk
+import torch
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 
-from nanounet.common import _CONSOLE, cprint, nano_header
+from nanounet.common import _CONSOLE, config_table, cprint, nano_header
 from nanounet.register.output import qc_png, write_dataset
 from nanounet.register.resources import apply_threads, resolve_threads
+from nanounet.register.unigradicon import get_model
 from nanounet.register.warp_case import warp_case
 
 
@@ -68,6 +72,8 @@ def _process(args, pid: str, idx: str, threads: int, on_step) -> tuple[int, int,
         threads=threads,
         verbose=args.verbose,
         on_step=on_step,
+        backend=args.backend,
+        io_iterations=args.io_iterations,
     )
     on_step("write")
     paths = write_dataset(args.out, args.data_root, pid, idx, res)
@@ -112,10 +118,37 @@ def main() -> None:
     ap.add_argument("--no-refine", action="store_true", help="disable per-lesion VOI refinement")
     ap.add_argument("--threads", default="auto", help="ITK threads: auto, all, integer, or NANOUNET_REG_THREADS env")
     ap.add_argument("--verbose", action="store_true", help="show elastix/transformix console log")
+    ap.add_argument("--backend", choices=["elastix", "unigradicon"], default="elastix",
+                     help="registration backend (default elastix)")
+    ap.add_argument("--io-iterations", type=int, default=50,
+                     help="uniGradICON native instance-optimization steps (0 disables); ignored for elastix backend")
     args = ap.parse_args()
     assert (args.pid and args.idx) or args.sample or args.all, "pass --pid/--idx, --sample N, or --all"
 
     nano_header("nanoUNet register-longi", color="magenta")
+
+    if args.backend == "unigradicon":
+        if args.io_iterations > 0 and not torch.cuda.is_available():
+            cprint(
+                f"[yellow]--io-iterations {args.io_iterations} on CPU: uniGradICON's native IO runs "
+                f"{args.io_iterations} backward passes through a 3D UNet at 175^3 per case and will be slow.\n"
+                "Consider --io-iterations 0 or running on a GPU node.[/yellow]"
+            )
+        try:
+            get_model()  # load net + weights now so package/download failures surface at startup
+        except (ImportError, FileNotFoundError) as e:
+            cprint(f"[red]{e}[/red]")
+            sys.exit(1)
+
+    config_table(
+        [
+            ("backend", args.backend, "cli/default"),
+            ("io_iterations", args.io_iterations if args.backend == "unigradicon" else "n/a", "cli/default"),
+            ("device", "cuda" if torch.cuda.is_available() else "cpu", "auto"),
+            ("refine", "off" if args.no_refine or args.backend == "unigradicon" else "on", "derived"),
+        ],
+        title="nanoUNet register-longi",
+    )
 
     threads = apply_threads(resolve_threads(args.threads))
     cases = _select_cases(args)
