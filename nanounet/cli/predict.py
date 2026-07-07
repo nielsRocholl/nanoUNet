@@ -58,13 +58,21 @@ def _patient_ids_from_csv(path: str) -> set[str]:
 
 
 def _preprocess_case(scan: str, json_path: str, pl, cm, dj, bl_scan: str | None = None, bl_json: str | None = None):
+    # FU and (when present) BL preprocessing (`run_case`, mostly resampling) are independent and
+    # each cost ~30s wall time; running them concurrently roughly halves this per-case cost since
+    # the underlying numpy/SimpleITK work releases the GIL.
+    bl_future = None
+    if bl_scan is not None:
+        bl_future = ThreadPoolExecutor(max_workers=1).submit(run_case, [bl_scan], None, pl, cm, dj, verbose=False)
+
     data, _seg, props = run_case([scan], None, pl, cm, dj, verbose=False)
     data_t = torch.from_numpy(data).float()
     pad, slicer_revert = pad_nd_image(data_t, tuple(cm.patch_size), "constant", {"value": 0}, True, None)
     points = load_points_xyz(json_path)
+
     bl_pack = None
-    if bl_scan is not None:
-        bl_data, _bl_seg, bl_props = run_case([bl_scan], None, pl, cm, dj, verbose=False)
+    if bl_future is not None:
+        bl_data, _bl_seg, bl_props = bl_future.result()
         bl_t = torch.from_numpy(bl_data).float()
         pad_bl, bl_slicer = pad_nd_image(bl_t, tuple(cm.patch_size), "constant", {"value": 0}, True, None)
         bl_pts = _load_bl_points(bl_json) if bl_json else [None] * len(points)
@@ -82,6 +90,10 @@ def main() -> None:
     ap.add_argument("--points", default=None, help="points JSON (single mode)")
     ap.add_argument("--baseline-image", default=None, help="sibling BL .nii.gz for two-stream longi inference")
     ap.add_argument("--baseline-points", default=None, help="BL partner points JSON, parallel to --points")
+    ap.add_argument("--baseline-image-dir", default=None,
+                    help="folder mode: per-case BL .nii.gz, looked up by case id (same stem as -i)")
+    ap.add_argument("--baseline-points-dir", default=None,
+                    help="folder mode: per-case BL partner points JSON, looked up by case id")
     ap.add_argument("--longi", action="store_true", help="force two-stream net build (else auto-detect from ckpt)")
     ap.add_argument("--no-prompt-encode", action="store_true")
     ap.add_argument("--border-expand", action="store_true")
@@ -115,6 +127,12 @@ def main() -> None:
         raise SystemExit("--baseline-points requires --baseline-image")
     if args.baseline_image and not args.baseline_points:
         raise SystemExit("--baseline-image requires --baseline-points")
+    if args.baseline_points_dir and not args.baseline_image_dir:
+        raise SystemExit("--baseline-points-dir requires --baseline-image-dir")
+    if args.baseline_image_dir and not args.baseline_points_dir:
+        raise SystemExit("--baseline-image-dir requires --baseline-points-dir")
+    if args.baseline_image_dir and args.baseline_image:
+        raise SystemExit("use either --baseline-image or --baseline-image-dir, not both")
 
     d = args.device
     if d == "cuda" and not torch.cuda.is_available():
@@ -186,14 +204,23 @@ def main() -> None:
     def consume(idx: int, case_id: str, out_trunc: str, pack) -> None:
         gpu_export(case_id, idx, out_trunc, pack)
 
-    bl_scan = args.baseline_image
-    bl_json = args.baseline_points
+    def bl_paths_for(cid: str) -> tuple[str | None, str | None]:
+        if args.baseline_image_dir:
+            bl_scan = join(args.baseline_image_dir, cid + end)
+            bl_json = join(args.baseline_points_dir, cid + ".json")
+            if not os.path.isfile(bl_scan):
+                raise FileNotFoundError(f"--baseline-image-dir missing case: {bl_scan}")
+            if not os.path.isfile(bl_json):
+                raise FileNotFoundError(f"--baseline-points-dir missing case: {bl_json}")
+            return bl_scan, bl_json
+        return args.baseline_image, args.baseline_points
 
     if n == 1 or args.num_workers <= 0:
         for i, (cid, scan, jp, ot) in enumerate(cases, 1):
             out = out_trunc_for(ot, cid)
             if skip_case(cid, i, out):
                 continue
+            bl_scan, bl_json = bl_paths_for(cid)
             consume(i, cid, out, _preprocess_case(scan, jp, pl, cm, dj, bl_scan, bl_json))
         return
 
@@ -203,6 +230,7 @@ def main() -> None:
         out = out_trunc_for(ot, cid)
         if skip_case(cid, i, out):
             continue
+        bl_scan, bl_json = bl_paths_for(cid)
         inflight.append((i, cid, out, pool.submit(_preprocess_case, scan, jp, pl, cm, dj, bl_scan, bl_json)))
         if len(inflight) > args.num_workers:
             idx, case_id, ot, fut = inflight.popleft()

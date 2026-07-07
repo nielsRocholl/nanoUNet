@@ -40,9 +40,11 @@ def encode_points_to_heatmap(
     strel = _build_ball_strel(radius_vox, use_edt)
     r = radius_vox
     for pz, py, px in points_zyx:
-        z0, z1 = max(0, pz - r), min(shape[0], pz + r + 1)
-        y0, y1 = max(0, py - r), min(shape[1], py + r + 1)
-        x0, x1 = max(0, px - r), min(shape[2], px + r + 1)
+        z0, z1 = min(max(0, pz - r), shape[0]), min(max(0, pz + r + 1), shape[0])
+        y0, y1 = min(max(0, py - r), shape[1]), min(max(0, py + r + 1), shape[1])
+        x0, x1 = min(max(0, px - r), shape[2]), min(max(0, px + r + 1), shape[2])
+        if z0 >= z1 or y0 >= y1 or x0 >= x1:
+            continue  # point (+radius) falls entirely outside the patch
         sz0 = r - (pz - z0)
         sz1 = sz0 + (z1 - z0)
         sy0 = r - (py - y0)

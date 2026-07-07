@@ -162,7 +162,8 @@ def predict_case_logits(
             sz, sy, sx = seed_slices[i]
             raw, seed_key = seed_raw[i], spatial_slices_to_tuple(*seed_slices[i])
             bp, anchor = bl_meta[i]
-            vis, q = {seed_key}, deque(plan_border_expansion_centers_from_logits(
+            vis = {seed_key}
+            q = deque(plan_border_expansion_centers_from_logits(
                 raw, lm, sz, sy, sx, patch_size, padded_shape, seed_key, max_border_expand_extra, skip_keys=vis))
             done = 0
             while q and done < max_border_expand_extra:
