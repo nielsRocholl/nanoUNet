@@ -3,7 +3,8 @@
 register() warps the moving image into the fixed frame; body_mask() builds a body-only mask so the
 metric ignores air/table; resample_seg() re-applies a transform to a label map with nearest-neighbour
 (FinalBSplineInterpolationOrder=0); resample_to() pulls an image onto a reference grid with a rigid
-transform. MIN_COMP_VOX lives here so warp_case and refine share it.
+transform. warp_pair() packages register+resample_seg so warp_case's elastix/unigradicon branches are
+symmetric. MIN_COMP_VOX lives here so warp_case and refine share it.
 """
 
 from __future__ import annotations
@@ -98,3 +99,28 @@ def resample_seg(
     filt.SetLogToConsole(verbose)
     filt.UpdateLargestPossibleRegion()
     return filt.GetOutput()
+
+
+def warp_pair(
+    fu: "itk.Image",
+    bl: "itk.Image",
+    bl_seg: "itk.Image",
+    bl_ids: "itk.Image",
+    *,
+    fixed_mask: "itk.Image | None" = None,
+    moving_mask: "itk.Image | None" = None,
+    geometric_init: bool = True,
+    threads: int | None = None,
+    verbose: bool = False,
+) -> tuple["itk.Image", "itk.Image", "itk.Image"]:
+    warped_img, tp = register(
+        fu, bl,
+        fixed_mask=fixed_mask,
+        moving_mask=moving_mask,
+        geometric_init=geometric_init,
+        threads=threads,
+        verbose=verbose,
+    )
+    warped_seg = resample_seg(bl_seg, tp, verbose=verbose)
+    warped_ids = resample_seg(bl_ids, tp, verbose=verbose)
+    return warped_img, warped_seg, warped_ids

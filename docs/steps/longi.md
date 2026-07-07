@@ -37,7 +37,7 @@ nanounet_predict \
 
 ## `nanounet_register_longi`
 
-Warp BL→FU frame (itk-elastix) for one or many longitudinal pairs.
+Warp BL→FU frame (itk-elastix or uniGradICON) for one or many longitudinal pairs.
 
 ```bash
 nanounet_register_longi --data-root /path/to/raw --out /path/to/regout --all
@@ -57,10 +57,27 @@ nanounet_register_longi --data-root /path/to/raw --out /path/to/regout --all
 | `--no-refine` | flag | off | Disable per-lesion VOI refinement |
 | `--threads` | str | `auto` | ITK threads: `auto`, `all`, integer, or `NANOUNET_REG_THREADS` |
 | `--verbose` | flag | off | Show elastix/transformix console log |
+| `--backend` | str | `elastix` | Registration backend: `elastix` (classical) or `unigradicon` (deep learning + native IO) |
+| `--io-iterations` | int | `50` | uniGradICON native instance-optimization steps (`0` disables); ignored for `elastix` |
 
 **Outputs:** `inputsTrFU/`, `inputsTrBL/`, `targetsTrFU/`, warped BL clicks JSON under `inputsTrBL/`.
+Same layout regardless of backend — output is byte-compatible with the classical pipeline.
 
 **Common errors:** must pass `--pid/--idx`, `--sample N`, or `--all`; skipped cases exit code 1.
+
+### Backends
+
+- `elastix` (default): classical rigid→affine→bspline multi-resolution registration; per-lesion
+  `refine` (VOI-local re-registration) runs afterwards unless `--no-refine`.
+- `unigradicon`: pretrained foundation model. Its native instance optimization (`--io-iterations`) is
+  the refinement step — per-lesion `refine`/`--no-refine` does not apply to this backend. GPU is
+  strongly preferred: IO is `--io-iterations` backward passes through a 3D UNet at 175³ per case and is
+  slow on CPU. Weights are cached at `$NANOUNET_UNIGRADICON_WEIGHTS` or
+  `~/.cache/nanounet/unigradicon/` on first use.
+
+```bash
+nanounet_register_longi --data-root /path/to/raw --out /path/to/regout --all --backend unigradicon --io-iterations 50
+```
 
 ---
 

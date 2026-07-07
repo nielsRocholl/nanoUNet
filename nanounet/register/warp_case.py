@@ -1,7 +1,9 @@
 """Warp one BL/FU pair into the FU frame: image, mask, CSV-keyed clicks.
 
 Registers FU<-BL, warps the BL image and BL mask, and derives BL clicks in the FU frame from a
-ball-stamped lesion-id map (train: meta CSV lesion_id; val: sequential json order). Standalone: no
+ball-stamped lesion-id map (train: meta CSV lesion_id; val: sequential json order). Two backends:
+`elastix` (classical, default) runs per-lesion VOI `refine` afterwards; `unigradicon` (deep learning)
+uses its own native instance optimization (`io_iterations`) as the refinement instead. Standalone: no
 dependency on nanounet.data.
 """
 
@@ -15,7 +17,8 @@ from dataclasses import dataclass
 import itk
 import numpy as np
 
-from nanounet.register.elastix import body_mask, frame_z_overlap_mm, register, resample_seg
+from nanounet.register.elastix import body_mask, frame_z_overlap_mm
+from nanounet.register.elastix import warp_pair as elastix_warp_pair
 from nanounet.register.landmarks import (
     correspondence,
     landmark_align,
@@ -24,6 +27,7 @@ from nanounet.register.landmarks import (
     stamp_ids,
 )
 from nanounet.register.refine import refine_clicks
+from nanounet.register.unigradicon import warp_pair as unigradicon_warp_pair
 
 StepFn = Callable[[str], None]
 
@@ -53,7 +57,11 @@ def warp_case(
     threads: int | None = None,
     verbose: bool = False,
     on_step: StepFn | None = None,
+    backend: str = "elastix",
+    io_iterations: int = 0,
 ) -> WarpResult:
+    assert backend in ("elastix", "unigradicon"), backend
+
     def step(name: str) -> None:
         if on_step is not None:
             on_step(name)
@@ -98,21 +106,21 @@ def warp_case(
         geometric_init = False
 
     step("register")
-    fu_mask = body_mask(fu) if body_mask_metric else None
-    bl_mask = body_mask(bl) if body_mask_metric else None
-    warped_img, tp = register(
-        fu,
-        bl,
-        fixed_mask=fu_mask,
-        moving_mask=bl_mask,
-        geometric_init=geometric_init,
-        threads=threads,
-        verbose=verbose,
-    )
-
-    step("mask")
-    warped_seg_itk = resample_seg(bl_seg, tp, verbose=verbose)
-    warped_ids_itk = resample_seg(bl_ids, tp, verbose=verbose)
+    if backend == "elastix":
+        fu_mask = body_mask(fu) if body_mask_metric else None
+        bl_mask = body_mask(bl) if body_mask_metric else None
+        warped_img, warped_seg_itk, warped_ids_itk = elastix_warp_pair(
+            fu, bl, bl_seg, bl_ids,
+            fixed_mask=fu_mask,
+            moving_mask=bl_mask,
+            geometric_init=geometric_init,
+            threads=threads,
+            verbose=verbose,
+        )
+    else:
+        warped_img, warped_seg_itk, warped_ids_itk = unigradicon_warp_pair(
+            fu, bl, bl_seg, bl_ids, io_iterations=io_iterations, verbose=verbose,
+        )
 
     step("clicks")
     seg = (itk.array_from_image(warped_seg_itk) > 0.5).astype(np.uint8)
@@ -126,7 +134,7 @@ def warp_case(
         bl_clicks.append((lbl, [float(xx.mean()), float(yy.mean()), float(zz.mean())]))
     assert bl_clicks, "all lesions vanished after registration"
 
-    if refine:
+    if refine and backend == "elastix":
         step("refine")
         xyz = [c for _, c in bl_clicks]
         xyz = refine_clicks(fu, warped_img, seg, xyz, verbose=verbose)
