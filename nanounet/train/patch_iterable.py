@@ -15,13 +15,6 @@ from nanounet.data.blosc2_dataset import Blosc2Folder, load_case_properties
 from nanounet.data.sampling import build_patch
 from nanounet.data.sampling_longi import build_patch_longi
 from nanounet.dataloader_prefs import pin_worker_threads
-from nanounet.mem_diag import (
-    log_snapshot,
-    mem_diag_enabled,
-    worker_diag_init,
-    worker_diag_iter_end,
-    worker_diag_tick,
-)
 
 _QUEUE_DEPTH = 2
 _META_CAP = 512
@@ -42,12 +35,11 @@ class CaseMetaCache:
         return prop
 
 
-def worker_init(worker_id: int, out_dir: str) -> None:
+def worker_init(worker_id: int) -> None:
     from nanounet.runtime import set_safe_tmpdir
 
     set_safe_tmpdir()
     pin_worker_threads()
-    worker_diag_init(worker_id, out_dir)
 
 
 class PatchIterable(IterableDataset):
@@ -64,7 +56,6 @@ class PatchIterable(IterableDataset):
         num_batches: int,
         batch_size: int,
         base_seed: int,
-        mem_diag_dir: str | None = None,
         longi: bool = False,
         force_null_baseline: bool = False,
     ):
@@ -79,7 +70,6 @@ class PatchIterable(IterableDataset):
         self.num_batches = num_batches
         self.batch_size = batch_size
         self.base_seed = base_seed
-        self.mem_diag_dir = mem_diag_dir
         self.longi = longi
         self.force_null_baseline = force_null_baseline
 
@@ -105,7 +95,6 @@ class PatchIterable(IterableDataset):
                 if prop is None:
                     prop = meta.put(cid, load_case_properties(ds.source_folder, cid))
                 with ds.open_case(cid, need_seg=True) as (data, seg, _, _):
-                    stats["opens"] += 1
                     if self.longi:
                         raw = build_patch_longi(
                             data,
@@ -145,16 +134,9 @@ class PatchIterable(IterableDataset):
         rng = np.random.default_rng(self.base_seed + wid * 10007)
         ds = Blosc2Folder(self.folder, identifiers=self.keys)
         meta = CaseMetaCache()
-        stats = {"opens": 0, "patches": 0}
+        stats = {"patches": 0}
         q: queue.Queue = queue.Queue(maxsize=_QUEUE_DEPTH)
         stop = threading.Event()
-        if mem_diag_enabled() and self.mem_diag_dir:
-            log_snapshot(
-                f"worker_{wid}_iter_start",
-                self.mem_diag_dir,
-                extra={"worker_id": wid, "n_here": n_here, "num_keys": len(self.keys), "batch_size": self.batch_size},
-                filename=f"mem_diag_worker_{wid}.jsonl",
-            )
         prod = threading.Thread(
             target=self._producer,
             args=(ds, q, n_here, rng, meta, stats, stop),
@@ -175,32 +157,9 @@ class PatchIterable(IterableDataset):
                     o = self.tf(**{"image": im, "segmentation": se})
                 yield {"data": o["image"], "target": o["segmentation"]}
                 stats["patches"] += 1
-                if mem_diag_enabled() and self.mem_diag_dir:
-                    worker_diag_tick(
-                        wid,
-                        {
-                            "opens": stats["opens"],
-                            "patches": stats["patches"],
-                            "worker_id": wid,
-                            "opens_per_epoch": stats["opens"],
-                            "patches_per_epoch": stats["patches"],
-                        },
-                    )
         finally:
             stop.set()
             prod.join(timeout=30.0)
-        if mem_diag_enabled() and self.mem_diag_dir:
-            worker_diag_iter_end(
-                wid,
-                {
-                    "opens": stats["opens"],
-                    "patches": stats["patches"],
-                    "worker_id": wid,
-                    "n_here": n_here,
-                    "opens_per_epoch": stats["opens"],
-                    "patches_per_epoch": stats["patches"],
-                },
-            )
 
 
 def collate_patches(batch: list) -> dict:

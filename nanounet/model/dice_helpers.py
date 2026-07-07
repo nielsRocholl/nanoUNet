@@ -75,6 +75,35 @@ def val_split_metrics(tp, fp, fn, y, output_seg):
     )
 
 
+def val_step_row(out, y, label_manager, enable_ds: bool, loss_val: float) -> dict:
+    """One validation batch → per-region metric row (tp/fp/fn, macro dice, fp count, loss)."""
+    import torch
+
+    if enable_ds:
+        out = out[0]
+        y = y[0]
+    axes = list(range(2, out.ndim))
+    output_seg = out.argmax(1)[:, None]
+    oh = torch.zeros_like(out, dtype=torch.float32, device=out.device)
+    oh.scatter_(1, output_seg, 1)
+    if label_manager.has_ignore_label:
+        mask = (y != label_manager.ignore_label).float()
+        y = y.clone()
+        y[y == label_manager.ignore_label] = 0
+    else:
+        # Instance-labeled targets (each lesion a distinct id) / out-of-FOV -1 vs a binary
+        # head: collapse positives to foreground for a 2-class head, else just drop -1. Keeps
+        # the metric one-hot scatter in bounds; no-op for {0,1} data.
+        mask = None
+        if out.shape[1] == 2:
+            y = (y > 0).to(y.dtype)
+        else:
+            y = y.clamp_min(0)
+    tp, fp, fn, _ = get_tp_fp_fn_tn(oh, y, axes=axes, mask=mask)
+    tg, pg, ng, da, fb = val_split_metrics(tp[:, 1:], fp[:, 1:], fn[:, 1:], y, output_seg)
+    return {"tp": tg, "fp": pg, "fn": ng, "dice_a": da, "fp_b": fb, "loss": loss_val}
+
+
 class MemoryEfficientSoftDiceLoss(nn.Module):
     def __init__(
         self,

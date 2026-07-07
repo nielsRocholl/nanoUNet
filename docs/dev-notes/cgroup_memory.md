@@ -47,14 +47,14 @@ Under a real Slurm step cgroup, page cache is usually reclaimable; tmpfs checkpo
 
 ### 3. Misleading metrics on the interactive node
 
-On VS Code / interactive sessions, `/proc/self/cgroup` is often `0::/` (root cgroup). `--mem-diag` then reports **node-wide** memory, not just your process. Use Slurm for authoritative cgroup deltas, or set `NANOUNET_ALLOW_ROOT_CGROUP=1` knowing the numbers are noisy.
+On VS Code / interactive sessions, `/proc/self/cgroup` is often `0::/` (root cgroup). The now-removed `--mem-diag` instrumentation reported **node-wide** memory in that case, not just your process — use Slurm for authoritative cgroup accounting.
 
 ---
 
 ## What we tried (short history)
 
 1. **Handle hygiene** — context managers, case-sticky I/O, small dl bucket. OOM continued.
-2. **`--mem-diag`** — confirmed growth in `cgroup_file` + `cgroup_shmem`, flat `cgroup_anon`.
+2. **`--mem-diag`** (instrumentation, since removed) — confirmed growth in `cgroup_file` + `cgroup_shmem`, flat `cgroup_anon`.
 3. **Disable mmap** — helped micro-benchmarks; full training still grew.
 4. **`posix_fadvise` + `num_workers=0`** — shmem still climbed until we moved TMPDIR off tmpfs.
 5. **TMPDIR redirect** — shmem flat; workers re-enabled when TMPDIR is on disk.
@@ -68,7 +68,8 @@ Rejected as fixes: raising `--mem`, splitting MAE into multiple jobs, job-only w
 | Component | What it does |
 |-----------|----------------|
 | [`nanounet/runtime.py`](../nanounet/runtime.py) | `set_safe_tmpdir()` — TMPDIR on disk, not tmpfs; prefers `$NANOUNET_TMPDIR`, `<run>/.tmp`, `$NANOUNET_RESULTS/.nanounet_tmp`; warns if under `$HOME` |
-| [`nanounet/mem_diag.py`](../nanounet/mem_diag.py) | Per-epoch cgroup snapshots; purge stale checkpoint temps on `/tmp` + `TMPDIR`, `/dev/shm` torch IPC (uid + age); `cgroup_scope` |
+| [`nanounet/diag/tmp_purge.py`](../nanounet/diag/tmp_purge.py) | Purges stale checkpoint temps on `/tmp` + `TMPDIR`, `/dev/shm` torch IPC (uid + age) — the permanent fix, runs every epoch unconditionally |
+| [`nanounet/diag/cgroup.py`](../nanounet/diag/cgroup.py) | `cgroup_scope`, tmpfs detection used by `set_safe_tmpdir` |
 | [`nanounet/data/blosc2_dataset.py`](../nanounet/data/blosc2_dataset.py) | `fadvise` after close; `POSIX_FADV_RANDOM` on open |
 | [`nanounet/dataloader_prefs.py`](../nanounet/dataloader_prefs.py) | `--dl-bucket` s/m/l (2/1, 4/2, 8/4 train/val when TMPDIR off tmpfs); `--dl-persistent-workers`; `file_system` IPC; `NANOUNET_DL_FORCE_NO_WORKERS=1` escape hatch |
 
@@ -125,7 +126,6 @@ Purge only deletes files that match **all** of:
 ## Required environment (interactive & Slurm)
 
 ```bash
-export NANOUNET_ALLOW_ROOT_CGROUP=1   # only for --mem-diag on interactive (root cgroup)
 export NANOUNET_TMPDIR=/root/.cache/nanounet_tmp   # local disk; CIFS/NFS breaks DataLoader workers
 ```
 
@@ -137,7 +137,7 @@ export NANOUNET_PREPROCESSED=/path/to/NanoUNet_preprocessed
 export NANOUNET_RESULTS=/data/NanoUNet_results
 ```
 
-On Slurm you typically **do not** need `NANOUNET_ALLOW_ROOT_CGROUP` (step cgroup is correct). Still set `NANOUNET_TMPDIR` to a path with space (not `$HOME` if quota is 10 GB).
+Still set `NANOUNET_TMPDIR` to a path with space (not `$HOME` if quota is 10 GB).
 
 ---
 
@@ -151,18 +151,22 @@ Scratch only — **not** final checkpoints or W&B artifacts.
 | DataLoader IPC files | Small–medium | When `num_workers > 0`; uses `file_system` strategy on disk |
 | Other Python/torch temps | Small | Short-lived |
 
-Final outputs stay under `$NANOUNET_RESULTS/...` (checkpoints, `mem_diag.jsonl`, configs).
+Final outputs stay under `$NANOUNET_RESULTS/...` (checkpoints, configs).
 
 ---
 
-## Monitoring (`--mem-diag`)
+## Monitoring (historical: `--mem-diag`)
 
-Logs: `<run>/mae_pretrain/mem_diag.jsonl` (and W&B `mem/*` if enabled).
+The original fix was validated with a `--mem-diag` instrumentation flag (per-epoch cgroup/RSS/GPU
+JSONL + W&B `mem/*` scalars, worker-level open/close counters). Once the root cause — checkpoint
+temp files on tmpfs `TMPDIR` — was fixed and `purge_torch_tmp()` wired in unconditionally every
+epoch, the instrumentation was no longer load-bearing and was removed. The permanent fixes
+(`set_safe_tmpdir`, per-epoch `purge_torch_tmp`, `fadvise` on close) remain in `nanounet/runtime.py`
+and `nanounet/diag/`.
 
 **Fix is holding if:**
 
 - Startup banner: `tmpdir=...` on **local zfs** (e.g. `/root/.cache/nanounet_tmp`), not `/tmp` or CIFS
-- `fadvise_calls` increases each epoch
 - `du -sh /tmp` stays small; TMPDIR stage orphans not accumulating without bound
 - For MAE with workers + `--dl-persistent-workers`: expect ~98 MB/ep shmem (acceptable on 250G jobs); use `NANOUNET_DL_FORCE_NO_WORKERS=1` only if shmem must stay flat
 
@@ -170,11 +174,8 @@ Logs: `<run>/mae_pretrain/mem_diag.jsonl` (and W&B `mem/*` if enabled).
 
 | Variable | Purpose |
 |----------|---------|
-| `NANOUNET_MEM_DIAG=1` | Same as `--mem-diag` |
 | `NANOUNET_DL_FORCE_NO_WORKERS=1` | Escape hatch: force `num_workers=0` (slow, ~0 shmem/ep) |
 | `NANOUNET_DL_KEEP_WORKERS=1` | Legacy: keep workers even on tmpfs (not recommended) |
-
-Validation script: [`scripts/interactive_validate_mem.sh`](../scripts/interactive_validate_mem.sh).
 
 ---
 

@@ -14,15 +14,8 @@ from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from torch import autocast
 
 from nanounet.config import RoiPromptConfig, load_config, save_config
-from nanounet.mem_diag import (
-    cgroup_epoch_deltas,
-    cgroup_mem_bytes,
-    log_snapshot,
-    log_wandb_scalars,
-    mem_diag_enabled,
-    purge_torch_tmp,
-)
-from nanounet.model.dice_helpers import get_tp_fp_fn_tn, pooled_fg_dice, val_split_metrics
+from nanounet.diag import purge_torch_tmp
+from nanounet.model.dice_helpers import pooled_fg_dice, val_step_row
 from nanounet.model.losses import build_loss
 from nanounet.model.lr_schedule import PolyLRScheduler, StretchedTailPolyLRScheduler
 from nanounet.model.mae_transfer import load_full_net, load_mae_encoder
@@ -77,8 +70,6 @@ class NanoUNetLM(pl.LightningModule):
         self.stretched_exp = stretched_exp
         self.enable_deep_supervision = enable_deep_supervision
         self._val_buf: List[Dict[str, Any]] = []
-        self._prev_cgroup_file: int | None = None
-        self._prev_cgroup_shmem: int | None = None
 
     def forward(self, x: torch.Tensor):
         return self.net(x)
@@ -119,30 +110,8 @@ class NanoUNetLM(pl.LightningModule):
         with autocast(self.device.type, enabled=self.device.type == "cuda"):
             out = self.net(x)
             loss = self.loss(out, y)
-        if self.enable_deep_supervision:
-            out = out[0]
-            y = y[0]
-        axes = list(range(2, out.ndim))
-        output_seg = out.argmax(1)[:, None]
-        oh = torch.zeros_like(out, dtype=torch.float32, device=out.device)
-        oh.scatter_(1, output_seg, 1)
-        if self.label_manager.has_ignore_label:
-            mask = (y != self.label_manager.ignore_label).float()
-            y = y.clone()
-            y[y == self.label_manager.ignore_label] = 0
-        else:
-            # Instance-labeled targets (each lesion a distinct id) / out-of-FOV -1 vs a binary
-            # head: collapse positives to foreground for a 2-class head, else just drop -1. Keeps
-            # the metric one-hot scatter in bounds; no-op for {0,1} data.
-            mask = None
-            if out.shape[1] == 2:
-                y = (y > 0).to(y.dtype)
-            else:
-                y = y.clamp_min(0)
-        tp, fp, fn, _ = get_tp_fp_fn_tn(oh, y, axes=axes, mask=mask)
-        tg, pg, ng, da, fb = val_split_metrics(tp[:, 1:], fp[:, 1:], fn[:, 1:], y, output_seg)
         self._val_buf.append(
-            {"tp": tg, "fp": pg, "fn": ng, "dice_a": da, "fp_b": fb, "loss": float(loss.detach())}
+            val_step_row(out, y, self.label_manager, self.enable_deep_supervision, float(loss.detach()))
         )
 
     def on_validation_epoch_start(self) -> None:
@@ -161,19 +130,6 @@ class NanoUNetLM(pl.LightningModule):
         self.log("val_n_a", float(da.numel()))
         self.log("val_n_b", float(fb.numel()))
         self.log("val_loss", float(np.mean([v["loss"] for v in self._val_buf])), prog_bar=False)
-        if mem_diag_enabled():
-            ep = int(self.current_epoch)
-            fd, sd = cgroup_epoch_deltas(self._prev_cgroup_file, self._prev_cgroup_shmem)
-            cg = cgroup_mem_bytes()
-            self._prev_cgroup_file = cg.get("file")
-            self._prev_cgroup_shmem = cg.get("shmem")
-            extra: dict = {"epoch": ep, "stage": "supervised"}
-            if fd is not None:
-                extra["cgroup_file_delta_bytes"] = fd
-            if sd is not None:
-                extra["cgroup_shmem_delta_bytes"] = sd
-            row = log_snapshot(f"sup_epoch_{ep}", self.output_dir, extra=extra)
-            log_wandb_scalars(self, row)
 
     def configure_optimizers(self):
         if self.optimizer == "adamw":
@@ -198,11 +154,3 @@ class NanoUNetLM(pl.LightningModule):
         else:
             sched = PolyLRScheduler(opt, self.initial_lr, self.num_epochs)
         return {"optimizer": opt, "lr_scheduler": {"scheduler": sched, "interval": "epoch"}}
-
-    def on_exception(self, exception: BaseException) -> None:
-        if mem_diag_enabled():
-            log_snapshot(
-                "sup_exception",
-                self.output_dir,
-                extra={"epoch": int(self.current_epoch), "error": type(exception).__name__},
-            )

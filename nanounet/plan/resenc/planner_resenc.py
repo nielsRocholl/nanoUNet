@@ -12,7 +12,7 @@ from dynamic_network_architectures.building_blocks.helper import convert_dim_to_
 
 from nanounet.data.resampling import resample_data_or_seg_to_shape
 from nanounet.model.network import estimate_conv_feature_map_size
-from nanounet.plan.planner_topology import get_pool_and_conv_props
+from nanounet.plan.resenc.planner_topology import get_pool_and_conv_props
 
 
 @dataclass(frozen=True)

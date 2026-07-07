@@ -16,8 +16,6 @@ import blosc2
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import isfile, join, load_pickle, write_pickle
 
-from nanounet.mem_diag import b2_close_inc, fadvise_inc, mem_diag_enabled
-
 
 def _close_b2(arr) -> None:
     if arr is not None and hasattr(arr, "close"):
@@ -33,7 +31,6 @@ def _fadvise_dontneed(path: str) -> None:
             os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)
         finally:
             os.close(fd)
-        fadvise_inc()
     except OSError:
         pass
 
@@ -113,8 +110,6 @@ class Blosc2Folder:
                 _fadvise_dontneed(seg_path)
             if seg_prev_path:
                 _fadvise_dontneed(seg_prev_path)
-            if mem_diag_enabled():
-                b2_close_inc()
 
     @staticmethod
     def save_case(data: np.ndarray, seg: np.ndarray, properties: dict, output_filename_truncated: str, chunks=None, blocks=None, chunks_seg=None, blocks_seg=None, clevel: int = 8, codec=blosc2.Codec.ZSTD):

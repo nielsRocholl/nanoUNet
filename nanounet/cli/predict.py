@@ -3,82 +3,23 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import os
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
 import torch
-from acvl_utils.cropping_and_padding.padding import pad_nd_image
 from batchgenerators.utilities.file_and_folder_operations import join, load_json, maybe_mkdir_p
 
-from nanounet.common import cprint, nano_header
+from nanounet.common import config_table, cprint, nano_header
 from nanounet.config import load_config
 from nanounet.infer.border_expand import DEFAULT_MAX_BORDER_EXPAND_EXTRA
 from nanounet.infer.export import export_prediction_from_logits
 from nanounet.infer.predict_case import predict_case_logits
+from nanounet.infer.predict_io import patient_ids_from_csv, preprocess_case
 from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
-from nanounet.plan.case_pp import run_case
 from nanounet.plan.labels import labels_from_dataset_json
 from nanounet.plan.plans import Plans
-from nanounet.prompt.coords import load_points_xyz
-
-
-def _load_bl_points(json_path: str) -> list[tuple[float, float, float] | None]:
-    import json
-    with open(json_path, encoding="utf-8") as f:
-        data = json.load(f)
-    pts = data.get("points")
-    if pts is None:
-        raise KeyError(f"'points' missing in {json_path}")
-    out: list[tuple[float, float, float] | None] = []
-    for item in pts:
-        if item is None:
-            out.append(None)
-            continue
-        p = item.get("point") if isinstance(item, dict) else item
-        if p is None:
-            out.append(None)
-            continue
-        out.append((float(p[0]), float(p[1]), float(p[2])))
-    return out
-
-
-def _patient_ids_from_csv(path: str) -> set[str]:
-    with open(path, newline="", encoding="utf-8") as f:
-        rows = list(csv.DictReader(f))
-    if not rows:
-        raise ValueError(f"empty patients csv: {path}")
-    col = "patient" if "patient" in rows[0] else next(iter(rows[0]))
-    out = {r[col].strip() for r in rows if r[col].strip()}
-    if not out:
-        raise ValueError(f"no patient ids in {path}")
-    return out
-
-
-def _preprocess_case(scan: str, json_path: str, pl, cm, dj, bl_scan: str | None = None, bl_json: str | None = None):
-    # FU and (when present) BL preprocessing (`run_case`, mostly resampling) are independent and
-    # each cost ~30s wall time; running them concurrently roughly halves this per-case cost since
-    # the underlying numpy/SimpleITK work releases the GIL.
-    bl_future = None
-    if bl_scan is not None:
-        bl_future = ThreadPoolExecutor(max_workers=1).submit(run_case, [bl_scan], None, pl, cm, dj, verbose=False)
-
-    data, _seg, props = run_case([scan], None, pl, cm, dj, verbose=False)
-    data_t = torch.from_numpy(data).float()
-    pad, slicer_revert = pad_nd_image(data_t, tuple(cm.patch_size), "constant", {"value": 0}, True, None)
-    points = load_points_xyz(json_path)
-
-    bl_pack = None
-    if bl_future is not None:
-        bl_data, _bl_seg, bl_props = bl_future.result()
-        bl_t = torch.from_numpy(bl_data).float()
-        pad_bl, bl_slicer = pad_nd_image(bl_t, tuple(cm.patch_size), "constant", {"value": 0}, True, None)
-        bl_pts = _load_bl_points(bl_json) if bl_json else [None] * len(points)
-        assert len(bl_pts) == len(points), (len(bl_pts), len(points))
-        bl_pack = (pad_bl, bl_slicer, bl_props, bl_pts)
-    return pad, slicer_revert, props, points, bl_pack
 
 
 def main() -> None:
@@ -116,6 +57,13 @@ def main() -> None:
     args = ap.parse_args()
 
     nano_header("nanoUNet predict", color="blue")
+    config_table(
+        [("model_dir", args.model_dir, "cli"), ("ckpt", args.ckpt or "auto", "cli/default"),
+         ("device", args.device, "cli/default"), ("inference_mode", args.inference_mode, "cli/default"),
+         ("merge", args.merge, "cli/default"), ("batch_size", args.batch_size, "cli/default"),
+         ("tta", "auto" if args.tta_flag is None else args.tta_flag, "cli/config")],
+        title="nanoUNet predict",
+    )
     md = args.model_dir
     pl = Plans(join(md, "plans.json"))
     cm = pl.get_configuration("3d_fullres")
@@ -149,7 +97,7 @@ def main() -> None:
         case_files = sorted(f for f in os.listdir(args.input) if f.endswith(end))
         cases = [(f[:-len(end)], join(args.input, f), join(args.input, f[:-len(end)] + ".json"), None) for f in case_files]
         if args.patients_csv:
-            pids = _patient_ids_from_csv(args.patients_csv)
+            pids = patient_ids_from_csv(args.patients_csv)
             cases = [(cid, scan, jp, ot) for cid, scan, jp, ot in cases if cid.split("_", 1)[0] in pids]
             if not cases:
                 raise SystemExit(f"no cases match --patients-csv {args.patients_csv}")
@@ -221,7 +169,8 @@ def main() -> None:
             if skip_case(cid, i, out):
                 continue
             bl_scan, bl_json = bl_paths_for(cid)
-            consume(i, cid, out, _preprocess_case(scan, jp, pl, cm, dj, bl_scan, bl_json))
+            consume(i, cid, out, preprocess_case(scan, jp, pl, cm, dj, bl_scan, bl_json))
+        cprint(f"[green]done — {n} case(s) → {out_dir}[/green]")
         return
 
     pool = ThreadPoolExecutor(max_workers=args.num_workers)
@@ -231,7 +180,7 @@ def main() -> None:
         if skip_case(cid, i, out):
             continue
         bl_scan, bl_json = bl_paths_for(cid)
-        inflight.append((i, cid, out, pool.submit(_preprocess_case, scan, jp, pl, cm, dj, bl_scan, bl_json)))
+        inflight.append((i, cid, out, pool.submit(preprocess_case, scan, jp, pl, cm, dj, bl_scan, bl_json)))
         if len(inflight) > args.num_workers:
             idx, case_id, ot, fut = inflight.popleft()
             consume(idx, case_id, ot, fut.result())
@@ -239,6 +188,7 @@ def main() -> None:
         idx, case_id, ot, fut = inflight.popleft()
         consume(idx, case_id, ot, fut.result())
     pool.shutdown(wait=True)
+    cprint(f"[green]done — {n} case(s) → {out_dir}[/green]")
 
 
 if __name__ == "__main__":

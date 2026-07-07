@@ -5,10 +5,10 @@ from __future__ import annotations
 import argparse
 
 from nanounet.common import nano_header, nano_rule
-from nanounet.plan.fingerprint import run_fingerprint
-from nanounet.plan.merge import build_merged_raw
-from nanounet.plan.planner import run_plan
-from nanounet.plan.preprocess import run_preprocess
+from nanounet.plan.prep.fingerprint import run_fingerprint
+from nanounet.plan.prep.merge import build_merged_raw
+from nanounet.plan.resenc.planner import run_plan
+from nanounet.plan.prep.preprocess import run_preprocess
 
 PATCH_VOL = {"small": 128, "medium": 192, "large": 256, "xlarge": 320}
 

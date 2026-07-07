@@ -1,16 +1,36 @@
-"""DC + CE (+ deep supervision wrapper)."""
+"""DC+CE and CC-DiceCE building blocks: RobustCrossEntropyLoss, DeepSupervisionWrapper, build_loss."""
 
 from __future__ import annotations
 
 import numpy as np
 import torch
 import torch.nn as nn
+from torch import Tensor
 
-from nanounet.model.deep_supervision import DeepSupervisionWrapper
 from nanounet.model.dice_helpers import MemoryEfficientSoftDiceLoss, softmax_helper_dim1
-from nanounet.model.robust_ce import RobustCrossEntropyLoss
 from nanounet.plan.labels import Labels
 from nanounet.plan.plans import Config3d
+
+
+class RobustCrossEntropyLoss(nn.CrossEntropyLoss):
+    def forward(self, input: Tensor, target: Tensor) -> Tensor:
+        if target.ndim == input.ndim:
+            assert target.shape[1] == 1
+            target = target[:, 0]
+        return super().forward(input, target.long())
+
+
+class DeepSupervisionWrapper(nn.Module):
+    def __init__(self, loss, weight_factors: tuple):
+        super().__init__()
+        assert any(x != 0 for x in weight_factors)
+        self.weight_factors = weight_factors
+        self.loss = loss
+
+    def forward(self, *args):
+        assert all(isinstance(i, (tuple, list)) for i in args)
+        w = self.weight_factors
+        return sum(w[i] * self.loss(*inputs) for i, inputs in enumerate(zip(*args)) if w[i] != 0.0)
 
 
 class DC_and_CE_loss(nn.Module):
@@ -72,7 +92,11 @@ def build_loss(
 
         loss = CC_DC_and_CE_loss({**sd_kw, "smooth": 0.0}, {}, ignore_label=lm.ignore_label, lam=1.0)
     else:
-        raise ValueError(loss_type)
+        raise ValueError(
+            f"Unknown --loss value {loss_type!r}.\n"
+            f"Supported: 'dc_ce' (default) or 'cc_dc_ce'.\n"
+            f"Fix: nanounet_train … --loss dc_ce   (see docs/reference/losses.md)"
+        )
     if not enable_ds:
         return loss
     pool = cm.pool_op_kernel_sizes
