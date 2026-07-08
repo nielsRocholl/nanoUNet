@@ -133,7 +133,9 @@ FU-stream prompt source for `build_patch_longi`, including disappeared-lesion po
 
 **Next step:** `nanounet_train -d NNN --plans … --longi --init-weights <stage2.ckpt>`.
 
-**Common errors:** mapped click outside preprocessed volume (wrong `--cog-axis-order`).
+**Notes:** points mapping outside the preprocessed volume are dropped (counted in the summary line),
+not asserted — a DISAPPEARING lesion's BL location can legitimately sit in FU-image territory the
+nonzero crop excluded. A wrong `--cog-axis-order` shows up as most/all points dropped.
 
 ---
 

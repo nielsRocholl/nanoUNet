@@ -10,6 +10,7 @@ from scipy.spatial import cKDTree
 
 from nanounet.config import RoiPromptConfig
 from nanounet.prompt.centroids import apply_propagation_offset, filter_centroids_in_patch
+from nanounet.prompt.encoding import encode_points_to_heatmap_pair
 
 
 def _lbs_ubs(
