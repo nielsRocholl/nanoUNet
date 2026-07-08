@@ -98,21 +98,25 @@ nanounet_longi_build \
 | `--template-dj` | str | (required) | `dataset.json` to copy labels / `file_ending` from |
 | `--out` | str | (required) | Raw dataset dir to create, e.g. `.../DatasetNNN_longi` |
 
-**Outputs:** `_0000` = FU CT, `_0001` = warped BL CT (FU frame), FU seg, `clicksTr/<case>.json`.
+**Outputs:** `_0000` = FU CT, `_0001` = warped BL CT (FU frame), FU seg, `clicksTr/<case>.json` (BL
+union clicks), `clicksTrFU/<case>.json` (FU union clicks). Both carry the full BL+FU lesion-id
+union, including "disappeared" lesions with no FU ground truth.
 
 **Next step:** `nanounet_preprocess -d <id-for-out>`.
 
-**Common errors:** size mismatch between FU and warped BL (bad registration); empty `inputsTrFU/`.
+**Common errors:** size mismatch between FU and warped BL (bad registration); empty `inputsTrFU/`;
+missing `clicksBL/`/`clicksFU/<case>.json` under `--register-out`.
 
 ---
 
 ## `nanounet_longi_clicks`
 
-Map warped BL clicks (register xyz, FU frame) into preprocessed voxels.
+Map warped-BL and FU union clicks (register xyz, FU frame) into preprocessed voxels.
 
 ```bash
 nanounet_longi_clicks -d NNN --plans nnUNetResEncUNetLPlans \
-  --clicks-dir "$NANOUNET_RAW/DatasetNNN_longi/clicksTr"
+  --clicks-dir "$NANOUNET_RAW/DatasetNNN_longi/clicksTr" \
+  --clicks-fu-dir "$NANOUNET_RAW/DatasetNNN_longi/clicksTrFU"
 ```
 
 | Argument | Type | Default | Description |
@@ -120,9 +124,12 @@ nanounet_longi_clicks -d NNN --plans nnUNetResEncUNetLPlans \
 | `-d`, `--dataset_id` | int | (required) | Preprocessed dataset id |
 | `--plans` | str | (required) | Plans basename (no `.json`) |
 | `--clicks-dir` | str | (required) | Raw `clicksTr` with warped BL click JSON per case |
+| `--clicks-fu-dir` | str | `None` | Raw `clicksTrFU` with FU union click JSON per case |
 | `--cog-axis-order` | choice | `xyz` | `xyz` \| `zyx` — must match click file axis order |
 
 **Outputs:** `<case>_bl_clicks.json` next to each preprocessed FU case (`bl_clicks_zyx`, `has_baseline`).
+If `--clicks-fu-dir` given, also `<case>_fu_clicks.json` (`fu_clicks_zyx`, `fu_topology`) — the
+FU-stream prompt source for `build_patch_longi`, including disappeared-lesion points.
 
 **Next step:** `nanounet_train -d NNN --plans … --longi --init-weights <stage2.ckpt>`.
 

@@ -1,9 +1,11 @@
 """Build a 2-channel raw longi dataset from register_longi output.
 
 Each FU case becomes a 2-modality nnUNet-raw case: _0000 = FU CT, _0001 = warped BL CT (FU frame),
-label = FU seg. Warped BL clicks are copied to clicksTr/<case>.json for later mapping into
-preprocessed voxels by nanounet.cli.longi_clicks. The FU-frame warp gives _0000/_0001 an identical
-grid, so preprocessing's single nonzero crop keeps them voxel-aligned (see design doc S12).
+label = FU seg. Warped-BL and FU union clicks (both carry the full lesion-id union, including
+"disappeared" lesions with no FU ground truth) are copied to clicksTr/<case>.json and
+clicksTrFU/<case>.json for later mapping into preprocessed voxels by nanounet.cli.longi_clicks.
+The FU-frame warp gives _0000/_0001 an identical grid, so preprocessing's single nonzero crop
+keeps them voxel-aligned (see design doc S12).
 
   python -m nanounet.cli.longi_build --register-out <regout> \
       --template-dj <a dataset.json with labels/file_ending> \
@@ -41,25 +43,40 @@ def main() -> None:
     img_out = os.path.join(args.out, "imagesTr")
     lab_out = os.path.join(args.out, "labelsTr")
     clk_out = os.path.join(args.out, "clicksTr")
-    for d in (img_out, lab_out, clk_out):
+    clk_fu_out = os.path.join(args.out, "clicksTrFU")
+    for d in (img_out, lab_out, clk_out, clk_fu_out):
         os.makedirs(d, exist_ok=True)
+
+    clicks_bl_dir = os.path.join(args.register_out, "clicksBL")
+    clicks_fu_dir = os.path.join(args.register_out, "clicksFU")
 
     n = 0
     for stem in stems:
         fu = os.path.join(fu_dir, f"{stem}.nii.gz")
         bl = os.path.join(bl_dir, f"{stem}.nii.gz")
         seg = os.path.join(seg_dir, f"{stem}.nii.gz")
-        clk = os.path.join(bl_dir, f"{stem}.json")
+        clk_bl = os.path.join(clicks_bl_dir, f"{stem}.json")
+        clk_fu = os.path.join(clicks_fu_dir, f"{stem}.json")
         assert os.path.isfile(bl), bl
         assert os.path.isfile(seg), seg
-        assert os.path.isfile(clk), clk
+        assert os.path.isfile(clk_bl), (
+            f"missing {clk_bl}. Expected clicksBL/<case>.json (lesion-union clicks) under --register-out.\n"
+            f"Fix: regenerate the click-fix data for {args.register_out}, or check --register-out points at "
+            f"the unigradicon-registered dir with clicksBL/clicksFU/lesions siblings."
+        )
+        assert os.path.isfile(clk_fu), (
+            f"missing {clk_fu}. Expected clicksFU/<case>.json (lesion-union clicks) under --register-out.\n"
+            f"Fix: regenerate the click-fix data for {args.register_out}, or check --register-out points at "
+            f"the unigradicon-registered dir with clicksBL/clicksFU/lesions siblings."
+        )
         # FU-frame warp => identical sampling grid; assert so a bad warp fails loudly, not silently misaligned.
         assert sitk.ReadImage(fu).GetSize() == sitk.ReadImage(bl).GetSize(), stem
         # copy2's copystat/utime raises PermissionError on the CIFS mount; copyfile copies data only.
         shutil.copyfile(fu, os.path.join(img_out, f"{stem}_0000.nii.gz"))
         shutil.copyfile(bl, os.path.join(img_out, f"{stem}_0001.nii.gz"))
         shutil.copyfile(seg, os.path.join(lab_out, f"{stem}.nii.gz"))
-        shutil.copyfile(clk, os.path.join(clk_out, f"{stem}.json"))
+        shutil.copyfile(clk_bl, os.path.join(clk_out, f"{stem}.json"))
+        shutil.copyfile(clk_fu, os.path.join(clk_fu_out, f"{stem}.json"))
         n += 1
 
     with open(args.template_dj, encoding="utf-8") as f:
