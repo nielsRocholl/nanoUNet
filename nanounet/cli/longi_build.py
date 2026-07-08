@@ -5,7 +5,8 @@ label = FU seg. Warped-BL and FU union clicks (both carry the full lesion-id uni
 "disappeared" lesions with no FU ground truth) are copied to clicksTr/<case>.json and
 clicksTrFU/<case>.json for later mapping into preprocessed voxels by nanounet.cli.longi_clicks.
 The FU-frame warp gives _0000/_0001 an identical grid, so preprocessing's single nonzero crop
-keeps them voxel-aligned (see design doc S12).
+keeps them voxel-aligned (see design doc S12). Cases marked non-"ok" in --register-out's
+clickfix_report.csv (unsanitized fallback points) are excluded, not patched.
 
   python -m nanounet.cli.longi_build --register-out <regout> \
       --template-dj <a dataset.json with labels/file_ending> \
@@ -15,6 +16,7 @@ keeps them voxel-aligned (see design doc S12).
 from __future__ import annotations
 
 import argparse
+import csv
 import glob
 import json
 import os
@@ -23,6 +25,21 @@ import shutil
 import SimpleITK as sitk
 
 from nanounet.common import cprint, nano_header
+
+
+def _ok_cases(register_out: str) -> set[str] | None:
+    """Cases marked "ok" in clickfix_report.csv, or None if no report (no filtering).
+
+    "partial" cases carry at least one unsanitized/border-clamped fallback point (registration
+    failure recovered via an out-of-range cog_propagated) that can land outside a case's cropped
+    preprocessing bbox and crash longi_clicks's in-bounds assert. Same exclude-don't-patch policy
+    as the rest of the click-fix pipeline: drop the case, don't silently clamp a bad point.
+    """
+    path = os.path.join(register_out, "clickfix_report.csv")
+    if not os.path.isfile(path):
+        return None
+    with open(path, encoding="utf-8") as f:
+        return {row["case"] for row in csv.DictReader(f) if row["status"] == "ok"}
 
 
 def main() -> None:
@@ -39,6 +56,13 @@ def main() -> None:
     seg_dir = os.path.join(args.register_out, "targetsTrFU")
     stems = sorted(os.path.basename(p)[: -len(".nii.gz")] for p in glob.glob(os.path.join(fu_dir, "*.nii.gz")))
     assert stems, fu_dir
+
+    ok_cases = _ok_cases(args.register_out)
+    if ok_cases is not None:
+        excluded = [s for s in stems if s not in ok_cases]
+        stems = [s for s in stems if s in ok_cases]
+        if excluded:
+            cprint(f"[yellow]excluding {len(excluded)} case(s) not marked ok in clickfix_report.csv: {excluded}[/yellow]")
 
     img_out = os.path.join(args.out, "imagesTr")
     lab_out = os.path.join(args.out, "labelsTr")
