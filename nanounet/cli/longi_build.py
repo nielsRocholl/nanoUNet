@@ -1,7 +1,11 @@
 """Build a 2-channel raw longi dataset from register_longi output.
 
 Each FU case becomes a 2-modality nnUNet-raw case: _0000 = FU CT, _0001 = warped BL CT (FU frame),
-label = FU seg. Warped-BL and FU union clicks (both carry the full lesion-id union, including
+label = FU seg. `targetsTrFU` masks are instance-labeled (per-lesion ids, not {0,1}), so the seg is
+binarized here (mirrors uclp-pro's binarize_mask) before writing labelsTr -- dataset.json only ever
+declares {"background":0,"lesion":1}, and preprocessing's foreground-oversampling (class_locations)
+only looks for id 1, so an un-binarized copy silently drops every other lesion instance from
+oversampling. Warped-BL and FU union clicks (both carry the full lesion-id union, including
 "disappeared" lesions with no FU ground truth) are copied to clicksTr/<case>.json and
 clicksTrFU/<case>.json for later mapping into preprocessed voxels by nanounet.cli.longi_clicks.
 The FU-frame warp gives _0000/_0001 an identical grid, so preprocessing's single nonzero crop
@@ -98,7 +102,9 @@ def main() -> None:
         # copy2's copystat/utime raises PermissionError on the CIFS mount; copyfile copies data only.
         shutil.copyfile(fu, os.path.join(img_out, f"{stem}_0000.nii.gz"))
         shutil.copyfile(bl, os.path.join(img_out, f"{stem}_0001.nii.gz"))
-        shutil.copyfile(seg, os.path.join(lab_out, f"{stem}.nii.gz"))
+        seg_img = sitk.ReadImage(seg)
+        seg_bin = sitk.Cast(seg_img > 0, sitk.sitkUInt8)  # instance ids -> {0,1}; see module docstring
+        sitk.WriteImage(seg_bin, os.path.join(lab_out, f"{stem}.nii.gz"), True)
         shutil.copyfile(clk_bl, os.path.join(clk_out, f"{stem}.json"))
         shutil.copyfile(clk_fu, os.path.join(clk_fu_out, f"{stem}.json"))
         n += 1
