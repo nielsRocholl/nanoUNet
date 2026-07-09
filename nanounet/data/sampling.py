@@ -1,4 +1,5 @@
-"""Per-click prompt sampling: jitter authored centroids, optional false-positive clicks (gated by probability), encode positives."""
+"""Per-click prompt sampling: jitter authored centroids (skippable for already-real points via
+prompt_channels(jitter=False)), optional false-positive clicks (gated by probability), encode positives."""
 
 from __future__ import annotations
 
@@ -83,7 +84,11 @@ def prompt_channels(
     cfg: RoiPromptConfig,
     force_zero_prompt: bool,
     rng: np.random.Generator,
+    jitter: bool = True,
 ) -> np.ndarray:
+    """jitter=False for points that are already real (registered/propagated), not mask-derived
+    guesses -- apply_propagation_offset exists to simulate baseline->follow-up spread when no real
+    cross-timepoint correspondence exists; re-jittering an already-precise point only adds noise."""
     pp: List[Tuple[int, int, int]] = []
     pn: List[Tuple[int, int, int]] = []
     if not force_zero_prompt:
@@ -93,12 +98,15 @@ def prompt_channels(
             kept = list(inch)
         else:
             kept = [p for p in inch if rng.random() < cm.pos]
-        prop = cfg.sampling.propagated
-        rg2 = np.random.default_rng(int(rng.integers(0, 2**31)))
-        pp = [
-            apply_propagation_offset(p, patch_shape, prop.sigma_per_axis, prop.max_vox, rg2)
-            for p in kept
-        ]
+        if jitter:
+            prop = cfg.sampling.propagated
+            rg2 = np.random.default_rng(int(rng.integers(0, 2**31)))
+            pp = [
+                apply_propagation_offset(p, patch_shape, prop.sigma_per_axis, prop.max_vox, rg2)
+                for p in kept
+            ]
+        else:
+            pp = list(kept)
         lo_fp, hi_fp = cfg.sampling.n_false_pos
         if hi_fp <= 0 or rng.random() >= cfg.sampling.false_pos_probability:
             n_fp = 0

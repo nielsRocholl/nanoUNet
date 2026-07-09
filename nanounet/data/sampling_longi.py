@@ -2,9 +2,12 @@
 preprocessing crop). FU stream = build_patch's prompt, sourced from prop["fu_clicks_zyx"] — the
 union of BL+FU lesion ids (from nanounet_longi_clicks --clicks-fu-dir), not just real FU lesions.
 This includes "disappeared" lesions (no FU ground truth at that point), so the model is prompted
-there and supervised by seg_crop to predict nothing -> learns disappearance. BL stream = same-bbox
-crop of ch1 + ALL in-patch warped clicks (positives only, no jitter, no spurious). Null baseline
-(has_baseline false, force_zero_prompt, or the ablation switch) duplicates FU -> identity DWB."""
+there and supervised by seg_crop to predict nothing -> learns disappearance. These are already
+real registered/propagated points, not mask-derived guesses, so prompt_channels is called with
+jitter=False (apply_propagation_offset exists to simulate BL->FU spread for datasets with no real
+cross-timepoint correspondence -- not applicable here). BL stream = same-bbox crop of ch1 + ALL
+in-patch warped clicks (positives only, no jitter, no spurious). Null baseline (has_baseline false,
+force_zero_prompt, or the ablation switch) duplicates FU -> identity DWB."""
 
 from __future__ import annotations
 
@@ -44,7 +47,7 @@ def build_patch_longi(
     )
     bbox = [[a, b] for a, b in zip(bbox_lbs, bbox_ubs)]
     both_crop, seg_crop, pshape, pslc = crop_patch(data, seg, bbox)  # both_crop: (2, *pshape)
-    fu_hm = prompt_channels(seg_crop, cts, pslc, pshape, cfg, force_zero_prompt, rng)
+    fu_hm = prompt_channels(seg_crop, cts, pslc, pshape, cfg, force_zero_prompt, rng, jitter=False)
     fu_stream = np.concatenate([both_crop[0:1], fu_hm], axis=0)
 
     has_bl = prop.get("has_baseline", False)
