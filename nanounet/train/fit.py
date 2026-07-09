@@ -148,7 +148,6 @@ def run_supervised(
         args.batch_size,
         args.iters_per_epoch,
         args.val_iters,
-        mem_diag_dir=out if mem_diag_enabled() else None,
         persistent_workers=args.dl_persistent_workers,
         only_prefix=args.only_prefix,
         longi=args.longi,
