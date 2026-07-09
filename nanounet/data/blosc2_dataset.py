@@ -66,6 +66,10 @@ def load_case_properties(folder: str, identifier: str) -> dict:
     if isfile(bcj):
         with open(bcj, encoding="utf-8") as f:
             properties = {**properties, **json.load(f)}
+    fcj = join(folder, identifier + "_fu_clicks.json")
+    if isfile(fcj):
+        with open(fcj, encoding="utf-8") as f:
+            properties = {**properties, **json.load(f)}
     return properties
 
 

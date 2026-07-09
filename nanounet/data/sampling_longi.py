@@ -1,7 +1,13 @@
 """Two-stream patch from a 2-channel case: ch0 FU_CT, ch1 warped-BL_CT (voxel-aligned by a shared
-preprocessing crop). FU stream = build_patch's prompt (all in-patch centroids, jittered). BL stream
-= same-bbox crop of ch1 + ALL in-patch warped clicks (positives only, no jitter, no spurious). Null
-baseline (has_baseline false, force_zero_prompt, or the ablation switch) duplicates FU -> identity DWB."""
+preprocessing crop). FU stream = build_patch's prompt, sourced from prop["fu_clicks_zyx"] — the
+union of BL+FU lesion ids (from nanounet_longi_clicks --clicks-fu-dir), not just real FU lesions.
+This includes "disappeared" lesions (no FU ground truth at that point), so the model is prompted
+there and supervised by seg_crop to predict nothing -> learns disappearance. These are already
+real registered/propagated points, not mask-derived guesses, so prompt_channels is called with
+jitter=False (apply_propagation_offset exists to simulate BL->FU spread for datasets with no real
+cross-timepoint correspondence -- not applicable here). BL stream = same-bbox crop of ch1 + ALL
+in-patch warped clicks (positives only, no jitter, no spurious). Null baseline (has_baseline false,
+force_zero_prompt, or the ablation switch) duplicates FU -> identity DWB."""
 
 from __future__ import annotations
 
@@ -11,16 +17,6 @@ from nanounet.config import RoiPromptConfig
 from nanounet.data.sampling import _sample_bbox, crop_patch, prompt_channels
 from nanounet.prompt.centroids import filter_centroids_in_patch
 from nanounet.prompt.encoding import encode_points_to_heatmap_pair
-
-
-def _weights_from_props(properties: dict, cts_global: list) -> np.ndarray | None:
-    w = properties.get("centroid_weights")
-    if w is None:
-        return None
-    assert len(w) == len(cts_global), (len(w), len(cts_global))
-    w = np.asarray(w, dtype=np.float64)
-    s = w.sum()
-    return w / s if s > 0 else None
 
 
 def build_patch_longi(
@@ -35,8 +31,15 @@ def build_patch_longi(
     rng: np.random.Generator,
 ) -> dict:
     assert data.shape[0] == 2, data.shape  # ch0 FU_CT, ch1 warped BL_CT
-    cts = [tuple(map(int, c)) for c in prop["centroids_zyx"]]
-    weights = _weights_from_props(prop, cts)
+    assert "fu_clicks_zyx" in prop, (
+        "fu_clicks_zyx missing from case properties; preprocessed data predates the FU-click mapping "
+        "step (this is a longi-only field, not the legacy centroids_zyx).\n"
+        "Fix: nanounet_longi_clicks -d <id> --plans <plans> --clicks-dir <clicksTr> --clicks-fu-dir <clicksTrFU>"
+    )
+    cts = [tuple(map(int, c)) for c in prop["fu_clicks_zyx"]]
+    # centroid_weights were sized/ordered for the old real-FU-lesion centroids_zyx, not the new
+    # BL+FU union (which also includes disappeared-lesion points with no weight entry) -> uniform sampling.
+    weights = None
     need_to_pad = (patch_size - final_patch_size).astype(int)
     shape = np.array(data.shape[1:])
     bbox_lbs, bbox_ubs, _anchor = _sample_bbox(
@@ -44,7 +47,7 @@ def build_patch_longi(
     )
     bbox = [[a, b] for a, b in zip(bbox_lbs, bbox_ubs)]
     both_crop, seg_crop, pshape, pslc = crop_patch(data, seg, bbox)  # both_crop: (2, *pshape)
-    fu_hm = prompt_channels(seg_crop, cts, pslc, pshape, cfg, force_zero_prompt, rng)
+    fu_hm = prompt_channels(seg_crop, cts, pslc, pshape, cfg, force_zero_prompt, rng, jitter=False)
     fu_stream = np.concatenate([both_crop[0:1], fu_hm], axis=0)
 
     has_bl = prop.get("has_baseline", False)
