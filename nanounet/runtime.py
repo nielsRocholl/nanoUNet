@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from nanounet.common import cprint
-from nanounet.diag import cgroup_scope, mem_diag_enabled, purge_torch_tmp, tmp_fs_type
+from nanounet.diag import cgroup_scope, log_snapshot, mem_diag_enabled, purge_torch_tmp, tmp_fs_type
 
 
 def _is_tmpfs(path: str) -> bool:
@@ -103,7 +103,7 @@ def _git_head() -> str | None:
     return None
 
 
-def runtime_banner() -> dict[str, Any]:
+def runtime_banner(out_dir: str | None = None) -> dict[str, Any]:
     import nanounet
 
     tmp = os.environ.get("TMPDIR", "")
@@ -118,6 +118,8 @@ def runtime_banner() -> dict[str, Any]:
     n = purge_torch_tmp()
     if n:
         row["purged_tmp_files"] = n
+    if mem_diag_enabled() and out_dir:
+        log_snapshot("runtime_banner", out_dir, extra=row)
     home = os.environ.get("HOME", "")
     if home and tmp.startswith(home):
         cprint(
