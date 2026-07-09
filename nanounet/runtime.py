@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from nanounet.common import cprint
-from nanounet.diag import cgroup_scope, purge_torch_tmp, tmp_fs_type
+from nanounet.diag import cgroup_scope, mem_diag_enabled, purge_torch_tmp, tmp_fs_type
 
 
 def _is_tmpfs(path: str) -> bool:
@@ -129,3 +129,15 @@ def runtime_banner() -> dict[str, Any]:
         f"git={row['git_head'] or '?'}[/dim]"
     )
     return row
+
+
+def assert_mem_diag_cgroup() -> None:
+    if not mem_diag_enabled():
+        return
+    if os.environ.get("NANOUNET_ALLOW_ROOT_CGROUP", "").strip() in ("1", "true", "yes"):
+        return
+    if cgroup_scope() == "root" and not os.environ.get("SLURM_JOB_ID"):
+        raise RuntimeError(
+            "mem-diag on root cgroup (0::/) measures node-wide RAM, not this process. "
+            "Submit via Slurm or set NANOUNET_ALLOW_ROOT_CGROUP=1 to override."
+        )
