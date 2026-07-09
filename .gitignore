@@ -68,7 +68,12 @@ Thumbs.db
 # NanoUNet_results/
 
 wandb/
-graphify-out/
+# graphify — keep graph artifacts, ignore machine-local cache
+graphify-out/cache/
+graphify-out/20*/
+graphify-out/.graphify_python
+graphify-out/.graphify_root
+graphify-out/cost.json
 _attic/
 arXiv-2605.23118v1/
 scripts/arXiv-2605.23118v1/
