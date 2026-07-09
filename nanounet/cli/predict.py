@@ -16,8 +16,9 @@ from nanounet.config import load_config
 from nanounet.infer.border_expand import DEFAULT_MAX_BORDER_EXPAND_EXTRA
 from nanounet.infer.export import export_prediction_from_logits
 from nanounet.infer.predict_case import predict_case_logits
-from nanounet.infer.predict_io import patient_ids_from_csv, preprocess_case
+from nanounet.infer.predict_io import baseline_resolver, check_baseline_files, patient_ids_from_csv, preprocess_case
 from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
+from nanounet.model.dwb import LongiResEncUNet
 from nanounet.plan.labels import labels_from_dataset_json
 from nanounet.plan.plans import Plans
 
@@ -30,11 +31,10 @@ def main() -> None:
     ap.add_argument("--ckpt", default=None)
     ap.add_argument("--points", default=None, help="points JSON (single mode)")
     ap.add_argument("--baseline-image", default=None, help="sibling BL .nii.gz for two-stream longi inference")
-    ap.add_argument("--baseline-points", default=None, help="BL partner points JSON, parallel to --points")
-    ap.add_argument("--baseline-image-dir", default=None,
-                    help="folder mode: per-case BL .nii.gz, looked up by case id (same stem as -i)")
-    ap.add_argument("--baseline-points-dir", default=None,
-                    help="folder mode: per-case BL partner points JSON, looked up by case id")
+    ap.add_argument("--baseline-points", default=None,
+                    help="BL click set JSON (single mode), same format as --points (native voxel x,y,z, FU-registered frame)")
+    ap.add_argument("--baseline-dir", default=None,
+                    help="dataset mode: dir with per-case BL <cid>.nii.gz + <cid>.json (longi)")
     ap.add_argument("--longi", action="store_true", help="force two-stream net build (else auto-detect from ckpt)")
     ap.add_argument("--no-prompt-encode", action="store_true")
     ap.add_argument("--border-expand", action="store_true")
@@ -75,12 +75,6 @@ def main() -> None:
         raise SystemExit("--baseline-points requires --baseline-image")
     if args.baseline_image and not args.baseline_points:
         raise SystemExit("--baseline-image requires --baseline-points")
-    if args.baseline_points_dir and not args.baseline_image_dir:
-        raise SystemExit("--baseline-points-dir requires --baseline-image-dir")
-    if args.baseline_image_dir and not args.baseline_points_dir:
-        raise SystemExit("--baseline-image-dir requires --baseline-points-dir")
-    if args.baseline_image_dir and args.baseline_image:
-        raise SystemExit("use either --baseline-image or --baseline-image-dir, not both")
 
     d = args.device
     if d == "cuda" and not torch.cuda.is_available():
@@ -118,6 +112,24 @@ def main() -> None:
         maybe_mkdir_p(out_dir)
         cases = [(case_id, scan, args.points, out_trunc)]
 
+    is_longi = isinstance(net, LongiResEncUNet)
+    if single_mode and args.baseline_dir:
+        raise SystemExit("--baseline-dir is for dataset mode; single mode uses --baseline-image/--baseline-points")
+    if not single_mode and (args.baseline_image or args.baseline_points):
+        raise SystemExit("dataset mode uses --baseline-dir (per-case BL); not --baseline-image/--baseline-points")
+    resolve_bl, bl_present = baseline_resolver(args.baseline_image, args.baseline_points, args.baseline_dir, end)
+    if bl_present and not is_longi:
+        raise SystemExit("baseline given but checkpoint is not longi (no dwb.* keys). Drop --baseline-* or pass a longi ckpt.")
+    if is_longi and not bl_present:
+        cprint("[yellow]longi checkpoint without a baseline: running null-baseline (single-timepoint identity)[/yellow]")
+    if args.baseline_dir:
+        check_baseline_files(cases, resolve_bl, args.baseline_dir, end)
+
+    config_table(
+        [("longi", "on" if bl_present else ("null-baseline" if is_longi else "off"), "cli/ckpt")],
+        title="nanoUNet predict",
+    )
+
     n = len(cases)
 
     def out_trunc_for(ot: str | None, case_id: str) -> str:
@@ -129,47 +141,31 @@ def main() -> None:
         cprint(f"[dim][{idx}/{n}] skip {case_id} (exists)[/dim]")
         return True
 
-    def gpu_export(case_id: str, idx: int, out_trunc: str, pack) -> None:
+    def gpu_export(case_id: str, idx: int, out_trunc: str, pack, bl_case: bool) -> None:
         t0 = time.perf_counter()
-        pad_cpu, slicer_revert, props, points_xyz, bl_pack = pack
-        kw = dict(
+        pad_cpu, slicer_revert, props, points_xyz, bl_points = pack
+        logits = predict_case_logits(
             net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dj=dj, dev=dev,
             pad=pad_cpu.to(dev), slicer_revert=slicer_revert, props=props, points_xyz=points_xyz,
             encode_prompt=not args.no_prompt_encode, use_tta=use_tta,
             border_expand=args.border_expand, max_border_expand_extra=args.max_border_extra,
             batch_size=args.batch_size, use_amp=not args.no_amp,
-            cluster_margin_frac=args.cluster_margin_frac,
-            mode=args.inference_mode,
-            merge=args.merge,
+            cluster_margin_frac=args.cluster_margin_frac, mode=args.inference_mode, merge=args.merge,
+            is_longi=is_longi, bl_present=bl_case, bl_points_xyz=bl_points,
         )
-        if bl_pack is not None:
-            pad_bl, bl_slicer, bl_props, bl_pts = bl_pack
-            kw.update(pad_bl=pad_bl.to(dev), bl_points_xyz=bl_pts, bl_props=bl_props, bl_slicer_revert=bl_slicer)
-        logits = predict_case_logits(**kw)
         export_prediction_from_logits(logits, props, cm, pl, dj, out_trunc)
         cprint(f"[bold green][{idx}/{n}] {case_id} ({time.perf_counter() - t0:.1f}s)[/bold green]")
 
-    def consume(idx: int, case_id: str, out_trunc: str, pack) -> None:
-        gpu_export(case_id, idx, out_trunc, pack)
-
-    def bl_paths_for(cid: str) -> tuple[str | None, str | None]:
-        if args.baseline_image_dir:
-            bl_scan = join(args.baseline_image_dir, cid + end)
-            bl_json = join(args.baseline_points_dir, cid + ".json")
-            if not os.path.isfile(bl_scan):
-                raise FileNotFoundError(f"--baseline-image-dir missing case: {bl_scan}")
-            if not os.path.isfile(bl_json):
-                raise FileNotFoundError(f"--baseline-points-dir missing case: {bl_json}")
-            return bl_scan, bl_json
-        return args.baseline_image, args.baseline_points
+    def consume(idx: int, case_id: str, out_trunc: str, pack, bl_case: bool) -> None:
+        gpu_export(case_id, idx, out_trunc, pack, bl_case)
 
     if n == 1 or args.num_workers <= 0:
         for i, (cid, scan, jp, ot) in enumerate(cases, 1):
             out = out_trunc_for(ot, cid)
             if skip_case(cid, i, out):
                 continue
-            bl_scan, bl_json = bl_paths_for(cid)
-            consume(i, cid, out, preprocess_case(scan, jp, pl, cm, dj, bl_scan, bl_json))
+            bs, bj = resolve_bl(cid)
+            consume(i, cid, out, preprocess_case(scan, jp, pl, cm, dj, bs, bj), bs is not None)
         cprint(f"[green]done — {n} case(s) → {out_dir}[/green]")
         return
 
@@ -179,14 +175,15 @@ def main() -> None:
         out = out_trunc_for(ot, cid)
         if skip_case(cid, i, out):
             continue
-        bl_scan, bl_json = bl_paths_for(cid)
-        inflight.append((i, cid, out, pool.submit(preprocess_case, scan, jp, pl, cm, dj, bl_scan, bl_json)))
+        bs, bj = resolve_bl(cid)
+        inflight.append((i, cid, out, bs is not None,
+                         pool.submit(preprocess_case, scan, jp, pl, cm, dj, bs, bj)))
         if len(inflight) > args.num_workers:
-            idx, case_id, ot, fut = inflight.popleft()
-            consume(idx, case_id, ot, fut.result())
+            idx, case_id, ot, bl_case, fut = inflight.popleft()
+            consume(idx, case_id, ot, fut.result(), bl_case)
     while inflight:
-        idx, case_id, ot, fut = inflight.popleft()
-        consume(idx, case_id, ot, fut.result())
+        idx, case_id, ot, bl_case, fut = inflight.popleft()
+        consume(idx, case_id, ot, fut.result(), bl_case)
     pool.shutdown(wait=True)
     cprint(f"[green]done — {n} case(s) → {out_dir}[/green]")
 

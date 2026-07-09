@@ -37,7 +37,8 @@ nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
 | `--ckpt` | str | auto | Checkpoint name/path; `auto` → `checkpoints/last.ckpt` |
 | `--points` | str | none | Points JSON (**single mode only**) |
 | `--baseline-image` | str | none | Sibling BL `.nii.gz` for two-stream longi inference |
-| `--baseline-points` | str | none | BL partner points JSON, parallel to `--points` |
+| `--baseline-points` | str | none | BL click set JSON (**single mode**), same format as `--points`; native voxel `(x,y,z)` in the FU-registered frame |
+| `--baseline-dir` | str | none | **Dataset mode** longi: dir with per-case BL `<cid>.nii.gz` + `<cid>.json` |
 | `--longi` | flag | off | Force two-stream net build (else auto-detect from ckpt) |
 | `--no-prompt-encode` | flag | off | Zero the 2 prompt channels |
 | `--border-expand` | flag | off | Large-lesion extra border patches (BFS per cluster) |
@@ -77,7 +78,12 @@ Points JSON format: `{"points": [{"name": "1", "point": [x, y, z]}, ...]}`. Empt
 |-------|-------|-----|
 | `missing points JSON for: …` | Dataset mode without sibling JSON | Add `<basename>.json` next to each scan |
 | `single mode requires --points` | Single `.nii.gz` without points | Pass `--points` |
-| `--baseline-points requires --baseline-image` | Longi flags mismatched | Pass both or neither |
+| `--baseline-points requires --baseline-image` | Longi flags mismatched (single mode) | Pass both or neither |
+| `--baseline-dir is for dataset mode` | `--baseline-dir` in single mode | Use `--baseline-image`/`--baseline-points` |
+| `dataset mode uses --baseline-dir` | `--baseline-image`/`--baseline-points` in dataset mode | Use `--baseline-dir` |
+| `baseline given but checkpoint is not longi` | Baseline flags with non-longi ckpt | Drop `--baseline-*` or use a longi ckpt |
+| `Baseline geometry does not match follow-up` | BL not registered into FU frame | Run `nanounet_register_longi` first |
+| `Missing baseline files for longi dataset inference` | Missing BL siblings in `--baseline-dir` | Build with `nanounet_register_longi` |
 | Missing checkpoint | Wrong `--ckpt` or incomplete train | Verify path under `checkpoints/` or `finetune/` |
 | CUDA unavailable | No GPU | Use `--device cpu` or `mps` |
 

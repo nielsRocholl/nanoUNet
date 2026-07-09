@@ -10,7 +10,7 @@ from torch import autocast
 
 from nanounet.infer.border_expand import plan_border_expansion_centers_from_logits
 from nanounet.infer.gaussian import gaussian_tile
-from nanounet.infer.longi_row import bl_partner_for_cluster, encode_inference_row
+from nanounet.infer.longi_row import encode_inference_row
 from nanounet.infer.roi_slices import (
     background_logits_vector,
     centered_spatial_slices_at_point,
@@ -30,21 +30,6 @@ def _acc_dtype(dev: torch.device) -> torch.dtype:
         return torch.float32
     r = (os.environ.get(ACC_DTYPE_ENV) or "").lower()
     return torch.float16 if r in ("half", "float16", "fp16") else torch.float32
-
-
-def _map_bl_pts_pad(bl_points_xyz, bl_props, bl_slicer_revert, cm, pl):
-    bl_unpadded = tuple(s.stop - s.start for s in bl_slicer_revert[1:])
-    bl_pts_pad = [None] * len(bl_points_xyz)
-    for i, pt in enumerate(bl_points_xyz):
-        if pt is None:
-            continue
-        x, y, z = pt
-        pre_i = points_to_centers_zyx(
-            [(z, y, x)], "voxel", bl_props, bl_unpadded, tuple(cm.spacing), pl.transpose_forward,
-            voxel_coordinate_frame="full",
-        )
-        bl_pts_pad[i] = map_points_zyx_unpadded_to_padded(pre_i, bl_slicer_revert)[0]
-    return bl_pts_pad
 
 
 @torch.inference_mode()
@@ -70,10 +55,9 @@ def predict_case_logits(
     cluster_margin_frac: float = 0.1,
     mode: str = "clustered",
     merge: str = "max",
-    pad_bl: torch.Tensor | None = None,
+    is_longi: bool = False,
+    bl_present: bool = False,
     bl_points_xyz: list | None = None,
-    bl_props: dict | None = None,
-    bl_slicer_revert: tuple | None = None,
 ) -> torch.Tensor:
     assert mode in ("clustered", "centered")
     assert merge in ("max", "average")
@@ -81,9 +65,11 @@ def predict_case_logits(
     padded_shape = tuple(pad.shape[1:])
     unpadded_shape = tuple(s.stop - s.start for s in slicer_revert[1:])
     nh = lm.num_segmentation_heads
-    n_img = pad.shape[0]
+    # longi net = 1 CT per stream (build_net_longi); joint volume has 2 channels when a baseline is
+    # present, else 1 (null-baseline single-timepoint). Non-longi is always pad.shape[0] modalities.
+    n_img = pad.shape[0] // 2 if (is_longi and bl_present) else pad.shape[0]
     n_stream = n_img + 2
-    row_ch = 2 * n_stream if pad_bl is not None else n_stream
+    row_ch = 2 * n_stream if is_longi else n_stream
     acc_dtype = _acc_dtype(dev)
     gaussian = gaussian_tile(patch_size, dev, torch.float32)
     gaussian_acc = gaussian.to(acc_dtype)
@@ -100,8 +86,13 @@ def predict_case_logits(
     )
     pts_pad = map_points_zyx_unpadded_to_padded(pre, slicer_revert)
     bl_pts_pad = None
-    if pad_bl is not None and bl_points_xyz is not None and bl_props is not None and bl_slicer_revert is not None:
-        bl_pts_pad = _map_bl_pts_pad(bl_points_xyz, bl_props, bl_slicer_revert, cm, pl)
+    if is_longi and bl_present and bl_points_xyz:
+        bl_zyx = [(z, y, x) for x, y, z in bl_points_xyz]
+        bl_pre = points_to_centers_zyx(
+            bl_zyx, "voxel", props, unpadded_shape, tuple(cm.spacing), pl.transpose_forward,
+            voxel_coordinate_frame="full",
+        )
+        bl_pts_pad = map_points_zyx_unpadded_to_padded(bl_pre, slicer_revert)
 
     if mode == "clustered":
         seeds_pts = cluster_points_for_patch_size(pts_pad, patch_size, cluster_margin_frac)
@@ -118,14 +109,14 @@ def predict_case_logits(
             seeds_pts.append([p])
             seed_slices.append(sl)
 
-    rows, bl_meta = [], []
+    rows = []
     for cl, (sz, sy, sx) in zip(seeds_pts, seed_slices):
         row = torch.empty((row_ch, *patch_size), device=dev, dtype=torch.float32)
-        bp, anchor = bl_partner_for_cluster(cl, pts_pad, bl_pts_pad)
-        encode_inference_row(row, pad, sz, sy, sx, n_img, cl, encode_prompt, cfg, patch_size, dev,
-                             pad_bl, bp, anchor if bp is not None else None)
+        encode_inference_row(
+            row, pad, sz, sy, sx, n_img, cl, encode_prompt, cfg, patch_size, dev,
+            is_longi=is_longi, bl_present=bl_present, bl_pts_pad=bl_pts_pad,
+        )
         rows.append(row)
-        bl_meta.append((bp, anchor))
 
     seed_raw: list[torch.Tensor] = []
     for i in range(0, len(rows), batch_size):
@@ -161,7 +152,6 @@ def predict_case_logits(
         for i, cl in enumerate(seeds_pts):
             sz, sy, sx = seed_slices[i]
             raw, seed_key = seed_raw[i], spatial_slices_to_tuple(*seed_slices[i])
-            bp, anchor = bl_meta[i]
             vis = {seed_key}
             q = deque(plan_border_expansion_centers_from_logits(
                 raw, lm, sz, sy, sx, patch_size, padded_shape, seed_key, max_border_expand_extra, skip_keys=vis))
@@ -174,8 +164,10 @@ def predict_case_logits(
                     continue
                 vis.add(ke)
                 workon = torch.empty((1, row_ch, *patch_size), device=dev, dtype=torch.float32)
-                encode_inference_row(workon[0], pad, sze, sye, sxe, n_img, cl, encode_prompt, cfg, patch_size, dev,
-                                     pad_bl, bp, anchor if bp is not None else None)
+                encode_inference_row(
+                    workon[0], pad, sze, sye, sxe, n_img, cl, encode_prompt, cfg, patch_size, dev,
+                    is_longi=is_longi, bl_present=bl_present, bl_pts_pad=bl_pts_pad,
+                )
                 with autocast(dev.type, enabled=amp_on):
                     raw_e = predict_batch_with_tta(net, workon, use_tta)[0].float()
                 accumulate(raw_e, sze, sye, sxe)

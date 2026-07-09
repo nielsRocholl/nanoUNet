@@ -36,21 +36,6 @@ def spatial_slices_from_lbs(
     return tuple(slice(starts[i], starts[i] + patch_size[i]) for i in range(3))
 
 
-def colocated_spatial_slices(
-    bl_pt: Tuple[int, int, int],
-    fu_local: Tuple[int, int, int],
-    patch_size: Tuple[int, int, int],
-    padded_shape: Tuple[int, int, int],
-) -> tuple[slice, slice, slice]:
-    return spatial_slices_from_lbs(
-        bl_pt[0] - fu_local[0],
-        bl_pt[1] - fu_local[1],
-        bl_pt[2] - fu_local[2],
-        patch_size,
-        padded_shape,
-    )
-
-
 def spatial_slices_to_tuple(sz: slice, sy: slice, sx: slice) -> Tuple[int, int, int, int, int, int]:
     return (sz.start, sz.stop, sy.start, sy.stop, sx.start, sx.stop)
 

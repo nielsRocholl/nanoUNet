@@ -1,33 +1,15 @@
-"""Two-stream inference row encoding: FU half + co-located BL half (exact BL click)."""
+"""Two-stream inference row on a JOINT 2-channel volume (ch0 FU CT, ch1 BL CT sharing one
+preprocessing crop, so FU/BL are voxel-aligned — same grid as training's build_patch_longi).
+BL stream = same-bbox crop of ch1 + all in-patch BL clicks. Null baseline (no BL image, or prompts
+disabled) duplicates the FU stream -> DWB(x_FU - x_FU)=0 -> identity (single-timepoint fallback)."""
 
 from __future__ import annotations
 
 import torch
 
-from nanounet.infer.roi_slices import (
-    colocated_spatial_slices,
-    local_prompt_points_for_patch,
-)
+from nanounet.infer.roi_slices import local_prompt_points_for_patch
 from nanounet.prompt.cluster import cluster_prompts_patch_local
 from nanounet.prompt.encoding import encode_points_to_heatmap_pair
-
-
-def bl_partner_for_cluster(
-    cl: list[tuple[int, int, int]],
-    pts_pad: list[tuple[int, int, int]],
-    bl_pts_pad: list | None,
-) -> tuple[tuple[int, int, int] | None, tuple[int, int, int]]:
-    if bl_pts_pad is None:
-        return None, cl[0]
-    for p in cl:
-        try:
-            i = pts_pad.index(p)
-        except ValueError:
-            continue
-        bp = bl_pts_pad[i]
-        if bp is not None:
-            return bp, p
-    return None, cl[0]
 
 
 def encode_inference_row(
@@ -42,12 +24,13 @@ def encode_inference_row(
     cfg,
     patch_size: tuple[int, int, int],
     dev: torch.device,
-    pad_bl: torch.Tensor | None = None,
-    bl_partner: tuple[int, int, int] | None = None,
-    bl_anchor: tuple[int, int, int] | None = None,
+    *,
+    is_longi: bool = False,
+    bl_present: bool = False,
+    bl_pts_pad: list[tuple[int, int, int]] | None = None,
 ) -> None:
     n_stream = n_img + 2
-    row[:n_img] = pad[:, sz, sy, sx]
+    row[:n_img] = pad[:n_img, sz, sy, sx]
     if not encode_prompt:
         row[n_img:n_stream].zero_()
     else:
@@ -59,17 +42,17 @@ def encode_inference_row(
             device=dev, intensity_scale=cfg.prompt.prompt_intensity_scale,
         )
         row[n_img:n_stream] = pr.float()
-    if pad_bl is None:
+    if not is_longi:
         return
-    fu_half = row[:n_stream]
-    if bl_partner is None or bl_anchor is None:
-        row[n_stream:] = fu_half
+    # Null baseline: duplicate FU -> identity DWB (matches training force_zero_prompt / not has_bl).
+    if not bl_present or not encode_prompt:
+        row[n_stream:] = row[:n_stream]
         return
-    fu_local = (bl_anchor[0] - sz.start, bl_anchor[1] - sy.start, bl_anchor[2] - sx.start)
-    bz, by, bx = colocated_spatial_slices(bl_partner, fu_local, patch_size, tuple(pad_bl.shape[1:]))
-    row[n_stream : n_stream + n_img] = pad_bl[:, bz, by, bx]
+    # Real baseline: same bbox crops ch1 because the joint 2-ch crop keeps FU/BL voxel-aligned.
+    row[n_stream : n_stream + n_img] = pad[n_img : 2 * n_img, sz, sy, sx]
+    bl_local = cluster_prompts_patch_local(bl_pts_pad, sz, sy, sx) if bl_pts_pad else []
     bl_pr = encode_points_to_heatmap_pair(
-        [fu_local], [], patch_size, cfg.prompt.point_radius_vox, cfg.prompt.encoding,
+        bl_local, [], patch_size, cfg.prompt.point_radius_vox, cfg.prompt.encoding,
         device=dev, intensity_scale=cfg.prompt.prompt_intensity_scale,
     )
     row[n_stream + n_img :] = bl_pr.float()

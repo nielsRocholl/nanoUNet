@@ -15,23 +15,30 @@ flowchart LR
 
 ## Two-stream inference
 
-For `--longi` finetune checkpoints, pass the baseline scan and pre-propagation BL centroids so the model receives a co-located BL stream (identity fallback when a partner is absent).
+FU + baseline are preprocessed **jointly as one 2-channel case** at inference (same as training):
+one nonzero crop → FU/BL voxel-aligned → clustered mode and `--border-expand` (large-lesion
+oversampling) behave exactly like the normal promptable model, and output is the **FU**
+segmentation.
 
 ```bash
 nanounet_predict \
-  -i followup.nii.gz \
-  -o out/pred \
-  -m "$MODEL_DIR" \
-  --ckpt finetune/best-epoch=412-val_dice_macro=0.6649.ckpt \
+  -i followup.nii.gz -o out/pred.nii.gz \
+  -m "$MODEL_DIR" --ckpt finetune/best.ckpt \
   --points fu_points.json \
-  --baseline-image baseline.nii.gz \
-  --baseline-points bl_partners.json \
+  --baseline-image baseline.nii.gz --baseline-points bl_clicks.json \
   --inference-mode clustered --merge max --border-expand
 ```
 
-- `--baseline-image`: sibling BL `.nii.gz`, preprocessed with the same path as FU.
-- `--baseline-points`: same `points` list format as `--points`; one BL partner per FU prompt (`null` for new lesions). Length must match FU points list.
-- Without both flags, inference stays single-stream. Net auto-detects longi from `net.dwb.*` keys; pass `--longi` to force.
+- `--baseline-image`: sibling BL `.nii.gz`, **already registered into the FU frame** (same
+  size/spacing as FU; `nanounet_register_longi` produces this). It is NOT re-preprocessed
+  separately.
+- `--baseline-points`: a **plain BL click set** (same JSON as `--points`), native voxel `(x,y,z)` in
+  the FU-registered frame — one entry per baseline lesion, **not** a partner list parallel to
+  `--points`.
+- Without both flags a longi checkpoint runs **null-baseline** (duplicated FU stream → identity DWB
+  → single-timepoint behaviour).
+- Dataset mode: use `--baseline-dir <dir>` with `<cid>.nii.gz` + `<cid>.json` per FU case.
+- Net auto-detects longi from `net.dwb.*` keys; pass `--longi` to force.
 
 ---
 
