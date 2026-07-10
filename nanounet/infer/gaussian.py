@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from typing import List, Tuple, Union
 
 import numpy as np
 import torch
 from scipy.ndimage import gaussian_filter
+
+
+ACC_DTYPE_ENV = "NANOUNET_SINGLE_PATCH_ACCUM_DTYPE"
+
+
+def accum_dtype(dev: torch.device) -> torch.dtype:
+    if dev.type == "cpu":
+        return torch.float32
+    r = (os.environ.get(ACC_DTYPE_ENV) or "").lower()
+    return torch.float16 if r in ("half", "float16", "fp16") else torch.float32
 
 
 @lru_cache(maxsize=8)
