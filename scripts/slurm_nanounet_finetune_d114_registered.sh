@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --qos=vram
-#SBATCH --constraint=a100
+#SBATCH --nodelist=dlc-arceus
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=160G
@@ -52,10 +52,7 @@ REMOTE_PREP="${STORAGE}/NanoUNet_preprocessed/${DS_FOLDER}"
 mkdir -p "$LOCAL_PREP/${DS_FOLDER}"
 
 DATA_ID=$(python3 -c "import json; print(json.load(open('${REMOTE_PREP}/${PLANS_NAME}.json'))['configurations']['3d_fullres']['data_identifier'])")
-
-# A100-40GB only: batch size straight from the plans file (=6). No H200/batch-10 branch.
-BATCH_SIZE=$(python3 -c "import json; print(json.load(open('${REMOTE_PREP}/${PLANS_NAME}.json'))['configurations']['3d_fullres']['batch_size'])")
-echo "batch_size=$BATCH_SIZE lr=$LR"
+echo "lr=$LR (batch size taken from plans file)"
 
 rclone copy "$REMOTE_PREP/" "$LOCAL_PREP/${DS_FOLDER}" \
   --progress --transfers 32 --multi-thread-streams 16 --no-update-modtime --retries 5 --copy-links \
@@ -70,7 +67,7 @@ INIT_CKPT="${NANOUNET_RESULTS}/nanounet/${BASE_DS_FOLDER}_${PLANS_NAME}_f${FOLD}
 OUT="${NANOUNET_RESULTS}/nanounet/${DS_FOLDER}_${PLANS_NAME}_f${FOLD}_finetune_dwb"
 rm -rf "$OUT"
 
-WANDB_NAME="Dataset114_registered_f0_finetune_dwb_adamw${LR}_bs${BATCH_SIZE}_500ep"
+WANDB_NAME="Dataset114_registered_f0_finetune_dwb_adamw${LR}_500ep"
 
 nanounet_train \
   -d "$DATASET_ID" \
@@ -81,7 +78,6 @@ nanounet_train \
   --longi \
   --out "$OUT" \
   --epochs "$FT_EPOCHS" \
-  --batch-size "$BATCH_SIZE" \
   --optimizer adamw \
   --lr "$LR" \
   --wd 3e-5 \
