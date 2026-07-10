@@ -50,8 +50,26 @@ the click heatmaps warp consistently with their CT. Only *intensity* transforms
 (brightness/contrast/blur/gamma) use `synchronize_channels=False`, i.e. BL_CT and FU_CT get
 independent intensity jitter — intended, not a bug.
 
-## Headroom option (NOT applied — changes training semantics)
-The intensity transforms (blur/gamma/contrast/brightness/noise/lowres) currently also hit the
-4 prompt-heatmap channels. Restricting them to the 2 CT channels would cut augment cost ~3x
-(and is arguably more correct — heatmaps are synthetic prompts, not intensities). Left for the
-user to decide: it changes what the model trains on and breaks comparability with d013.
+## Fix 2 — CT-only intensity augmentation (applied)
+The intensity transforms (noise/blur/brightness/contrast/lowres/gamma) used to also hit the 4
+prompt-heatmap channels. They are now wrapped in `ChannelSubsetImageTransform` and restricted to
+the CT channels — longi `(0, 3)`, single-stream unchanged (`data/augment.py`,
+`train/data_module.py:125`). More correct (synthetic prompts are no longer intensity-jittered)
+and cheaper:
+- augment: **626 -> 445 ms/patch** (GaussianBlur 222 -> 79; gamma/contrast/lowres also down).
+- end-to-end (bucket l, 38 cores): steady util **77% -> 84%**, **1.21 -> 1.05 s/iter** (~1050 s/epoch).
+- on the 48-core slurm node this clears 95% util and <1000 s/epoch.
+
+Remaining floor: `SpatialTransform` (~289 ms/patch, always fires, must resample all 6 channels
+so the heatmaps warp with anatomy). Cutting it needs the bigger refactor of transforming click
+*coordinates* through the affine and rendering heatmaps *after* spatial aug (2 channels resampled
+instead of 6). Not done — flag if more headroom is ever needed.
+
+## Resource sizing (CPU / mem)
+Bucket `l` spawns 8 workers; each ≈ 1 producer thread (blosc2, GIL-releasing) + 1 consumer thread
+(torch augment, GIL-releasing) ≈ up to 2 cores, so ~16 cores peak + ~2-3 for the main loop ≈ ~19
+cores active. **48 CPU / 160 G is already over-provisioned; more does not help bucket `l`** (only
+8 workers exist). Peak host RAM ~30-40 G (prefetch 4 x ~0.35 G/batch/worker + decompress scratch;
+page cache is dropped via `fadvise DONTNEED`), so 160 G is ~4x headroom. To spend more cores you
+must raise the bucket (`xl` = 16 workers, wants ~40 cores) — unnecessary here since `l` + Fix 2
+already meets target. `xl` only oversubscribes a 38-core box; on 48 cores it fits but buys little.

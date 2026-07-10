@@ -122,7 +122,10 @@ class NanoDataModule(pl.LightningDataModule):
         fl = self.label_manager.foreground_labels
         reg = self.label_manager.foreground_regions if self.label_manager.has_regions else None
         ign = self.label_manager.ignore_label
-        self.train_tf = augment.train_transforms(ps, rot, dss, mirrors, do_dum, umn, False, fl, reg, ign)
+        # Longi tensor is 6ch [FU_CT, hm+, hm-, BL_CT, hm+, hm-]; keep intensity aug off the
+        # prompt-heatmap channels (correctness + ~3x cheaper augment). Single-stream: all channels.
+        intensity_ch = (0, 3) if self.longi else None
+        self.train_tf = augment.train_transforms(ps, rot, dss, mirrors, do_dum, umn, False, fl, reg, ign, intensity_channels=intensity_ch)
         self.val_tf = augment.val_transforms(dss, False, fl, reg, ign)
         self.patch_size = ps
         self.final_ps = ps
