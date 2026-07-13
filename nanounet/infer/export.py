@@ -42,6 +42,14 @@ def convert_logits_to_seg_shape(
     return full
 
 
+def save_preprocessed_seg(seg: np.ndarray, spacing: tuple[float, ...], out_path: str) -> None:
+    import SimpleITK as sitk
+
+    img = sitk.GetImageFromArray(seg.astype(np.uint8))
+    img.SetSpacing(tuple(float(s) for s in spacing))
+    sitk.WriteImage(img, out_path)
+
+
 def export_prediction_from_logits(
     logits: Union[np.ndarray, torch.Tensor],
     props: dict,

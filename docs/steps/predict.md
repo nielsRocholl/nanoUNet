@@ -88,3 +88,43 @@ Points JSON format: `{"points": [{"name": "1", "point": [x, y, z]}, ...]}`. Empt
 | CUDA unavailable | No GPU | Use `--device cpu` or `mps` |
 
 Longitudinal two-stream inference: [longi.md](longi.md).
+
+## Preprocessed longi test inference (`nanounet_predict_preprocessed`)
+
+For held-out test sets already in `NanoUNet_preprocessed/` (`.b2nd` + click sidecars). Skips raw NIfTI preprocess and scanner-space export; writes segmentations in **preprocessed resampled space** (same grid as `<case>_seg.b2nd`).
+
+```bash
+nanounet_predict_preprocessed \
+  -m /nnunet_data/NanoUNet_results/nanounet/Dataset114_longi_nnUNetResEncUNetLPlans_h200_smallpv_f0_finetune_dwb \
+  --ckpt finetune/last.ckpt \
+  -i /nnunet_data/NanoUNet_preprocessed/Dataset115_longi_test/nnUNetPlans_3d_fullres \
+  -o /nnunet_data/NanoUNet_preprocessed/Dataset115_longi_test/preds \
+  --border-expand --batch-size 16 --num-workers 8
+```
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `-m`, `--model-dir` | str | (required) | Longi training run dir |
+| `-i`, `--input` | str | (required) | Preprocessed `data_identifier` folder (`nnUNetPlans_3d_fullres`) |
+| `-o`, `--output` | str | (required) | Output preds folder (`<case>.nii.gz` per case) |
+| `--ckpt` | str | auto | Checkpoint; finetune runs live under `finetune/` |
+| `--border-expand` | flag | off | Large-lesion extra border patches |
+| `--max-border-extra` | int | `16` | Max extra patches per cluster |
+| `--tta` / `--disable-tta` | flag | from config | Force TTA on / off |
+| `--batch-size` | int | `16` | GPU patch mini-batch |
+| `--num-workers` | int | `8` | CPU blosc2+pad prefetch threads |
+| `--inference-mode` | choice | `clustered` | `clustered` \| `centered` |
+| `--merge` | choice | `max` | `max` \| `average` |
+| `--device` | choice | `cuda` | `cuda` \| `cpu` (CUDA required for practical throughput) |
+| `--no-amp` | flag | off | Disable autocast |
+| `--overwrite` | flag | off | Re-run cases whose output exists |
+
+**Inputs:** `<case>.b2nd` (2-channel longi), `<case>_fu_clicks.json`, `<case>_bl_clicks.json` (from `nanounet_longi_clicks`).
+
+**Outputs:** `<out>/<case>.nii.gz` in preprocessed spacing.
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `No .b2nd cases in …` | Wrong `-i` path | Point at `.../NanoUNet_preprocessed/<Dataset>/<data_identifier>` |
+| `Missing fu_clicks_zyx sidecars` | Clicks not mapped | `nanounet_longi_clicks -d <id> --plans <plans> --clicks-dir … --clicks-fu-dir …` |
+| `CUDA requested but … False` | No GPU | Run on a CUDA node |

@@ -1,15 +1,18 @@
-"""Predict-side host IO: patient-id CSV filter, single-case CPU preprocess (joint longi 2-ch)."""
+"""Predict-side host IO: patient-id CSV filter, raw + preprocessed b2nd case load (joint longi 2-ch)."""
 
 from __future__ import annotations
 
 import csv
 import os
 
+import blosc2
 import numpy as np
 import SimpleITK as sitk
 import torch
 from acvl_utils.cropping_and_padding.padding import pad_nd_image
+from batchgenerators.utilities.file_and_folder_operations import join
 
+from nanounet.data.blosc2_dataset import Blosc2Folder, load_case_properties
 from nanounet.plan.prep.case_pp import run_case
 from nanounet.prompt.coords import load_points_xyz
 
@@ -82,3 +85,53 @@ def preprocess_case(scan: str, json_path: str, pl, cm, dj, bl_scan=None, bl_json
     points = load_points_xyz(json_path)
     bl_points = load_points_xyz(bl_json) if bl_json else None
     return pad, slicer_revert, props, points, bl_points
+
+
+def _zyx_to_xyz(clicks: list) -> list[tuple[float, float, float]]:
+    return [(float(x), float(y), float(z)) for z, y, x in clicks]
+
+
+def check_preprocessed_folder(folder: str) -> list[str]:
+    if not os.path.isdir(folder):
+        raise FileNotFoundError(
+            f"Preprocessed folder not found: {folder}\n"
+            f"Expected a data_identifier dir with <case>.b2nd and click sidecars.\n"
+            f"Fix: pass -i .../NanoUNet_preprocessed/<Dataset>/nnUNetPlans_3d_fullres   (see docs/steps/predict.md)"
+        )
+    ids = Blosc2Folder(folder).identifiers
+    if not ids:
+        raise FileNotFoundError(
+            f"No .b2nd cases in {folder}.\n"
+            f"Expected preprocessed longi cases from nanounet_preprocess + nanounet_longi_clicks.\n"
+            f"Fix: nanounet_preprocess -d <id> && nanounet_longi_clicks -d <id> --plans <plans>   (see docs/steps/preprocess.md)"
+        )
+    missing = []
+    for cid in ids:
+        props = load_case_properties(folder, cid)
+        if "fu_clicks_zyx" not in props:
+            missing.append(cid)
+    if missing:
+        raise FileNotFoundError(
+            f"Missing fu_clicks_zyx sidecars for {len(missing)} case(s) in {folder}.\n"
+            f"First: {missing[0]}\n"
+            f"Fix: nanounet_longi_clicks -d <id> --plans <plans> --clicks-dir <clicksTr> --clicks-fu-dir <clicksTrFU>"
+        )
+    return ids
+
+
+def preprocess_preprocessed_case(folder: str, identifier: str, patch_size: tuple[int, int, int]):
+    props = load_case_properties(folder, identifier)
+    data = np.array(blosc2.open(join(folder, identifier + ".b2nd"), mode="r")[()], dtype=np.float32)
+    assert data.shape[0] == 2, data.shape  # ch0 FU_CT, ch1 warped BL_CT
+    pad, slicer_revert = pad_nd_image(
+        torch.from_numpy(data).float(), patch_size, "constant", {"value": 0}, True, None
+    )
+    # clicks are already in resampled preprocessed zyx; drop raw-crop keys so predict_case won't remap.
+    infer_props = {
+        k: v for k, v in props.items()
+        if k not in ("bbox_used_for_cropping", "shape_after_cropping_and_before_resampling")
+    }
+    has_bl = bool(props.get("has_baseline"))
+    fu_xyz = _zyx_to_xyz(props["fu_clicks_zyx"])
+    bl_xyz = _zyx_to_xyz(props["bl_clicks_zyx"]) if has_bl else []
+    return pad, slicer_revert, infer_props, fu_xyz, bl_xyz, has_bl
