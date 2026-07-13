@@ -128,3 +128,32 @@ nanounet_predict_preprocessed \
 | `No .b2nd cases in …` | Wrong `-i` path | Point at `.../NanoUNet_preprocessed/<Dataset>/<data_identifier>` |
 | `Missing fu_clicks_zyx sidecars` | Clicks not mapped | `nanounet_longi_clicks -d <id> --plans <plans> --clicks-dir … --clicks-fu-dir …` |
 | `CUDA requested but … False` | No GPU | Run on a CUDA node |
+
+## Viewer export (`export_d115_viewer_bundle.py`)
+
+After preprocessed inference, build a viewer-ready bundle with the registered-dataset folder layout. Native scans + union-click JSONs are copied; preprocessed preds are warped back to scanner space.
+
+```bash
+python3 scripts/export_d115_viewer_bundle.py \
+  --model-dir /nnunet_data/NanoUNet_results/nanounet/Dataset114_longi_nnUNetResEncUNetLPlans_h200_smallpv_f0_finetune_dwb \
+  --pred-dir /nnunet_data/NanoUNet_preprocessed/Dataset115_longi_test/preds \
+  --preprocessed-dir /nnunet_data/NanoUNet_preprocessed/Dataset115_longi_test/nnUNetPlans_3d_fullres \
+  --out /nnunet_data/nnUNet_raw/Dataset115_longi_test/last
+```
+
+Output: `<out>/{inputsTsFU,inputsTsBL,targetsTsFU,targetsTsBL,predsTsFU}/`.
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--dataset-raw` | str | `Dataset115_longi_test` | Raw nnUNet dataset (imagesTr, labelsTr, clicks) |
+| `--pred-dir` | str | `.../Dataset115_longi_test/preds` | Preprocessed-space preds from `nanounet_predict_preprocessed` |
+| `--preprocessed-dir` | str | `.../nnUNetPlans_3d_fullres` | Preprocessed folder with `<case>.pkl` props |
+| `--model-dir` | str | finetune run dir | Training run (for `plans.json` warp) |
+| `--registered-root` | str | registered unigradicon dir | Source of `targetsTrBL` |
+| `--out` | str | `<dataset-raw>/viewer_export` | Output bundle root |
+| `--overwrite` | flag | off | Re-export existing files |
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `Missing source file` | Incomplete raw or registered data | Verify `--dataset-raw` and `--registered-root` |
+| Exit 1 with missing preds list | Inference incomplete | Finish `nanounet_predict_preprocessed`, then re-run |

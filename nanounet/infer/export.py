@@ -50,6 +50,34 @@ def save_preprocessed_seg(seg: np.ndarray, spacing: tuple[float, ...], out_path:
     sitk.WriteImage(img, out_path)
 
 
+def export_preprocessed_seg_to_native(
+    seg_pp: np.ndarray,
+    props: dict,
+    cm: Config3d,
+    plans: Plans,
+    dataset_json: dict,
+    output_path: str,
+    num_threads: int = 8,
+) -> None:
+    """Preprocessed-space binary seg → native scanner grid (inverse of save_preprocessed_seg)."""
+    o = torch.get_num_threads()
+    torch.set_num_threads(num_threads)
+    sp_t = [props["spacing"][i] for i in plans.transpose_forward]
+    sh = props["shape_after_cropping_and_before_resampling"]
+    cur_sp = cm.spacing if len(cm.spacing) == len(sh) else [sp_t[0], *cm.spacing]
+    tgt_sp = [props["spacing"][i] for i in plans.transpose_forward]
+    x = seg_pp[None].astype(np.float32)
+    x = np.asarray(cm.resampling_fn_seg(x, sh, cur_sp, tgt_sp))
+    seg = x[0]
+    dtype = np.uint8 if seg.max() < 255 else np.uint16
+    full = np.zeros(props["shape_before_cropping"], dtype=dtype)
+    full = insert_crop_into_image(full, seg.astype(dtype), props["bbox_used_for_cropping"])
+    full = full.transpose(tuple(plans.transpose_backward))
+    torch.set_num_threads(o)
+    rw = reader_writer_class_from_dataset(dataset_json, None, verbose=False)()
+    rw.write_seg(full, output_path, props)
+
+
 def export_prediction_from_logits(
     logits: Union[np.ndarray, torch.Tensor],
     props: dict,
