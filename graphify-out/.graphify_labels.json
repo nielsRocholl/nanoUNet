@@ -178,5 +178,13 @@
   "176": "NANOUNET_TMPDIR",
   "177": "nanounet_train",
   "178": "nnU-Net Pipeline Inspiration",
-  "179": "Longi Inference Smoke Test 11364907cf_00"
+  "179": "Longi Inference Smoke Test 11364907cf_00",
+  "180": "ChannelSubsetImageTransform",
+  "181": "runtime.py",
+  "182": "io.py",
+  "183": "Longi finetune GPU starvation — diagnosis + fix (2026-07-10)",
+  "184": "augment.py",
+  "185": "Radiom in-process embed API",
+  "186": "bottleneck_mask",
+  "187": "AGENTS.md"
 }

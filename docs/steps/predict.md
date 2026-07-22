@@ -157,3 +157,15 @@ Output: `<out>/{inputsTsFU,inputsTsBL,targetsTsFU,targetsTsBL,predsTsFU}/`.
 |-------|-------|-----|
 | `Missing source file` | Incomplete raw or registered data | Verify `--dataset-raw` and `--registered-root` |
 | Exit 1 with missing preds list | Inference incomplete | Finish `nanounet_predict_preprocessed`, then re-run |
+
+## Interactive / embed (library)
+
+Not a CLI flag. Radiom remote interactive session calls these in-process:
+
+| Function | Module | Description |
+|----------|--------|-------------|
+| `predict_patch_logits` | `nanounet.infer.predict_patch` | One centered patch forward; returns `(logits, slices)`. TTA/border-expand off by default. |
+| `patch_logits_to_native_seg` | `nanounet.infer.patch_export` | Argmax patch → native scanner-space seg array |
+| `native_seg_to_nifti_bytes` | `nanounet.infer.patch_export` | Gzip NIfTI bytes from native seg + `props["sitk_stuff"]` |
+
+See also [radiom_embed_api.md](../dev-notes/radiom_embed_api.md).

@@ -40,17 +40,17 @@
     "semantic_hash": "6916ca457215b35f9316e1dac9a40916"
   },
   "nanounet/cli/predict.py": {
-    "mtime": 1783601719.2693443,
+    "mtime": 1784706929.2799687,
     "ast_hash": "d842350ab6cf432be1f3829d0e66be09",
     "semantic_hash": "d842350ab6cf432be1f3829d0e66be09"
   },
   "nanounet/cli/preprocess.py": {
-    "mtime": 1783601719.2711995,
+    "mtime": 1784706929.331242,
     "ast_hash": "220cb3a342ffdc14a7e7b61eb482b267",
     "semantic_hash": "220cb3a342ffdc14a7e7b61eb482b267"
   },
   "nanounet/cli/pretrain.py": {
-    "mtime": 1783601719.256032,
+    "mtime": 1784706929.2799995,
     "ast_hash": "055bd3508e0c809a12427442dbcf028e",
     "semantic_hash": "055bd3508e0c809a12427442dbcf028e"
   },
@@ -60,12 +60,12 @@
     "semantic_hash": "13136206810b03f4b459845b412bf70b"
   },
   "nanounet/cli/train.py": {
-    "mtime": 1783601719.2567725,
+    "mtime": 1784706929.2799892,
     "ast_hash": "cee9cc77d2275ca499cad6dcc675f7f1",
     "semantic_hash": "cee9cc77d2275ca499cad6dcc675f7f1"
   },
   "nanounet/common.py": {
-    "mtime": 1783601719.2242928,
+    "mtime": 1784706929.2795994,
     "ast_hash": "f017778d746f003523205379e4858634",
     "semantic_hash": "f017778d746f003523205379e4858634"
   },
@@ -80,12 +80,12 @@
     "semantic_hash": "24b29b217bfd251afcc533af5594323e"
   },
   "nanounet/data/augment.py": {
-    "mtime": 1778695756.1447499,
-    "ast_hash": "ddc33b775b36cf92716f14061c0aace2",
-    "semantic_hash": "ddc33b775b36cf92716f14061c0aace2"
+    "mtime": 1783668200.6646378,
+    "ast_hash": "7e5edca1d0bd4e5e82112d47df6be161",
+    "semantic_hash": ""
   },
   "nanounet/data/blosc2_dataset.py": {
-    "mtime": 1783601719.2613945,
+    "mtime": 1784706929.2800276,
     "ast_hash": "67e9f38ff9a2cbcde2029de1b72de2b7",
     "semantic_hash": "67e9f38ff9a2cbcde2029de1b72de2b7"
   },
@@ -145,27 +145,27 @@
     "semantic_hash": "80d54d23a39c55597edf41ed56277e02"
   },
   "nanounet/infer/gaussian.py": {
-    "mtime": 1778695756.7099001,
-    "ast_hash": "08f2faa368f89783ca0e67a36b82f673",
-    "semantic_hash": "08f2faa368f89783ca0e67a36b82f673"
+    "mtime": 1784706082.7278335,
+    "ast_hash": "3531cf3055dd12d81e8f98b4caabd7c5",
+    "semantic_hash": ""
   },
   "nanounet/infer/longi_row.py": {
-    "mtime": 1783601719.2710092,
+    "mtime": 1784706929.3229933,
     "ast_hash": "1abf242300ef6998620e3a57d9337534",
     "semantic_hash": "1abf242300ef6998620e3a57d9337534"
   },
   "nanounet/infer/predict_case.py": {
-    "mtime": 1783583182.5086305,
-    "ast_hash": "9122e07c76f5c9b7bc95ab3c8f901f64",
-    "semantic_hash": "9122e07c76f5c9b7bc95ab3c8f901f64"
+    "mtime": 1784706082.72786,
+    "ast_hash": "52e763043531e63ad8e18d83a8bb1a5d",
+    "semantic_hash": ""
   },
   "nanounet/infer/predictor.py": {
-    "mtime": 1783601719.2509513,
+    "mtime": 1784706929.2795923,
     "ast_hash": "7df54d6761fd002077f72c78b6c04871",
     "semantic_hash": "7df54d6761fd002077f72c78b6c04871"
   },
   "nanounet/infer/roi_slices.py": {
-    "mtime": 1783601719.2243266,
+    "mtime": 1784706929.2795718,
     "ast_hash": "a35079a0185eb06f9a23fdb892ae82e8",
     "semantic_hash": "a35079a0185eb06f9a23fdb892ae82e8"
   },
@@ -215,7 +215,7 @@
     "semantic_hash": "2202cb95398c4f3ddbfc81419e6e5e63"
   },
   "nanounet/model/network.py": {
-    "mtime": 1783601719.2712083,
+    "mtime": 1784706929.323102,
     "ast_hash": "1a8daa7d083748a8e5f33d590d8b1491",
     "semantic_hash": "1a8daa7d083748a8e5f33d590d8b1491"
   },
@@ -225,7 +225,7 @@
     "semantic_hash": "e4a1fe1d0d7ab6dc62290fd3a090ed26"
   },
   "nanounet/plan/dataset_id.py": {
-    "mtime": 1783601719.2348166,
+    "mtime": 1784706929.2796333,
     "ast_hash": "fb1a6415d6ef5fbbf7b00ad12ab723a7",
     "semantic_hash": "fb1a6415d6ef5fbbf7b00ad12ab723a7"
   },
@@ -260,7 +260,7 @@
     "semantic_hash": "25556fd2c6b81a2ed3f9a62eb901460c"
   },
   "nanounet/pretrain/dataset.py": {
-    "mtime": 1783601719.2243109,
+    "mtime": 1784706929.279622,
     "ast_hash": "87d09687524a2b36ce8e35cc19abde4e",
     "semantic_hash": "87d09687524a2b36ce8e35cc19abde4e"
   },
@@ -335,7 +335,7 @@
     "semantic_hash": "16db4bbad73c623b8e1e2804b10f8c3c"
   },
   "nanounet/runtime.py": {
-    "mtime": 1783602866.612377,
+    "mtime": 1784706929.322953,
     "ast_hash": "63a8f5817671d615b2c23a205c1fb47e",
     "semantic_hash": ""
   },
@@ -345,9 +345,9 @@
     "semantic_hash": "4786795008f1af066b337b4016086aa4"
   },
   "nanounet/train/data_module.py": {
-    "mtime": 1783601719.2241848,
-    "ast_hash": "915272ef02271b702f0a11a6e805e3aa",
-    "semantic_hash": "915272ef02271b702f0a11a6e805e3aa"
+    "mtime": 1784706929.2795684,
+    "ast_hash": "635c48497bdca14e012773844ed8f122",
+    "semantic_hash": ""
   },
   "nanounet/train/lightning_module.py": {
     "mtime": 1783327160.6813438,
@@ -380,7 +380,7 @@
     "semantic_hash": "ce22a9be4b3c392ec54cdf32a6a6761b"
   },
   "scripts/slurm_nanounet_preprocess_merge_999.sh": {
-    "mtime": 1783601719.255945,
+    "mtime": 1784706929.2796516,
     "ast_hash": "4ac41f4dd9660e32ccc37498368bda5f",
     "semantic_hash": "4ac41f4dd9660e32ccc37498368bda5f"
   },
@@ -395,7 +395,7 @@
     "semantic_hash": "59212867eca82064dde39253dec2aaac"
   },
   "scripts/slurm_nanounet_train_mae_999.sh": {
-    "mtime": 1783601719.256803,
+    "mtime": 1784706929.318949,
     "ast_hash": "a37645904ae3c72c275ce1bd72f0fd08",
     "semantic_hash": "a37645904ae3c72c275ce1bd72f0fd08"
   },
@@ -425,7 +425,7 @@
     "semantic_hash": "f38b77461b15b1ecb329ccadaf9feefc"
   },
   "README.md": {
-    "mtime": 1783601719.2709813,
+    "mtime": 1784706929.322903,
     "ast_hash": "679bca388937633f0280d37c1e03b8ce",
     "semantic_hash": "679bca388937633f0280d37c1e03b8ce"
   },
@@ -453,11 +453,6 @@
     "mtime": 1783328028.5026498,
     "ast_hash": "0ccbe7b21f99df4d490ee8301c2ff487",
     "semantic_hash": "0ccbe7b21f99df4d490ee8301c2ff487"
-  },
-  "docs/dev-notes/sol_pressure.md": {
-    "mtime": 1779281973.3358674,
-    "ast_hash": "6ea1450cf2ff4fc74f1832b99e0cdd0f",
-    "semantic_hash": "6ea1450cf2ff4fc74f1832b99e0cdd0f"
   },
   "nanounet/diag/__init__.py": {
     "mtime": 1783601732.7103074,
@@ -525,12 +520,12 @@
     "semantic_hash": "a19295a923dcfc3430b7c39bd7b66948"
   },
   "nanounet/train/fit.py": {
-    "mtime": 1783330096.3081226,
-    "ast_hash": "8b3bde6991d37b621e71983fd73d265d",
-    "semantic_hash": "8b3bde6991d37b621e71983fd73d265d"
+    "mtime": 1783606943.1878772,
+    "ast_hash": "659cce2a5a59d687afdaa2ef4d35ba49",
+    "semantic_hash": ""
   },
   ".claude/skills/nanochat-style/SKILL.md": {
-    "mtime": 1783601719.25114,
+    "mtime": 1784706929.2796044,
     "ast_hash": "410dfc7d31404844d4fa34cf848ab9f0",
     "semantic_hash": "410dfc7d31404844d4fa34cf848ab9f0"
   },
@@ -560,9 +555,9 @@
     "semantic_hash": "7cc7625be1c017e78399ad584a391490"
   },
   "docs/steps/predict.md": {
-    "mtime": 1783601719.2709675,
-    "ast_hash": "49647e9d646928cb3e3616bb681995a5",
-    "semantic_hash": "49647e9d646928cb3e3616bb681995a5"
+    "mtime": 1784707728.8827388,
+    "ast_hash": "51305a992c548f52d85803864447263f",
+    "semantic_hash": ""
   },
   "docs/steps/preprocess.md": {
     "mtime": 1783326603.5886967,
@@ -619,9 +614,39 @@
     "ast_hash": "ad6ea5ac8706ea14ccb18f27101bbe36",
     "semantic_hash": "ad6ea5ac8706ea14ccb18f27101bbe36"
   },
-  "docs/dev-notes/unigradicon_gpu_handoff.md": {
-    "mtime": 1783583105.2598803,
-    "ast_hash": "879c7fe1263306424cb6f0e114ee161b",
-    "semantic_hash": "879c7fe1263306424cb6f0e114ee161b"
+  "nanounet/infer/patch_export.py": {
+    "mtime": 1784707716.1992319,
+    "ast_hash": "321f60038593ed9a02a4ec0b6274876c",
+    "semantic_hash": ""
+  },
+  "nanounet/infer/points_pad.py": {
+    "mtime": 1784706082.7278156,
+    "ast_hash": "b3cdf4f40bdb9df503913e60e543ae16",
+    "semantic_hash": ""
+  },
+  "nanounet/infer/predict_patch.py": {
+    "mtime": 1784707714.6786444,
+    "ast_hash": "acecb91b16ed833e51d5ac3f08a5d05d",
+    "semantic_hash": ""
+  },
+  "scripts/slurm_nanounet_finetune_d114_registered.sh": {
+    "mtime": 1783668200.6652243,
+    "ast_hash": "0b5da4627a5a622d4243c6120ee69025",
+    "semantic_hash": ""
+  },
+  "AGENTS.md": {
+    "mtime": 1783665320.121168,
+    "ast_hash": "6a47d64fcc136324ca395065a707ef76",
+    "semantic_hash": ""
+  },
+  "docs/dev-notes/longi_gpu_starvation.md": {
+    "mtime": 1783668200.6637945,
+    "ast_hash": "f8046747381ea9f990f99a9ac46893b9",
+    "semantic_hash": ""
+  },
+  "docs/dev-notes/radiom_embed_api.md": {
+    "mtime": 1784707729.9247782,
+    "ast_hash": "0a03b19eebf66407371cf2fed21ab379",
+    "semantic_hash": ""
   }
 }

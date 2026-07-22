@@ -316,7 +316,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "nanounet_cli_longi_clicks_map_points",
-      "community": 5,
+      "community": 0,
       "norm_label": "_map_points()"
     },
     {
@@ -346,7 +346,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "nanounet_cli_longi_clicks_rationale_32",
-      "community": 5,
+      "community": 0,
       "norm_label": "read a clicksxx/<case>.json and forward-map each point into preprocessed voxel z"
     },
     {
@@ -846,7 +846,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_config",
-      "community": 14,
+      "community": 7,
       "norm_label": "config.py"
     },
     {
@@ -856,7 +856,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "nanounet_config_largelesionconfig",
-      "community": 14,
+      "community": 7,
       "norm_label": "largelesionconfig"
     },
     {
@@ -866,7 +866,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "nanounet_config_propagatedconfig",
-      "community": 14,
+      "community": 7,
       "norm_label": "propagatedconfig"
     },
     {
@@ -876,7 +876,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "nanounet_config_clickmodeconfig",
-      "community": 14,
+      "community": 7,
       "norm_label": "clickmodeconfig"
     },
     {
@@ -886,7 +886,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "nanounet_config_samplingconfig",
-      "community": 14,
+      "community": 7,
       "norm_label": "samplingconfig"
     },
     {
@@ -896,7 +896,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "nanounet_config_promptconfig",
-      "community": 14,
+      "community": 7,
       "norm_label": "promptconfig"
     },
     {
@@ -906,7 +906,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "nanounet_config_inferenceconfig",
-      "community": 14,
+      "community": 7,
       "norm_label": "inferenceconfig"
     },
     {
@@ -916,7 +916,7 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "nanounet_config_validationconfig",
-      "community": 14,
+      "community": 7,
       "norm_label": "validationconfig"
     },
     {
@@ -936,7 +936,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "nanounet_config_require",
-      "community": 14,
+      "community": 7,
       "norm_label": "_require()"
     },
     {
@@ -946,7 +946,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "nanounet_config_parse_int_range",
-      "community": 14,
+      "community": 7,
       "norm_label": "_parse_int_range()"
     },
     {
@@ -956,7 +956,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "nanounet_config_load_large",
-      "community": 14,
+      "community": 7,
       "norm_label": "_load_large()"
     },
     {
@@ -966,7 +966,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "nanounet_config_load_prop",
-      "community": 14,
+      "community": 7,
       "norm_label": "_load_prop()"
     },
     {
@@ -976,7 +976,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "nanounet_config_load_sampling",
-      "community": 14,
+      "community": 7,
       "norm_label": "_load_sampling()"
     },
     {
@@ -986,7 +986,7 @@
       "source_location": "L140",
       "_origin": "ast",
       "id": "nanounet_config_load_prompt",
-      "community": 14,
+      "community": 7,
       "norm_label": "_load_prompt()"
     },
     {
@@ -996,7 +996,7 @@
       "source_location": "L155",
       "_origin": "ast",
       "id": "nanounet_config_load_inf",
-      "community": 14,
+      "community": 7,
       "norm_label": "_load_inf()"
     },
     {
@@ -1006,7 +1006,7 @@
       "source_location": "L164",
       "_origin": "ast",
       "id": "nanounet_config_load_validation",
-      "community": 14,
+      "community": 7,
       "norm_label": "_load_validation()"
     },
     {
@@ -1016,7 +1016,7 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "nanounet_config_load_config",
-      "community": 14,
+      "community": 7,
       "norm_label": "load_config()"
     },
     {
@@ -1026,7 +1026,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_config_py_path",
-      "community": 14,
+      "community": 7,
       "norm_label": "path"
     },
     {
@@ -1036,7 +1036,7 @@
       "source_location": "L187",
       "_origin": "ast",
       "id": "nanounet_config_save_config",
-      "community": 14,
+      "community": 7,
       "norm_label": "save_config()"
     },
     {
@@ -1046,7 +1046,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_config_rationale_1",
-      "community": 14,
+      "community": 7,
       "norm_label": "roi / prompt json config \u2192 frozen dataclasses."
     },
     {
@@ -1076,17 +1076,67 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_data_augment",
-      "community": 11,
+      "community": 180,
       "norm_label": "augment.py"
+    },
+    {
+      "label": "ChannelSubsetImageTransform",
+      "file_type": "code",
+      "source_file": "nanounet/data/augment.py",
+      "source_location": "L32",
+      "_origin": "ast",
+      "id": "nanounet_data_augment_channelsubsetimagetransform",
+      "community": 180,
+      "norm_label": "channelsubsetimagetransform"
+    },
+    {
+      "label": "BasicTransform",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "basictransform",
+      "community": 180,
+      "norm_label": "basictransform"
+    },
+    {
+      "label": ".__init__()",
+      "file_type": "code",
+      "source_file": "nanounet/data/augment.py",
+      "source_location": "L38",
+      "_origin": "ast",
+      "id": "nanounet_data_augment_channelsubsetimagetransform_init",
+      "community": 180,
+      "norm_label": ".__init__()"
+    },
+    {
+      "label": ".__call__()",
+      "file_type": "code",
+      "source_file": "nanounet/data/augment.py",
+      "source_location": "L43",
+      "_origin": "ast",
+      "id": "nanounet_data_augment_channelsubsetimagetransform_call",
+      "community": 180,
+      "norm_label": ".__call__()"
+    },
+    {
+      "label": ".__repr__()",
+      "file_type": "code",
+      "source_file": "nanounet/data/augment.py",
+      "source_location": "L52",
+      "_origin": "ast",
+      "id": "nanounet_data_augment_channelsubsetimagetransform_repr",
+      "community": 180,
+      "norm_label": ".__repr__()"
     },
     {
       "label": "train_transforms()",
       "file_type": "code",
       "source_file": "nanounet/data/augment.py",
-      "source_location": "L32",
+      "source_location": "L56",
       "_origin": "ast",
       "id": "nanounet_data_augment_train_transforms",
-      "community": 11,
+      "community": 180,
       "norm_label": "train_transforms()"
     },
     {
@@ -1096,7 +1146,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_data_augment_py_ndarray",
-      "community": 11,
+      "community": 180,
       "norm_label": "ndarray"
     },
     {
@@ -1106,27 +1156,17 @@
       "source_location": "",
       "_origin": "ast",
       "id": "randomscalar",
-      "community": 11,
+      "community": 180,
       "norm_label": "randomscalar"
-    },
-    {
-      "label": "BasicTransform",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "id": "nanounet_data_augment_py_basictransform",
-      "community": 11,
-      "norm_label": "basictransform"
     },
     {
       "label": "val_transforms()",
       "file_type": "code",
       "source_file": "nanounet/data/augment.py",
-      "source_location": "L135",
+      "source_location": "L165",
       "_origin": "ast",
       "id": "nanounet_data_augment_val_transforms",
-      "community": 11,
+      "community": 180,
       "norm_label": "val_transforms()"
     },
     {
@@ -1136,8 +1176,18 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_data_augment_rationale_1",
-      "community": 11,
+      "community": 180,
       "norm_label": "spatial + intensity augment chains (nnunettrainer.get_*_transforms port, 3d only"
+    },
+    {
+      "label": "Run an image-only transform on a fixed subset of image channels, leaving the res",
+      "file_type": "rationale",
+      "source_file": "nanounet/data/augment.py",
+      "source_location": "L33",
+      "_origin": "ast",
+      "id": "nanounet_data_augment_rationale_33",
+      "community": 180,
+      "norm_label": "run an image-only transform on a fixed subset of image channels, leaving the res"
     },
     {
       "label": "blosc2_dataset.py",
@@ -1206,7 +1256,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "nanounet_data_blosc2_dataset_blosc2folder",
-      "community": 5,
+      "community": 14,
       "norm_label": "blosc2folder"
     },
     {
@@ -1216,7 +1266,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "nanounet_data_blosc2_dataset_blosc2folder_init",
-      "community": 5,
+      "community": 14,
       "norm_label": ".__init__()"
     },
     {
@@ -1236,7 +1286,7 @@
       "source_location": "L119",
       "_origin": "ast",
       "id": "nanounet_data_blosc2_dataset_blosc2folder_save_case",
-      "community": 15,
+      "community": 34,
       "norm_label": ".save_case()"
     },
     {
@@ -1246,7 +1296,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_data_blosc2_dataset_py_ndarray",
-      "community": 15,
+      "community": 34,
       "norm_label": "ndarray"
     },
     {
@@ -1256,7 +1306,7 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "nanounet_data_blosc2_dataset_blosc2folder_comp_blosc2_params",
-      "community": 5,
+      "community": 34,
       "norm_label": ".comp_blosc2_params()"
     },
     {
@@ -1266,7 +1316,7 @@
       "source_location": "L181",
       "_origin": "ast",
       "id": "nanounet_data_blosc2_dataset_blosc2folder_get_identifiers",
-      "community": 5,
+      "community": 14,
       "norm_label": ".get_identifiers()"
     },
     {
@@ -1286,7 +1336,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_data_crop",
-      "community": 15,
+      "community": 34,
       "norm_label": "crop.py"
     },
     {
@@ -1296,7 +1346,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "nanounet_data_crop_nonzero_mask",
-      "community": 15,
+      "community": 34,
       "norm_label": "_nonzero_mask()"
     },
     {
@@ -1306,7 +1356,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_data_crop_py_ndarray",
-      "community": 15,
+      "community": 34,
       "norm_label": "ndarray"
     },
     {
@@ -1316,7 +1366,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "nanounet_data_crop_crop_to_nonzero",
-      "community": 15,
+      "community": 34,
       "norm_label": "crop_to_nonzero()"
     },
     {
@@ -1326,7 +1376,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_data_crop_rationale_1",
-      "community": 15,
+      "community": 34,
       "norm_label": "nonzero bounding-box crop; seg voxels outside mask set to ``nonzero_label`` (def"
     },
     {
@@ -1436,7 +1486,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_data_io",
-      "community": 0,
+      "community": 182,
       "norm_label": "io.py"
     },
     {
@@ -1446,7 +1496,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "nanounet_data_io_same_shape",
-      "community": 0,
+      "community": 182,
       "norm_label": "_same_shape()"
     },
     {
@@ -1456,7 +1506,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "nanounet_data_io_simpleitkio",
-      "community": 0,
+      "community": 182,
       "norm_label": "simpleitkio"
     },
     {
@@ -1466,7 +1516,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "nanounet_data_io_simpleitkio_read_images",
-      "community": 0,
+      "community": 182,
       "norm_label": ".read_images()"
     },
     {
@@ -1476,7 +1526,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_data_io_py_ndarray",
-      "community": 0,
+      "community": 182,
       "norm_label": "ndarray"
     },
     {
@@ -1486,7 +1536,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "nanounet_data_io_simpleitkio_read_seg",
-      "community": 0,
+      "community": 182,
       "norm_label": ".read_seg()"
     },
     {
@@ -1496,7 +1546,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "nanounet_data_io_simpleitkio_write_seg",
-      "community": 0,
+      "community": 182,
       "norm_label": ".write_seg()"
     },
     {
@@ -1506,7 +1556,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "nanounet_data_io_read_images",
-      "community": 0,
+      "community": 182,
       "norm_label": "read_images()"
     },
     {
@@ -1516,7 +1566,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "nanounet_data_io_read_seg",
-      "community": 0,
+      "community": 182,
       "norm_label": "read_seg()"
     },
     {
@@ -1526,7 +1576,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "nanounet_data_io_write_seg",
-      "community": 0,
+      "community": 182,
       "norm_label": "write_seg()"
     },
     {
@@ -1546,7 +1596,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_data_io_rationale_1",
-      "community": 0,
+      "community": 182,
       "norm_label": "simpleitk reader/writer: nnu-net channel stacking, ``sitk_stuff`` in properties,"
     },
     {
@@ -1736,7 +1786,7 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "nanounet_data_normalization_normalization_class_from_plan_name",
-      "community": 15,
+      "community": 34,
       "norm_label": "normalization_class_from_plan_name()"
     },
     {
@@ -1746,7 +1796,7 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "nanounet_data_normalization_normalization_class_for_channel",
-      "community": 0,
+      "community": 15,
       "norm_label": "normalization_class_for_channel()"
     },
     {
@@ -2106,7 +2156,7 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "nanounet_dataloader_prefs_pin_worker_threads",
-      "community": 7,
+      "community": 11,
       "norm_label": "pin_worker_threads()"
     },
     {
@@ -2116,7 +2166,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "nanounet_dataloader_prefs_init_dataloader_ipc",
-      "community": 0,
+      "community": 11,
       "norm_label": "init_dataloader_ipc()"
     },
     {
@@ -2176,7 +2226,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_diag_cgroup",
-      "community": 3,
+      "community": 41,
       "norm_label": "cgroup.py"
     },
     {
@@ -2186,7 +2236,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "nanounet_diag_cgroup_cgroup_dir",
-      "community": 3,
+      "community": 41,
       "norm_label": "_cgroup_dir()"
     },
     {
@@ -2196,7 +2246,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_diag_cgroup_py_path",
-      "community": 3,
+      "community": 41,
       "norm_label": "path"
     },
     {
@@ -2206,7 +2256,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "nanounet_diag_cgroup_cgroup_scope",
-      "community": 3,
+      "community": 41,
       "norm_label": "cgroup_scope()"
     },
     {
@@ -2216,7 +2266,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "nanounet_diag_cgroup_tmp_fs_type",
-      "community": 3,
+      "community": 41,
       "norm_label": "tmp_fs_type()"
     },
     {
@@ -2226,7 +2276,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_diag_cgroup_rationale_1",
-      "community": 3,
+      "community": 41,
       "norm_label": "host resource readers: cgroup scope, mount fs-type (used by tmpdir selection + p"
     },
     {
@@ -2276,7 +2326,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "nanounet_diag_mem_diag_set_worker_log_dir",
-      "community": 3,
+      "community": 14,
       "norm_label": "set_worker_log_dir()"
     },
     {
@@ -2436,7 +2486,7 @@
       "source_location": "L194",
       "_origin": "ast",
       "id": "nanounet_diag_mem_diag_worker_diag_init",
-      "community": 3,
+      "community": 14,
       "norm_label": "worker_diag_init()"
     },
     {
@@ -2476,7 +2526,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_diag_tmp_purge",
-      "community": 3,
+      "community": 41,
       "norm_label": "tmp_purge.py"
     },
     {
@@ -2486,7 +2536,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "nanounet_diag_tmp_purge_is_pytorch_zip_stage",
-      "community": 3,
+      "community": 41,
       "norm_label": "_is_pytorch_zip_stage()"
     },
     {
@@ -2496,7 +2546,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "nanounet_diag_tmp_purge_purge_ckpt_stage_files",
-      "community": 3,
+      "community": 41,
       "norm_label": "_purge_ckpt_stage_files()"
     },
     {
@@ -2506,7 +2556,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "nanounet_diag_tmp_purge_purge_ipc_files",
-      "community": 3,
+      "community": 41,
       "norm_label": "_purge_ipc_files()"
     },
     {
@@ -2516,7 +2566,7 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "nanounet_diag_tmp_purge_purge_dev_shm_torch",
-      "community": 3,
+      "community": 41,
       "norm_label": "_purge_dev_shm_torch()"
     },
     {
@@ -2526,7 +2576,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "nanounet_diag_tmp_purge_purge_torch_tmp",
-      "community": 3,
+      "community": 41,
       "norm_label": "purge_torch_tmp()"
     },
     {
@@ -2536,7 +2586,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_diag_tmp_purge_rationale_1",
-      "community": 3,
+      "community": 41,
       "norm_label": "purge orphaned torch checkpoint-stage + ipc temp files from /tmp, tmpdir, /dev/s"
     },
     {
@@ -2636,7 +2686,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_infer_export",
-      "community": 18,
+      "community": 103,
       "norm_label": "export.py"
     },
     {
@@ -2646,7 +2696,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "nanounet_infer_export_convert_logits_to_seg_shape",
-      "community": 18,
+      "community": 103,
       "norm_label": "convert_logits_to_seg_shape()"
     },
     {
@@ -2656,7 +2706,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_infer_export_py_tensor",
-      "community": 18,
+      "community": 103,
       "norm_label": "tensor"
     },
     {
@@ -2666,7 +2716,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_infer_export_py_ndarray",
-      "community": 18,
+      "community": 103,
       "norm_label": "ndarray"
     },
     {
@@ -2676,7 +2726,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "nanounet_infer_export_export_prediction_from_logits",
-      "community": 18,
+      "community": 103,
       "norm_label": "export_prediction_from_logits()"
     },
     {
@@ -2686,7 +2736,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_infer_export_rationale_1",
-      "community": 18,
+      "community": 103,
       "norm_label": "logits in preprocessed space \u2192 resample, uncrop, untranspose, simpleitk seg writ"
     },
     {
@@ -2696,17 +2746,47 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_infer_gaussian",
-      "community": 103,
+      "community": 1,
       "norm_label": "gaussian.py"
+    },
+    {
+      "label": "accum_dtype()",
+      "file_type": "code",
+      "source_file": "nanounet/infer/gaussian.py",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "nanounet_infer_gaussian_accum_dtype",
+      "community": 1,
+      "norm_label": "accum_dtype()"
+    },
+    {
+      "label": "device",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "nanounet_infer_gaussian_py_device",
+      "community": 1,
+      "norm_label": "device"
+    },
+    {
+      "label": "dtype",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "dtype",
+      "community": 1,
+      "norm_label": "dtype"
     },
     {
       "label": "compute_gaussian()",
       "file_type": "code",
       "source_file": "nanounet/infer/gaussian.py",
-      "source_location": "L14",
+      "source_location": "L25",
       "_origin": "ast",
       "id": "nanounet_infer_gaussian_compute_gaussian",
-      "community": 103,
+      "community": 1,
       "norm_label": "compute_gaussian()"
     },
     {
@@ -2716,38 +2796,18 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_infer_gaussian_py_tensor",
-      "community": 103,
+      "community": 1,
       "norm_label": "tensor"
     },
     {
       "label": "gaussian_tile()",
       "file_type": "code",
       "source_file": "nanounet/infer/gaussian.py",
-      "source_location": "L37",
+      "source_location": "L48",
       "_origin": "ast",
       "id": "nanounet_infer_gaussian_gaussian_tile",
-      "community": 103,
+      "community": 1,
       "norm_label": "gaussian_tile()"
-    },
-    {
-      "label": "device",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "id": "nanounet_infer_gaussian_py_device",
-      "community": 103,
-      "norm_label": "device"
-    },
-    {
-      "label": "dtype",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "id": "nanounet_infer_gaussian_py_dtype",
-      "community": 103,
-      "norm_label": "dtype"
     },
     {
       "label": "Gaussian importance map on patch grid (cached by size + device + dtype).",
@@ -2756,7 +2816,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_infer_gaussian_rationale_1",
-      "community": 103,
+      "community": 1,
       "norm_label": "gaussian importance map on patch grid (cached by size + device + dtype)."
     },
     {
@@ -2766,7 +2826,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_infer_longi_row",
-      "community": 7,
+      "community": 1,
       "norm_label": "longi_row.py"
     },
     {
@@ -2816,8 +2876,188 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_infer_longi_row_rationale_1",
-      "community": 7,
+      "community": 1,
       "norm_label": "two-stream inference row on a joint 2-channel volume (ch0 fu ct, ch1 bl ct shari"
+    },
+    {
+      "label": "patch_export.py",
+      "file_type": "code",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "nanounet_infer_patch_export",
+      "community": 113,
+      "norm_label": "patch_export.py"
+    },
+    {
+      "label": "_axis_overlap()",
+      "file_type": "code",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "nanounet_infer_patch_export_axis_overlap",
+      "community": 113,
+      "norm_label": "_axis_overlap()"
+    },
+    {
+      "label": "slice",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "nanounet_infer_patch_export_py_slice",
+      "community": 113,
+      "norm_label": "slice"
+    },
+    {
+      "label": "patch_unpadded_overlap()",
+      "file_type": "code",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L20",
+      "_origin": "ast",
+      "id": "nanounet_infer_patch_export_patch_unpadded_overlap",
+      "community": 113,
+      "norm_label": "patch_unpadded_overlap()"
+    },
+    {
+      "label": "_unpadded_shape()",
+      "file_type": "code",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L33",
+      "_origin": "ast",
+      "id": "nanounet_infer_patch_export_unpadded_shape",
+      "community": 113,
+      "norm_label": "_unpadded_shape()"
+    },
+    {
+      "label": "_convert_preprocessed_seg_to_native()",
+      "file_type": "code",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L41",
+      "_origin": "ast",
+      "id": "nanounet_infer_patch_export_convert_preprocessed_seg_to_native",
+      "community": 113,
+      "norm_label": "_convert_preprocessed_seg_to_native()"
+    },
+    {
+      "label": "ndarray",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "nanounet_infer_patch_export_py_ndarray",
+      "community": 113,
+      "norm_label": "ndarray"
+    },
+    {
+      "label": "patch_logits_to_native_seg()",
+      "file_type": "code",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L54",
+      "_origin": "ast",
+      "id": "nanounet_infer_patch_export_patch_logits_to_native_seg",
+      "community": 113,
+      "norm_label": "patch_logits_to_native_seg()"
+    },
+    {
+      "label": "Tensor",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "nanounet_infer_patch_export_py_tensor",
+      "community": 113,
+      "norm_label": "tensor"
+    },
+    {
+      "label": "native_seg_to_nifti_bytes()",
+      "file_type": "code",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L89",
+      "_origin": "ast",
+      "id": "nanounet_infer_patch_export_native_seg_to_nifti_bytes",
+      "community": 113,
+      "norm_label": "native_seg_to_nifti_bytes()"
+    },
+    {
+      "label": "Patch logits \u2192 native scanner-space seg array + optional gzip NIfTI bytes.",
+      "file_type": "rationale",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "nanounet_infer_patch_export_rationale_1",
+      "community": 113,
+      "norm_label": "patch logits \u2192 native scanner-space seg array + optional gzip nifti bytes."
+    },
+    {
+      "label": "(unpadded slices, patch-local slices) overlapping slicer_revert crop.",
+      "file_type": "rationale",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L23",
+      "_origin": "ast",
+      "id": "nanounet_infer_patch_export_rationale_23",
+      "community": 113,
+      "norm_label": "(unpadded slices, patch-local slices) overlapping slicer_revert crop."
+    },
+    {
+      "label": "Argmax patch \u2192 scatter into unpadded pp volume \u2192 resample to native array.",
+      "file_type": "rationale",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L65",
+      "_origin": "ast",
+      "id": "nanounet_infer_patch_export_rationale_65",
+      "community": 113,
+      "norm_label": "argmax patch \u2192 scatter into unpadded pp volume \u2192 resample to native array."
+    },
+    {
+      "label": "Write gzip NIfTI in-memory; return file bytes.",
+      "file_type": "rationale",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L90",
+      "_origin": "ast",
+      "id": "nanounet_infer_patch_export_rationale_90",
+      "community": 113,
+      "norm_label": "write gzip nifti in-memory; return file bytes."
+    },
+    {
+      "label": "points_pad.py",
+      "file_type": "code",
+      "source_file": "nanounet/infer/points_pad.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "nanounet_infer_points_pad",
+      "community": 1,
+      "norm_label": "points_pad.py"
+    },
+    {
+      "label": "resolve_pts_pad()",
+      "file_type": "code",
+      "source_file": "nanounet/infer/points_pad.py",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "nanounet_infer_points_pad_resolve_pts_pad",
+      "community": 1,
+      "norm_label": "resolve_pts_pad()"
+    },
+    {
+      "label": "ZYX",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "nanounet_infer_points_pad_py_zyx",
+      "community": 1,
+      "norm_label": "zyx"
+    },
+    {
+      "label": "Padded click coords from scanner JSON (x,y,z) or caller-supplied preprocessed (z",
+      "file_type": "rationale",
+      "source_file": "nanounet/infer/points_pad.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "nanounet_infer_points_pad_rationale_1",
+      "community": 1,
+      "norm_label": "padded click coords from scanner json (x,y,z) or caller-supplied preprocessed (z"
     },
     {
       "label": "predict_case.py",
@@ -2830,14 +3070,14 @@
       "norm_label": "predict_case.py"
     },
     {
-      "label": "_acc_dtype()",
+      "label": "predict_case_logits()",
       "file_type": "code",
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L28",
+      "source_location": "L27",
       "_origin": "ast",
-      "id": "nanounet_infer_predict_case_acc_dtype",
+      "id": "nanounet_infer_predict_case_predict_case_logits",
       "community": 1,
-      "norm_label": "_acc_dtype()"
+      "norm_label": "predict_case_logits()"
     },
     {
       "label": "device",
@@ -2848,26 +3088,6 @@
       "id": "nanounet_infer_predict_case_py_device",
       "community": 1,
       "norm_label": "device"
-    },
-    {
-      "label": "dtype",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "id": "nanounet_infer_predict_case_py_dtype",
-      "community": 1,
-      "norm_label": "dtype"
-    },
-    {
-      "label": "predict_case_logits()",
-      "file_type": "code",
-      "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L36",
-      "_origin": "ast",
-      "id": "nanounet_infer_predict_case_predict_case_logits",
-      "community": 1,
-      "norm_label": "predict_case_logits()"
     },
     {
       "label": "Tensor",
@@ -2970,13 +3190,83 @@
       "norm_label": "cid -> (bl_scan|none, bl_json|none) and a bl_present bool, for cli longi inferen"
     },
     {
+      "label": "predict_patch.py",
+      "file_type": "code",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "nanounet_infer_predict_patch",
+      "community": 1,
+      "norm_label": "predict_patch.py"
+    },
+    {
+      "label": "predict_patch_logits()",
+      "file_type": "code",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "nanounet_infer_predict_patch_predict_patch_logits",
+      "community": 1,
+      "norm_label": "predict_patch_logits()"
+    },
+    {
+      "label": "Tensor",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "nanounet_infer_predict_patch_py_tensor",
+      "community": 1,
+      "norm_label": "tensor"
+    },
+    {
+      "label": "device",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "nanounet_infer_predict_patch_py_device",
+      "community": 1,
+      "norm_label": "device"
+    },
+    {
+      "label": "slice",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "id": "nanounet_infer_predict_patch_py_slice",
+      "community": 1,
+      "norm_label": "slice"
+    },
+    {
+      "label": "Single centered patch forward for interactive viewers (TTA/border-expand off hot",
+      "file_type": "rationale",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "nanounet_infer_predict_patch_rationale_1",
+      "community": 1,
+      "norm_label": "single centered patch forward for interactive viewers (tta/border-expand off hot"
+    },
+    {
+      "label": "Centered crop + optional prompt heatmaps \u2192 one forward.      Returns (logits (C,",
+      "file_type": "rationale",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L28",
+      "_origin": "ast",
+      "id": "nanounet_infer_predict_patch_rationale_28",
+      "community": 1,
+      "norm_label": "centered crop + optional prompt heatmaps \u2192 one forward.      returns (logits (c,"
+    },
+    {
       "label": "predictor.py",
       "file_type": "code",
       "source_file": "nanounet/infer/predictor.py",
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_infer_predictor",
-      "community": 18,
+      "community": 19,
       "norm_label": "predictor.py"
     },
     {
@@ -2986,7 +3276,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "nanounet_infer_predictor_strip_pl_state",
-      "community": 18,
+      "community": 19,
       "norm_label": "_strip_pl_state()"
     },
     {
@@ -2996,7 +3286,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "nanounet_infer_predictor_load_net_from_ckpt",
-      "community": 18,
+      "community": 19,
       "norm_label": "load_net_from_ckpt()"
     },
     {
@@ -3006,7 +3296,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_infer_predictor_py_device",
-      "community": 18,
+      "community": 19,
       "norm_label": "device"
     },
     {
@@ -3026,7 +3316,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_infer_predictor_rationale_1",
-      "community": 18,
+      "community": 19,
       "norm_label": "checkpoint load: strip lightning prefix, build net, pick ckpt file."
     },
     {
@@ -3186,7 +3476,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_infer_tta",
-      "community": 34,
+      "community": 1,
       "norm_label": "tta.py"
     },
     {
@@ -3196,7 +3486,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "nanounet_infer_tta_predict_with_optional_tta",
-      "community": 34,
+      "community": 1,
       "norm_label": "predict_with_optional_tta()"
     },
     {
@@ -3206,7 +3496,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_infer_tta_py_module",
-      "community": 34,
+      "community": 1,
       "norm_label": "module"
     },
     {
@@ -3216,7 +3506,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_infer_tta_py_tensor",
-      "community": 34,
+      "community": 1,
       "norm_label": "tensor"
     },
     {
@@ -3226,7 +3516,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "nanounet_infer_tta_predict_batch_with_tta",
-      "community": 34,
+      "community": 1,
       "norm_label": "predict_batch_with_tta()"
     },
     {
@@ -3236,7 +3526,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_infer_tta_rationale_1",
-      "community": 34,
+      "community": 1,
       "norm_label": "test-time mirroring over spatial axes (combinations, nnu-net tta)."
     },
     {
@@ -3246,7 +3536,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "nanounet_infer_tta_rationale_25",
-      "community": 34,
+      "community": 1,
       "norm_label": "x: (b, c, z, y, x) -> (b, n_heads, z, y, x), mirror-averaged."
     },
     {
@@ -3256,7 +3546,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_lightning_ckpt",
-      "community": 11,
+      "community": 0,
       "norm_label": "lightning_ckpt.py"
     },
     {
@@ -3266,7 +3556,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "nanounet_lightning_ckpt_pl_ckpt_epoch_and_target",
-      "community": 11,
+      "community": 0,
       "norm_label": "pl_ckpt_epoch_and_target()"
     },
     {
@@ -3276,7 +3566,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "nanounet_lightning_ckpt_pl_ckpt_stage_done",
-      "community": 11,
+      "community": 0,
       "norm_label": "pl_ckpt_stage_done()"
     },
     {
@@ -3286,7 +3576,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "nanounet_lightning_ckpt_pl_ckpt_assert_epochs_match",
-      "community": 11,
+      "community": 0,
       "norm_label": "pl_ckpt_assert_epochs_match()"
     },
     {
@@ -3296,7 +3586,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_lightning_ckpt_rationale_1",
-      "community": 11,
+      "community": 0,
       "norm_label": "lightning 2.x checkpoint metadata: fit epoch index vs saved ``num_epochs``.  ``e"
     },
     {
@@ -3476,7 +3766,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "nanounet_model_dice_helpers_pooled_fg_dice",
-      "community": 14,
+      "community": 4,
       "norm_label": "pooled_fg_dice()"
     },
     {
@@ -3546,7 +3836,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "nanounet_model_dice_helpers_rationale_49",
-      "community": 14,
+      "community": 4,
       "norm_label": "nnu-net global pseudo-dice: pool per-class fg tp/fp/fn over the whole val buffer"
     },
     {
@@ -3576,7 +3866,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_model_dwb",
-      "community": 19,
+      "community": 18,
       "norm_label": "dwb.py"
     },
     {
@@ -3586,7 +3876,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "nanounet_model_dwb_longiresencunet",
-      "community": 19,
+      "community": 18,
       "norm_label": "longiresencunet"
     },
     {
@@ -3596,7 +3886,7 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "nanounet_model_dwb_longiresencunet_init",
-      "community": 19,
+      "community": 18,
       "norm_label": ".__init__()"
     },
     {
@@ -3606,7 +3896,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_model_dwb_py_module",
-      "community": 19,
+      "community": 18,
       "norm_label": "module"
     },
     {
@@ -3616,7 +3906,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "nanounet_model_dwb_longiresencunet_forward",
-      "community": 19,
+      "community": 18,
       "norm_label": ".forward()"
     },
     {
@@ -3626,7 +3916,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_model_dwb_py_tensor",
-      "community": 19,
+      "community": 18,
       "norm_label": "tensor"
     },
     {
@@ -3636,7 +3926,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "nanounet_model_dwb_longiresencunet_initialize",
-      "community": 19,
+      "community": 18,
       "norm_label": ".initialize()"
     },
     {
@@ -3646,7 +3936,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "nanounet_model_dwb_longiresencunet_compute_conv_feature_map_size",
-      "community": 19,
+      "community": 18,
       "norm_label": ".compute_conv_feature_map_size()"
     },
     {
@@ -3656,7 +3946,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_model_dwb_rationale_1",
-      "community": 19,
+      "community": 18,
       "norm_label": "two-stream shared-encoder unet with difference weighting at every skip (longiseg"
     },
     {
@@ -3796,7 +4086,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_model_lr_schedule",
-      "community": 14,
+      "community": 4,
       "norm_label": "lr_schedule.py"
     },
     {
@@ -3806,7 +4096,7 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "nanounet_model_lr_schedule_polylrscheduler",
-      "community": 14,
+      "community": 4,
       "norm_label": "polylrscheduler"
     },
     {
@@ -3816,7 +4106,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "lrscheduler",
-      "community": 14,
+      "community": 4,
       "norm_label": "_lrscheduler"
     },
     {
@@ -3826,7 +4116,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "nanounet_model_lr_schedule_polylrscheduler_init",
-      "community": 14,
+      "community": 4,
       "norm_label": ".__init__()"
     },
     {
@@ -3836,7 +4126,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "nanounet_model_lr_schedule_polylrscheduler_step",
-      "community": 14,
+      "community": 4,
       "norm_label": ".step()"
     },
     {
@@ -3846,7 +4136,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "nanounet_model_lr_schedule_stretchedtailpolylrscheduler",
-      "community": 14,
+      "community": 4,
       "norm_label": "stretchedtailpolylrscheduler"
     },
     {
@@ -3856,7 +4146,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "nanounet_model_lr_schedule_stretchedtailpolylrscheduler_init",
-      "community": 14,
+      "community": 4,
       "norm_label": ".__init__()"
     },
     {
@@ -3866,7 +4156,7 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "nanounet_model_lr_schedule_stretchedtailpolylrscheduler_step",
-      "community": 14,
+      "community": 4,
       "norm_label": ".step()"
     },
     {
@@ -3876,7 +4166,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_model_lr_schedule_rationale_1",
-      "community": 14,
+      "community": 4,
       "norm_label": "polynomial lr + stretched-tail variant (nnu-net)."
     },
     {
@@ -3886,7 +4176,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_model_mae_transfer",
-      "community": 14,
+      "community": 4,
       "norm_label": "mae_transfer.py"
     },
     {
@@ -3896,7 +4186,7 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "nanounet_model_mae_transfer_load_mae_encoder",
-      "community": 14,
+      "community": 4,
       "norm_label": "load_mae_encoder()"
     },
     {
@@ -3906,7 +4196,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_model_mae_transfer_py_module",
-      "community": 14,
+      "community": 4,
       "norm_label": "module"
     },
     {
@@ -3916,7 +4206,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "nanounet_model_mae_transfer_load_full_net",
-      "community": 14,
+      "community": 4,
       "norm_label": "load_full_net()"
     },
     {
@@ -3926,7 +4216,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_model_mae_transfer_rationale_1",
-      "community": 14,
+      "community": 4,
       "norm_label": "lightning checkpoint loaders: mae encoder-only (stem zero-pad) or full supervise"
     },
     {
@@ -3976,7 +4266,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "nanounet_model_network_estimate_conv_feature_map_size",
-      "community": 12,
+      "community": 18,
       "norm_label": "estimate_conv_feature_map_size()"
     },
     {
@@ -4096,7 +4386,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_plan_labels",
-      "community": 18,
+      "community": 34,
       "norm_label": "labels.py"
     },
     {
@@ -4296,7 +4586,7 @@
       "source_location": "L131",
       "_origin": "ast",
       "id": "nanounet_plan_labels_labels_from_dataset_json",
-      "community": 18,
+      "community": 34,
       "norm_label": "labels_from_dataset_json()"
     },
     {
@@ -4306,7 +4596,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_plan_labels_rationale_1",
-      "community": 18,
+      "community": 34,
       "norm_label": "label dict \u2192 training heads, ignore label, foreground sets. regions unsupported."
     },
     {
@@ -4456,7 +4746,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_plan_plans",
-      "community": 18,
+      "community": 34,
       "norm_label": "plans.py"
     },
     {
@@ -4466,7 +4756,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "nanounet_plan_plans_bind_resample",
-      "community": 4,
+      "community": 38,
       "norm_label": "_bind_resample()"
     },
     {
@@ -4476,7 +4766,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d",
-      "community": 4,
+      "community": 38,
       "norm_label": "config3d"
     },
     {
@@ -4486,7 +4776,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_init",
-      "community": 4,
+      "community": 38,
       "norm_label": ".__init__()"
     },
     {
@@ -4496,7 +4786,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_data_identifier",
-      "community": 4,
+      "community": 38,
       "norm_label": ".data_identifier()"
     },
     {
@@ -4506,7 +4796,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_batch_size",
-      "community": 4,
+      "community": 38,
       "norm_label": ".batch_size()"
     },
     {
@@ -4516,7 +4806,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_patch_size",
-      "community": 4,
+      "community": 38,
       "norm_label": ".patch_size()"
     },
     {
@@ -4526,7 +4816,7 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_spacing",
-      "community": 4,
+      "community": 38,
       "norm_label": ".spacing()"
     },
     {
@@ -4536,7 +4826,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_normalization_schemes",
-      "community": 4,
+      "community": 38,
       "norm_label": ".normalization_schemes()"
     },
     {
@@ -4546,7 +4836,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_use_mask_for_norm",
-      "community": 4,
+      "community": 38,
       "norm_label": ".use_mask_for_norm()"
     },
     {
@@ -4556,7 +4846,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_network_arch_class_name",
-      "community": 4,
+      "community": 38,
       "norm_label": ".network_arch_class_name()"
     },
     {
@@ -4566,7 +4856,7 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_network_arch_init_kwargs",
-      "community": 4,
+      "community": 38,
       "norm_label": ".network_arch_init_kwargs()"
     },
     {
@@ -4576,7 +4866,7 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_network_arch_init_kwargs_req_import",
-      "community": 4,
+      "community": 38,
       "norm_label": ".network_arch_init_kwargs_req_import()"
     },
     {
@@ -4586,7 +4876,7 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_batch_dice",
-      "community": 4,
+      "community": 38,
       "norm_label": ".batch_dice()"
     },
     {
@@ -4596,7 +4886,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_pool_op_kernel_sizes",
-      "community": 4,
+      "community": 38,
       "norm_label": ".pool_op_kernel_sizes()"
     },
     {
@@ -4606,7 +4896,7 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_previous_stage_name",
-      "community": 4,
+      "community": 38,
       "norm_label": ".previous_stage_name()"
     },
     {
@@ -4616,7 +4906,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_resampling_fn_data",
-      "community": 4,
+      "community": 38,
       "norm_label": ".resampling_fn_data()"
     },
     {
@@ -4626,7 +4916,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_resampling_fn_probabilities",
-      "community": 4,
+      "community": 38,
       "norm_label": ".resampling_fn_probabilities()"
     },
     {
@@ -4636,7 +4926,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "nanounet_plan_plans_config3d_resampling_fn_seg",
-      "community": 4,
+      "community": 38,
       "norm_label": ".resampling_fn_seg()"
     },
     {
@@ -4646,7 +4936,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "nanounet_plan_plans_plans",
-      "community": 15,
+      "community": 103,
       "norm_label": "plans"
     },
     {
@@ -4656,7 +4946,7 @@
       "source_location": "L96",
       "_origin": "ast",
       "id": "nanounet_plan_plans_plans_init",
-      "community": 15,
+      "community": 103,
       "norm_label": ".__init__()"
     },
     {
@@ -4666,7 +4956,7 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "nanounet_plan_plans_plans_resolve",
-      "community": 15,
+      "community": 103,
       "norm_label": "._resolve()"
     },
     {
@@ -4676,7 +4966,7 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "nanounet_plan_plans_plans_get_configuration",
-      "community": 15,
+      "community": 103,
       "norm_label": ".get_configuration()"
     },
     {
@@ -4686,7 +4976,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "nanounet_plan_plans_plans_transpose_forward",
-      "community": 15,
+      "community": 103,
       "norm_label": ".transpose_forward()"
     },
     {
@@ -4696,7 +4986,7 @@
       "source_location": "L125",
       "_origin": "ast",
       "id": "nanounet_plan_plans_plans_transpose_backward",
-      "community": 15,
+      "community": 103,
       "norm_label": ".transpose_backward()"
     },
     {
@@ -4706,7 +4996,7 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "nanounet_plan_plans_plans_image_reader_writer",
-      "community": 15,
+      "community": 103,
       "norm_label": ".image_reader_writer()"
     },
     {
@@ -4716,7 +5006,7 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "nanounet_plan_plans_plans_get_label_manager",
-      "community": 20,
+      "community": 103,
       "norm_label": ".get_label_manager()"
     },
     {
@@ -4726,7 +5016,7 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "nanounet_plan_plans_plans_foreground_intensity_properties_per_channel",
-      "community": 15,
+      "community": 103,
       "norm_label": ".foreground_intensity_properties_per_channel()"
     },
     {
@@ -4736,7 +5026,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "nanounet_plan_plans_migrate_old_architecture",
-      "community": 4,
+      "community": 38,
       "norm_label": "_migrate_old_architecture()"
     },
     {
@@ -4756,7 +5046,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_plan_plans_rationale_1",
-      "community": 18,
+      "community": 34,
       "norm_label": "load plans.json: inheritance, 3d_fullres config3d, resampling partials, old-unet"
     },
     {
@@ -4766,7 +5056,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "nanounet_plan_plans_rationale_26",
-      "community": 4,
+      "community": 38,
       "norm_label": "one nnu-net configuration block after `inherits_from` merge."
     },
     {
@@ -4796,7 +5086,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_plan_prep_case_pp",
-      "community": 15,
+      "community": 34,
       "norm_label": "case_pp.py"
     },
     {
@@ -4806,7 +5096,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "nanounet_plan_prep_case_pp_sample_foreground_locations",
-      "community": 15,
+      "community": 34,
       "norm_label": "sample_foreground_locations()"
     },
     {
@@ -4816,7 +5106,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_plan_prep_case_pp_py_ndarray",
-      "community": 15,
+      "community": 34,
       "norm_label": "ndarray"
     },
     {
@@ -4826,7 +5116,7 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "nanounet_plan_prep_case_pp_load_dj",
-      "community": 15,
+      "community": 34,
       "norm_label": "_load_dj()"
     },
     {
@@ -4836,7 +5126,7 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "nanounet_plan_prep_case_pp_run_case_npy",
-      "community": 15,
+      "community": 34,
       "norm_label": "run_case_npy()"
     },
     {
@@ -4846,7 +5136,7 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "nanounet_plan_prep_case_pp_run_case",
-      "community": 15,
+      "community": 34,
       "norm_label": "run_case()"
     },
     {
@@ -4856,7 +5146,7 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "nanounet_plan_prep_case_pp_run_case_save",
-      "community": 15,
+      "community": 34,
       "norm_label": "run_case_save()"
     },
     {
@@ -4866,7 +5156,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_plan_prep_case_pp_rationale_1",
-      "community": 15,
+      "community": 34,
       "norm_label": "single-case raw \u2192 cropped normalized blosc2 bundle; uniform foreground sampling"
     },
     {
@@ -5016,7 +5306,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "nanounet_plan_prep_preprocess_worker",
-      "community": 15,
+      "community": 0,
       "norm_label": "_worker()"
     },
     {
@@ -5256,7 +5546,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_plan_splits",
-      "community": 11,
+      "community": 14,
       "norm_label": "splits.py"
     },
     {
@@ -5286,7 +5576,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "nanounet_plan_splits_make_splits",
-      "community": 11,
+      "community": 14,
       "norm_label": "make_splits()"
     },
     {
@@ -5296,7 +5586,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "nanounet_plan_splits_load_or_create_splits",
-      "community": 11,
+      "community": 14,
       "norm_label": "load_or_create_splits()"
     },
     {
@@ -5306,7 +5596,7 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "nanounet_plan_splits_fold_keys",
-      "community": 11,
+      "community": 14,
       "norm_label": "fold_keys()"
     },
     {
@@ -5316,7 +5606,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_plan_splits_rationale_1",
-      "community": 11,
+      "community": 14,
       "norm_label": "k-fold splits; same file format as nnu-net."
     },
     {
@@ -5346,7 +5636,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_pretrain_augment",
-      "community": 5,
+      "community": 184,
       "norm_label": "augment.py"
     },
     {
@@ -5356,7 +5646,7 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "nanounet_pretrain_augment_rotation_for_da",
-      "community": 5,
+      "community": 184,
       "norm_label": "_rotation_for_da()"
     },
     {
@@ -5366,7 +5656,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "nanounet_pretrain_augment_train_spatial_tf",
-      "community": 5,
+      "community": 184,
       "norm_label": "train_spatial_tf()"
     },
     {
@@ -5376,7 +5666,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_pretrain_augment_py_ndarray",
-      "community": 5,
+      "community": 184,
       "norm_label": "ndarray"
     },
     {
@@ -5386,7 +5676,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_pretrain_augment_py_basictransform",
-      "community": 5,
+      "community": 184,
       "norm_label": "basictransform"
     },
     {
@@ -5396,7 +5686,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "nanounet_pretrain_augment_apply_spatial_tf",
-      "community": 5,
+      "community": 184,
       "norm_label": "apply_spatial_tf()"
     },
     {
@@ -5406,7 +5696,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_pretrain_augment_rationale_1",
-      "community": 5,
+      "community": 184,
       "norm_label": "mae pretrain spatial aug: rotation + scale + mirror (nnssl basemae recipe)."
     },
     {
@@ -5416,7 +5706,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_pretrain_dataset",
-      "community": 5,
+      "community": 14,
       "norm_label": "dataset.py"
     },
     {
@@ -5426,7 +5716,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "nanounet_pretrain_dataset_pretrain_collate",
-      "community": 5,
+      "community": 14,
       "norm_label": "_pretrain_collate()"
     },
     {
@@ -5436,7 +5726,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "nanounet_pretrain_dataset_worker_init",
-      "community": 0,
+      "community": 14,
       "norm_label": "_worker_init()"
     },
     {
@@ -5446,7 +5736,7 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "nanounet_pretrain_dataset_pretrainpatchiterable",
-      "community": 5,
+      "community": 14,
       "norm_label": "pretrainpatchiterable"
     },
     {
@@ -5456,7 +5746,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "iterabledataset",
-      "community": 5,
+      "community": 7,
       "norm_label": "iterabledataset"
     },
     {
@@ -5466,7 +5756,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "nanounet_pretrain_dataset_pretrainpatchiterable_init",
-      "community": 5,
+      "community": 14,
       "norm_label": ".__init__()"
     },
     {
@@ -5476,7 +5766,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_pretrain_dataset_py_ndarray",
-      "community": 5,
+      "community": 14,
       "norm_label": "ndarray"
     },
     {
@@ -5486,7 +5776,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_pretrain_dataset_py_basictransform",
-      "community": 5,
+      "community": 14,
       "norm_label": "basictransform"
     },
     {
@@ -5496,7 +5786,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "nanounet_pretrain_dataset_pretrainpatchiterable_len",
-      "community": 5,
+      "community": 14,
       "norm_label": ".__len__()"
     },
     {
@@ -5516,7 +5806,7 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "nanounet_pretrain_dataset_keys_fit_patch",
-      "community": 5,
+      "community": 3,
       "norm_label": "_keys_fit_patch()"
     },
     {
@@ -5526,7 +5816,7 @@
       "source_location": "L127",
       "_origin": "ast",
       "id": "nanounet_pretrain_dataset_build_pretrain_dataloaders",
-      "community": 0,
+      "community": 14,
       "norm_label": "build_pretrain_dataloaders()"
     },
     {
@@ -5536,7 +5826,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_pretrain_dataset_py_dataloader",
-      "community": 0,
+      "community": 14,
       "norm_label": "dataloader"
     },
     {
@@ -5546,7 +5836,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_pretrain_dataset_rationale_1",
-      "community": 5,
+      "community": 14,
       "norm_label": "mae pretrain patches: random crop, optional spatial aug, persistent worker rng."
     },
     {
@@ -5556,7 +5846,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_pretrain_masking",
-      "community": 3,
+      "community": 186,
       "norm_label": "masking.py"
     },
     {
@@ -5566,7 +5856,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "nanounet_pretrain_masking_bottleneck_mask",
-      "community": 3,
+      "community": 186,
       "norm_label": "bottleneck_mask()"
     },
     {
@@ -5576,7 +5866,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_pretrain_masking_py_device",
-      "community": 3,
+      "community": 186,
       "norm_label": "device"
     },
     {
@@ -5586,7 +5876,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_pretrain_masking_py_tensor",
-      "community": 3,
+      "community": 186,
       "norm_label": "tensor"
     },
     {
@@ -5596,7 +5886,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_pretrain_masking_rationale_1",
-      "community": 3,
+      "community": 186,
       "norm_label": "bottleneck-grid random masks upsampled to voxel resolution (spark3d-style)."
     },
     {
@@ -5616,7 +5906,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "nanounet_pretrain_module_nanomaelm",
-      "community": 3,
+      "community": 4,
       "norm_label": "nanomaelm"
     },
     {
@@ -5636,7 +5926,7 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "nanounet_pretrain_module_nanomaelm_forward",
-      "community": 3,
+      "community": 4,
       "norm_label": ".forward()"
     },
     {
@@ -5646,7 +5936,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_pretrain_module_py_tensor",
-      "community": 3,
+      "community": 4,
       "norm_label": "tensor"
     },
     {
@@ -5656,7 +5946,7 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "nanounet_pretrain_module_nanomaelm_loss",
-      "community": 3,
+      "community": 4,
       "norm_label": "._loss()"
     },
     {
@@ -5666,7 +5956,7 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "nanounet_pretrain_module_nanomaelm_training_step",
-      "community": 3,
+      "community": 4,
       "norm_label": ".training_step()"
     },
     {
@@ -5676,7 +5966,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "nanounet_pretrain_module_nanomaelm_validation_step",
-      "community": 3,
+      "community": 4,
       "norm_label": ".validation_step()"
     },
     {
@@ -5686,7 +5976,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "nanounet_pretrain_module_nanomaelm_on_train_epoch_start",
-      "community": 3,
+      "community": 41,
       "norm_label": ".on_train_epoch_start()"
     },
     {
@@ -5726,7 +6016,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "nanounet_pretrain_module_nanomaelm_configure_optimizers",
-      "community": 14,
+      "community": 4,
       "norm_label": ".configure_optimizers()"
     },
     {
@@ -5846,7 +6136,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "nanounet_prompt_centroids_precompute_folder",
-      "community": 0,
+      "community": 7,
       "norm_label": "precompute_folder()"
     },
     {
@@ -5876,7 +6166,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_prompt_cluster",
-      "community": 38,
+      "community": 1,
       "norm_label": "cluster.py"
     },
     {
@@ -5886,7 +6176,7 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "nanounet_prompt_cluster_margin_vox",
-      "community": 38,
+      "community": 1,
       "norm_label": "_margin_vox()"
     },
     {
@@ -5896,7 +6186,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "nanounet_prompt_cluster_bbox_fits_in_patch",
-      "community": 38,
+      "community": 1,
       "norm_label": "bbox_fits_in_patch()"
     },
     {
@@ -5905,8 +6195,8 @@
       "source_file": "",
       "source_location": "",
       "_origin": "ast",
-      "id": "zyx",
-      "community": 38,
+      "id": "nanounet_prompt_cluster_py_zyx",
+      "community": 1,
       "norm_label": "zyx"
     },
     {
@@ -5916,7 +6206,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "nanounet_prompt_cluster_cluster_points_for_patch_size",
-      "community": 38,
+      "community": 1,
       "norm_label": "cluster_points_for_patch_size()"
     },
     {
@@ -5926,7 +6216,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "nanounet_prompt_cluster_spatial_slices_covering_points",
-      "community": 38,
+      "community": 1,
       "norm_label": "spatial_slices_covering_points()"
     },
     {
@@ -5936,7 +6226,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_prompt_cluster_py_slice",
-      "community": 38,
+      "community": 1,
       "norm_label": "slice"
     },
     {
@@ -5946,7 +6236,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "nanounet_prompt_cluster_cluster_prompts_patch_local",
-      "community": 38,
+      "community": 1,
       "norm_label": "cluster_prompts_patch_local()"
     },
     {
@@ -5956,7 +6246,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_prompt_cluster_rationale_1",
-      "community": 38,
+      "community": 1,
       "norm_label": "greedy point clustering for patch-sized 'infer all' seed batches."
     },
     {
@@ -5966,7 +6256,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "nanounet_prompt_cluster_rationale_60",
-      "community": 38,
+      "community": 1,
       "norm_label": "patch placement that includes every point (bbox-centered, volume-clamped)."
     },
     {
@@ -5976,7 +6266,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_prompt_coords",
-      "community": 113,
+      "community": 1,
       "norm_label": "coords.py"
     },
     {
@@ -5986,7 +6276,7 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "nanounet_prompt_coords_bbox_lo",
-      "community": 113,
+      "community": 1,
       "norm_label": "_bbox_lo()"
     },
     {
@@ -5996,7 +6286,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "nanounet_prompt_coords_points_to_centers_zyx",
-      "community": 113,
+      "community": 1,
       "norm_label": "points_to_centers_zyx()"
     },
     {
@@ -6016,7 +6306,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_prompt_coords_rationale_1",
-      "community": 113,
+      "community": 1,
       "norm_label": "world/voxel points \u2192 preprocessed (z,y,x); json reader for native-voxel clickpoi"
     },
     {
@@ -6596,7 +6886,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_runtime",
-      "community": 0,
+      "community": 181,
       "norm_label": "runtime.py"
     },
     {
@@ -6606,7 +6896,7 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "nanounet_runtime_is_tmpfs",
-      "community": 0,
+      "community": 181,
       "norm_label": "_is_tmpfs()"
     },
     {
@@ -6616,7 +6906,7 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "nanounet_runtime_fs_type",
-      "community": 0,
+      "community": 181,
       "norm_label": "_fs_type()"
     },
     {
@@ -6626,7 +6916,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "nanounet_runtime_ipc_fs_ok",
-      "community": 0,
+      "community": 181,
       "norm_label": "_ipc_fs_ok()"
     },
     {
@@ -6646,7 +6936,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "nanounet_runtime_writable_dir",
-      "community": 0,
+      "community": 181,
       "norm_label": "_writable_dir()"
     },
     {
@@ -6656,7 +6946,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "nanounet_runtime_results_scratch",
-      "community": 0,
+      "community": 181,
       "norm_label": "_results_scratch()"
     },
     {
@@ -6666,7 +6956,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "nanounet_runtime_set_safe_tmpdir",
-      "community": 0,
+      "community": 181,
       "norm_label": "set_safe_tmpdir()"
     },
     {
@@ -6676,7 +6966,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "nanounet_runtime_join_safe",
-      "community": 0,
+      "community": 181,
       "norm_label": "join_safe()"
     },
     {
@@ -6686,7 +6976,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "nanounet_runtime_git_head",
-      "community": 0,
+      "community": 181,
       "norm_label": "_git_head()"
     },
     {
@@ -6726,7 +7016,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_runtime_rationale_1",
-      "community": 0,
+      "community": 181,
       "norm_label": "process runtime: tmpdir off tmpfs, cgroup scope, startup banner."
     },
     {
@@ -6736,7 +7026,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "nanounet_runtime_rationale_29",
-      "community": 0,
+      "community": 181,
       "norm_label": "dataloader file_system ipc needs a local-ish fs (not tmpfs/cifs/nfs)."
     },
     {
@@ -6746,7 +7036,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "nanounet_runtime_rationale_60",
-      "community": 0,
+      "community": 181,
       "norm_label": "tmpdir off tmpfs; prefer local disk so dataloader workers + checkpoint staging w"
     },
     {
@@ -6786,7 +7076,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "nanounet_train_data_module_ds_scales",
-      "community": 11,
+      "community": 14,
       "norm_label": "_ds_scales()"
     },
     {
@@ -6826,14 +7116,14 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "nanounet_train_data_module_nanodatamodule_setup",
-      "community": 11,
+      "community": 14,
       "norm_label": ".setup()"
     },
     {
       "label": ".train_dataloader()",
       "file_type": "code",
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L131",
+      "source_location": "L134",
       "_origin": "ast",
       "id": "nanounet_train_data_module_nanodatamodule_train_dataloader",
       "community": 11,
@@ -6853,7 +7143,7 @@
       "label": ".val_dataloader()",
       "file_type": "code",
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L163",
+      "source_location": "L166",
       "_origin": "ast",
       "id": "nanounet_train_data_module_nanodatamodule_val_dataloader",
       "community": 11,
@@ -6876,7 +7166,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_train_fit",
-      "community": 11,
+      "community": 0,
       "norm_label": "fit.py"
     },
     {
@@ -6886,7 +7176,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "nanounet_train_fit_run_mae_pretrain",
-      "community": 11,
+      "community": 0,
       "norm_label": "run_mae_pretrain()"
     },
     {
@@ -6896,7 +7186,7 @@
       "source_location": "L131",
       "_origin": "ast",
       "id": "nanounet_train_fit_run_supervised",
-      "community": 11,
+      "community": 0,
       "norm_label": "run_supervised()"
     },
     {
@@ -6906,7 +7196,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_train_fit_rationale_1",
-      "community": 11,
+      "community": 0,
       "norm_label": "fit orchestration for nanounet_train: integrated mae pretrain stage + supervised"
     },
     {
@@ -6916,7 +7206,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "nanounet_train_fit_rationale_29",
-      "community": 11,
+      "community": 0,
       "norm_label": "integrated mae stage. returns the mae checkpoint path to transfer, or none."
     },
     {
@@ -6926,7 +7216,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_train_lightning_module",
-      "community": 14,
+      "community": 4,
       "norm_label": "lightning_module.py"
     },
     {
@@ -6936,7 +7226,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "nanounet_train_lightning_module_nanounetlm",
-      "community": 14,
+      "community": 4,
       "norm_label": "nanounetlm"
     },
     {
@@ -6946,7 +7236,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "nanounet_train_lightning_module_nanounetlm_init",
-      "community": 14,
+      "community": 4,
       "norm_label": ".__init__()"
     },
     {
@@ -6956,7 +7246,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "nanounet_train_lightning_module_nanounetlm_forward",
-      "community": 14,
+      "community": 4,
       "norm_label": ".forward()"
     },
     {
@@ -6966,7 +7256,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "nanounet_train_lightning_module_py_tensor",
-      "community": 14,
+      "community": 4,
       "norm_label": "tensor"
     },
     {
@@ -6976,7 +7266,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "nanounet_train_lightning_module_nanounetlm_on_train_start",
-      "community": 14,
+      "community": 7,
       "norm_label": ".on_train_start()"
     },
     {
@@ -6986,7 +7276,7 @@
       "source_location": "L86",
       "_origin": "ast",
       "id": "nanounet_train_lightning_module_nanounetlm_on_train_epoch_start",
-      "community": 3,
+      "community": 41,
       "norm_label": ".on_train_epoch_start()"
     },
     {
@@ -6996,7 +7286,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "nanounet_train_lightning_module_nanounetlm_training_step",
-      "community": 14,
+      "community": 4,
       "norm_label": ".training_step()"
     },
     {
@@ -7016,7 +7306,7 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "nanounet_train_lightning_module_nanounetlm_on_validation_epoch_start",
-      "community": 14,
+      "community": 4,
       "norm_label": ".on_validation_epoch_start()"
     },
     {
@@ -7026,7 +7316,7 @@
       "source_location": "L120",
       "_origin": "ast",
       "id": "nanounet_train_lightning_module_nanounetlm_on_validation_epoch_end",
-      "community": 14,
+      "community": 4,
       "norm_label": ".on_validation_epoch_end()"
     },
     {
@@ -7036,7 +7326,7 @@
       "source_location": "L134",
       "_origin": "ast",
       "id": "nanounet_train_lightning_module_nanounetlm_configure_optimizers",
-      "community": 14,
+      "community": 4,
       "norm_label": ".configure_optimizers()"
     },
     {
@@ -7046,7 +7336,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "nanounet_train_lightning_module_rationale_1",
-      "community": 14,
+      "community": 4,
       "norm_label": "lightning module: prompt-aware resenc, val dice, sgd + poly lr."
     },
     {
@@ -7106,7 +7396,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "nanounet_train_patch_iterable_worker_init",
-      "community": 7,
+      "community": 11,
       "norm_label": "worker_init()"
     },
     {
@@ -7116,7 +7406,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "nanounet_train_patch_iterable_patchiterable",
-      "community": 11,
+      "community": 7,
       "norm_label": "patchiterable"
     },
     {
@@ -7146,7 +7436,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "nanounet_train_patch_iterable_patchiterable_len",
-      "community": 11,
+      "community": 7,
       "norm_label": ".__len__()"
     },
     {
@@ -7600,6 +7890,188 @@
       "_origin": "ast",
       "id": "scripts_slurm_nanounet_finetune_d013_registered_nnunet_preprocessed",
       "community": 21,
+      "norm_label": "nnunet_preprocessed"
+    },
+    {
+      "label": "slurm_nanounet_finetune_d114_registered.sh",
+      "file_type": "code",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L1",
+      "metadata": {
+        "language": "bash",
+        "kind": "file"
+      },
+      "_origin": "ast",
+      "id": "scripts_slurm_nanounet_finetune_d114_registered",
+      "community": 142,
+      "norm_label": "slurm_nanounet_finetune_d114_registered.sh"
+    },
+    {
+      "label": "slurm_nanounet_finetune_d114_registered.sh script",
+      "file_type": "code",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L1",
+      "metadata": {
+        "language": "bash",
+        "kind": "bash_entrypoint"
+      },
+      "_origin": "ast",
+      "id": "scripts_slurm_nanounet_finetune_d114_registered_sh__entry",
+      "community": 142,
+      "norm_label": "slurm_nanounet_finetune_d114_registered.sh script"
+    },
+    {
+      "label": "NANOUNET_RAW",
+      "file_type": "code",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L39",
+      "metadata": {
+        "language": "bash",
+        "kind": "code"
+      },
+      "_origin": "ast",
+      "id": "scripts_slurm_nanounet_finetune_d114_registered_nanounet_raw",
+      "community": 142,
+      "norm_label": "nanounet_raw"
+    },
+    {
+      "label": "NANOUNET_RESULTS",
+      "file_type": "code",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L40",
+      "metadata": {
+        "language": "bash",
+        "kind": "code"
+      },
+      "_origin": "ast",
+      "id": "scripts_slurm_nanounet_finetune_d114_registered_nanounet_results",
+      "community": 142,
+      "norm_label": "nanounet_results"
+    },
+    {
+      "label": "NANOUNET_TMPDIR",
+      "file_type": "code",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L41",
+      "metadata": {
+        "language": "bash",
+        "kind": "code"
+      },
+      "_origin": "ast",
+      "id": "scripts_slurm_nanounet_finetune_d114_registered_nanounet_tmpdir",
+      "community": 142,
+      "norm_label": "nanounet_tmpdir"
+    },
+    {
+      "label": "OMP_NUM_THREADS",
+      "file_type": "code",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L42",
+      "metadata": {
+        "language": "bash",
+        "kind": "code"
+      },
+      "_origin": "ast",
+      "id": "scripts_slurm_nanounet_finetune_d114_registered_omp_num_threads",
+      "community": 142,
+      "norm_label": "omp_num_threads"
+    },
+    {
+      "label": "MKL_NUM_THREADS",
+      "file_type": "code",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L43",
+      "metadata": {
+        "language": "bash",
+        "kind": "code"
+      },
+      "_origin": "ast",
+      "id": "scripts_slurm_nanounet_finetune_d114_registered_mkl_num_threads",
+      "community": 142,
+      "norm_label": "mkl_num_threads"
+    },
+    {
+      "label": "OPENBLAS_NUM_THREADS",
+      "file_type": "code",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L44",
+      "metadata": {
+        "language": "bash",
+        "kind": "code"
+      },
+      "_origin": "ast",
+      "id": "scripts_slurm_nanounet_finetune_d114_registered_openblas_num_threads",
+      "community": 142,
+      "norm_label": "openblas_num_threads"
+    },
+    {
+      "label": "NUMEXPR_NUM_THREADS",
+      "file_type": "code",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L45",
+      "metadata": {
+        "language": "bash",
+        "kind": "code"
+      },
+      "_origin": "ast",
+      "id": "scripts_slurm_nanounet_finetune_d114_registered_numexpr_num_threads",
+      "community": 142,
+      "norm_label": "numexpr_num_threads"
+    },
+    {
+      "label": "nnUNet_raw",
+      "file_type": "code",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L46",
+      "metadata": {
+        "language": "bash",
+        "kind": "code"
+      },
+      "_origin": "ast",
+      "id": "scripts_slurm_nanounet_finetune_d114_registered_nnunet_raw",
+      "community": 142,
+      "norm_label": "nnunet_raw"
+    },
+    {
+      "label": "nnUNet_results",
+      "file_type": "code",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L47",
+      "metadata": {
+        "language": "bash",
+        "kind": "code"
+      },
+      "_origin": "ast",
+      "id": "scripts_slurm_nanounet_finetune_d114_registered_nnunet_results",
+      "community": 142,
+      "norm_label": "nnunet_results"
+    },
+    {
+      "label": "NANOUNET_PREPROCESSED",
+      "file_type": "code",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L63",
+      "metadata": {
+        "language": "bash",
+        "kind": "code"
+      },
+      "_origin": "ast",
+      "id": "scripts_slurm_nanounet_finetune_d114_registered_nanounet_preprocessed",
+      "community": 142,
+      "norm_label": "nanounet_preprocessed"
+    },
+    {
+      "label": "nnUNet_preprocessed",
+      "file_type": "code",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L64",
+      "metadata": {
+        "language": "bash",
+        "kind": "code"
+      },
+      "_origin": "ast",
+      "id": "scripts_slurm_nanounet_finetune_d114_registered_nnunet_preprocessed",
+      "community": 142,
       "norm_label": "nnunet_preprocessed"
     },
     {
@@ -9359,6 +9831,26 @@
       "norm_label": "what stays the same"
     },
     {
+      "label": "AGENTS.md",
+      "file_type": "document",
+      "source_file": "AGENTS.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "agents",
+      "community": 187,
+      "norm_label": "agents.md"
+    },
+    {
+      "label": "graphify",
+      "file_type": "document",
+      "source_file": "AGENTS.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "agents_graphify",
+      "community": 187,
+      "norm_label": "graphify"
+    },
+    {
       "label": "README.md",
       "file_type": "document",
       "source_file": "README.md",
@@ -9939,6 +10431,96 @@
       "norm_label": "11. review checklist (run before done \u2014 skill \u00a7\"review checklist\")"
     },
     {
+      "label": "longi_gpu_starvation.md",
+      "file_type": "document",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_dev_notes_longi_gpu_starvation",
+      "community": 183,
+      "norm_label": "longi_gpu_starvation.md"
+    },
+    {
+      "label": "Longi finetune GPU starvation \u2014 diagnosis + fix (2026-07-10)",
+      "file_type": "document",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "docs_dev_notes_longi_gpu_starvation_longi_finetune_gpu_starvation_diagnosis_fix_2026_07_10",
+      "community": 183,
+      "norm_label": "longi finetune gpu starvation \u2014 diagnosis + fix (2026-07-10)"
+    },
+    {
+      "label": "Symptom",
+      "file_type": "document",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "docs_dev_notes_longi_gpu_starvation_symptom",
+      "community": 183,
+      "norm_label": "symptom"
+    },
+    {
+      "label": "Root cause",
+      "file_type": "document",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "docs_dev_notes_longi_gpu_starvation_root_cause",
+      "community": 183,
+      "norm_label": "root cause"
+    },
+    {
+      "label": "Evidence (A100-40GB, 38 usable cores, 120-iter burst)",
+      "file_type": "document",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L29",
+      "_origin": "ast",
+      "id": "docs_dev_notes_longi_gpu_starvation_evidence_a100_40gb_38_usable_cores_120_iter_burst",
+      "community": 183,
+      "norm_label": "evidence (a100-40gb, 38 usable cores, 120-iter burst)"
+    },
+    {
+      "label": "Fix",
+      "file_type": "document",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L40",
+      "_origin": "ast",
+      "id": "docs_dev_notes_longi_gpu_starvation_fix",
+      "community": 183,
+      "norm_label": "fix"
+    },
+    {
+      "label": "Augmentation synchronization (verified \u2014 no bug)",
+      "file_type": "document",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L44",
+      "_origin": "ast",
+      "id": "docs_dev_notes_longi_gpu_starvation_augmentation_synchronization_verified_no_bug",
+      "community": 183,
+      "norm_label": "augmentation synchronization (verified \u2014 no bug)"
+    },
+    {
+      "label": "Fix 2 \u2014 CT-only intensity augmentation (applied)",
+      "file_type": "document",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L53",
+      "_origin": "ast",
+      "id": "docs_dev_notes_longi_gpu_starvation_fix_2_ct_only_intensity_augmentation_applied",
+      "community": 183,
+      "norm_label": "fix 2 \u2014 ct-only intensity augmentation (applied)"
+    },
+    {
+      "label": "Resource sizing (CPU / mem)",
+      "file_type": "document",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L68",
+      "_origin": "ast",
+      "id": "docs_dev_notes_longi_gpu_starvation_resource_sizing_cpu_mem",
+      "community": 183,
+      "norm_label": "resource sizing (cpu / mem)"
+    },
+    {
       "label": "longi_layer2_and_test_split_handoff.md",
       "file_type": "document",
       "source_file": "docs/dev-notes/longi_layer2_and_test_split_handoff.md",
@@ -10039,94 +10621,54 @@
       "norm_label": "training"
     },
     {
-      "label": "sol_pressure.md",
+      "label": "radiom_embed_api.md",
       "file_type": "document",
-      "source_file": "docs/dev-notes/sol_pressure.md",
+      "source_file": "docs/dev-notes/radiom_embed_api.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "docs_dev_notes_sol_pressure",
-      "community": 142,
-      "norm_label": "sol_pressure.md"
+      "id": "docs_dev_notes_radiom_embed_api",
+      "community": 185,
+      "norm_label": "radiom_embed_api.md"
     },
     {
-      "label": "unigradicon_gpu_handoff.md",
+      "label": "Radiom in-process embed API",
       "file_type": "document",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
+      "source_file": "docs/dev-notes/radiom_embed_api.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "docs_dev_notes_unigradicon_gpu_handoff",
-      "community": 41,
-      "norm_label": "unigradicon_gpu_handoff.md"
+      "id": "docs_dev_notes_radiom_embed_api_radiom_in_process_embed_api",
+      "community": 185,
+      "norm_label": "radiom in-process embed api"
     },
     {
-      "label": "Handoff: run uniGradICON registration on the GPU cluster",
+      "label": "`points_zyx_unpadded`",
       "file_type": "document",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
-      "source_location": "L1",
+      "source_file": "docs/dev-notes/radiom_embed_api.md",
+      "source_location": "L6",
       "_origin": "ast",
-      "id": "docs_dev_notes_unigradicon_gpu_handoff_handoff_run_unigradicon_registration_on_the_gpu_cluster",
-      "community": 41,
-      "norm_label": "handoff: run unigradicon registration on the gpu cluster"
+      "id": "docs_dev_notes_radiom_embed_api_points_zyx_unpadded",
+      "community": 185,
+      "norm_label": "`points_zyx_unpadded`"
     },
     {
-      "label": "What changed (code is in place, deps resolve)",
+      "label": "`on_forward`",
       "file_type": "document",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
-      "source_location": "L12",
+      "source_file": "docs/dev-notes/radiom_embed_api.md",
+      "source_location": "L15",
       "_origin": "ast",
-      "id": "docs_dev_notes_unigradicon_gpu_handoff_what_changed_code_is_in_place_deps_resolve",
-      "community": 41,
-      "norm_label": "what changed (code is in place, deps resolve)"
+      "id": "docs_dev_notes_radiom_embed_api_on_forward",
+      "community": 185,
+      "norm_label": "`on_forward`"
     },
     {
-      "label": "First: get the weights",
+      "label": "Interactive patch API",
       "file_type": "document",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
-      "source_location": "L22",
+      "source_file": "docs/dev-notes/radiom_embed_api.md",
+      "source_location": "L26",
       "_origin": "ast",
-      "id": "docs_dev_notes_unigradicon_gpu_handoff_first_get_the_weights",
-      "community": 41,
-      "norm_label": "first: get the weights"
-    },
-    {
-      "label": "Run it",
-      "file_type": "document",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
-      "source_location": "L38",
-      "_origin": "ast",
-      "id": "docs_dev_notes_unigradicon_gpu_handoff_run_it",
-      "community": 41,
-      "norm_label": "run it"
-    },
-    {
-      "label": "Validate (this is the point of the run)",
-      "file_type": "document",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
-      "source_location": "L64",
-      "_origin": "ast",
-      "id": "docs_dev_notes_unigradicon_gpu_handoff_validate_this_is_the_point_of_the_run",
-      "community": 41,
-      "norm_label": "validate (this is the point of the run)"
-    },
-    {
-      "label": "Notes / gotchas",
-      "file_type": "document",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
-      "source_location": "L79",
-      "_origin": "ast",
-      "id": "docs_dev_notes_unigradicon_gpu_handoff_notes_gotchas",
-      "community": 41,
-      "norm_label": "notes / gotchas"
-    },
-    {
-      "label": "If you improve things",
-      "file_type": "document",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
-      "source_location": "L91",
-      "_origin": "ast",
-      "id": "docs_dev_notes_unigradicon_gpu_handoff_if_you_improve_things",
-      "community": 41,
-      "norm_label": "if you improve things"
+      "id": "docs_dev_notes_radiom_embed_api_interactive_patch_api",
+      "community": 185,
+      "norm_label": "interactive patch api"
     },
     {
       "label": "index.md",
@@ -10617,6 +11159,16 @@
       "id": "docs_steps_predict_common_errors",
       "community": 108,
       "norm_label": "common errors"
+    },
+    {
+      "label": "Interactive / embed (library)",
+      "file_type": "document",
+      "source_file": "docs/steps/predict.md",
+      "source_location": "L92",
+      "_origin": "ast",
+      "id": "docs_steps_predict_interactive_embed_library",
+      "community": 108,
+      "norm_label": "interactive / embed (library)"
     },
     {
       "label": "preprocess.md",
@@ -17787,6 +18339,16 @@
       "source_location": "L32",
       "weight": 1.0,
       "source": "nanounet_data_augment",
+      "target": "nanounet_data_augment_channelsubsetimagetransform",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/data/augment.py",
+      "source_location": "L56",
+      "weight": 1.0,
+      "source": "nanounet_data_augment",
       "target": "nanounet_data_augment_train_transforms",
       "confidence_score": 1.0
     },
@@ -17794,7 +18356,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/data/augment.py",
-      "source_location": "L135",
+      "source_location": "L165",
       "weight": 1.0,
       "source": "nanounet_data_augment",
       "target": "nanounet_data_augment_val_transforms",
@@ -17822,14 +18384,86 @@
       "confidence_score": 1.0
     },
     {
-      "relation": "references",
-      "context": "return_type",
+      "relation": "inherits",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/data/augment.py",
       "source_location": "L32",
       "weight": 1.0,
+      "source": "nanounet_data_augment_channelsubsetimagetransform",
+      "target": "basictransform",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/data/augment.py",
+      "source_location": "L43",
+      "weight": 1.0,
+      "source": "nanounet_data_augment_channelsubsetimagetransform",
+      "target": "nanounet_data_augment_channelsubsetimagetransform_call",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/data/augment.py",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "nanounet_data_augment_channelsubsetimagetransform",
+      "target": "nanounet_data_augment_channelsubsetimagetransform_init",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/data/augment.py",
+      "source_location": "L52",
+      "weight": 1.0,
+      "source": "nanounet_data_augment_channelsubsetimagetransform",
+      "target": "nanounet_data_augment_channelsubsetimagetransform_repr",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/data/augment.py",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "nanounet_data_augment_rationale_33",
+      "target": "nanounet_data_augment_channelsubsetimagetransform",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/data/augment.py",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "nanounet_data_augment_channelsubsetimagetransform_init",
+      "target": "basictransform",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "return_type",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/data/augment.py",
+      "source_location": "L56",
+      "weight": 1.0,
       "source": "nanounet_data_augment_train_transforms",
-      "target": "nanounet_data_augment_py_basictransform",
+      "target": "basictransform",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "return_type",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/data/augment.py",
+      "source_location": "L165",
+      "weight": 1.0,
+      "source": "nanounet_data_augment_val_transforms",
+      "target": "basictransform",
       "confidence_score": 1.0
     },
     {
@@ -17837,7 +18471,7 @@
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/data/augment.py",
-      "source_location": "L32",
+      "source_location": "L56",
       "weight": 1.0,
       "source": "nanounet_data_augment_train_transforms",
       "target": "nanounet_data_augment_py_ndarray",
@@ -17848,21 +18482,10 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/data/augment.py",
-      "source_location": "L32",
+      "source_location": "L56",
       "weight": 1.0,
       "source": "nanounet_data_augment_train_transforms",
       "target": "randomscalar",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "references",
-      "context": "return_type",
-      "confidence": "EXTRACTED",
-      "source_file": "nanounet/data/augment.py",
-      "source_location": "L135",
-      "weight": 1.0,
-      "source": "nanounet_data_augment_val_transforms",
-      "target": "nanounet_data_augment_py_basictransform",
       "confidence_score": 1.0
     },
     {
@@ -20607,7 +21230,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L132",
+      "source_location": "L135",
       "weight": 1.0,
       "source": "nanounet_train_data_module_nanodatamodule_train_dataloader",
       "target": "nanounet_dataloader_prefs_init_dataloader_ipc"
@@ -20618,7 +21241,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L164",
+      "source_location": "L167",
       "weight": 1.0,
       "source": "nanounet_train_data_module_nanodatamodule_val_dataloader",
       "target": "nanounet_dataloader_prefs_init_dataloader_ipc"
@@ -20673,7 +21296,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L151",
+      "source_location": "L154",
       "weight": 1.0,
       "source": "nanounet_train_data_module_nanodatamodule_train_dataloader",
       "target": "nanounet_dataloader_prefs_build_iter_dataloader"
@@ -20684,7 +21307,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L183",
+      "source_location": "L186",
       "weight": 1.0,
       "source": "nanounet_train_data_module_nanodatamodule_val_dataloader",
       "target": "nanounet_dataloader_prefs_build_iter_dataloader"
@@ -21518,17 +22141,6 @@
       "source_location": "L36",
       "weight": 1.0,
       "source": "nanounet_train_fit_run_mae_pretrain",
-      "target": "nanounet_diag_mem_diag_mem_diag_enabled",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "nanounet/train/fit.py",
-      "source_location": "L151",
-      "weight": 1.0,
-      "source": "nanounet_train_fit_run_supervised",
       "target": "nanounet_diag_mem_diag_mem_diag_enabled",
       "confidence_score": 1.0
     },
@@ -22385,7 +22997,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L11",
+      "source_location": "L10",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case",
       "target": "nanounet_infer_border_expand",
@@ -22506,7 +23118,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L11",
+      "source_location": "L10",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case",
       "target": "nanounet_infer_border_expand_plan_border_expansion_centers_from_logits",
@@ -22518,7 +23130,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L156",
+      "source_location": "L160",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case_predict_case_logits",
       "target": "nanounet_infer_border_expand_plan_border_expansion_centers_from_logits"
@@ -22744,7 +23356,17 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/infer/gaussian.py",
-      "source_location": "L14",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "nanounet_infer_gaussian",
+      "target": "nanounet_infer_gaussian_accum_dtype",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/gaussian.py",
+      "source_location": "L25",
       "weight": 1.0,
       "source": "nanounet_infer_gaussian",
       "target": "nanounet_infer_gaussian_compute_gaussian",
@@ -22754,7 +23376,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/infer/gaussian.py",
-      "source_location": "L37",
+      "source_location": "L48",
       "weight": 1.0,
       "source": "nanounet_infer_gaussian",
       "target": "nanounet_infer_gaussian_gaussian_tile",
@@ -22775,21 +23397,10 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L12",
+      "source_location": "L11",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case",
       "target": "nanounet_infer_gaussian",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "nanounet/infer/gaussian.py",
-      "source_location": "L22",
-      "weight": 1.0,
-      "source": "nanounet_infer_gaussian_compute_gaussian",
-      "target": "nanounet_infer_gaussian_py_device",
       "confidence_score": 1.0
     },
     {
@@ -22797,7 +23408,84 @@
       "context": "return_type",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/infer/gaussian.py",
-      "source_location": "L14",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "nanounet_infer_gaussian_accum_dtype",
+      "target": "dtype",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/gaussian.py",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "nanounet_infer_gaussian_accum_dtype",
+      "target": "nanounet_infer_gaussian_py_device",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_case.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_case",
+      "target": "nanounet_infer_gaussian_accum_dtype",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "nanounet/infer/predict_case.py",
+      "source_location": "L64",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_case_predict_case_logits",
+      "target": "nanounet_infer_gaussian_accum_dtype"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/gaussian.py",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "nanounet_infer_gaussian_compute_gaussian",
+      "target": "nanounet_infer_gaussian_py_device",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/gaussian.py",
+      "source_location": "L48",
+      "weight": 1.0,
+      "source": "nanounet_infer_gaussian_gaussian_tile",
+      "target": "nanounet_infer_gaussian_py_device",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/gaussian.py",
+      "source_location": "L48",
+      "weight": 1.0,
+      "source": "nanounet_infer_gaussian_gaussian_tile",
+      "target": "dtype",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "return_type",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/gaussian.py",
+      "source_location": "L25",
       "weight": 1.0,
       "source": "nanounet_infer_gaussian_compute_gaussian",
       "target": "nanounet_infer_gaussian_py_tensor",
@@ -22808,7 +23496,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/infer/gaussian.py",
-      "source_location": "L45",
+      "source_location": "L56",
       "weight": 1.0,
       "source": "nanounet_infer_gaussian_gaussian_tile",
       "target": "nanounet_infer_gaussian_compute_gaussian",
@@ -22819,32 +23507,10 @@
       "context": "return_type",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/infer/gaussian.py",
-      "source_location": "L37",
+      "source_location": "L48",
       "weight": 1.0,
       "source": "nanounet_infer_gaussian_gaussian_tile",
       "target": "nanounet_infer_gaussian_py_tensor",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "references",
-      "context": "parameter_type",
-      "confidence": "EXTRACTED",
-      "source_file": "nanounet/infer/gaussian.py",
-      "source_location": "L37",
-      "weight": 1.0,
-      "source": "nanounet_infer_gaussian_gaussian_tile",
-      "target": "nanounet_infer_gaussian_py_device",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "references",
-      "context": "parameter_type",
-      "confidence": "EXTRACTED",
-      "source_file": "nanounet/infer/gaussian.py",
-      "source_location": "L37",
-      "weight": 1.0,
-      "source": "nanounet_infer_gaussian_gaussian_tile",
-      "target": "nanounet_infer_gaussian_py_dtype",
       "confidence_score": 1.0
     },
     {
@@ -22852,7 +23518,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L12",
+      "source_location": "L11",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case",
       "target": "nanounet_infer_gaussian_gaussian_tile",
@@ -22864,7 +23530,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L74",
+      "source_location": "L65",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case_predict_case_logits",
       "target": "nanounet_infer_gaussian_gaussian_tile"
@@ -22960,9 +23626,20 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L13",
+      "source_location": "L12",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case",
+      "target": "nanounet_infer_longi_row",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_patch",
       "target": "nanounet_infer_longi_row",
       "confidence_score": 1.0
     },
@@ -23037,7 +23714,7 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L13",
+      "source_location": "L12",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case",
       "target": "nanounet_infer_longi_row_encode_inference_row",
@@ -23049,26 +23726,389 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L115",
+      "source_location": "L110",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case_predict_case_logits",
       "target": "nanounet_infer_longi_row_encode_inference_row"
     },
     {
-      "relation": "contains",
+      "relation": "imports",
+      "context": "import",
       "confidence": "EXTRACTED",
-      "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L28",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L8",
       "weight": 1.0,
-      "source": "nanounet_infer_predict_case",
-      "target": "nanounet_infer_predict_case_acc_dtype",
+      "source": "nanounet_infer_predict_patch",
+      "target": "nanounet_infer_longi_row_encode_inference_row",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L40",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_patch_predict_patch_logits",
+      "target": "nanounet_infer_longi_row_encode_inference_row",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export",
+      "target": "nanounet_infer_patch_export_axis_overlap",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L41",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export",
+      "target": "nanounet_infer_patch_export_convert_preprocessed_seg_to_native",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L89",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export",
+      "target": "nanounet_infer_patch_export_native_seg_to_nifti_bytes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L54",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export",
+      "target": "nanounet_infer_patch_export_patch_logits_to_native_seg",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export",
+      "target": "nanounet_infer_patch_export_patch_unpadded_overlap",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export",
+      "target": "nanounet_infer_patch_export_unpadded_shape",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_rationale_1",
+      "target": "nanounet_infer_patch_export",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "generic_arg",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_axis_overlap",
+      "target": "nanounet_infer_patch_export_py_slice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_patch_unpadded_overlap",
+      "target": "nanounet_infer_patch_export_axis_overlap",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L54",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_patch_logits_to_native_seg",
+      "target": "nanounet_infer_patch_export_py_slice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "generic_arg",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_patch_unpadded_overlap",
+      "target": "nanounet_infer_patch_export_py_slice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L66",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_patch_logits_to_native_seg",
+      "target": "nanounet_infer_patch_export_patch_unpadded_overlap",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_rationale_23",
+      "target": "nanounet_infer_patch_export_patch_unpadded_overlap",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L84",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_patch_logits_to_native_seg",
+      "target": "nanounet_infer_patch_export_unpadded_shape",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "return_type",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L41",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_convert_preprocessed_seg_to_native",
+      "target": "nanounet_infer_patch_export_py_ndarray",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L86",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_patch_logits_to_native_seg",
+      "target": "nanounet_infer_patch_export_convert_preprocessed_seg_to_native",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L89",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_native_seg_to_nifti_bytes",
+      "target": "nanounet_infer_patch_export_py_ndarray",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "return_type",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L54",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_patch_logits_to_native_seg",
+      "target": "nanounet_infer_patch_export_py_ndarray",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L54",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_patch_logits_to_native_seg",
+      "target": "nanounet_infer_patch_export_py_tensor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L65",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_rationale_65",
+      "target": "nanounet_infer_patch_export_patch_logits_to_native_seg",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/patch_export.py",
+      "source_location": "L90",
+      "weight": 1.0,
+      "source": "nanounet_infer_patch_export_rationale_90",
+      "target": "nanounet_infer_patch_export_native_seg_to_nifti_bytes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/points_pad.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "nanounet_infer_points_pad",
+      "target": "nanounet_infer_points_pad_resolve_pts_pad",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/points_pad.py",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "nanounet_infer_points_pad",
+      "target": "nanounet_infer_roi_slices",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/points_pad.py",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "nanounet_infer_points_pad",
+      "target": "nanounet_infer_roi_slices_map_points_zyx_unpadded_to_padded",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/points_pad.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "nanounet_infer_points_pad",
+      "target": "nanounet_prompt_coords",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/points_pad.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "nanounet_infer_points_pad",
+      "target": "nanounet_prompt_coords_points_to_centers_zyx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/points_pad.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "nanounet_infer_points_pad_rationale_1",
+      "target": "nanounet_infer_points_pad",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L36",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_case",
+      "target": "nanounet_infer_points_pad",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "generic_arg",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/points_pad.py",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "nanounet_infer_points_pad_resolve_pts_pad",
+      "target": "nanounet_infer_points_pad_py_zyx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/points_pad.py",
+      "source_location": "L26",
+      "weight": 1.0,
+      "source": "nanounet_infer_points_pad_resolve_pts_pad",
+      "target": "nanounet_infer_roi_slices_map_points_zyx_unpadded_to_padded",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/points_pad.py",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "nanounet_infer_points_pad_resolve_pts_pad",
+      "target": "nanounet_prompt_coords_points_to_centers_zyx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_case.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_case",
+      "target": "nanounet_infer_points_pad_resolve_pts_pad",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "nanounet/infer/predict_case.py",
+      "source_location": "L72",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_case_predict_case_logits",
+      "target": "nanounet_infer_points_pad_resolve_pts_pad"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_case.py",
+      "source_location": "L27",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case",
       "target": "nanounet_infer_predict_case_predict_case_logits",
@@ -23232,40 +24272,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L28",
-      "weight": 1.0,
-      "source": "nanounet_infer_predict_case_acc_dtype",
-      "target": "nanounet_infer_predict_case_py_device",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "references",
-      "context": "return_type",
-      "confidence": "EXTRACTED",
-      "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L28",
-      "weight": 1.0,
-      "source": "nanounet_infer_predict_case_acc_dtype",
-      "target": "nanounet_infer_predict_case_py_dtype",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L73",
-      "weight": 1.0,
-      "source": "nanounet_infer_predict_case_predict_case_logits",
-      "target": "nanounet_infer_predict_case_acc_dtype",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "references",
-      "context": "parameter_type",
-      "confidence": "EXTRACTED",
-      "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L36",
+      "source_location": "L27",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case_predict_case_logits",
       "target": "nanounet_infer_predict_case_py_device",
@@ -23276,7 +24283,7 @@
       "context": "return_type",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L36",
+      "source_location": "L27",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case_predict_case_logits",
       "target": "nanounet_infer_predict_case_py_tensor",
@@ -23288,7 +24295,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L76",
+      "source_location": "L67",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case_predict_case_logits",
       "target": "nanounet_infer_roi_slices_background_logits_vector"
@@ -23299,7 +24306,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L104",
+      "source_location": "L99",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case_predict_case_logits",
       "target": "nanounet_infer_roi_slices_centered_spatial_slices_at_point"
@@ -23310,7 +24317,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L87",
+      "source_location": "L90",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case_predict_case_logits",
       "target": "nanounet_infer_roi_slices_map_points_zyx_unpadded_to_padded"
@@ -23321,7 +24328,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L182",
+      "source_location": "L188",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case_predict_case_logits",
       "target": "nanounet_infer_roi_slices_safe_divide_merged_logits"
@@ -23332,7 +24339,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L105",
+      "source_location": "L100",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case_predict_case_logits",
       "target": "nanounet_infer_roi_slices_spatial_slices_to_tuple"
@@ -23343,7 +24350,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L124",
+      "source_location": "L127",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case_predict_case_logits",
       "target": "nanounet_infer_tta_predict_batch_with_tta"
@@ -23354,7 +24361,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L98",
+      "source_location": "L93",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case_predict_case_logits",
       "target": "nanounet_prompt_cluster_cluster_points_for_patch_size"
@@ -23365,7 +24372,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L99",
+      "source_location": "L94",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case_predict_case_logits",
       "target": "nanounet_prompt_cluster_spatial_slices_covering_points"
@@ -23376,7 +24383,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/infer/predict_case.py",
-      "source_location": "L83",
+      "source_location": "L87",
       "weight": 1.0,
       "source": "nanounet_infer_predict_case_predict_case_logits",
       "target": "nanounet_prompt_coords_points_to_centers_zyx"
@@ -23526,6 +24533,135 @@
       "weight": 1.0,
       "source": "nanounet_infer_predict_io_preprocess_case",
       "target": "nanounet_prompt_coords_load_points_xyz",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_patch",
+      "target": "nanounet_infer_predict_patch_predict_patch_logits",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_patch",
+      "target": "nanounet_infer_roi_slices",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_patch",
+      "target": "nanounet_infer_roi_slices_centered_spatial_slices_at_point",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_patch",
+      "target": "nanounet_infer_tta",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_patch",
+      "target": "nanounet_infer_tta_predict_batch_with_tta",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_patch_rationale_1",
+      "target": "nanounet_infer_predict_patch",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_patch_predict_patch_logits",
+      "target": "nanounet_infer_predict_patch_py_device",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "generic_arg",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_patch_predict_patch_logits",
+      "target": "nanounet_infer_predict_patch_py_slice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "generic_arg",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_patch_predict_patch_logits",
+      "target": "nanounet_infer_predict_patch_py_tensor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_patch_predict_patch_logits",
+      "target": "nanounet_infer_roi_slices_centered_spatial_slices_at_point",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L59",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_patch_predict_patch_logits",
+      "target": "nanounet_infer_tta_predict_batch_with_tta",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "nanounet/infer/predict_patch.py",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "nanounet_infer_predict_patch_rationale_28",
+      "target": "nanounet_infer_predict_patch_predict_patch_logits",
       "confidence_score": 1.0
     },
     {
@@ -28419,7 +29555,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L144",
+      "source_location": "L147",
       "weight": 1.0,
       "source": "nanounet_train_data_module_nanodatamodule_train_dataloader",
       "target": "nanounet_plan_splits_fold_seed"
@@ -28430,7 +29566,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L176",
+      "source_location": "L179",
       "weight": 1.0,
       "source": "nanounet_train_data_module_nanodatamodule_val_dataloader",
       "target": "nanounet_plan_splits_fold_seed"
@@ -29467,7 +30603,7 @@
       "source_location": "L19",
       "weight": 1.0,
       "source": "nanounet_prompt_cluster_bbox_fits_in_patch",
-      "target": "zyx",
+      "target": "nanounet_prompt_cluster_py_zyx",
       "confidence_score": 1.0
     },
     {
@@ -29489,7 +30625,7 @@
       "source_location": "L35",
       "weight": 1.0,
       "source": "nanounet_prompt_cluster_cluster_points_for_patch_size",
-      "target": "zyx",
+      "target": "nanounet_prompt_cluster_py_zyx",
       "confidence_score": 1.0
     },
     {
@@ -29500,7 +30636,7 @@
       "source_location": "L83",
       "weight": 1.0,
       "source": "nanounet_prompt_cluster_cluster_prompts_patch_local",
-      "target": "zyx",
+      "target": "nanounet_prompt_cluster_py_zyx",
       "confidence_score": 1.0
     },
     {
@@ -29511,7 +30647,7 @@
       "source_location": "L55",
       "weight": 1.0,
       "source": "nanounet_prompt_cluster_spatial_slices_covering_points",
-      "target": "zyx",
+      "target": "nanounet_prompt_cluster_py_zyx",
       "confidence_score": 1.0
     },
     {
@@ -31185,7 +32321,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L131",
+      "source_location": "L134",
       "weight": 1.0,
       "source": "nanounet_train_data_module_nanodatamodule",
       "target": "nanounet_train_data_module_nanodatamodule_train_dataloader",
@@ -31195,7 +32331,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L163",
+      "source_location": "L166",
       "weight": 1.0,
       "source": "nanounet_train_data_module_nanodatamodule",
       "target": "nanounet_train_data_module_nanodatamodule_val_dataloader",
@@ -31238,7 +32374,7 @@
       "context": "return_type",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L131",
+      "source_location": "L134",
       "weight": 1.0,
       "source": "nanounet_train_data_module_nanodatamodule_train_dataloader",
       "target": "nanounet_train_data_module_py_dataloader",
@@ -31250,7 +32386,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L157",
+      "source_location": "L160",
       "weight": 1.0,
       "source": "nanounet_train_data_module_nanodatamodule_train_dataloader",
       "target": "nanounet_train_patch_iterable_collate_patches"
@@ -31261,7 +32397,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L133",
+      "source_location": "L136",
       "weight": 1.0,
       "source": "nanounet_train_data_module_nanodatamodule_train_dataloader",
       "target": "nanounet_train_patch_iterable_patchiterable"
@@ -31271,7 +32407,7 @@
       "context": "return_type",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L163",
+      "source_location": "L166",
       "weight": 1.0,
       "source": "nanounet_train_data_module_nanodatamodule_val_dataloader",
       "target": "nanounet_train_data_module_py_dataloader",
@@ -31283,7 +32419,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L189",
+      "source_location": "L192",
       "weight": 1.0,
       "source": "nanounet_train_data_module_nanodatamodule_val_dataloader",
       "target": "nanounet_train_patch_iterable_collate_patches"
@@ -31294,7 +32430,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "nanounet/train/data_module.py",
-      "source_location": "L165",
+      "source_location": "L168",
       "weight": 1.0,
       "source": "nanounet_train_data_module_nanodatamodule_val_dataloader",
       "target": "nanounet_train_patch_iterable_patchiterable"
@@ -31366,7 +32502,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "nanounet/train/fit.py",
-      "source_location": "L157",
+      "source_location": "L156",
       "weight": 1.0,
       "source": "nanounet_train_fit_run_supervised",
       "target": "nanounet_train_lightning_module_nanounetlm",
@@ -31982,6 +33118,126 @@
       "weight": 1.0,
       "source": "scripts_slurm_nanounet_finetune_d013_registered",
       "target": "scripts_slurm_nanounet_finetune_d013_registered_sh__entry",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L43",
+      "weight": 1.0,
+      "source": "scripts_slurm_nanounet_finetune_d114_registered",
+      "target": "scripts_slurm_nanounet_finetune_d114_registered_mkl_num_threads",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L63",
+      "weight": 1.0,
+      "source": "scripts_slurm_nanounet_finetune_d114_registered",
+      "target": "scripts_slurm_nanounet_finetune_d114_registered_nanounet_preprocessed",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L39",
+      "weight": 1.0,
+      "source": "scripts_slurm_nanounet_finetune_d114_registered",
+      "target": "scripts_slurm_nanounet_finetune_d114_registered_nanounet_raw",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L40",
+      "weight": 1.0,
+      "source": "scripts_slurm_nanounet_finetune_d114_registered",
+      "target": "scripts_slurm_nanounet_finetune_d114_registered_nanounet_results",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L41",
+      "weight": 1.0,
+      "source": "scripts_slurm_nanounet_finetune_d114_registered",
+      "target": "scripts_slurm_nanounet_finetune_d114_registered_nanounet_tmpdir",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L64",
+      "weight": 1.0,
+      "source": "scripts_slurm_nanounet_finetune_d114_registered",
+      "target": "scripts_slurm_nanounet_finetune_d114_registered_nnunet_preprocessed",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L46",
+      "weight": 1.0,
+      "source": "scripts_slurm_nanounet_finetune_d114_registered",
+      "target": "scripts_slurm_nanounet_finetune_d114_registered_nnunet_raw",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L47",
+      "weight": 1.0,
+      "source": "scripts_slurm_nanounet_finetune_d114_registered",
+      "target": "scripts_slurm_nanounet_finetune_d114_registered_nnunet_results",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L45",
+      "weight": 1.0,
+      "source": "scripts_slurm_nanounet_finetune_d114_registered",
+      "target": "scripts_slurm_nanounet_finetune_d114_registered_numexpr_num_threads",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L42",
+      "weight": 1.0,
+      "source": "scripts_slurm_nanounet_finetune_d114_registered",
+      "target": "scripts_slurm_nanounet_finetune_d114_registered_omp_num_threads",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L44",
+      "weight": 1.0,
+      "source": "scripts_slurm_nanounet_finetune_d114_registered",
+      "target": "scripts_slurm_nanounet_finetune_d114_registered_openblas_num_threads",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "scripts/slurm_nanounet_finetune_d114_registered.sh",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "scripts_slurm_nanounet_finetune_d114_registered",
+      "target": "scripts_slurm_nanounet_finetune_d114_registered_sh__entry",
       "confidence_score": 1.0
     },
     {
@@ -33416,6 +34672,16 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "AGENTS.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "agents",
+      "target": "agents_graphify",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "docs/index.md",
@@ -34098,6 +35364,86 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_dev_notes_longi_gpu_starvation",
+      "target": "docs_dev_notes_longi_gpu_starvation_longi_finetune_gpu_starvation_diagnosis_fix_2026_07_10",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L44",
+      "weight": 1.0,
+      "source": "docs_dev_notes_longi_gpu_starvation_longi_finetune_gpu_starvation_diagnosis_fix_2026_07_10",
+      "target": "docs_dev_notes_longi_gpu_starvation_augmentation_synchronization_verified_no_bug",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L29",
+      "weight": 1.0,
+      "source": "docs_dev_notes_longi_gpu_starvation_longi_finetune_gpu_starvation_diagnosis_fix_2026_07_10",
+      "target": "docs_dev_notes_longi_gpu_starvation_evidence_a100_40gb_38_usable_cores_120_iter_burst",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L40",
+      "weight": 1.0,
+      "source": "docs_dev_notes_longi_gpu_starvation_longi_finetune_gpu_starvation_diagnosis_fix_2026_07_10",
+      "target": "docs_dev_notes_longi_gpu_starvation_fix",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L53",
+      "weight": 1.0,
+      "source": "docs_dev_notes_longi_gpu_starvation_longi_finetune_gpu_starvation_diagnosis_fix_2026_07_10",
+      "target": "docs_dev_notes_longi_gpu_starvation_fix_2_ct_only_intensity_augmentation_applied",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L68",
+      "weight": 1.0,
+      "source": "docs_dev_notes_longi_gpu_starvation_longi_finetune_gpu_starvation_diagnosis_fix_2026_07_10",
+      "target": "docs_dev_notes_longi_gpu_starvation_resource_sizing_cpu_mem",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "docs_dev_notes_longi_gpu_starvation_longi_finetune_gpu_starvation_diagnosis_fix_2026_07_10",
+      "target": "docs_dev_notes_longi_gpu_starvation_root_cause",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/dev-notes/longi_gpu_starvation.md",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "docs_dev_notes_longi_gpu_starvation_longi_finetune_gpu_starvation_diagnosis_fix_2026_07_10",
+      "target": "docs_dev_notes_longi_gpu_starvation_symptom",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "docs/dev-notes/longi_layer2_and_test_split_handoff.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -34188,71 +35534,51 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
+      "source_file": "docs/dev-notes/radiom_embed_api.md",
       "source_location": "L1",
       "weight": 1.0,
-      "source": "docs_dev_notes_unigradicon_gpu_handoff",
-      "target": "docs_dev_notes_unigradicon_gpu_handoff_handoff_run_unigradicon_registration_on_the_gpu_cluster",
+      "source": "docs_dev_notes_radiom_embed_api",
+      "target": "docs_dev_notes_radiom_embed_api_radiom_in_process_embed_api",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/steps/predict.md",
+      "source_location": "L102",
+      "weight": 1.0,
+      "source": "docs_steps_predict",
+      "target": "docs_dev_notes_radiom_embed_api",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
-      "source_location": "L22",
+      "source_file": "docs/dev-notes/radiom_embed_api.md",
+      "source_location": "L26",
       "weight": 1.0,
-      "source": "docs_dev_notes_unigradicon_gpu_handoff_handoff_run_unigradicon_registration_on_the_gpu_cluster",
-      "target": "docs_dev_notes_unigradicon_gpu_handoff_first_get_the_weights",
+      "source": "docs_dev_notes_radiom_embed_api_radiom_in_process_embed_api",
+      "target": "docs_dev_notes_radiom_embed_api_interactive_patch_api",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
-      "source_location": "L91",
+      "source_file": "docs/dev-notes/radiom_embed_api.md",
+      "source_location": "L15",
       "weight": 1.0,
-      "source": "docs_dev_notes_unigradicon_gpu_handoff_handoff_run_unigradicon_registration_on_the_gpu_cluster",
-      "target": "docs_dev_notes_unigradicon_gpu_handoff_if_you_improve_things",
+      "source": "docs_dev_notes_radiom_embed_api_radiom_in_process_embed_api",
+      "target": "docs_dev_notes_radiom_embed_api_on_forward",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
-      "source_location": "L79",
+      "source_file": "docs/dev-notes/radiom_embed_api.md",
+      "source_location": "L6",
       "weight": 1.0,
-      "source": "docs_dev_notes_unigradicon_gpu_handoff_handoff_run_unigradicon_registration_on_the_gpu_cluster",
-      "target": "docs_dev_notes_unigradicon_gpu_handoff_notes_gotchas",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
-      "source_location": "L38",
-      "weight": 1.0,
-      "source": "docs_dev_notes_unigradicon_gpu_handoff_handoff_run_unigradicon_registration_on_the_gpu_cluster",
-      "target": "docs_dev_notes_unigradicon_gpu_handoff_run_it",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
-      "source_location": "L64",
-      "weight": 1.0,
-      "source": "docs_dev_notes_unigradicon_gpu_handoff_handoff_run_unigradicon_registration_on_the_gpu_cluster",
-      "target": "docs_dev_notes_unigradicon_gpu_handoff_validate_this_is_the_point_of_the_run",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/dev-notes/unigradicon_gpu_handoff.md",
-      "source_location": "L12",
-      "weight": 1.0,
-      "source": "docs_dev_notes_unigradicon_gpu_handoff_handoff_run_unigradicon_registration_on_the_gpu_cluster",
-      "target": "docs_dev_notes_unigradicon_gpu_handoff_what_changed_code_is_in_place_deps_resolve",
+      "source": "docs_dev_notes_radiom_embed_api_radiom_in_process_embed_api",
+      "target": "docs_dev_notes_radiom_embed_api_points_zyx_unpadded",
       "confidence_score": 1.0
     },
     {
@@ -34818,6 +36144,16 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "docs/steps/predict.md",
+      "source_location": "L92",
+      "weight": 1.0,
+      "source": "docs_steps_predict_predict",
+      "target": "docs_steps_predict_interactive_embed_library",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "docs/steps/preprocess.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -35311,5 +36647,5 @@
       "source_file": "docs/longi_registration_landmark_align_plan.md"
     }
   ],
-  "built_at_commit": "f9cb4b7835c7ac38c0448d5973fbb5d7a7a979af"
+  "built_at_commit": "126e7287a1bbb3eee448828ba38e3e499787b646"
 }
