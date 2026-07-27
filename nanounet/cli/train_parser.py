@@ -53,6 +53,9 @@ def build_train_parser() -> argparse.ArgumentParser:
     ap.add_argument("--dl-bucket", choices=("s", "m", "l", "xl"), default="m")
     ap.add_argument("--dl-persistent-workers", action="store_true")
     ap.add_argument("--mem-diag", action="store_true")
+    ap.add_argument("--prompts-per-patch", type=int, default=1, help="Independent click draws rendered per patch (2 enables the consistency loss).")
+    ap.add_argument("--consistency-weight", type=float, default=0.0, help="Lambda max for the two-prompt consistency term; 0 disables it.")
+    ap.add_argument("--consistency-warmup-epochs", type=int, default=50, help="Epochs to linearly ramp lambda from 0 to --consistency-weight.")
     return ap
 
 
@@ -74,6 +77,18 @@ def validate_train_args(args) -> None:
         raise ValueError("--longi requires --init-weights (warm-start from stage-2 supervised net)")
     if args.longi_null and not args.longi:
         raise ValueError("--longi-null requires --longi")
+    if args.consistency_weight > 0 and args.prompts_per_patch < 2:
+        raise ValueError(
+            f"--consistency-weight {args.consistency_weight} requires --prompts-per-patch >= 2 "
+            f"(got --prompts-per-patch {args.prompts_per_patch}).\n"
+            f"Fix: nanounet_train … --prompts-per-patch 2 --consistency-weight {args.consistency_weight}"
+        )
+    if args.batch_size is not None and args.batch_size % args.prompts_per_patch != 0:
+        raise ValueError(
+            f"--batch-size {args.batch_size} is not divisible by --prompts-per-patch {args.prompts_per_patch}.\n"
+            f"Fix: pick a --batch-size that is a multiple of --prompts-per-patch (e.g. "
+            f"{(args.batch_size // args.prompts_per_patch) * args.prompts_per_patch or args.prompts_per_patch})."
+        )
     args.roi_cfg = resolve_user_config_path(args.roi_cfg)
 
 
@@ -92,5 +107,7 @@ def train_config_rows(args, ds: str, out: str) -> list[tuple[str, object, str]]:
         ("dl_bucket", args.dl_bucket, "cli/default"),
         ("mae_pretrain", args.mae_pretrain, "cli"),
         ("longi", args.longi, "cli"),
+        ("prompts_per_patch", args.prompts_per_patch, "cli/default"),
+        ("consistency_weight", args.consistency_weight, "cli/default"),
         ("out", out, "derived"),
     ]

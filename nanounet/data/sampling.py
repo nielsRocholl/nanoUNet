@@ -1,6 +1,6 @@
-"""Per-click prompt sampling: jitter authored centroids (skippable for already-real points via
-select_prompt_points(jitter=False)), optional false-positive clicks (gated by probability). Returns
-click COORDINATES only -- rendering to heatmaps happens after augmentation, in patch_iterable.py."""
+"""Per-click prompt sampling: jitter authored centroids (skippable via select_prompt_points(jitter=
+False)), optional false-positive clicks (gated by probability). Returns click COORDINATES only --
+rendering to heatmaps happens after augmentation, in patch_iterable.py."""
 
 from __future__ import annotations
 
@@ -11,7 +11,8 @@ from acvl_utils.cropping_and_padding.bounding_boxes import crop_and_pad_nd
 from scipy.spatial import cKDTree
 
 from nanounet.config import RoiPromptConfig
-from nanounet.prompt.centroids import apply_propagation_offset, filter_centroids_in_patch
+from nanounet.data.error_table import draw_propagated_offset
+from nanounet.prompt.centroids import filter_centroids_in_patch
 
 
 def _lbs_ubs(
@@ -68,11 +69,7 @@ def crop_patch(data, seg, bbox) -> tuple[np.ndarray, np.ndarray, tuple[int, int,
     bbox_lbs = [b[0] for b in bbox]
     bbox_ubs = [b[1] for b in bbox]
     patch_shape = tuple(int(bbox_ubs[k] - bbox_lbs[k]) for k in range(3))
-    pslc = (
-        slice(bbox_lbs[0], bbox_ubs[0]),
-        slice(bbox_lbs[1], bbox_ubs[1]),
-        slice(bbox_lbs[2], bbox_ubs[2]),
-    )
+    pslc = tuple(slice(bbox_lbs[k], bbox_ubs[k]) for k in range(3))
     return data_crop, seg_crop, patch_shape, pslc
 
 
@@ -80,36 +77,33 @@ def select_prompt_points(
     seg_crop: np.ndarray,
     cts_global: List[Tuple[int, int, int]],
     pslc: tuple,
-    patch_shape: tuple[int, int, int],
     cfg: RoiPromptConfig,
     force_zero_prompt: bool,
     rng: np.random.Generator,
     jitter: bool = True,
+    volumes_vox: List[float | None] | None = None,
 ) -> Tuple[List[Tuple[int, int, int]], List[Tuple[int, int, int]]]:
     """Click SELECTION only -- returns (positive, negative) patch-local point lists; rendering to
     heatmaps happens later (after augmentation), see nanounet/train/patch_iterable.py.
 
-    jitter=False for points that are already real (registered/propagated), not mask-derived
-    guesses -- apply_propagation_offset exists to simulate baseline->follow-up spread when no real
-    cross-timepoint correspondence exists; re-jittering an already-precise point only adds noise."""
+    Order matters: offset applied to the GLOBAL centroid first, THEN filtered into the patch -- a
+    displaced click that lands outside the patch is simply not rendered, no clamping to the border.
+    jitter=False for points already real (registered/propagated), not mask-derived guesses."""
     pp: List[Tuple[int, int, int]] = []
     pn: List[Tuple[int, int, int]] = []
     if not force_zero_prompt:
-        inch = filter_centroids_in_patch(cts_global, pslc)
-        cm = cfg.sampling.click_modes
-        if cm.drop == 0.0:
-            kept = list(inch)
-        else:
-            kept = [p for p in inch if rng.random() < cm.pos]
         if jitter:
             prop = cfg.sampling.propagated
             rg2 = np.random.default_rng(int(rng.integers(0, 2**31)))
-            pp = [
-                apply_propagation_offset(p, patch_shape, prop.sigma_per_axis, prop.max_vox, rg2)
-                for p in kept
-            ]
+            vols = volumes_vox if volumes_vox is not None else [None] * len(cts_global)
+            assert len(vols) == len(cts_global)
+            displaced = [draw_propagated_offset(c, v, prop, rg2) for c, v in zip(cts_global, vols)]
         else:
-            pp = list(kept)
+            displaced = list(cts_global)
+        inch = filter_centroids_in_patch(displaced, pslc)
+        cm = cfg.sampling.click_modes
+        kept = inch if cm.drop == 0.0 else [p for p in inch if rng.random() < cm.pos]
+        pp = list(kept)
         lo_fp, hi_fp = cfg.sampling.n_false_pos
         if hi_fp <= 0 or rng.random() >= cfg.sampling.false_pos_probability:
             n_fp = 0
@@ -165,12 +159,18 @@ def build_patch(
     rng: np.random.Generator,
 ) -> dict:
     _ = annotated_classes_key
-    if "centroids_zyx" not in properties:
-        raise KeyError("centroids_zyx required; no seg-derived fallback (R12)")
-    raw_c = properties["centroids_zyx"]
+    raw_c = properties.get("centroids_zyx")
     if raw_c is None:
         raise KeyError("centroids_zyx required; no seg-derived fallback (R12)")
     cts_global = [tuple(int(x) for x in c) for c in raw_c]
+    raw_v = properties.get("volume_vox")
+    if raw_v is None:
+        raise KeyError(
+            "volume_vox missing from case properties (needed to size-match the empirical "
+            "registration-error draw to each lesion). Fix: nanounet_preprocess --sidecars-only"
+        )
+    volumes_vox = [float(v) for v in raw_v]
+    assert len(volumes_vox) == len(cts_global), (len(volumes_vox), len(cts_global))
     w = properties.get("centroid_weights")
     if w is not None:
         assert len(w) == len(cts_global), (len(w), len(cts_global))
@@ -185,8 +185,10 @@ def build_patch(
         shape, cts_global, weights, cfg.sampling.fg_patch_prob, patch_size, need_to_pad, rng
     )
     bbox = [[a, b] for a, b in zip(bbox_lbs, bbox_ubs)]
-    data_crop, seg_crop, patch_shape, pslc = crop_patch(data, seg, bbox)
-    pp, pn = select_prompt_points(seg_crop, cts_global, pslc, patch_shape, cfg, force_zero_prompt, rng)
+    data_crop, seg_crop, _patch_shape, pslc = crop_patch(data, seg, bbox)
+    pp, pn = select_prompt_points(
+        seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, volumes_vox=volumes_vox
+    )
     return {
         "image": data_crop.astype(np.float32),
         "segmentation": seg_crop.astype(np.int16),

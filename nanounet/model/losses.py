@@ -1,4 +1,11 @@
-"""DC+CE and CC-DiceCE building blocks: RobustCrossEntropyLoss, DeepSupervisionWrapper, build_loss."""
+"""DC+CE and CC-DiceCE building blocks: RobustCrossEntropyLoss, DeepSupervisionWrapper, build_loss.
+
+Also `consistency_dice_term`: the two-prompt consistency penalty used when
+--prompts-per-patch >= 2 (see lightning_module.py). Computed on the FINEST resolution only (deep
+supervision scales are ignored) because a per-voxel divergence over the whole (mostly background)
+patch would be dominated by trivially-agreeing background voxels; soft Dice on the foreground
+channel focuses the penalty on the region that actually varies with the click.
+"""
 
 from __future__ import annotations
 
@@ -66,6 +73,22 @@ class DC_and_CE_loss(nn.Module):
         dc_loss = self.dc(net_output, target_dice, loss_mask=mask) if self.weight_dice != 0 else 0
         ce_loss = self.ce(net_output, target[:, 0]) if self.weight_ce != 0 and (self.ignore_label is None or num_fg > 0) else 0
         return self.weight_ce * ce_loss + self.weight_dice * dc_loss
+
+
+def consistency_dice_term(net_output, pair_id: torch.Tensor) -> torch.Tensor:
+    """1 - soft Dice between the two foreground-probability maps of each pair, at the finest
+    scale. Both branches keep gradient (no stop-gradient teacher). `pair_id` must group rows in
+    twos (exactly two rows share each id) -- collate_patches guarantees this."""
+    finest = net_output[0] if isinstance(net_output, (list, tuple)) else net_output
+    fg = torch.softmax(finest, dim=1)[:, 1:2].float()
+    order = torch.argsort(pair_id)
+    _, counts = torch.unique(pair_id, return_counts=True)
+    assert torch.all(counts == 2), "consistency_dice_term: every pair_id must have exactly 2 rows"
+    a, b = fg[order][0::2], fg[order][1::2]
+    axes = tuple(range(2, a.ndim))
+    intersect = (a * b).sum(dim=axes)
+    denom = (a.sum(dim=axes) + b.sum(dim=axes)).clamp_min(1e-8)
+    return (1.0 - 2 * intersect / denom).mean()
 
 
 def build_loss(

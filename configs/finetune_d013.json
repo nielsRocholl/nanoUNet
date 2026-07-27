@@ -24,10 +24,13 @@
       "max_extra": 0
     },
     "propagated": {
+      "mode": "empirical",
+      "error_table": "/nnunet_data/Longitudinal-CT/derivatives/registration_error_table.json",
+      "backends": ["original", "unigradicon"],
       "sigma_per_axis": [
-        2.75,
-        5.19,
-        5.40
+        5.95,
+        6.39,
+        5.93
       ],
       "max_vox": 34.0
     }

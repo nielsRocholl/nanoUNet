@@ -7,6 +7,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal, Tuple, cast
 
+from nanounet.data.error_table import parse_propagated
+
 
 @dataclass(frozen=True)
 class LargeLesionConfig:
@@ -18,6 +20,9 @@ class LargeLesionConfig:
 
 @dataclass(frozen=True)
 class PropagatedConfig:
+    mode: Literal["gaussian", "empirical"]
+    error_table: str
+    backends: Tuple[str, ...]
     sigma_per_axis: Tuple[float, float, float]
     max_vox: float
 
@@ -93,14 +98,9 @@ def _load_large(d: dict) -> LargeLesionConfig:
 
 
 def _load_prop(d: dict | None) -> PropagatedConfig:
-    if not isinstance(d, dict):
-        return PropagatedConfig(sigma_per_axis=(2.75, 5.19, 5.40), max_vox=34.0)
-    sg = d.get("sigma_per_axis", (2.75, 5.19, 5.40))
-    assert isinstance(sg, (list, tuple)) and len(sg) == 3
-    return PropagatedConfig(
-        sigma_per_axis=tuple(float(x) for x in sg),
-        max_vox=float(d.get("max_vox", 34.0)),
-    )
+    kw = parse_propagated(d)
+    kw["mode"] = cast(Literal["gaussian", "empirical"], kw["mode"])
+    return PropagatedConfig(**kw)
 
 
 def _load_sampling(d: dict) -> SamplingConfig:

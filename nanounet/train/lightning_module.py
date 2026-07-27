@@ -16,7 +16,7 @@ from torch import autocast
 from nanounet.config import RoiPromptConfig, load_config, save_config
 from nanounet.diag import purge_torch_tmp
 from nanounet.model.dice_helpers import pooled_fg_dice, val_step_row
-from nanounet.model.losses import build_loss
+from nanounet.model.losses import build_loss, consistency_dice_term
 from nanounet.model.lr_schedule import PolyLRScheduler, StretchedTailPolyLRScheduler
 from nanounet.model.mae_transfer import load_full_net, load_mae_encoder
 from nanounet.model.network import build_net, build_net_longi
@@ -42,6 +42,8 @@ class NanoUNetLM(pl.LightningModule):
         mae_ckpt: str | None = None,
         init_weights: str | None = None,
         longi: bool = False,
+        consistency_weight: float = 0.0,
+        consistency_warmup_epochs: int = 50,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -69,7 +71,14 @@ class NanoUNetLM(pl.LightningModule):
         self.stretched_ref = stretched_ref
         self.stretched_exp = stretched_exp
         self.enable_deep_supervision = enable_deep_supervision
+        self.longi = longi
+        self.consistency_weight_max = consistency_weight
+        self.consistency_warmup_epochs = consistency_warmup_epochs
+        # Prompt-heatmap channel indices, per the fixed layouts documented in patch_iterable.py:
+        # supervised [CT, hm+, hm-], longi [FU_CT, FU_hm+, FU_hm-, BL_CT, BL_hm+, BL_hm-].
+        self._prompt_ch = [1, 2, 4, 5] if longi else [1, 2]
         self._val_buf: List[Dict[str, Any]] = []
+        self._val_buf_ablated: List[Dict[str, Any]] = []
 
     def forward(self, x: torch.Tensor):
         return self.net(x)
@@ -96,7 +105,17 @@ class NanoUNetLM(pl.LightningModule):
             y = y.to(self.device, non_blocking=True)
         with autocast(self.device.type, enabled=self.device.type == "cuda"):
             out = self.net(x)
-            loss = self.loss(out, y)
+            loss_seg = self.loss(out, y)
+            if self.consistency_weight_max > 0:
+                pair_id = batch["pair_id"].to(self.device, non_blocking=True)
+                lam = self.consistency_weight_max * min(1.0, self.current_epoch / max(1, self.consistency_warmup_epochs))
+                loss_consistency = consistency_dice_term(out, pair_id)
+                loss = loss_seg + lam * loss_consistency
+            else:
+                loss_consistency = torch.zeros((), device=loss_seg.device)
+                loss = loss_seg
+        self.log("train_loss_seg", loss_seg, batch_size=x.shape[0])
+        self.log("train_loss_consistency", loss_consistency, batch_size=x.shape[0])
         self.log("train_loss", loss, prog_bar=True, batch_size=x.shape[0])
         return loss
 
@@ -110,12 +129,22 @@ class NanoUNetLM(pl.LightningModule):
         with autocast(self.device.type, enabled=self.device.type == "cuda"):
             out = self.net(x)
             loss = self.loss(out, y)
+            # Collapse diagnostic: zero the prompt-heatmap channels and re-run. If val_dice here
+            # closes the gap to the normal val_dice, the net (and/or the consistency term) is
+            # learning to ignore the click -- lambda is too high.
+            x_ablated = x.clone()
+            x_ablated[:, self._prompt_ch] = 0.0
+            out_ablated = self.net(x_ablated)
         self._val_buf.append(
             val_step_row(out, y, self.label_manager, self.enable_deep_supervision, float(loss.detach()))
+        )
+        self._val_buf_ablated.append(
+            val_step_row(out_ablated, y, self.label_manager, self.enable_deep_supervision, 0.0)
         )
 
     def on_validation_epoch_start(self) -> None:
         self._val_buf.clear()
+        self._val_buf_ablated.clear()
 
     def on_validation_epoch_end(self) -> None:
         if hasattr(self, "_epoch_t0") and not self.trainer.sanity_checking:
@@ -130,6 +159,8 @@ class NanoUNetLM(pl.LightningModule):
         self.log("val_n_a", float(da.numel()))
         self.log("val_n_b", float(fb.numel()))
         self.log("val_loss", float(np.mean([v["loss"] for v in self._val_buf])), prog_bar=False)
+        if self._val_buf_ablated:
+            self.log("val_dice_prompt_ablated", pooled_fg_dice(self._val_buf_ablated), prog_bar=False)
 
     def configure_optimizers(self):
         if self.optimizer == "adamw":

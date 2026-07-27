@@ -62,8 +62,24 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/defau
 | `--mae-iters-per-epoch` | int | same as train | MAE batches per epoch |
 | `--dl-bucket` | choice | `m` | DataLoader worker preset: `s` / `m` / `l` / `xl` |
 | `--dl-persistent-workers` | flag | off | Keep workers between epochs |
+| `--prompts-per-patch` | int | `1` | Independent click draws rendered per patch (same CT crop + augmentation); 2 enables the consistency loss below |
+| `--consistency-weight` | float | `0.0` | Lambda max for the two-prompt consistency term; `0` disables it. Requires `--prompts-per-patch >= 2` |
+| `--consistency-warmup-epochs` | int | `50` | Epochs to linearly ramp lambda from 0 to `--consistency-weight` |
 
 Checkpoints: `<run>/checkpoints/` (supervised); `<run>/mae_pretrain/checkpoints/` (integrated MAE). Finetune with `--init-weights` writes to `<run>/finetune/`.
+
+## Two-prompt consistency
+
+`--prompts-per-patch 2 --consistency-weight <lambda>` trains each patch with two independently
+drawn click sets sharing the same CT crop and augmentation pass, and penalises disagreement
+between the two predictions (1 − soft Dice between their foreground-probability maps, finest
+resolution only). This directly targets click-position sensitivity: the same lesion clicked in two
+places should not swing per-lesion Dice.
+
+`--batch-size` must be divisible by `--prompts-per-patch`. `train_loss_seg` and
+`train_loss_consistency` are logged separately. `val_dice_prompt_ablated` (prompt-heatmap channels
+zeroed) is logged beside `val_dice` on every validation epoch — if that gap closes, the net (or the
+consistency term) is learning to ignore the prompt, and `--consistency-weight` is too high.
 
 ## Loss throughput
 
@@ -100,3 +116,5 @@ Full write-up: [dev-notes/cgroup_memory.md](../dev-notes/cgroup_memory.md).
 | Conflicting resume flags | `--init-weights` + `--resume` / `--mae-pretrain` | Pick one init path |
 | Cgroup OOM | tmpfs TMPDIR during checkpoint save | Set `NANOUNET_TMPDIR`; see cgroup doc |
 | Missing plans / config | Preprocess or path error | Verify `--plans` basename and `--config` path |
+| `--consistency-weight ... requires --prompts-per-patch >= 2` | Consistency enabled without 2 prompts | Add `--prompts-per-patch 2` |
+| `batch_size ... not divisible by --prompts-per-patch` | Batch size / prompt count mismatch | Pick `--batch-size` as a multiple of `--prompts-per-patch` |

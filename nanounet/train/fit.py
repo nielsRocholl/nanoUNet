@@ -152,6 +152,7 @@ def run_supervised(
         only_prefix=args.only_prefix,
         longi=args.longi,
         longi_null=args.longi_null,
+        prompts_per_patch=args.prompts_per_patch,
     )
     lm = NanoUNetLM(
         plans_path,
@@ -170,6 +171,8 @@ def run_supervised(
         mae_ckpt=mae_ckpt_arg,
         init_weights=args.init_weights,
         longi=args.longi,
+        consistency_weight=args.consistency_weight,
+        consistency_warmup_epochs=args.consistency_warmup_epochs,
     )
     # finetune optimizes hard small lesions + FP suppression; select on macro Dice, not the
     # big-lesion-dominated global val_dice that the base run uses.

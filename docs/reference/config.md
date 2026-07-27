@@ -46,8 +46,11 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/defau
 | `large_lesion.K_min` | int | `1` | Minimum extra samples |
 | `large_lesion.K_max` | int | `4` | Maximum extra samples |
 | `large_lesion.max_extra` | int | `0` | Cap on additional large-lesion patches |
-| `propagated.sigma_per_axis` | `[sx, sy, sz]` | `[2.75, 5.19, 5.40]` | Gaussian jitter sigmas for propagated clicks (voxels) |
-| `propagated.max_vox` | float | `34.0` | Max jitter magnitude (voxels) |
+| `propagated.mode` | `"gaussian"` \| `"empirical"` | `"empirical"` | How the propagated-click offset is drawn |
+| `propagated.error_table` | str | `/nnunet_data/Longitudinal-CT/derivatives/registration_error_table.json` | Path to the measured registration-error table (mode=`empirical` only) |
+| `propagated.backends` | `[str, ...]` | `["original", "unigradicon"]` | Registration backends to draw offsets from (mode=`empirical`) |
+| `propagated.sigma_per_axis` | `[sz, sy, sx]` | `[5.95, 6.39, 5.93]` | Gaussian jitter sigmas, mode=`gaussian` (voxels) |
+| `propagated.max_vox` | float | `34.0` | Max jitter magnitude, mode=`gaussian` only (voxels) |
 
 ### `click_modes` constraint
 
@@ -61,7 +64,17 @@ Example valid modes:
 
 There is no separate `neg` mode — drop covers no-prompt training.
 
-If `propagated` is omitted, defaults `(2.75, 5.19, 5.40)` and `max_vox: 34.0` apply.
+### `propagated` modes
+
+`mode: "empirical"` (default) draws real registration-error offsets from the measured table,
+size-matched to each lesion's equivalent-sphere diameter (`volume_vox` from the centroid sidecar).
+No magnitude clip -- the table is already outlier-filtered. At startup the table is validated to
+exist, parse, and have a non-empty offset pool for every `(size bin, backend)` pair in `backends`;
+otherwise the config load raises naming the fix: `python3 scripts/measure_registration_error.py`.
+
+`mode: "gaussian"` keeps the legacy Gaussian jitter (`sigma_per_axis`, clipped to `max_vox`).
+
+If `propagated` is omitted entirely, `mode: "empirical"` with the defaults above applies.
 
 ---
 

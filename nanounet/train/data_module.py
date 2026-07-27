@@ -64,10 +64,10 @@ class NanoDataModule(pl.LightningDataModule):
         only_prefix: str | None = None,
         longi: bool = False,
         longi_null: bool = False,
+        prompts_per_patch: int = 1,
     ):
         super().__init__()
-        self.dataset_name = dataset_name
-        self.fold = fold
+        self.prompts_per_patch, self.dataset_name, self.fold = prompts_per_patch, dataset_name, fold
         self.plans_identifier = plans_identifier
         self.roi_cfg = load_config(roi_cfg_path)
         # Val mirrors test: a fraction of patches are background+prompt (no lesion). Force a
@@ -102,6 +102,11 @@ class NanoDataModule(pl.LightningDataModule):
         self.label_manager = self.pm.get_label_manager(dj)
         if self.batch_size is None:
             self.batch_size = self.cm.batch_size
+        if self.batch_size % self.prompts_per_patch != 0:
+            raise ValueError(
+                f"batch_size {self.batch_size} (plans {self.plans_identifier}) not divisible by "
+                f"--prompts-per-patch {self.prompts_per_patch}. Fix: pass --batch-size <multiple>."
+            )
         fold_dir = join(pp, self.dataset_name)
         case_dir = join(pp, self.dataset_name, self.cm.data_identifier)
         all_ids = Blosc2Folder.get_identifiers(case_dir)
@@ -144,13 +149,15 @@ class NanoDataModule(pl.LightningDataModule):
             fold_seed(self.fold) + 1000 * self.num_iterations_per_epoch,
             self.longi,
             self.longi_null,
+            self.prompts_per_patch,
         )
         b = self.dl_bucket
         nw = b.nw_train
         winit = worker_init if nw else None
+        # Items are patches (each holding prompts_per_patch rows) -> batch_size is patch count.
         return build_iter_dataloader(
             it,
-            batch_size=self.batch_size,
+            batch_size=self.batch_size // self.prompts_per_patch,
             bucket=b,
             nw=nw,
             prefetch=b.prefetch_train,

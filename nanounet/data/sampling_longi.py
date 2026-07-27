@@ -3,12 +3,13 @@ preprocessing crop). FU click SELECTION = build_patch's prompt, sourced from pro
 — the union of BL+FU lesion ids (from nanounet_longi_clicks --clicks-fu-dir), not just real FU
 lesions. This includes "disappeared" lesions (no FU ground truth at that point), so the model is
 prompted there and supervised by seg_crop to predict nothing -> learns disappearance. These are
-already real registered/propagated points, not mask-derived guesses, so select_prompt_points is
-called with jitter=False (apply_propagation_offset exists to simulate BL->FU spread for datasets
-with no real cross-timepoint correspondence -- not applicable here). BL click selection = ALL
-in-patch warped clicks (positives only, no jitter, no spurious). Null baseline (has_baseline
-false, force_zero_prompt, or the ablation switch) duplicates FU -> identity DWB; rendering (both
-heatmaps and the identity-DWB duplication) happens after augmentation, in patch_iterable.py."""
+registration-propagated points (not mask-derived guesses), so we jitter them exactly like build_patch
+via cfg.sampling.propagated -- fu_clicks_zyx has no 1:1 lesion correspondence, so volume_vox is
+resolved by nearest-neighbour match against centroids_zyx (see _volume_for_click), falling back to a
+pooled size-bin draw. BL click selection = ALL in-patch warped clicks (positives only, no jitter, no
+spurious). Null baseline (has_baseline false, force_zero_prompt, or the ablation switch) duplicates
+FU -> identity DWB; rendering (both heatmaps and the identity-DWB duplication) happens after
+augmentation, in patch_iterable.py."""
 
 from __future__ import annotations
 
@@ -17,6 +18,24 @@ import numpy as np
 from nanounet.config import RoiPromptConfig
 from nanounet.data.sampling import _sample_bbox, crop_patch, select_prompt_points
 from nanounet.prompt.centroids import filter_centroids_in_patch
+
+_NEAREST_MATCH_MAX_VOX = 20.0
+
+
+def _volumes_for_clicks(cts: list, prop: dict) -> list[float | None]:
+    """volume_vox for each FU click, matched to the nearest centroids_zyx entry within
+    _NEAREST_MATCH_MAX_VOX; None (-> pooled draw) if no centroid is that close."""
+    centroids = prop.get("centroids_zyx") or []
+    volumes = prop.get("volume_vox") or []
+    if not centroids or not cts:
+        return [None] * len(cts)
+    pts = np.asarray(centroids, dtype=np.float64)
+    out: list[float | None] = []
+    for c in cts:
+        d2 = np.sum((pts - np.asarray(c, dtype=np.float64)) ** 2, axis=1)
+        j = int(np.argmin(d2))
+        out.append(float(volumes[j]) if d2[j] <= _NEAREST_MATCH_MAX_VOX**2 else None)
+    return out
 
 
 def build_patch_longi(
@@ -46,8 +65,11 @@ def build_patch_longi(
         shape, cts, weights, cfg.sampling.fg_patch_prob, patch_size, need_to_pad, rng
     )
     bbox = [[a, b] for a, b in zip(bbox_lbs, bbox_ubs)]
-    both_crop, seg_crop, pshape, pslc = crop_patch(data, seg, bbox)  # both_crop: (2, *pshape)
-    fu_pp, fu_pn = select_prompt_points(seg_crop, cts, pslc, pshape, cfg, force_zero_prompt, rng, jitter=False)
+    both_crop, seg_crop, _pshape, pslc = crop_patch(data, seg, bbox)  # both_crop: (2, *pshape)
+    fu_volumes = _volumes_for_clicks(cts, prop)
+    fu_pp, fu_pn = select_prompt_points(
+        seg_crop, cts, pslc, cfg, force_zero_prompt, rng, jitter=True, volumes_vox=fu_volumes
+    )
 
     has_bl = prop.get("has_baseline", False)
     null_baseline = bool(force_zero_prompt or force_null_baseline or not has_bl)
