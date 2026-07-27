@@ -11,7 +11,7 @@
 #SBATCH --error=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_ft_d013_stratified_h200.err
 #SBATCH --no-container-entrypoint
 #SBATCH --container-mounts=/data/oncology/experiments/universal-lesion-segmentation:/nnunet_data
-#SBATCH --container-image="dockerdex.umcn.nl:5005/nielsrocholl/nnunet-v2-pro-sol-docker:latest"
+#SBATCH --container-image="dockerdex.umcn.nl:5005/nielsrocholl/nanounet-sol-docker:latest"
 
 # STAGE 3 -- STRATIFIED FINETUNE ON LONGITUDINAL-CT ONLY, SINGLE-TIMEPOINT.
 # Single H200 (dlc-slowpoke, 141 GB). Successor to nanoUNet-finetrune_stratified.sh, which produced

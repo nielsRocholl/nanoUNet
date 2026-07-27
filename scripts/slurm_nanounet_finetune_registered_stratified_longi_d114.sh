@@ -11,7 +11,7 @@
 #SBATCH --error=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_finetune_d114_registered.err
 #SBATCH --no-container-entrypoint
 #SBATCH --container-mounts=/data/oncology/experiments/universal-lesion-segmentation:/nnunet_data
-#SBATCH --container-image="dockerdex.umcn.nl:5005/nielsrocholl/nnunet-v2-pro-sol-docker:latest"
+#SBATCH --container-image="dockerdex.umcn.nl:5005/nielsrocholl/nanounet-sol-docker:latest"
 
 # Longi finetune of Dataset114 (unigradicon-registered union clicks), A100-40GB (dlc-arceus).
 #

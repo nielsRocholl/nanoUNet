@@ -11,7 +11,7 @@
 #SBATCH --error=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_sup_999_warmstart_2gpu.err
 #SBATCH --no-container-entrypoint
 #SBATCH --container-mounts=/data/oncology/experiments/universal-lesion-segmentation:/nnunet_data
-#SBATCH --container-image="dockerdex.umcn.nl:5005/nielsrocholl/nnunet-v2-pro-sol-docker:latest"
+#SBATCH --container-image="dockerdex.umcn.nl:5005/nielsrocholl/nanounet-sol-docker:latest"
 
 # Reuses the existing self-supervised (MAE) checkpoint via --mae-ckpt instead of rerunning MAE
 # pretraining -- the MAE stage is prompt-free and unaffected by the prompt-robustness changes.

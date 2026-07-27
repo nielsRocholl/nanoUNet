@@ -11,7 +11,7 @@
 #SBATCH --error=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_sup_999_2gpu.err
 #SBATCH --no-container-entrypoint
 #SBATCH --container-mounts=/data/oncology/experiments/universal-lesion-segmentation:/nnunet_data
-#SBATCH --container-image="dockerdex.umcn.nl:5005/nielsrocholl/nnunet-v2-pro-sol-docker:latest"
+#SBATCH --container-image="dockerdex.umcn.nl:5005/nielsrocholl/nanounet-sol-docker:latest"
 
 # STAGE 2 -- SUPERVISED, SINGLE-TIMEPOINT, on the full merged pool (Dataset999_Merged).
 # No --longi: this trains the ordinary one-stream prompted model, NOT the two-stream DWB
