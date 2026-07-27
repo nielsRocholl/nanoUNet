@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 from scipy.ndimage import distance_transform_edt
 
-from nanounet.model.dice_helpers import get_tp_fp_fn_tn, softmax_helper_dim1
+from nanounet.model.dice_loss import get_tp_fp_fn_tn, softmax_helper_dim1
 from nanounet.model.losses import DC_and_CE_loss, RobustCrossEntropyLoss
 
 

@@ -1,48 +1,12 @@
-"""Dice + TP/FP/FN for loss and validation (nnU-Net dice.py port, ddp=False)."""
+"""Validation-time Dice metrics, built on the tp/fp/fn core in dice_loss.py: pooled pseudo-Dice,
+per-row lesion/no-lesion split, click-inside-vs-outside split, and prompt-pair agreement."""
 
 from __future__ import annotations
 
-from typing import Callable
-
 import numpy as np
 import torch
-from torch import nn
 
-
-def softmax_helper_dim1(x: torch.Tensor) -> torch.Tensor:
-    return torch.softmax(x, 1)
-
-
-def get_tp_fp_fn_tn(net_output, gt, axes=None, mask=None, square=False):
-    if axes is None:
-        axes = tuple(range(2, net_output.ndim))
-    with torch.no_grad():
-        if net_output.ndim != gt.ndim:
-            gt = gt.view((gt.shape[0], 1, *gt.shape[1:]))
-        if net_output.shape == gt.shape:
-            y_onehot = gt.to(torch.float32)
-        else:
-            y_onehot = torch.zeros(net_output.shape, device=net_output.device, dtype=torch.float32)
-            y_onehot.scatter_(1, gt.long(), 1)
-    tp = net_output * y_onehot
-    fp = net_output * (1 - y_onehot)
-    fn = (1 - net_output) * y_onehot
-    tn = (1 - net_output) * (1 - y_onehot)
-    if mask is not None:
-        with torch.no_grad():
-            mask_here = torch.tile(mask, (1, tp.shape[1], *[1 for _ in range(2, tp.ndim)]))
-        tp *= mask_here
-        fp *= mask_here
-        fn *= mask_here
-        tn *= mask_here
-    if square:
-        tp, fp, fn, tn = tp**2, fp**2, fn**2, tn**2
-    if len(axes) > 0:
-        tp = tp.sum(dim=axes, keepdim=False, dtype=torch.float32)
-        fp = fp.sum(dim=axes, keepdim=False, dtype=torch.float32)
-        fn = fn.sum(dim=axes, keepdim=False, dtype=torch.float32)
-        tn = tn.sum(dim=axes, keepdim=False, dtype=torch.float32)
-    return tp, fp, fn, tn
+from nanounet.model.dice_loss import get_tp_fp_fn_tn
 
 
 def pooled_fg_dice(buf) -> float:
@@ -75,10 +39,12 @@ def val_split_metrics(tp, fp, fn, y, output_seg):
     )
 
 
-def val_step_row(out, y, label_manager, enable_ds: bool, loss_val: float) -> dict:
-    """One validation batch → per-region metric row (tp/fp/fn, macro dice, fp count, loss)."""
-    import torch
+def val_step_row(out, y, label_manager, enable_ds: bool, loss_val: float, click_inside=None) -> dict:
+    """One validation batch → per-region metric row (tp/fp/fn, macro dice, fp count, loss).
 
+    `click_inside` (optional, -1/0/1 per row -- see patch_render.click_inside_flags) additionally
+    splits the has-foreground rows' per-row Dice into `dice_click_in` / `dice_click_out`, feeding
+    val_dice_click_inside / val_dice_click_outside (deployment-split diagnostic)."""
     if enable_ds:
         out = out[0]
         y = y[0]
@@ -100,53 +66,50 @@ def val_step_row(out, y, label_manager, enable_ds: bool, loss_val: float) -> dic
         else:
             y = y.clamp_min(0)
     tp, fp, fn, _ = get_tp_fp_fn_tn(oh, y, axes=axes, mask=mask)
-    tg, pg, ng, da, fb = val_split_metrics(tp[:, 1:], fp[:, 1:], fn[:, 1:], y, output_seg)
-    return {"tp": tg, "fp": pg, "fn": ng, "dice_a": da, "fp_b": fb, "loss": loss_val}
+    tp_fg, fp_fg, fn_fg = tp[:, 1:], fp[:, 1:], fn[:, 1:]
+    tg, pg, ng, da, fb = val_split_metrics(tp_fg, fp_fg, fn_fg, y, output_seg)
+    row = {"tp": tg, "fp": pg, "fn": ng, "dice_a": da, "fp_b": fb, "loss": loss_val}
+    if click_inside is not None:
+        has_fg = (y > 0).flatten(1).any(1).cpu()
+        ci = click_inside.cpu()
+        den = 2 * tp_fg.sum(1) + fp_fg.sum(1) + fn_fg.sum(1)
+        dice_row = torch.where(den > 0, 2 * tp_fg.sum(1) / den, torch.zeros_like(den)).cpu()
+        valid = has_fg & (ci >= 0)
+        row["dice_click_in"] = dice_row[valid & (ci == 1)]
+        row["dice_click_out"] = dice_row[valid & (ci == 0)]
+    return row
 
 
-class MemoryEfficientSoftDiceLoss(nn.Module):
-    def __init__(
-        self,
-        apply_nonlin: Callable | None = None,
-        batch_dice: bool = False,
-        do_bg: bool = True,
-        smooth: float = 1.0,
-        ddp: bool = False,
-    ):
-        super().__init__()
-        self.do_bg = do_bg
-        self.batch_dice = batch_dice
-        self.apply_nonlin = apply_nonlin
-        self.smooth = smooth
-        self.ddp = ddp
-        assert not ddp
+def click_split_means(buf) -> tuple[float, float]:
+    """val_dice_click_inside / val_dice_click_outside: mean per-row Dice (see val_step_row's
+    dice_click_in/out), nan if a bucket is empty this epoch rather than a fabricated 0/1."""
+    din = torch.cat([v["dice_click_in"] for v in buf if "dice_click_in" in v])
+    dout = torch.cat([v["dice_click_out"] for v in buf if "dice_click_out" in v])
+    return (float(din.mean()) if din.numel() else float("nan")), (float(dout.mean()) if dout.numel() else float("nan"))
 
-    def forward(self, x, y, loss_mask=None):
-        if self.apply_nonlin is not None:
-            x = self.apply_nonlin(x)
-        axes = tuple(range(2, x.ndim))
-        with torch.no_grad():
-            if x.ndim != y.ndim:
-                y = y.view((y.shape[0], 1, *y.shape[1:]))
-            if x.shape == y.shape:
-                y_onehot = y.to(torch.float32)
-            else:
-                y_onehot = torch.zeros(x.shape, device=x.device, dtype=torch.float32)
-                y_onehot.scatter_(1, y.long(), 1)
-            if not self.do_bg:
-                y_onehot = y_onehot[:, 1:]
-            sum_gt = y_onehot.sum(axes, dtype=torch.float32) if loss_mask is None else (y_onehot * loss_mask).sum(axes, dtype=torch.float32)
-        if not self.do_bg:
-            x = x[:, 1:]
-        if loss_mask is None:
-            intersect = (x * y_onehot).sum(axes, dtype=torch.float32)
-            sum_pred = x.sum(axes, dtype=torch.float32)
-        else:
-            intersect = (x * y_onehot * loss_mask).sum(axes, dtype=torch.float32)
-            sum_pred = (x * loss_mask).sum(axes, dtype=torch.float32)
-        if self.batch_dice:
-            intersect = intersect.sum(0, dtype=torch.float32)
-            sum_pred = sum_pred.sum(0, dtype=torch.float32)
-            sum_gt = sum_gt.sum(0, dtype=torch.float32)
-        dc = (2 * intersect + self.smooth) / (sum_gt + sum_pred + float(self.smooth)).clamp_min(1e-8)
-        return -dc.mean()
+
+def agreement_mean(buf) -> float:
+    """val_prompt_agreement: mean of prompt_pair_dice per-row values, skipping NaN
+    (both-predictions-empty) rows rather than scoring them 1.0 or 0.0."""
+    if not buf:
+        return float("nan")
+    agree = torch.cat(buf)
+    valid = agree[~torch.isnan(agree)]
+    return float(valid.mean()) if valid.numel() else float("nan")
+
+
+def prompt_pair_dice(out, out2, enable_ds: bool) -> torch.Tensor:
+    """val_prompt_agreement: per-row foreground Dice between two predictions on the SAME patch
+    from two independently-drawn prompts (argmax fg, NOT compared against ground truth). A row
+    where both predictions are empty has undefined Dice -- returned as NaN, filtered out by the
+    caller before averaging (not scored as 1.0, which would reward agreeing-on-nothing, and not
+    0.0, which would penalise a case with no valid comparison)."""
+    if enable_ds:
+        out, out2 = out[0], out2[0]
+    a = out.argmax(1) > 0
+    b = out2.argmax(1) > 0
+    axes = tuple(range(1, a.ndim))
+    inter = (a & b).sum(dim=axes).float()
+    denom = a.sum(dim=axes).float() + b.sum(dim=axes).float()
+    dice = torch.where(denom > 0, 2 * inter / denom, torch.full_like(denom, float("nan")))
+    return dice.detach().cpu()

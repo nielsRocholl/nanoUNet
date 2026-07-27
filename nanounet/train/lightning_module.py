@@ -15,7 +15,7 @@ from torch import autocast
 
 from nanounet.config import RoiPromptConfig, load_config, save_config
 from nanounet.diag import purge_torch_tmp
-from nanounet.model.dice_helpers import pooled_fg_dice, val_step_row
+from nanounet.model.dice_helpers import agreement_mean, click_split_means, pooled_fg_dice, prompt_pair_dice, val_step_row
 from nanounet.model.losses import build_loss, consistency_dice_term
 from nanounet.model.lr_schedule import PolyLRScheduler, StretchedTailPolyLRScheduler
 from nanounet.model.mae_transfer import load_full_net, load_mae_encoder
@@ -61,6 +61,7 @@ class NanoUNetLM(pl.LightningModule):
             load_full_net(self.net, init_weights)
         elif mae_ckpt is not None:
             load_mae_encoder(self.net, mae_ckpt)
+        # is_ddp=False is correct, not a stub: plans set batch_dice=False, so dice is per-sample
         self.loss = build_loss(self.cm, self.label_manager, enable_deep_supervision, loss_type=loss_type, is_ddp=False)
         self.initial_lr = initial_lr
         self.weight_decay = weight_decay
@@ -79,6 +80,7 @@ class NanoUNetLM(pl.LightningModule):
         self._prompt_ch = [1, 2, 4, 5] if longi else [1, 2]
         self._val_buf: List[Dict[str, Any]] = []
         self._val_buf_ablated: List[Dict[str, Any]] = []
+        self._agreement_buf: List[torch.Tensor] = []
 
     def forward(self, x: torch.Tensor):
         return self.net(x)
@@ -108,7 +110,9 @@ class NanoUNetLM(pl.LightningModule):
             loss_seg = self.loss(out, y)
             if self.consistency_weight_max > 0:
                 pair_id = batch["pair_id"].to(self.device, non_blocking=True)
-                lam = self.consistency_weight_max * min(1.0, self.current_epoch / max(1, self.consistency_warmup_epochs))
+                w = self.consistency_warmup_epochs  # epoch+1: epoch 0 must not be a dead epoch
+                ramp = 1.0 if w <= 0 else min(1.0, (self.current_epoch + 1) / w)
+                lam = self.consistency_weight_max * ramp
                 loss_consistency = consistency_dice_term(out, pair_id)
                 loss = loss_seg + lam * loss_consistency
             else:
@@ -135,44 +139,52 @@ class NanoUNetLM(pl.LightningModule):
             x_ablated = x.clone()
             x_ablated[:, self._prompt_ch] = 0.0
             out_ablated = self.net(x_ablated)
-        self._val_buf.append(
-            val_step_row(out, y, self.label_manager, self.enable_deep_supervision, float(loss.detach()))
-        )
-        self._val_buf_ablated.append(
-            val_step_row(out_ablated, y, self.label_manager, self.enable_deep_supervision, 0.0)
-        )
+        ds, lm = self.enable_deep_supervision, self.label_manager
+        self._val_buf.append(val_step_row(out, y, lm, ds, float(loss.detach()), batch["click_inside"]))
+        self._val_buf_ablated.append(val_step_row(out_ablated, y, lm, ds, 0.0))
+        # val_prompt_agreement: 3rd forward, only when the val dataloader emits a 2nd independent
+        # prompt on the same patch (data_module sets emit_prompt2=True for validation only).
+        if "data_prompt2" in batch:
+            x2 = batch["data_prompt2"].to(self.device, non_blocking=True)
+            with autocast(self.device.type, enabled=self.device.type == "cuda"):
+                out2 = self.net(x2)
+            self._agreement_buf.append(prompt_pair_dice(out, out2, self.enable_deep_supervision))
 
     def on_validation_epoch_start(self) -> None:
         self._val_buf.clear()
         self._val_buf_ablated.clear()
+        self._agreement_buf.clear()
 
     def on_validation_epoch_end(self) -> None:
         if hasattr(self, "_epoch_t0") and not self.trainer.sanity_checking:
             self.log("epoch_wall_time_sec", float(time.perf_counter() - self._epoch_t0))
         if not self._val_buf:
             return
-        da = torch.cat([v["dice_a"] for v in self._val_buf])
-        fb = torch.cat([v["fp_b"] for v in self._val_buf])
-        self.log("val_dice", pooled_fg_dice(self._val_buf), prog_bar=True)
-        self.log("val_dice_macro", float(da.mean()) if da.numel() else float("nan"), prog_bar=True)
-        self.log("val_fp", float(fb.mean()) if fb.numel() else 0.0, prog_bar=False)
-        self.log("val_n_a", float(da.numel()))
-        self.log("val_n_b", float(fb.numel()))
-        self.log("val_loss", float(np.mean([v["loss"] for v in self._val_buf])), prog_bar=False)
+        da, fb = (torch.cat([v[k] for v in self._val_buf]) for k in ("dice_a", "fp_b"))
+        val_dice = pooled_fg_dice(self._val_buf)
+        d = dict(sync_dist=True)  # each rank validates its own shard; else metrics are rank 0 only
+        self.log("val_dice", val_dice, prog_bar=True, **d)
+        self.log("val_dice_macro", float(da.mean()) if da.numel() else float("nan"), prog_bar=True, **d)
+        self.log("val_fp", float(fb.mean()) if fb.numel() else 0.0, prog_bar=False, **d)
+        for k, v in (("val_n_a", da.numel()), ("val_n_b", fb.numel())):
+            self.log(k, float(v), reduce_fx="sum", sync_dist=True)
+        self.log("val_loss", float(np.mean([v["loss"] for v in self._val_buf])), prog_bar=False, **d)
         if self._val_buf_ablated:
-            self.log("val_dice_prompt_ablated", pooled_fg_dice(self._val_buf_ablated), prog_bar=False)
+            val_dice_ablated = pooled_fg_dice(self._val_buf_ablated)
+            self.log("val_dice_prompt_ablated", val_dice_ablated, **d)
+            self.log("val_prompt_gap", val_dice - val_dice_ablated, **d)  # METRIC 3: collapse guard
+        # METRIC 2 (deployment split): Dice split by whether the drawn click landed on foreground.
+        din, dout = click_split_means(self._val_buf)
+        self.log("val_dice_click_inside", din, **d)
+        self.log("val_dice_click_outside", dout, **d)
+        # METRIC 1 (headline): pairwise prediction agreement under two independent prompt draws.
+        self.log("val_prompt_agreement", agreement_mean(self._agreement_buf), **d)
 
     def configure_optimizers(self):
         if self.optimizer == "adamw":
             opt = torch.optim.AdamW(self.net.parameters(), lr=self.initial_lr, weight_decay=self.weight_decay)
         else:
-            opt = torch.optim.SGD(
-                self.net.parameters(),
-                lr=self.initial_lr,
-                weight_decay=self.weight_decay,
-                momentum=0.99,
-                nesterov=True,
-            )
+            opt = torch.optim.SGD(self.net.parameters(), lr=self.initial_lr, weight_decay=self.weight_decay, momentum=0.99, nesterov=True)
         if self.lr_schedule == "stretched_tail_poly":
             sched = StretchedTailPolyLRScheduler(
                 opt,

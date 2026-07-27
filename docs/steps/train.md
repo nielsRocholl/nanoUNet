@@ -91,6 +91,31 @@ places should not swing per-lesion Dice.
 zeroed) is logged beside `val_dice` on every validation epoch — if that gap closes, the net (or the
 consistency term) is learning to ignore the prompt, and `--consistency-weight` is too high.
 
+## Prompt-robustness validation metrics
+
+Logged every validation epoch alongside `val_dice` / `val_dice_macro` / `val_fp`, always on (no
+flag needed) — they measure whether prompt-consistency training is actually working:
+
+| Metric | What it measures | Direction |
+|--------|-------------------|-----------|
+| `val_prompt_agreement` | Dice between two predictions on the *same* val patch under two independently-drawn clicks (NOT vs. ground truth). The headline number — the project's own sweep measured 0.588–0.605 pre-fix. | higher is better, target → 1.0 |
+| `val_dice_click_inside` | Per-lesion Dice on rows where the drawn click landed on foreground (post-augmentation). | — |
+| `val_dice_click_outside` | Same, for rows where the click missed (models the 52% deployment case, vs. 88% during old training). | should stay close to `_inside` |
+| `val_prompt_gap` | `val_dice − val_dice_prompt_ablated`. | trending to 0 = net has stopped using the click, lower `--consistency-weight` |
+
+Implementation notes:
+- `val_prompt_agreement` costs a **3rd forward pass** during validation (normal + prompt-ablated +
+  2nd-prompt), computed only because the val dataloader renders one extra prompt variant per patch
+  (`emit_prompt2`, its own RNG stream, never perturbing the patch/prompt sequence that produces
+  `val_dice`). Validation is 50 iterations, so this is cheap; it does not touch training throughput.
+- Foreground = argmax over classes (not a probability threshold). A row where both predictions (or,
+  for the click split, the row itself) are empty is **skipped**, not scored 1.0 (rewards agreeing on
+  nothing) or 0.0 (penalises an undefined comparison) or NaN-propagated into the mean.
+- `val_dice_click_inside` / `_outside` only cover has-foreground rows with at least one positive
+  click; rows with no positive click are excluded from both buckets. "Inside" is a strict majority
+  vote when a row has multiple positive clicks; a tie counts as outside.
+- Sanity-check epochs (`trainer.sanity_checking`) run this same path — no special-casing needed.
+
 ## Loss throughput
 
 Use `--loss dc_ce` for normal long supervised training. `--loss cc_dc_ce` runs CPU connected components plus SciPy Euclidean-distance Voronoi inside the training loss and can make epochs roughly **4× slower** on A100/H200 nodes. Treat CC-DiceCE as an opt-in experiment or short fine-tuning objective. Details: [reference/losses.md](../reference/losses.md).

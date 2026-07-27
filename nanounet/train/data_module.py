@@ -169,20 +169,12 @@ class NanoDataModule(pl.LightningDataModule):
 
     def val_dataloader(self) -> DataLoader:
         init_dataloader_ipc()
+        # emit_prompt2=True: 2nd independent-prompt draw for val_prompt_agreement, own RNG stream
+        # (prompts_per_patch stays 1 -- val batch composition, and val_dice, are unaffected).
         it = PatchIterable(
-            self.case_folder,
-            self.val_keys,
-            self.val_cfg,
-            self.final_ps,
-            self.final_ps,
-            self.label_manager.annotated_classes_key,
-            self.val_tf,
-            False,
-            self.num_val_iterations,
-            self.batch_size,
-            fold_seed(self.fold) + 2000,
-            self.longi,
-            self.longi_null,
+            self.case_folder, self.val_keys, self.val_cfg, self.final_ps, self.final_ps,
+            self.label_manager.annotated_classes_key, self.val_tf, False, self.num_val_iterations,
+            self.batch_size, fold_seed(self.fold) + 2000, self.longi, self.longi_null, emit_prompt2=True,
         )
         b = self.dl_bucket
         nw = b.nw_val

@@ -39,6 +39,7 @@ def build_train_parser() -> argparse.ArgumentParser:
     ap.add_argument("--longi-null", action="store_true")
     ap.add_argument("--precision", default="16-mixed")
     ap.add_argument("--accelerator", default="auto", choices=("auto", "cpu", "cuda", "gpu", "mps"))
+    ap.add_argument("--devices", type=int, default=1, help="GPUs for data-parallel training. >1 uses DDP; each rank runs its own dataloader workers, so effective batch stays the plans batch_size split across ranks.")
     ap.add_argument("--mae-ckpt", default=None)
     ap.add_argument("--mae-pretrain", action="store_true")
     ap.add_argument("--mae-resume", default=None)

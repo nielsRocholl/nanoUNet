@@ -9,6 +9,7 @@ import torch
 from batchgenerators.utilities.file_and_folder_operations import join, maybe_mkdir_p
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.strategies import DDPStrategy
 
 from nanounet.common import cprint
 from nanounet.diag import log_snapshot, mem_diag_enabled
@@ -24,6 +25,15 @@ from nanounet.pretrain.module import NanoMAELM
 from nanounet.train.data_module import NanoDataModule
 from nanounet.train.lightning_module import NanoUNetLM
 
+
+def _ddp(devices: int):
+    """static_graph: deep supervision zeroes the coarsest head's loss weight (losses.py w[-1]=0), so
+    the unused-parameter set is CONSTANT -- tell DDP once instead of re-detecting it every step, which
+    is what find_unused_parameters costs. gradient_as_bucket_view: gradients alias the comm buckets
+    instead of being copied, saving roughly one gradient-sized allocation."""
+    if devices <= 1:
+        return "auto"
+    return DDPStrategy(static_graph=True, gradient_as_bucket_view=True)
 
 def run_mae_pretrain(args, ds, pp, plans_path, dj_path, out, accel, loggers, dl_b, pm0) -> str | None:
     """Integrated MAE stage. Returns the mae checkpoint path to transfer, or None."""
@@ -112,7 +122,7 @@ def run_mae_pretrain(args, ds, pp, plans_path, dj_path, out, accel, loggers, dl_
         pre_trnr = Trainer(
             max_epochs=args.mae_epochs,
             accelerator=accel,
-            devices=1,
+            devices=args.devices, strategy=_ddp(args.devices),
             precision=args.precision,
             callbacks=pre_cb,
             logger=loggers or False,
@@ -190,7 +200,7 @@ def run_supervised(
     tr = Trainer(
         max_epochs=args.epochs,
         accelerator=accel,
-        devices=1,
+        devices=args.devices, strategy=_ddp(args.devices),
         precision=args.precision,
         gradient_clip_val=args.grad_clip or None,
         callbacks=cb,

@@ -16,7 +16,8 @@ from __future__ import annotations
 import numpy as np
 
 from nanounet.config import RoiPromptConfig
-from nanounet.data.sampling import _sample_bbox, crop_patch, points_variant
+from nanounet.data.patch_bbox import _sample_bbox, crop_patch
+from nanounet.data.sampling import points_variant
 from nanounet.prompt.centroids import filter_centroids_in_patch
 
 _NEAREST_MATCH_MAX_VOX = 20.0
@@ -49,6 +50,7 @@ def build_patch_longi(
     force_null_baseline: bool,
     rng: np.random.Generator,
     prompts_per_patch: int = 1,
+    extra_rng: np.random.Generator | None = None,
 ) -> dict:
     assert data.shape[0] == 2, data.shape  # ch0 FU_CT, ch1 warped BL_CT
     assert "fu_clicks_zyx" in prop, (
@@ -80,6 +82,11 @@ def build_patch_longi(
     variants = []
     for _ in range(prompts_per_patch):
         v = points_variant(seg_crop, cts, pslc, cfg, force_zero_prompt, rng, True, fu_volumes)
+        v["bl_points_pos"] = v["points_pos"] if null_baseline else bl_fixed
+        variants.append(v)
+    if extra_rng is not None:
+        # See build_patch: independent RNG stream, same crop, does not perturb the main sequence.
+        v = points_variant(seg_crop, cts, pslc, cfg, force_zero_prompt, extra_rng, True, fu_volumes)
         v["bl_points_pos"] = v["points_pos"] if null_baseline else bl_fixed
         variants.append(v)
 

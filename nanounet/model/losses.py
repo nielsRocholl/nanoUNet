@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from nanounet.model.dice_helpers import MemoryEfficientSoftDiceLoss, softmax_helper_dim1
+from nanounet.model.dice_loss import MemoryEfficientSoftDiceLoss, softmax_helper_dim1
 from nanounet.plan.labels import Labels
 from nanounet.plan.plans import Config3d
 

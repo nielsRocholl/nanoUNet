@@ -21,20 +21,17 @@
 # 99.2% (was 84%), 0.96 s/iter (was 1.05). Do NOT drop below bucket `l` for longi.
 
 # ---------------------------------------------------------------------------------------------
-# 2-GPU VARIANT. NOT RUNNABLE YET -- prepared ahead of the code change.
+# 2-GPU VARIANT (DDP). Effective batch 12 = 6 rows per rank, i.e. each GPU does exactly what the
+# verified single-GPU run does. NOTE this DOUBLES the effective batch versus the single-GPU script.
+# That was a deliberate decision to get the full ~2x wall-clock win; the LR note below is affected.
 #
-# `devices=1` is currently hardcoded in nanounet/train/fit.py (two places) and there is no
-# --devices CLI flag, so `--devices 2` below will be rejected until that lands.
+# Lightning spawns its own 2 processes, so --ntasks stays 1 and --gpus-per-task is 2.
+# strategy is ddp_find_unused_parameters_true: deep supervision zeroes the coarsest scale's loss
+# weight (losses.py w[-1]=0), so that head produces no gradient and DDP's reducer aborts without it.
 #
-# Before running this, the multi-GPU work in
-# /nnunet_data/prompt_sensitivity/HANDOFF_RETRAIN.md section 4 must be done, in particular the
-# SILENT bug: PatchIterable.__iter__ shards by worker id only, not by global rank, so under DDP
-# both GPUs draw the IDENTICAL patch sequence. It does not crash -- it trains happily doing half
-# the data at twice the cost, and no loss curve reveals it. Verify per-rank case ids differ before
-# trusting any throughput number from this script.
-#
-# Effective batch stays 6 (3 per GPU) so LR needs no rescaling and VRAM headroom improves; the
-# single-GPU run peaked at 39161/40960 MiB.
+# Data sharding: PatchIterable seeds its RNG by (rank, worker). Seeding by worker alone -- which is
+# what the code did before -- makes every rank draw the IDENTICAL patch sequence. It does not crash;
+# it silently trains each step on world_size copies of the same data, and no loss curve reveals it.
 # ---------------------------------------------------------------------------------------------
 
 set -euo pipefail
@@ -47,10 +44,14 @@ BASE_DS_FOLDER=Dataset999_Merged
 FT_EPOCHS=500
 ITERS_PER_EPOCH=1000
 VAL_ITERS=50
-LR=1e-5          # fixed on ALL nodes; do NOT scale with batch (warm-start finetune)
-# Placeholder -- weight to be chosen by measurement (W9 gate / held-out eval), not guessed.
-CONSISTENCY_WEIGHT=0.0
-PROMPTS_PER_PATCH=1
+LR=1e-5          # warm-start finetune. NOTE: effective batch is 12 here (2 ranks x 6 rows)
+                 # vs 6 single-GPU. The original 'do not scale with batch' note assumed 6.
+CONSISTENCY_WEIGHT=0.02   # measured, not guessed: on this checkpoint train_loss_seg averages 0.047
+                          # (median 0.0003, spiky) while the raw consistency term sits at 0.79-0.82,
+                          # so 0.02 puts consistency at ~20-25% of total loss magnitude. Revisit from
+                          # the logged train_loss_seg / train_loss_consistency ratio after a few real
+                          # epochs; val_prompt_gap collapsing toward 0 means it is too high.
+PROMPTS_PER_PATCH=2   # pairs rows for the consistency term; batch_size must divide by it
 STORAGE=/nnunet_data
 
 export NANOUNET_RAW="${STORAGE}/nnUNet_raw"
