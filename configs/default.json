@@ -11,12 +11,7 @@
       "pos": 1.0,
       "drop": 0.0
     },
-    "n_false_pos": [
-      1,
-      1
-    ],
-    "false_pos_min_dist_vox": 50,
-    "false_pos_probability": 0.2,
+    "false_pos_probability": 0.05,
     "large_lesion": {
       "K": 2,
       "K_min": 1,

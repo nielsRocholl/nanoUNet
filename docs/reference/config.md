@@ -39,9 +39,7 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/defau
 | `fg_patch_prob` | float | `0.67` | Probability of foreground-centred patch vs random background |
 | `click_modes.pos` | float | `1.0` | Probability of jittered centroid prompt |
 | `click_modes.drop` | float | `0.0` | Probability of omitting prompt (no-click training) |
-| `n_false_pos` | int or `[min, max]` | `[1, 1]` | Count range of decoy false-positive clicks per patch |
-| `false_pos_min_dist_vox` | int | `50` | Minimum voxel distance of decoys from true foreground |
-| `false_pos_probability` | float | `0.2` | Probability of adding false-positive decoys |
+| `false_pos_probability` | float | `0.05` | Probability of adding a false-positive decoy click |
 | `large_lesion.K` | int or `[min, max]` | `2` | Extra centroid samples for large lesions |
 | `large_lesion.K_min` | int | `1` | Minimum extra samples |
 | `large_lesion.K_max` | int | `4` | Maximum extra samples |
@@ -51,6 +49,15 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/defau
 | `propagated.backends` | `[str, ...]` | `["original", "unigradicon"]` | Registration backends to draw offsets from (mode=`empirical`) |
 | `propagated.sigma_per_axis` | `[sz, sy, sx]` | `[5.95, 6.39, 5.93]` | Gaussian jitter sigmas, mode=`gaussian` (voxels) |
 | `propagated.max_vox` | float | `34.0` | Max jitter magnitude, mode=`gaussian` only (voxels) |
+
+### `false_pos_probability`
+
+A synthetic false-positive decoy models a spurious click on empty tissue, which does not occur at
+deployment — detection is handled upstream and every click refers to a real lesion. The genuine
+negative is the disappeared lesion (35% of propagated clicks), which is already present in the data
+via the empirical click model. `false_pos_probability` is kept small (`0.05`) only as a residual
+robustness margin: 42% of real lesions have a neighbour closer than 30 voxels, so any decoy sampled
+far from foreground sits further away than a typical real neighbour ever would.
 
 ### `click_modes` constraint
 

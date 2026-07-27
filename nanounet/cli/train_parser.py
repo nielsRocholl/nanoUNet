@@ -53,8 +53,8 @@ def build_train_parser() -> argparse.ArgumentParser:
     ap.add_argument("--dl-bucket", choices=("s", "m", "l", "xl"), default="m")
     ap.add_argument("--dl-persistent-workers", action="store_true")
     ap.add_argument("--mem-diag", action="store_true")
-    ap.add_argument("--prompts-per-patch", type=int, default=1, help="Independent click draws rendered per patch (2 enables the consistency loss).")
-    ap.add_argument("--consistency-weight", type=float, default=0.0, help="Lambda max for the two-prompt consistency term; 0 disables it.")
+    ap.add_argument("--prompts-per-patch", type=int, default=1, help="Independent click draws rendered per patch. NOT YET IMPLEMENTED for >1 (see validate_train_args); must stay 1.")
+    ap.add_argument("--consistency-weight", type=float, default=0.0, help="Lambda max for the two-prompt consistency term; 0 disables it. Unreachable until --prompts-per-patch >1 is implemented.")
     ap.add_argument("--consistency-warmup-epochs", type=int, default=50, help="Epochs to linearly ramp lambda from 0 to --consistency-weight.")
     return ap
 
@@ -82,6 +82,14 @@ def validate_train_args(args) -> None:
             f"--consistency-weight {args.consistency_weight} requires --prompts-per-patch >= 2 "
             f"(got --prompts-per-patch {args.prompts_per_patch}).\n"
             f"Fix: nanounet_train … --prompts-per-patch 2 --consistency-weight {args.consistency_weight}"
+        )
+    if args.prompts_per_patch > 1:
+        raise ValueError(
+            f"--prompts-per-patch {args.prompts_per_patch} is not implemented yet: "
+            f"build_patch/build_patch_longi (nanounet/data/sampling.py, sampling_longi.py) only "
+            f"draw ONE click set per patch and have no multi-draw / points_variants support.\n"
+            f"Fix: use --prompts-per-patch 1 (default), or implement N-way draws sharing one "
+            f"crop in sampling.py before enabling this flag."
         )
     if args.batch_size is not None and args.batch_size % args.prompts_per_patch != 0:
         raise ValueError(

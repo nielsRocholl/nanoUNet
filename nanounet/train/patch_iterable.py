@@ -4,12 +4,13 @@ build_patch*/producer hand over CT crop + click COORDINATES ("keypoints"); the c
 augmentation chain on CT + points (see spatial_points.py) and only then renders heatmaps at the
 final patch size -- grid_sample only ever sees CT channels (1 supervised, 2 longi).
 
-Two-prompt consistency (prompts_per_patch > 1): the producer draws `prompts_per_patch` independent
-click sets per patch under raw["points_variants"] (list of dicts shaped like the old single-draw
-fields). One raw patch = one case draw + one augmentation pass; only rendered heatmaps differ
-across variants, isolating prompt- from augmentation-variance. Each raw patch yields ONE item
-holding all its variants; collate_patches flattens them into rows with a shared `pair_id` so the
-consistency loss can regroup them after one forward pass.
+Two-prompt consistency (prompts_per_patch > 1): NOT YET WIRED. render/collate below
+(`raw["points_variants"]`, `pair_id`) is generic over N variants per raw patch, ready for it, but
+build_patch/build_patch_longi (nanounet/data/sampling*.py) only draw ONE click set each -- no
+`prompts_per_patch` param, can't yet share one crop across independent click draws. PatchIterable
+asserts prompts_per_patch == 1 and wraps that single draw as a length-1 points_variants list.
+Wiring N>1 needs build_patch*() changed to draw N point sets from the same bbox/crop; see
+train_parser.py's --prompts-per-patch validation.
 """
 
 from __future__ import annotations
@@ -39,7 +40,6 @@ class CaseMetaCache:
 
     def get(self, cid: str) -> dict | None:
         return self._d.get(cid)
-
     def put(self, cid: str, prop: dict) -> dict:
         if cid not in self._d and len(self._d) >= self._cap:
             self._d.pop(next(iter(self._d)))
@@ -48,18 +48,14 @@ class CaseMetaCache:
 
 def worker_init(worker_id: int) -> None:
     from nanounet.runtime import set_safe_tmpdir
-
     set_safe_tmpdir()
     pin_worker_threads()
 
 def _point_list(pts: torch.Tensor) -> list:
-    if pts.numel() == 0:
-        return []
-    return [tuple(v) for v in torch.round(pts).long().tolist()]
+    return [] if pts.numel() == 0 else [tuple(v) for v in torch.round(pts).long().tolist()]
 
 def _concat_variant_keypoints(variants: list, longi: bool) -> torch.Tensor:
-    """Concat every variant's clicks into one (N,3) tensor, order (pos, neg[, bl_pos]) per
-    variant, so a single augmentation pass moves all of them together."""
+    """Concat every variant's clicks into one (N,3) tensor so one augmentation pass moves all."""
     parts = []
     for v in variants:
         parts += [v["points_pos"], v["points_neg"]] + ([v["bl_points_pos"]] if longi else [])
@@ -90,7 +86,7 @@ def _render_variant(o: dict, entry: dict, raw: dict, longi: bool, final_patch_si
         return torch.cat([o["image"][0:1], fu_hm], dim=0)
     fu_stream = torch.cat([o["image"][0:1], fu_hm], dim=0)
     if raw["null_baseline"]:
-        bl_stream = fu_stream  # duplicate the RENDERED FU stream -> identity DWB (matches old behaviour)
+        bl_stream = fu_stream  # duplicate rendered FU stream -> identity DWB
     else:
         bl_hm = encode_points_to_heatmap_pair(_point_list(entry["bp"]), [], shape, pr.point_radius_vox, pr.encoding, None, pr.prompt_intensity_scale)
         bl_stream = torch.cat([o["image"][1:2], bl_hm], dim=0)
@@ -115,6 +111,8 @@ class PatchIterable(IterableDataset):
         prompts_per_patch: int = 1,
     ):
         assert batch_size % prompts_per_patch == 0, (batch_size, prompts_per_patch)
+        # backstop: real gate is train_parser.py; build_patch* have no multi-draw support yet.
+        assert prompts_per_patch == 1, "prompts_per_patch > 1 not implemented in sampling*.py"
         self.folder, self.keys, self.roi_cfg = folder, keys, roi_cfg
         self.patch_size, self.final_patch_size = patch_size, final_patch_size
         self.annotated_key, self.tf, self.force_zero_prompt = annotated_key, tf, force_zero_prompt
@@ -123,23 +121,25 @@ class PatchIterable(IterableDataset):
         self.prompts_per_patch = prompts_per_patch
 
     def __len__(self) -> int:
-        # Item count (1 item/raw patch, `prompts_per_patch` rows each) -- NanoDataModule sets the
-        # DataLoader batch_size to batch_size // prompts_per_patch so a batch has `batch_size` rows.
+        # item count == raw-patch count; NanoDataModule uses batch_size // prompts_per_patch.
         return self.num_batches * (self.batch_size // self.prompts_per_patch)
 
     def _producer(self, ds: Blosc2Folder, q: queue.Queue, n_here: int, rng: np.random.Generator, meta: CaseMetaCache, stop: threading.Event) -> None:
         try:
             for _ in range(n_here):
-                if stop.is_set():
-                    break
+                if stop.is_set(): break
                 cid = self.keys[int(rng.integers(0, len(self.keys)))]
                 prop = meta.get(cid) or meta.put(cid, load_case_properties(ds.source_folder, cid))
                 with ds.open_case(cid, need_seg=True) as (data, seg, _, _):
                     common = (data, seg, prop, self.roi_cfg, self.patch_size, self.final_patch_size)
                     if self.longi:
-                        raw = build_patch_longi(*common, self.force_zero_prompt, self.force_null_baseline, rng, prompts_per_patch=self.prompts_per_patch)
+                        d = build_patch_longi(*common, self.force_zero_prompt, self.force_null_baseline, rng)
+                        variant = {"points_pos": d["points_pos"], "points_neg": d["points_neg"], "bl_points_pos": d["bl_points_pos"]}
+                        raw = {"image": d["image"], "segmentation": d["segmentation"], "null_baseline": d["null_baseline"], "points_variants": [variant]}
                     else:
-                        raw = build_patch(*common, self.annotated_key, self.force_zero_prompt, rng, prompts_per_patch=self.prompts_per_patch)
+                        d = build_patch(*common, self.annotated_key, self.force_zero_prompt, rng)
+                        variant = {"points_pos": d["points_pos"], "points_neg": d["points_neg"]}
+                        raw = {"image": d["image"], "segmentation": d["segmentation"], "points_variants": [variant]}
                 q.put(raw)
         except Exception as e:
             q.put(e)
@@ -182,8 +182,7 @@ class PatchIterable(IterableDataset):
             prod.join(timeout=30.0)
 
 def collate_patches(batch: list) -> dict:
-    """Flatten each item's `prompts_per_patch` variants into rows; `pair_id` groups rows from the
-    same raw patch (same case draw + augmentation, different rendered clicks)."""
+    """Flatten each item's variants into rows; `pair_id` groups rows from the same raw patch."""
     t0 = batch[0]["target"]
     is_list = isinstance(t0, list)
     rows_data, rows_target, pair_ids = [], [], []

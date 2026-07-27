@@ -104,14 +104,16 @@ def select_prompt_points(
         cm = cfg.sampling.click_modes
         kept = inch if cm.drop == 0.0 else [p for p in inch if rng.random() < cm.pos]
         pp = list(kept)
-        lo_fp, hi_fp = cfg.sampling.n_false_pos
-        if hi_fp <= 0 or rng.random() >= cfg.sampling.false_pos_probability:
-            n_fp = 0
-        else:
-            n_fp = int(rng.integers(lo_fp, hi_fp + 1))
-        if n_fp > 0:
-            pp = pp + _sample_false_pos(seg_crop, n_fp, cfg.sampling.false_pos_min_dist_vox, rng)
+        if rng.random() < cfg.sampling.false_pos_probability:
+            pp = pp + _sample_false_pos(seg_crop, 1, _FALSE_POS_GUARD_VOX, rng)
     return pp, pn
+
+
+# One decoy, covering only the rare "click on empty tissue" case. Not a difficulty knob: at deployment
+# every click refers to a real lesion, and the genuine negative is the disappeared lesion, already in
+# the data. The guard distance only keeps the point unambiguously background. The old 30-50 vox
+# setting tuned hardness, and wrongly: 42% of real lesions have a neighbour closer than 30 vox.
+_FALSE_POS_GUARD_VOX = 5
 
 
 def _sample_false_pos(

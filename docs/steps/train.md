@@ -17,6 +17,16 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/defau
   --mae-pretrain --dl-persistent-workers
 ```
 
+Reuse an existing self-supervised checkpoint instead of rerunning MAE (`--mae-ckpt` alone, no
+`--mae-pretrain`, skips the MAE stage entirely — see
+[`scripts/slurm_nanounet_pretrain_train_999.sh`](../../scripts/slurm_nanounet_pretrain_train_999.sh)):
+
+```bash
+nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv \
+  --mae-ckpt /nnunet_data/NanoUNet_results/nanounet/Dataset999_Merged_nnUNetResEncUNetLPlans_h200_smallpv_f0/mae_pretrain/checkpoints/last.ckpt \
+  --dl-persistent-workers
+```
+
 ## Arguments
 
 | Argument | Type | Default | Description |

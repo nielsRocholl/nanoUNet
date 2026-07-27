@@ -34,6 +34,9 @@ FT_EPOCHS=500
 ITERS_PER_EPOCH=1000
 VAL_ITERS=50
 LR=1e-5          # fixed on ALL nodes; do NOT scale with batch (warm-start finetune)
+# Placeholder -- weight to be chosen by measurement (W9 gate / held-out eval), not guessed.
+CONSISTENCY_WEIGHT=0.0
+PROMPTS_PER_PATCH=1
 STORAGE=/nnunet_data
 
 export NANOUNET_RAW="${STORAGE}/nnUNet_raw"
@@ -88,6 +91,8 @@ nanounet_train \
   --loss dc_ce \
   --dl-bucket l \
   --dl-persistent-workers \
+  --prompts-per-patch "$PROMPTS_PER_PATCH" \
+  --consistency-weight "$CONSISTENCY_WEIGHT" \
   --accelerator cuda \
   --precision 16-mixed \
   --wandb-name "$WANDB_NAME" || { rm -rf "$LOCAL_PREP/${DS_FOLDER}"; exit 1; }
