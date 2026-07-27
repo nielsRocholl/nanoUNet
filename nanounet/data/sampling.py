@@ -105,48 +105,46 @@ def select_prompt_points(
         kept = inch if cm.drop == 0.0 else [p for p in inch if rng.random() < cm.pos]
         pp = list(kept)
         if rng.random() < cfg.sampling.false_pos_probability:
-            pp = pp + _sample_false_pos(seg_crop, 1, _FALSE_POS_GUARD_VOX, rng)
+            pp = pp + _sample_false_pos(seg_crop, rng)
     return pp, pn
 
 
-# One decoy, covering only the rare "click on empty tissue" case. Not a difficulty knob: at deployment
-# every click refers to a real lesion, and the genuine negative is the disappeared lesion, already in
-# the data. The guard distance only keeps the point unambiguously background. The old 30-50 vox
-# setting tuned hardness, and wrongly: 42% of real lesions have a neighbour closer than 30 vox.
+# One decoy for the rare "click on empty tissue" case; not a difficulty knob (at deployment every click
+# refers to a real lesion, and the genuine negative is the disappeared lesion, already in the data).
+# The old 30-50 vox setting tuned hardness, wrongly: 42% of lesions have a neighbour closer than 30.
 _FALSE_POS_GUARD_VOX = 5
 
 
-def _sample_false_pos(
-    seg_crop: np.ndarray, n: int, min_dist_vox: int, rng: np.random.Generator
-) -> list[tuple[int, int, int]]:
-    """Random background voxels for positive-channel clicks ≥ min_dist from foreground.
+def points_variant(seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox):
+    """One prompt draw as float (N,3) arrays, ready to ride through the augmentation chain."""
+    pp, pn = select_prompt_points(
+        seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox
+    )
+    return {
+        "points_pos": np.asarray(pp, dtype=np.float32).reshape(-1, 3),
+        "points_neg": np.asarray(pn, dtype=np.float32).reshape(-1, 3),
+    }
 
-    KD-tree rejection sampling over the sparse foreground coords. A full-volume EDT
-    here dominated dataloader CPU and starved the GPU (~60% util); foreground is
-    sparse so candidate rejection against a cKDTree is far cheaper.
-    """
-    if n <= 0:
-        return []
+
+def _sample_false_pos(seg_crop: np.ndarray, rng: np.random.Generator) -> list[tuple[int, int, int]]:
+    """One random background voxel >= _FALSE_POS_GUARD_VOX from foreground. KD-tree rejection
+    sampling over the sparse foreground coords: a full-volume EDT here dominated dataloader CPU
+    and starved the GPU (~60% util)."""
     s = np.asarray(seg_crop)
     if s.ndim == 4:
         s = s[0]
     shape = s.shape
     fg = np.argwhere(s > 0)
     if len(fg) == 0:
-        cand = np.stack([rng.integers(0, d, size=n) for d in shape], axis=1)
-        return [tuple(int(v) for v in c) for c in cand]
+        return [tuple(int(rng.integers(0, d)) for d in shape)]
     tree = cKDTree(fg)
-    md = float(min_dist_vox)
-    out: list[tuple[int, int, int]] = []
     for _ in range(8):
-        m = 8 * (n - len(out)) + 64
-        cand = np.stack([rng.integers(0, d, size=m) for d in shape], axis=1)
+        cand = np.stack([rng.integers(0, d, size=72) for d in shape], axis=1)
         dist, _ = tree.query(cand, k=1)
-        for c in cand[dist > md]:
-            out.append(tuple(int(v) for v in c))
-            if len(out) >= n:
-                return out
-    return out
+        hit = cand[dist > float(_FALSE_POS_GUARD_VOX)]
+        if len(hit):
+            return [tuple(int(v) for v in hit[0])]
+    return []
 
 
 def build_patch(
@@ -159,6 +157,7 @@ def build_patch(
     annotated_classes_key,
     force_zero_prompt: bool,
     rng: np.random.Generator,
+    prompts_per_patch: int = 1,
 ) -> dict:
     _ = annotated_classes_key
     raw_c = properties.get("centroids_zyx")
@@ -188,12 +187,13 @@ def build_patch(
     )
     bbox = [[a, b] for a, b in zip(bbox_lbs, bbox_ubs)]
     data_crop, seg_crop, _patch_shape, pslc = crop_patch(data, seg, bbox)
-    pp, pn = select_prompt_points(
-        seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, volumes_vox=volumes_vox
-    )
+    # N independent click draws over ONE shared crop, so a consistency pair differs only in the click.
+    variants = [
+        points_variant(seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, True, volumes_vox)
+        for _ in range(prompts_per_patch)
+    ]
     return {
         "image": data_crop.astype(np.float32),
         "segmentation": seg_crop.astype(np.int16),
-        "points_pos": np.asarray(pp, dtype=np.float32).reshape(-1, 3),
-        "points_neg": np.asarray(pn, dtype=np.float32).reshape(-1, 3),
+        "points_variants": variants,
     }

@@ -83,14 +83,6 @@ def validate_train_args(args) -> None:
             f"(got --prompts-per-patch {args.prompts_per_patch}).\n"
             f"Fix: nanounet_train … --prompts-per-patch 2 --consistency-weight {args.consistency_weight}"
         )
-    if args.prompts_per_patch > 1:
-        raise ValueError(
-            f"--prompts-per-patch {args.prompts_per_patch} is not implemented yet: "
-            f"build_patch/build_patch_longi (nanounet/data/sampling.py, sampling_longi.py) only "
-            f"draw ONE click set per patch and have no multi-draw / points_variants support.\n"
-            f"Fix: use --prompts-per-patch 1 (default), or implement N-way draws sharing one "
-            f"crop in sampling.py before enabling this flag."
-        )
     if args.batch_size is not None and args.batch_size % args.prompts_per_patch != 0:
         raise ValueError(
             f"--batch-size {args.batch_size} is not divisible by --prompts-per-patch {args.prompts_per_patch}.\n"

@@ -16,7 +16,7 @@ from __future__ import annotations
 import numpy as np
 
 from nanounet.config import RoiPromptConfig
-from nanounet.data.sampling import _sample_bbox, crop_patch, select_prompt_points
+from nanounet.data.sampling import _sample_bbox, crop_patch, points_variant
 from nanounet.prompt.centroids import filter_centroids_in_patch
 
 _NEAREST_MATCH_MAX_VOX = 20.0
@@ -48,6 +48,7 @@ def build_patch_longi(
     force_zero_prompt: bool,
     force_null_baseline: bool,
     rng: np.random.Generator,
+    prompts_per_patch: int = 1,
 ) -> dict:
     assert data.shape[0] == 2, data.shape  # ch0 FU_CT, ch1 warped BL_CT
     assert "fu_clicks_zyx" in prop, (
@@ -67,23 +68,24 @@ def build_patch_longi(
     bbox = [[a, b] for a, b in zip(bbox_lbs, bbox_ubs)]
     both_crop, seg_crop, _pshape, pslc = crop_patch(data, seg, bbox)  # both_crop: (2, *pshape)
     fu_volumes = _volumes_for_clicks(cts, prop)
-    fu_pp, fu_pn = select_prompt_points(
-        seg_crop, cts, pslc, cfg, force_zero_prompt, rng, jitter=True, volumes_vox=fu_volumes
-    )
-
     has_bl = prop.get("has_baseline", False)
     null_baseline = bool(force_zero_prompt or force_null_baseline or not has_bl)
     if null_baseline:
-        bl_pp = fu_pp  # duplicate FU -> DWB(x_FU - x_FU)=0 -> identity (single-timepoint)
-    else:
+        bl_fixed = None
+    else:  # ALL in-patch warped BL clicks, local coords; already real points, so never jittered
         clicks = [tuple(map(int, c)) for c in prop["bl_clicks_zyx"]]
-        bl_pp = filter_centroids_in_patch(clicks, pslc)  # ALL in-patch warped clicks, local coords
+        bl_fixed = np.asarray(filter_centroids_in_patch(clicks, pslc), dtype=np.float32).reshape(-1, 3)
+    # N independent FU click draws over ONE shared crop (see build_patch). A null baseline duplicates
+    # that variant's own FU points -> DWB(x_FU - x_FU)=0 -> identity (single-timepoint).
+    variants = []
+    for _ in range(prompts_per_patch):
+        v = points_variant(seg_crop, cts, pslc, cfg, force_zero_prompt, rng, True, fu_volumes)
+        v["bl_points_pos"] = v["points_pos"] if null_baseline else bl_fixed
+        variants.append(v)
 
     return {
         "image": both_crop.astype(np.float32),  # 2ch: [FU_CT, BL_CT]
         "segmentation": seg_crop.astype(np.int16),
-        "points_pos": np.asarray(fu_pp, dtype=np.float32).reshape(-1, 3),
-        "points_neg": np.asarray(fu_pn, dtype=np.float32).reshape(-1, 3),
-        "bl_points_pos": np.asarray(bl_pp, dtype=np.float32).reshape(-1, 3),
+        "points_variants": variants,
         "null_baseline": null_baseline,
     }

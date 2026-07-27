@@ -4,13 +4,11 @@ build_patch*/producer hand over CT crop + click COORDINATES ("keypoints"); the c
 augmentation chain on CT + points (see spatial_points.py) and only then renders heatmaps at the
 final patch size -- grid_sample only ever sees CT channels (1 supervised, 2 longi).
 
-Two-prompt consistency (prompts_per_patch > 1): NOT YET WIRED. render/collate below
-(`raw["points_variants"]`, `pair_id`) is generic over N variants per raw patch, ready for it, but
-build_patch/build_patch_longi (nanounet/data/sampling*.py) only draw ONE click set each -- no
-`prompts_per_patch` param, can't yet share one crop across independent click draws. PatchIterable
-asserts prompts_per_patch == 1 and wraps that single draw as a length-1 points_variants list.
-Wiring N>1 needs build_patch*() changed to draw N point sets from the same bbox/crop; see
-train_parser.py's --prompts-per-patch validation.
+Two-prompt consistency: build_patch* returns `points_variants`, one independent click draw per
+prompt, all sharing ONE bbox/crop. All variants' points ride through a SINGLE augmentation pass
+(concat -> augment -> split), so paired rows differ only in where the click landed -- which is what
+makes the consistency term measure prompt sensitivity rather than augmentation noise. Each variant
+becomes one batch row; `collate_patches` tags rows from the same patch with a shared `pair_id`.
 """
 
 from __future__ import annotations
@@ -111,8 +109,6 @@ class PatchIterable(IterableDataset):
         prompts_per_patch: int = 1,
     ):
         assert batch_size % prompts_per_patch == 0, (batch_size, prompts_per_patch)
-        # backstop: real gate is train_parser.py; build_patch* have no multi-draw support yet.
-        assert prompts_per_patch == 1, "prompts_per_patch > 1 not implemented in sampling*.py"
         self.folder, self.keys, self.roi_cfg = folder, keys, roi_cfg
         self.patch_size, self.final_patch_size = patch_size, final_patch_size
         self.annotated_key, self.tf, self.force_zero_prompt = annotated_key, tf, force_zero_prompt
@@ -132,14 +128,11 @@ class PatchIterable(IterableDataset):
                 prop = meta.get(cid) or meta.put(cid, load_case_properties(ds.source_folder, cid))
                 with ds.open_case(cid, need_seg=True) as (data, seg, _, _):
                     common = (data, seg, prop, self.roi_cfg, self.patch_size, self.final_patch_size)
+                    n = self.prompts_per_patch
                     if self.longi:
-                        d = build_patch_longi(*common, self.force_zero_prompt, self.force_null_baseline, rng)
-                        variant = {"points_pos": d["points_pos"], "points_neg": d["points_neg"], "bl_points_pos": d["bl_points_pos"]}
-                        raw = {"image": d["image"], "segmentation": d["segmentation"], "null_baseline": d["null_baseline"], "points_variants": [variant]}
+                        raw = build_patch_longi(*common, self.force_zero_prompt, self.force_null_baseline, rng, n)
                     else:
-                        d = build_patch(*common, self.annotated_key, self.force_zero_prompt, rng)
-                        variant = {"points_pos": d["points_pos"], "points_neg": d["points_neg"]}
-                        raw = {"image": d["image"], "segmentation": d["segmentation"], "points_variants": [variant]}
+                        raw = build_patch(*common, self.annotated_key, self.force_zero_prompt, rng, n)
                 q.put(raw)
         except Exception as e:
             q.put(e)
