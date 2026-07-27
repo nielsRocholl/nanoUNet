@@ -13,7 +13,7 @@
 #SBATCH --container-mounts=/data/oncology/experiments/universal-lesion-segmentation:/nnunet_data
 #SBATCH --container-image="dockerdex.umcn.nl:5005/nielsrocholl/nnunet-v2-pro-sol-docker:latest"
 
-# Longi finetune of Dataset114 (unigradicon-registered union clicks), A100-40GB only.
+# Longi finetune of Dataset114 (unigradicon-registered union clicks), A100-40GB (dlc-arceus).
 #
 # GPU-STARVATION NOTE (2026-07-10): this job is dataloader-bound, not compute-bound.
 # Each longi sample decompresses a 2-channel volume and pushes a 6-channel patch through
