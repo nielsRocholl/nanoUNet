@@ -53,8 +53,8 @@ def build_train_parser() -> argparse.ArgumentParser:
     ap.add_argument("--dl-bucket", choices=("s", "m", "l", "xl"), default="m")
     ap.add_argument("--dl-persistent-workers", action="store_true")
     ap.add_argument("--mem-diag", action="store_true")
-    ap.add_argument("--prompts-per-patch", type=int, default=1, help="Independent click draws rendered per patch. NOT YET IMPLEMENTED for >1 (see validate_train_args); must stay 1.")
-    ap.add_argument("--consistency-weight", type=float, default=0.0, help="Lambda max for the two-prompt consistency term; 0 disables it. Unreachable until --prompts-per-patch >1 is implemented.")
+    ap.add_argument("--prompts-per-patch", type=int, default=1, help="Independent click draws per patch, all sharing one crop and one augmentation pass. >1 pairs rows for the consistency term; batch_size must be divisible by it.")
+    ap.add_argument("--consistency-weight", type=float, default=0.0, help="Lambda max for the two-prompt consistency term, ramped linearly over --consistency-warmup-epochs; 0 disables it. Requires --prompts-per-patch >1.")
     ap.add_argument("--consistency-warmup-epochs", type=int, default=50, help="Epochs to linearly ramp lambda from 0 to --consistency-weight.")
     return ap
 
