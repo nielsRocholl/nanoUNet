@@ -1,4 +1,10 @@
-"""cc3d centroids/bboxes JSON next to *_seg.b2nd; propagation-offset for simulated longitudinal COG error."""
+"""cc3d centroids/bboxes JSON next to *_seg.b2nd; propagation-offset for simulated longitudinal COG error.
+
+seed_zyx/volume_vox exist because the plain centroid falls outside its own lesion ~12% of the time
+(irregular/concave shapes): training needs a point guaranteed inside the component (the argmax-EDT
+voxel) to identify which lesion a click refers to, and the voxel count to pick a size bin in the
+registration-error offset table.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +16,7 @@ from typing import Any, Dict, List, Tuple
 import blosc2
 import cc3d
 import numpy as np
+from scipy.ndimage import distance_transform_edt
 
 
 def centroids_from_seg(seg: np.ndarray) -> List[Tuple[int, int, int]]:
@@ -48,27 +55,49 @@ def filter_centroids_in_patch(
     return o
 
 
+_EMPTY_CENTROIDS: Dict[str, Any] = {
+    "centroids_zyx": [],
+    "bboxes_zyx": [],
+    "seed_zyx": [],
+    "volume_vox": [],
+}
+
+
 def _one_case(seg_path: str) -> Dict[str, Any]:
     seg = np.asarray(blosc2.open(seg_path, mode="r")[:])
     if seg.ndim == 4:
         seg = seg[0]
     seg = np.maximum(seg, 0).astype(np.uint8)
     if not np.any(seg > 0):
-        return {"centroids_zyx": [], "bboxes_zyx": []}
+        return dict(_EMPTY_CENTROIDS)
     lab = cc3d.connected_components((seg > 0).astype(np.uint8))
-    stats = cc3d.statistics(lab, no_slice_conversion=True)
+    stats = cc3d.statistics(lab, no_slice_conversion=False)
     centroids: List[List[int]] = []
     bboxes: List[List[int]] = []
+    seeds: List[List[int]] = []
+    volumes: List[int] = []
     for i in range(1, int(lab.max()) + 1):
-        zz, yy, xx = np.where(lab == i)
-        if zz.size == 0:
+        sl = stats["bounding_boxes"][i]
+        sub_lab = lab[sl]
+        mask = sub_lab == i
+        if not mask.any():
             continue
+        off = np.array([s.start for s in sl])
         cz, cy, cx = stats["centroids"][i]
         centroids.append([int(round(cz)), int(round(cy)), int(round(cx))])
         bboxes.append(
-            [int(zz.min()), int(zz.max()), int(yy.min()), int(yy.max()), int(xx.min()), int(xx.max())]
+            [sl[0].start, sl[0].stop - 1, sl[1].start, sl[1].stop - 1, sl[2].start, sl[2].stop - 1]
         )
-    return {"centroids_zyx": centroids, "bboxes_zyx": bboxes}
+        edt = distance_transform_edt(mask)
+        seed_local = np.array(np.unravel_index(np.argmax(edt), edt.shape))
+        seeds.append((seed_local + off).astype(int).tolist())
+        volumes.append(int(mask.sum()))
+    return {
+        "centroids_zyx": centroids,
+        "bboxes_zyx": bboxes,
+        "seed_zyx": seeds,
+        "volume_vox": volumes,
+    }
 
 
 def _write_centroids_for_case(folder: str, case_id: str) -> None:

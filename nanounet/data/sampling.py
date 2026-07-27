@@ -1,5 +1,6 @@
 """Per-click prompt sampling: jitter authored centroids (skippable for already-real points via
-prompt_channels(jitter=False)), optional false-positive clicks (gated by probability), encode positives."""
+select_prompt_points(jitter=False)), optional false-positive clicks (gated by probability). Returns
+click COORDINATES only -- rendering to heatmaps happens after augmentation, in patch_iterable.py."""
 
 from __future__ import annotations
 
@@ -11,7 +12,6 @@ from scipy.spatial import cKDTree
 
 from nanounet.config import RoiPromptConfig
 from nanounet.prompt.centroids import apply_propagation_offset, filter_centroids_in_patch
-from nanounet.prompt.encoding import encode_points_to_heatmap_pair
 
 
 def _lbs_ubs(
@@ -76,7 +76,7 @@ def crop_patch(data, seg, bbox) -> tuple[np.ndarray, np.ndarray, tuple[int, int,
     return data_crop, seg_crop, patch_shape, pslc
 
 
-def prompt_channels(
+def select_prompt_points(
     seg_crop: np.ndarray,
     cts_global: List[Tuple[int, int, int]],
     pslc: tuple,
@@ -85,8 +85,11 @@ def prompt_channels(
     force_zero_prompt: bool,
     rng: np.random.Generator,
     jitter: bool = True,
-) -> np.ndarray:
-    """jitter=False for points that are already real (registered/propagated), not mask-derived
+) -> Tuple[List[Tuple[int, int, int]], List[Tuple[int, int, int]]]:
+    """Click SELECTION only -- returns (positive, negative) patch-local point lists; rendering to
+    heatmaps happens later (after augmentation), see nanounet/train/patch_iterable.py.
+
+    jitter=False for points that are already real (registered/propagated), not mask-derived
     guesses -- apply_propagation_offset exists to simulate baseline->follow-up spread when no real
     cross-timepoint correspondence exists; re-jittering an already-precise point only adds noise."""
     pp: List[Tuple[int, int, int]] = []
@@ -114,10 +117,7 @@ def prompt_channels(
             n_fp = int(rng.integers(lo_fp, hi_fp + 1))
         if n_fp > 0:
             pp = pp + _sample_false_pos(seg_crop, n_fp, cfg.sampling.false_pos_min_dist_vox, rng)
-    pr = cfg.prompt
-    return encode_points_to_heatmap_pair(
-        pp, pn, patch_shape, pr.point_radius_vox, pr.encoding, None, pr.prompt_intensity_scale
-    ).numpy()
+    return pp, pn
 
 
 def _sample_false_pos(
@@ -182,16 +182,14 @@ def build_patch(
     need_to_pad = (patch_size - final_patch_size).astype(int)
     shape = np.array(data.shape[1:])
     bbox_lbs, bbox_ubs, _anchor = _sample_bbox(
-        shape,
-        cts_global,
-        weights,
-        cfg.sampling.fg_patch_prob,
-        patch_size,
-        need_to_pad,
-        rng,
+        shape, cts_global, weights, cfg.sampling.fg_patch_prob, patch_size, need_to_pad, rng
     )
     bbox = [[a, b] for a, b in zip(bbox_lbs, bbox_ubs)]
     data_crop, seg_crop, patch_shape, pslc = crop_patch(data, seg, bbox)
-    hm = prompt_channels(seg_crop, cts_global, pslc, patch_shape, cfg, force_zero_prompt, rng)
-    x = np.concatenate([data_crop, hm], axis=0)
-    return {"image": x.astype(np.float32), "segmentation": seg_crop.astype(np.int16)}
+    pp, pn = select_prompt_points(seg_crop, cts_global, pslc, patch_shape, cfg, force_zero_prompt, rng)
+    return {
+        "image": data_crop.astype(np.float32),
+        "segmentation": seg_crop.astype(np.int16),
+        "points_pos": np.asarray(pp, dtype=np.float32).reshape(-1, 3),
+        "points_neg": np.asarray(pn, dtype=np.float32).reshape(-1, 3),
+    }

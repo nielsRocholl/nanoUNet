@@ -31,6 +31,7 @@ def run_preprocess(
     config_path: Optional[str],
     configuration: str = "3d_fullres",
     verbose: bool = True,
+    sidecars_only: bool = False,
 ) -> None:
     del config_path  # nanoUNet training does not require ``source_datasets`` stats
     dn = convert_id_to_dataset_name(dataset_id)
@@ -44,6 +45,18 @@ def run_preprocess(
     pl = Plans(plans_f)
     cm = pl.get_configuration(configuration)
     out_dir = join(pre, cm.data_identifier)
+    if sidecars_only:
+        if not os.path.isdir(out_dir):
+            raise FileNotFoundError(
+                f"--sidecars-only needs an existing preprocessed folder at {out_dir}, but it is missing.\n"
+                f"Expected output of a prior preprocess run for dataset {dataset_id}, plans {plans_identifier}.\n"
+                f"Fix: run without --sidecars-only first: "
+                f"nanounet_preprocess -d {dataset_id} --planner nnUNetPlannerResEncL -np {num_processes}"
+            )
+        precompute_folder(out_dir, num_processes, resume=False)
+        if verbose:
+            cprint(f"[bold green]✓ sidecars regenerated → {out_dir}[/bold green]")
+        return
     if not resume and os.path.isdir(out_dir):
         shutil.rmtree(out_dir)
     maybe_mkdir_p(out_dir)

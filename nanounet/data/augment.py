@@ -18,8 +18,6 @@ from batchgeneratorsv2.transforms.nnunet.remove_connected_components import (
 from batchgeneratorsv2.transforms.nnunet.seg_to_onehot import MoveSegAsOneHotToDataTransform
 from batchgeneratorsv2.transforms.noise.gaussian_blur import GaussianBlurTransform
 from batchgeneratorsv2.transforms.spatial.low_resolution import SimulateLowResolutionTransform
-from batchgeneratorsv2.transforms.spatial.mirroring import MirrorTransform
-from batchgeneratorsv2.transforms.spatial.spatial import SpatialTransform
 from batchgeneratorsv2.transforms.utils.compose import ComposeTransforms
 from batchgeneratorsv2.transforms.utils.deep_supervision_downsampling import DownsampleSegForDSTransform
 from batchgeneratorsv2.transforms.utils.nnunet_masking import MaskImageTransform
@@ -28,29 +26,7 @@ from batchgeneratorsv2.transforms.utils.random import RandomTransform
 from batchgeneratorsv2.transforms.utils.remove_label import RemoveLabelTansform
 from batchgeneratorsv2.transforms.utils.seg_to_regions import ConvertSegmentationToRegionsTransform
 
-
-class ChannelSubsetImageTransform(BasicTransform):
-    """Run an image-only transform on a fixed subset of image channels, leaving the rest
-    untouched. In longi mode the 6-channel tensor is [FU_CT, hm+, hm-, BL_CT, hm+, hm-];
-    intensity aug (brightness/contrast/blur/gamma/...) should hit only the CT channels (0, 3),
-    not the synthetic prompt heatmaps. Also ~3x cheaper: 2 channels convolved instead of 6."""
-
-    def __init__(self, transform: BasicTransform, channels: Tuple[int, ...]):
-        super().__init__()
-        self.transform = transform
-        self.channels = list(channels)
-
-    def __call__(self, **data_dict) -> dict:
-        image = data_dict["image"]
-        sub = dict(data_dict)
-        sub["image"] = image[self.channels]  # advanced index -> copy of CT channels only
-        out = self.transform(**sub)
-        image[self.channels] = out["image"]  # scatter back; heatmap channels untouched
-        data_dict["image"] = image
-        return data_dict
-
-    def __repr__(self) -> str:
-        return f"ChannelSubsetImageTransform(channels={self.channels}, transform={self.transform})"
+from nanounet.data.spatial_points import MirrorPointsTransform, SpatialPointsTransform
 
 
 def train_transforms(
@@ -64,13 +40,10 @@ def train_transforms(
     foreground_labels,
     regions,
     ignore_label: int | None,
-    intensity_channels: Tuple[int, ...] | None = None,
 ) -> BasicTransform:
-    # When intensity_channels is set (longi: the CT channels), restrict intensity aug to them
-    # so the prompt-heatmap channels are not corrupted (and aug runs on fewer channels).
-    def _intensity(t: BasicTransform) -> BasicTransform:
-        return ChannelSubsetImageTransform(t, intensity_channels) if intensity_channels is not None else t
-
+    # No ChannelSubsetImageTransform / intensity_channels here: build_patch* no longer renders
+    # heatmaps into the image tensor entering this chain, so "image" is CT-only (1ch supervised,
+    # 2ch longi) -- intensity aug hits every channel, which is now exactly the CT channels.
     transforms = []
     if do_dummy_2d_data_aug:
         ignore_axes = (0,)
@@ -80,7 +53,7 @@ def train_transforms(
         patch_size_spatial = patch_size
         ignore_axes = None
     transforms.append(
-        SpatialTransform(
+        SpatialPointsTransform(
             patch_size_spatial,
             patch_center_dist_from_border=0,
             random_crop=False,
@@ -95,39 +68,39 @@ def train_transforms(
     )
     if do_dummy_2d_data_aug:
         transforms.append(Convert2DTo3DTransform())
-    transforms.append(RandomTransform(_intensity(GaussianNoiseTransform(noise_variance=(0, 0.1), p_per_channel=1, synchronize_channels=True)), apply_probability=0.1))
+    transforms.append(RandomTransform(GaussianNoiseTransform(noise_variance=(0, 0.1), p_per_channel=1, synchronize_channels=True), apply_probability=0.1))
     transforms.append(
         RandomTransform(
-            _intensity(GaussianBlurTransform(blur_sigma=(0.5, 1.0), synchronize_channels=False, synchronize_axes=False, p_per_channel=0.5, benchmark=True)),
+            GaussianBlurTransform(blur_sigma=(0.5, 1.0), synchronize_channels=False, synchronize_axes=False, p_per_channel=0.5, benchmark=True),
             apply_probability=0.2,
         )
     )
     transforms.append(
         RandomTransform(
-            _intensity(MultiplicativeBrightnessTransform(multiplier_range=BGContrast((0.75, 1.25)), synchronize_channels=False, p_per_channel=1)),
+            MultiplicativeBrightnessTransform(multiplier_range=BGContrast((0.75, 1.25)), synchronize_channels=False, p_per_channel=1),
             apply_probability=0.15,
         )
     )
     transforms.append(
         RandomTransform(
-            _intensity(ContrastTransform(contrast_range=BGContrast((0.75, 1.25)), preserve_range=True, synchronize_channels=False, p_per_channel=1)),
+            ContrastTransform(contrast_range=BGContrast((0.75, 1.25)), preserve_range=True, synchronize_channels=False, p_per_channel=1),
             apply_probability=0.15,
         )
     )
     transforms.append(
         RandomTransform(
-            _intensity(SimulateLowResolutionTransform(scale=(0.5, 1), synchronize_channels=False, synchronize_axes=True, ignore_axes=ignore_axes, allowed_channels=None, p_per_channel=0.5)),
+            SimulateLowResolutionTransform(scale=(0.5, 1), synchronize_channels=False, synchronize_axes=True, ignore_axes=ignore_axes, allowed_channels=None, p_per_channel=0.5),
             apply_probability=0.25,
         )
     )
     transforms.append(
-        RandomTransform(_intensity(GammaTransform(gamma=BGContrast((0.7, 1.5)), p_invert_image=1, synchronize_channels=False, p_per_channel=1, p_retain_stats=1)), apply_probability=0.1)
+        RandomTransform(GammaTransform(gamma=BGContrast((0.7, 1.5)), p_invert_image=1, synchronize_channels=False, p_per_channel=1, p_retain_stats=1), apply_probability=0.1)
     )
     transforms.append(
-        RandomTransform(_intensity(GammaTransform(gamma=BGContrast((0.7, 1.5)), p_invert_image=0, synchronize_channels=False, p_per_channel=1, p_retain_stats=1)), apply_probability=0.3)
+        RandomTransform(GammaTransform(gamma=BGContrast((0.7, 1.5)), p_invert_image=0, synchronize_channels=False, p_per_channel=1, p_retain_stats=1), apply_probability=0.3)
     )
     if mirror_axes is not None and len(mirror_axes) > 0:
-        transforms.append(MirrorTransform(allowed_axes=mirror_axes))
+        transforms.append(MirrorPointsTransform(allowed_axes=mirror_axes, patch_size=patch_size))
     if use_mask_for_norm is not None and any(use_mask_for_norm):
         transforms.append(
             MaskImageTransform(apply_to_channels=[i for i in range(len(use_mask_for_norm)) if use_mask_for_norm[i]], channel_idx_in_seg=0, set_outside_to=0)

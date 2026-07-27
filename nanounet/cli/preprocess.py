@@ -32,6 +32,11 @@ def main() -> None:
     ap.add_argument("--config-path", default=None)
     ap.add_argument("--skip-fingerprint", action="store_true")
     ap.add_argument("--skip-plan", action="store_true")
+    ap.add_argument(
+        "--sidecars-only",
+        action="store_true",
+        help="regenerate *_centroids.json sidecars only; never touches .b2nd/plans/gt_segmentations",
+    )
     args = ap.parse_args()
     if len(args.dataset_id) == 1:
         did = args.dataset_id[0]
@@ -43,6 +48,18 @@ def main() -> None:
             "nanoUNet preprocess  merge "
             f"{','.join(str(i) for i in args.dataset_id)} -> Dataset{did:03d}_{args.merged_name}"
         )
+    if args.sidecars_only:
+        if not args.plans_name:
+            ap.error("--sidecars-only needs --plans-name (identifies the existing plans json to read)")
+        run_preprocess(
+            did,
+            args.plans_name,
+            args.num_processes,
+            False,
+            args.config_path,
+            sidecars_only=True,
+        )
+        return
     if not args.skip_fingerprint:
         run_fingerprint(did, args.num_processes)
         nano_rule()
