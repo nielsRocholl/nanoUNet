@@ -50,14 +50,19 @@ if __name__ == "__main__":
     dm.setup()
     mod = module_from_config(cfg)
 
+    keep_ckpts = ("best.ckpt", "last.ckpt", "best_raw.ckpt", "swa_plateau.ckpt")
     for p in out.glob("*.ckpt"):
-        if p.name not in ("best.ckpt", "last.ckpt"):
+        if p.name not in keep_ckpts:
             p.unlink(missing_ok=True)
     ckpt = ModelCheckpoint(
         dirpath=str(out), monitor=CKPT_MONITOR, mode="max", save_top_k=1, save_last=True,
         filename="best", auto_insert_metric_name=False, enable_version_counter=False,
     )
-    callbacks = [ckpt, TQDMProgressBar()]
+    ckpt_raw = ModelCheckpoint(
+        dirpath=str(out), monitor="val_match_score", mode="max", save_top_k=1, save_last=False,
+        filename="best_raw", auto_insert_metric_name=False, enable_version_counter=False,
+    )
+    callbacks = [ckpt, ckpt_raw, TQDMProgressBar()]
     if not args.no_early_stop:
         callbacks.insert(1, EarlyStopping(monitor=CKPT_MONITOR, mode="max", patience=cfg.early_stop_patience))
 
@@ -82,5 +87,11 @@ if __name__ == "__main__":
         "val_match_score_raw": mod._best_raw_score,
         "val_match_score_peak": mod._val_score_peak,
         **{f"val_acc_{k}": v for k, v in mod._best_sub.items()},
+        # Stage B.3 selector bake-off: which checkpoint file backs each of the three candidate selectors.
+        "selector_ckpts": {
+            "best_ema": str(ckpt.best_model_path),
+            "best_raw": str(ckpt_raw.best_model_path),
+            "swa_plateau": str(out / "swa_plateau.ckpt"),
+        },
     }
     dump_json(out / "fold_metrics.json", fold_metrics)

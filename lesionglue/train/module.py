@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import copy
+from pathlib import Path
+
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
@@ -22,6 +25,8 @@ from tracking.train.match_utils import (
 from tracking.train.sinkhorn import sinkhorn_loss
 
 PROJ_DIM = 64
+SWA_BAND = 0.01        # raw val_match_score within 1pp of the running max counts as "on the plateau"
+SWA_MIN_UPDATES = 5
 
 
 class MatcherModule(pl.LightningModule):
@@ -57,6 +62,11 @@ class MatcherModule(pl.LightningModule):
         self._val_score_peak = self._best_ema_score = self._best_raw_score = 0.0
         self._best_sub: dict[str, float] = {}
         self.ema_matcher = AveragedModel(self.matcher, avg_fn=lambda a, m, n: ema_decay * a + (1.0 - ema_decay) * m) if ema_decay > 0.0 else None
+        # Held in a list so nn.Module never registers it: keeping SWA out of state_dict is what lets
+        # load_from_checkpoint keep working on pre-R12 checkpoints. Built lazily on the first
+        # plateau hit, by which point matcher is already on the training device.
+        self._swa: list[AveragedModel] = []
+        self._swa_updates = 0
         self.proj = nn.Linear(d, PROJ_DIM)
         self.auroc = BinaryAUROC()
         self.ap_sinkhorn = BinaryAveragePrecision()
@@ -145,6 +155,13 @@ class MatcherModule(pl.LightningModule):
             self.log("val_match_score_ema", self._val_score_ewma, prog_bar=True)
             self._val_score_peak = max(self._val_score_peak, raw)
             self.log("val_match_score_peak", self._val_score_peak)
+            # unchanged_split converges ~500 steps before disappeared/newly decay, so no single step is
+            # optimal for all three; averaging the plateau window captures both.
+            if raw >= self._val_score_peak - SWA_BAND:
+                if not self._swa:
+                    self._swa.append(AveragedModel(self.matcher))
+                self._swa[0].update_parameters(self.matcher)
+                self._swa_updates += 1
             if self._val_score_ewma > self._best_ema_score:
                 self._best_ema_score, self._best_raw_score = self._val_score_ewma, raw
                 self._best_sub = {n: (o / t if t else 0.0) for n, o, t, _ in subs}
@@ -152,6 +169,25 @@ class MatcherModule(pl.LightningModule):
                 self._best_raw_score = raw
         self.auroc.reset()
         self.ap_sinkhorn.reset()
+
+    def on_train_end(self) -> None:
+        if self._swa_updates < SWA_MIN_UPDATES:
+            raise RuntimeError(
+                f"swa_matcher only saw {self._swa_updates} plateau updates (need >= {SWA_MIN_UPDATES}); "
+                "a run that never plateaued is broken, not silently skippable."
+            )
+        path = Path(self.trainer.default_root_dir) / "swa_plateau.ckpt"
+        swa_sd = self._swa[0].module.state_dict()
+        matcher_sd = copy.deepcopy(self.matcher.state_dict())
+        ema_sd = copy.deepcopy(self.ema_matcher.module.state_dict()) if self.ema_matcher is not None else None
+        # overwrite both shadow copies so eval.py picks up SWA weights whether or not it reads the EMA branch
+        self.matcher.load_state_dict(swa_sd)
+        if self.ema_matcher is not None:
+            self.ema_matcher.module.load_state_dict(swa_sd)
+        self.trainer.save_checkpoint(str(path))
+        self.matcher.load_state_dict(matcher_sd)
+        if ema_sd is not None:
+            self.ema_matcher.module.load_state_dict(ema_sd)
 
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
