@@ -177,6 +177,67 @@ answerable at all — so B.2 is now a prerequisite for Gate A, not an independen
 
 ---
 
+## Stage B.1 / B.2 — implemented and verified (2026-07-29)
+
+### B.2.1 The paired estimator is **8.7× tighter** than the marginal bands
+
+Measured on a synthetic 224-patient cohort with lesion counts 1–86 and a planted +2 pp effect:
+
+| estimator | 95% interval width |
+|---|---|
+| marginal band (`bootstrap_match_score`, per config) | 0.0082 |
+| **paired delta (`paired_delta_ci`, shared resample indices)** | **0.0009** |
+
+**This quantifies why R10 and R11 read as flat.** The R9/R10/R11 ship rule ("non-overlapping
+mean±std bands") was roughly an order of magnitude underpowered: a 0.5 pp real effect is invisible
+under it and unambiguous under the paired estimator. The gain is free — same runs, same data, correct
+pairing.
+
+**Estimand bug found and fixed during review:** the first implementation of `paired_delta_ci`
+averaged *per-patient* scores unweighted, while `bootstrap_match_score` and the logged
+`val_match_score` are **pooled and lesion-weighted**. With lesion counts 1–86 these are materially
+different quantities, and a patient with zero labelled events contributed a spurious 0.0. Both now
+use the pooled estimand, with pairing carried by shared bootstrap resample indices.
+
+### B.2.2 Per-patient counts are produced POST-HOC, not snapshotted during training
+
+The training-time snapshot approach was abandoned after review found it unsalvageable:
+1. The EMA-best branch overwrote the raw-best snapshot, so "raw" counts did not correspond to
+   `best_raw.ckpt` (which Lightning selects by a true argmax over raw `val_match_score`).
+2. **SWA has no corresponding validation pass at all** — averaged weights are not the weights of any
+   single step, so its per-patient counts are unobtainable that way.
+
+`tracking/cli/oof.py` instead runs one real validation pass of a given checkpoint over its own
+fold's held-out patients, reusing `validation_step`'s existing accumulator. Uniform across all three
+selectors.
+
+**Assert bug found and fixed:** the fold sanity check compared evaluated patients against
+`fold_patient_sets`, which covers all **270** train+val-pool patients, while only **252** have cached
+graphs — 54 val patients per fold but only 42–49 reachable. It could never pass. Now compares against
+`dm.val_ds` (what was actually loaded), plus a subset check against fold membership.
+
+### B.2.3 Verification results
+
+- `match_score_from_counts`: 0.712500 vs hand-computed 0.712500; sub-metrics with `tot==0` correctly
+  **dropped** from numerator and denominator rather than counted as zero.
+- `oof.py` on the real fold-0 `best.ckpt` (mid-training, epoch ~89/320): `match_score` 0.9226,
+  `unchanged_split` 0.8950, `disappeared` 0.9812, `newly_appearing` 0.9194, **n_patients 52**, fold
+  assert passed.
+- `pool.py` on 5 synthetic disjoint folds: pooled 50 patients, `match_score` 0.7125 (exact).
+- `pool.py` leakage guard: fires with an explicit message when a patient is duplicated across folds.
+
+### B.2.4 Operational: GPU capacity was mis-estimated, costing fold 2
+
+`torch.cuda.max_memory_allocated()` over 60 steps reported **703 MB** for one run, so 5 concurrent
+folds were launched. Real per-process footprint is **1.2–1.8 GB** (caching-allocator reservation
+beyond peak-allocated, plus the largest graphs at 86×95 lesions exceeding a short sample). With other
+users holding ~3.2 GB of 10.57 GB, **fold 2 OOMed at epoch 28**.
+**Correct budget: ~1.8 GB/run against ~7.3 GB usable → cap concurrency at 4.**
+Real throughput with 4–5 concurrent is ~0.5 steps/s per fold → **~4.9 h**, not the 2.6 h a startup
+progress line suggested. Fold 2 is queued to relaunch when a slot frees.
+
+---
+
 ## Stage A.5 (scheduled) — recover the 25 unused viable transitions
 
 Deferred until after Stage B.3 to avoid confounding the selector measurement with a data change.
