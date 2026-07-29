@@ -73,9 +73,18 @@ loads each `.pt`, asserts `assert_graph_feat`, writes `{split}_v5_l0{,_meta}.pt`
   single run. Bottleneck is the per-graph Python loop in `MatcherModule._loss` (Sinkhorn + InfoNCE
   per graph → thousands of tiny CUDA launches) plus CPU augmentation.
 - Measured: `num_workers=0` → 1172 ms/step; `num_workers=4` → 794 ms/step (8000 steps ≈ 106 min).
-- **Consequence: run folds CONCURRENTLY.** 5 parallel folds each run at ~0.87 it/s — the *same*
-  speed as one alone. 5-fold CV: **~2.6–3.1 h parallel vs ~9 h sequential.** `tracking/cli/cv.py`
-  spawns folds *sequentially*, so launch `train.py --fold N` in parallel instead.
+- **Run folds CONCURRENTLY, but cap at 4.** `tracking/cli/cv.py` spawns folds *sequentially*, so
+  launch `train.py --fold N` in parallel instead.
+- **GPU MEMORY TRAP (learned the hard way — fold 2 OOMed at epoch 28 with 5 concurrent).**
+  `torch.cuda.max_memory_allocated()` reported **703 MB** for one run over 60 steps, but the real
+  per-process footprint is **1.2–1.8 GB**: the caching allocator reserves well beyond peak-allocated,
+  and the largest graphs (86×95 lesions → big dense cross-edge tensors) exceed a short sample.
+  Other users hold **~3.2 GB** of the 10.57 GB. **Budget ~1.8 GB/run against ~7.3 GB usable → 4 max.**
+  Use `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` to cut fragmentation.
+- **Real throughput with 4-5 concurrent is ~0.5 steps/s per fold, not 0.87** → **~4.3 h** for 8000
+  steps, not the 2.6 h a startup reading suggests. Measure over epochs, not the first progress line.
+- **Do NOT count running folds with `pgrep -fc 'tracking/cli/train.py'`** — it also matches dataloader
+  workers (returns ~21 for 4 folds). Key off `fold_*/fold_metrics.json`, written only on completion.
 - Available future speedup (deliberate, not casual): vectorize the per-graph Sinkhorn/InfoNCE loops.
   Pure performance, no semantics — but touches `sinkhorn.py`, which plan §10 rules out of scope.
 
@@ -105,8 +114,14 @@ full curve to compare selectors.
 `best_raw.ckpt` (raw monitor), `swa_plateau.ckpt` (plateau weight average), `last.ckpt`,
 plus `fold_metrics.json`.
 
-**If these runs died:** just relaunch the block above. Folds are independent and idempotent
-(`train.py` clears stray ckpts but preserves the four named ones).
+**Status 2026-07-29 ~14:00 UTC:** folds 0/1/3/4 alive at ~epoch 68/320. **Fold 2 OOMed at epoch 28**
+(5 concurrent did not fit — see §2 GPU MEMORY TRAP). A detached watcher
+(`$RUNS/requeue_fold2.sh`, launched with `setsid`) polls for the first `fold_*/fold_metrics.json`
+and then relaunches fold 2 alone with `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`.
+Check it with `pgrep -af requeue_fold2.sh`; result lands in `$RUNS/requeue.status`.
+
+**If these runs died:** relaunch the block above, **but no more than 4 at once**. Folds are
+independent and idempotent (`train.py` clears stray ckpts but preserves the four named ones).
 
 ---
 

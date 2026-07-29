@@ -105,6 +105,7 @@ class MatcherModule(pl.LightningModule):
 
     def on_validation_start(self) -> None:
         self._uc_ok = self._uc_tot = self._dis_ok = self._dis_tot = self._new_ok = self._new_tot = 0
+        self._per_patient: dict[str, dict[str, int]] = {}
 
     def training_step(self, batch: Batch, _) -> torch.Tensor:
         loss, parts = self._loss(batch, self.matcher(batch))
@@ -131,6 +132,16 @@ class MatcherModule(pl.LightningModule):
             self._dis_tot += dt
             self._new_ok += no
             self._new_tot += nt
+            # Batching may put >1 graph from the same patient in one step (e.g. two BL/FU transitions),
+            # so accumulate rather than overwrite.
+            pid = str(g.pid)
+            acc = self._per_patient.setdefault(pid, {"uc_ok": 0, "uc_tot": 0, "dis_ok": 0, "dis_tot": 0, "new_ok": 0, "new_tot": 0})
+            acc["uc_ok"] += uo
+            acc["uc_tot"] += ut
+            acc["dis_ok"] += do
+            acc["dis_tot"] += dt
+            acc["new_ok"] += no
+            acc["new_tot"] += nt
         self.log("val_loss", loss, prog_bar=True, batch_size=batch.num_graphs)
         self.log("val_row_acc_hungarian", sum(rows) / len(rows), prog_bar=True, batch_size=batch.num_graphs)
         for k, v in parts.items():
