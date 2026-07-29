@@ -127,9 +127,29 @@ NEWLYAPPEARING 559, MERGING 166 rows / 38 groups}. Splits elsewhere are **synthe
 merges**. So `val_acc_unchanged_split` is ~98.5% plain UNCHANGED accuracy. R10 and R11 both attacked
 a ceiling defined partly by manufactured labels.
 
-**D3 — ~30% of GT positions are registration-imputed** (`clickfix_report.csv`: 678 BL / 1364 FU
-filled, 137 `sanity_bad`, of 4486 lesions). **Unresolved:** whether the *correspondence labels*
-derive from registration proximity, or only the coordinates. Gate A settles it (§5).
+**D3 — registration dependence is REAL but UNIFORM, not per-node. Gate A was reformulated.**
+The original framing ("~30% of GT positions are registration-imputed, stratify by it") is **wrong at
+the node level** and was corrected by measurement: of **3,815 graph-eligible BL nodes, 0 lack a real
+`cog_bl`**; every FU node has a real `cog_fu`. So the "imputed" stratum is empty (n=0).
+`clickfix_report.csv`'s `n_bl_filled`/`n_fu_filled` count registration guesses handed to the
+**missing** side of NEWLYAPPEARING / DISAPPEARED rows — those never become graph nodes.
+
+The actual dependence: `graph.py:123` computes the descriptor at the **real annotated** `cog_bl`,
+but `graph.py:124` sets **every** BL node's `pos` from `cog_propagated`, a registration projection.
+Registration error is therefore a *global* property of the BL geometry channel — which is the same
+conclusion the R11 critique reached, and consistent with R11 failing empirically.
+
+**Reformulated Gate A** (see `round12_findings.md` §A.3.4): stratify by *case-level* registration
+quality from `derivatives/registration_error_table.json` →
+`excluded.{backend}.case_level_failure_patients` (26 `original` / 45 `unigradicon`) plus
+`clickfix_report.csv` `status != "ok"` or `n_sanity_bad > 0`. Union of flagged patients **with
+cached graphs**: 33/224 train, 5/28 val, 2/29 test.
+> **Ordering consequence: Stage B.2 is now a PREREQUISITE for Gate A**, not an independent step —
+> the 28-patient global val split cannot answer it; only pooled out-of-fold per-patient metrics can.
+
+`registration_error_table.json` also holds measured per-lesion offsets binned by lesion size (the
+empirical basis for `PROP_SIGMA` in `tracking/common.py`) — useful if a continuous stratifier is ever
+wanted instead of a binary flag.
 
 **D4 — "radiomics is slow" is FALSE.** No pyradiomics in the repo at all. `descriptor_l0` is 4 scales
 × 7³ = 1372 trilinear HU samples — microseconds/lesion. The bottleneck is I/O: full-volume
@@ -170,13 +190,16 @@ identity dominates variance — which is exactly why R10/R11 read as flat.
    `tracking/train/datamodule.py` fold wiring and, if `eval.py` cannot target a fold, read the
    numbers from each fold's `fold_metrics.json` / W&B history instead. **Do not report fold results
    from the global val split.**
-2. **Gate A — error stratification.** Needs a properly held-out checkpoint; use a fold checkpoint,
-   NOT `models/best.ckpt` (that was trained under the `final` split scheme and would leak against
-   `cv/val`). Rule: if `acc_observed − acc_imputed ≥ 5 pp`, the ceiling is substantially a LABEL
-   ceiling → primary metric becomes the observed-position subset and geometry modelling stays dead.
-3. **Stage B.2** — per-patient out-of-fold metrics + patient-level bootstrap CI
-   (`bootstrap_match_score` in `tracking/data/splits.py`). Replaces the statistically wrong
-   "non-overlapping mean±std" rule with paired per-patient deltas.
+2. **Stage B.2 FIRST** (it now gates step 3) — per-patient out-of-fold metrics + patient-level
+   bootstrap CI (`bootstrap_match_score` in `tracking/data/splits.py`). Each patient is in exactly
+   one fold's val side, so concatenating per-patient records across the 5 folds gives ONE
+   out-of-fold score per patient over the whole 224-patient pool. Replaces the statistically wrong
+   "non-overlapping mean±std" rule with paired per-patient deltas + a 10k patient bootstrap.
+3. **Gate A — registration-quality stratification** (needs step 2). Compare pooled OOF per-patient
+   `match_score` on the **33 flagged** vs **191 clean** training-pool patients (§4 D3).
+   Use a fold checkpoint, NOT `models/best.ckpt` (trained under the `final` split scheme → leaks
+   against `cv/val`). If flagged patients are materially worse, report a registration-clean subset
+   alongside the full number and leave geometry modelling dead.
 4. **Stage A.5** — recover the 25 unused viable transitions (+8.9% data).
    **Leakage guard:** a patient contributing 2 graphs must have BOTH in the same CV fold.
    `splits.py::fold_map` keys on pid, so verify the datamodule filters by `pid`, not index.
