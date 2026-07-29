@@ -192,19 +192,26 @@ identity dominates variance — which is exactly why R10/R11 read as flat.
 
 ## 5. Next actions, in order
 
-1. **[blocked ~3 h] Stage B.3 selector bake-off.** When folds finish, evaluate all three selectors
-   per fold and pick the winner:
+1. **[blocked ~4 h] Stage B.3 selector bake-off.** When folds finish, run the fold-aware evaluator
+   for all 3 selectors × 5 folds, then pool:
    ```bash
    for f in 0 1 2 3 4; do for s in best best_raw swa_plateau; do
-     PYTHONPATH=. python3 tracking/cli/eval.py --ckpt $RUNS/fold_$f/$s.ckpt --split val \
-       --root /nnunet_data/Longitudinal-CT --cache /nnunet_data/lesion_tracking/cache
+     PYTHONPATH=. python3 tracking/cli/oof.py --ckpt $RUNS/fold_$f/$s.ckpt --fold $f \
+       --config configs/base.json --root /nnunet_data/Longitudinal-CT \
+       --cache /nnunet_data/lesion_tracking/cache --out $RUNS/fold_$f/oof_$s
    done; done
+   PYTHONPATH=. python3 tracking/cli/pool.py --runs $RUNS --out runs/pool
    ```
-   **CAUTION:** `eval.py --split val` evaluates the *global* val split (28 graphs), NOT the fold's
-   held-out patients. For a correct per-fold number the fold's own val set must be used — check
-   `tracking/train/datamodule.py` fold wiring and, if `eval.py` cannot target a fold, read the
-   numbers from each fold's `fold_metrics.json` / W&B history instead. **Do not report fold results
-   from the global val split.**
+   **Use `tracking/cli/oof.py`, NEVER `eval.py --split val`** — the latter evaluates the *global*
+   28-graph val split, not the fold's held-out patients, and would silently produce meaningless
+   per-fold numbers.
+   `oof.py` runs CPU-only by default (the GPU is saturated by training). One fold takes a while on
+   this contended box; **switch it to `accelerator="auto"` once training is done**, or run the 15
+   jobs in parallel.
+   **Known trap, already fixed — do not reintroduce:** `oof.py`'s sanity assert must compare the
+   evaluated patients against **`dm.val_ds`**, not against `fold_patient_sets`. The latter covers all
+   270 train+val-pool patients while only 252 have cached graphs (54 val patients per fold, but only
+   42–49 are reachable), so asserting against it can never pass.
 2. **Stage B.2 FIRST** (it now gates step 3) — per-patient out-of-fold metrics + patient-level
    bootstrap CI (`bootstrap_match_score` in `tracking/data/splits.py`). Each patient is in exactly
    one fold's val side, so concatenating per-patient records across the 5 folds gives ONE

@@ -13,7 +13,6 @@ import argparse
 from pathlib import Path
 
 import pytorch_lightning as pl
-import torch
 
 from tracking.common import CACHE_ROOT, DATASET_ROOT, dump_json
 from tracking.config import load_config
@@ -48,16 +47,23 @@ if __name__ == "__main__":
     if args.dust_tau is not None:
         mod.hparams.dust_tau = args.dust_tau
 
-    acc = "gpu" if torch.cuda.is_available() else "cpu"
-    trainer = pl.Trainer(accelerator=acc, devices=1, logger=False, enable_checkpointing=False, enable_progress_bar=True)
+    # CPU-only: 5 training jobs already saturate the single GPU (Round 12 constraint), and one
+    # validation pass over a fold is cheap enough that GPU contention isn't worth the risk.
+    trainer = pl.Trainer(accelerator="cpu", devices=1, logger=False, enable_checkpointing=False, enable_progress_bar=True)
     trainer.validate(mod, dataloaders=dm.val_dataloader())
 
     per_patient = mod._per_patient
     _, val_pids = fold_patient_sets(args.root, args.fold, cfg.n_folds, cfg.cv_seed)
-    # R15: a mismatch here means the wrong split was evaluated -- must crash, not pass silently.
-    assert set(per_patient) == val_pids, (
-        f"evaluated patient set != fold {args.fold} val set: "
-        f"missing={val_pids - set(per_patient)} extra={set(per_patient) - val_pids}"
+    # fold_patient_sets covers the whole 270-patient train+val pool, but only 252 patients have
+    # cached graphs (19 are skipped -- complete responders, registration failures, dominant-FU
+    # casualties; see round12_findings.md A.1.2). So the reachable set is the pooled cache filtered
+    # by fold membership, NOT val_pids itself -- comparing against val_pids can never pass.
+    loaded = {str(dm.val_ds[i].pid) for i in range(len(dm.val_ds))}
+    # R15: either mismatch means the wrong loader was evaluated -- crash, do not pass silently.
+    assert loaded <= val_pids, f"fold {args.fold} val loader leaked non-fold patients: {loaded - val_pids}"
+    assert set(per_patient) == loaded, (
+        f"evaluated patient set != fold {args.fold} val loader: "
+        f"missing={loaded - set(per_patient)} extra={set(per_patient) - loaded}"
     )
 
     totals = {k: sum(p[k] for p in per_patient.values()) for k in ("uc_ok", "uc_tot", "dis_ok", "dis_tot", "new_ok", "new_tot")}
