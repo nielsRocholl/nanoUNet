@@ -61,6 +61,7 @@ class LesionRow:
     topology: str
     cog_bl: tuple[float, float, float] | None
     cog_propagated: tuple[float, float, float] | None
+    cog_backpropagated: tuple[float, float, float] | None
     cog_fu: tuple[float, float, float] | None
     img_id_bl: int
     img_id_fu: int
@@ -86,6 +87,7 @@ def parse_meta_csv(path: Path) -> list[LesionRow]:
                 topology=topo,
                 cog_bl=parse_zyx(r["cog_bl"]),
                 cog_propagated=parse_zyx(r["cog_propagated"]),
+                cog_backpropagated=parse_zyx(r.get("cog_backpropagated")),
                 cog_fu=parse_zyx(r["cog_fu"]),
                 img_id_bl=int(r["img_id_bl"]),
                 img_id_fu=int(r["img_id_fu"]),

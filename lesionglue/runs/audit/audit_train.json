@@ -1,0 +1,30 @@
+{
+  "split": "train",
+  "n_patients": 240,
+  "class_balance": {
+    "UNCHANGED": 2026,
+    "NEWLYAPPEARING": 492,
+    "DISAPPEARED": 1074,
+    "MERGED": 147
+  },
+  "n_split_native": 0,
+  "imputation": {
+    "bl_rate": 0.1240895602913407,
+    "bl_n": 3707,
+    "bl_n_imputed": 460,
+    "fu_rate": 0.2830239440408932,
+    "fu_n": 3717,
+    "fu_n_imputed": 1052,
+    "n_sanity_bad_patients": 18
+  },
+  "volume_bl_quartiles": {
+    "0.25": 115.24553489685059,
+    "0.5": 357.3579902648926,
+    "0.75": 1496.7359619140625
+  },
+  "volume_fu_quartiles": {
+    "0.25": 15.75176239013672,
+    "0.5": 203.31573486328125,
+    "0.75": 1150.1380920410156
+  }
+}

@@ -48,4 +48,4 @@ wandb/
 *.pt
 
 # Predict CLI default (`--out preds`)
-preds/
+preds/runs/

@@ -271,6 +271,21 @@ It must produce **exactly** these numbers and write them to `{out}/audit.json`:
 
 ### A.4 Decision gate A — this gate governs the whole round
 
+> **SUPERSEDED 2026-07-29 — the version below is undefined as written.** Measurement showed the
+> imputed stratum is empty: of 3,815 graph-eligible BL nodes, **0** lack a real `cog_bl`, and every
+> FU node has a real `cog_fu`. The `n_bl_filled`/`n_fu_filled` counts refer to registration guesses
+> handed to the *missing* side of NEWLYAPPEARING/DISAPPEARED rows, which never become graph nodes.
+> The true registration dependence is **uniform, not stratified**: `graph.py:124` sets every BL
+> node's `pos` from `cog_propagated`, a registration projection, while `graph.py:123` computes the
+> descriptor at the real annotated `cog_bl`.
+>
+> **Use the reformulated gate in `round12_findings.md` §A.3.4**: stratify by *case-level*
+> registration quality (`registration_error_table.json` → `case_level_failure_patients`, 26 for
+> `original` / 45 for `unigradicon`; plus `clickfix_report.csv` `status != "ok"` or
+> `n_sanity_bad > 0`). Union = 33/224 train, 5/28 val, 2/29 test cached graphs.
+> **This makes Stage B.2 (pooled out-of-fold per-patient metrics) a PREREQUISITE for Gate A** — the
+> 28-patient global val split is far too small to answer it.
+
 Let `acc_imp` and `acc_obs` be `val_acc_unchanged_split` on imputed-position vs observed-position
 lesions.
 
