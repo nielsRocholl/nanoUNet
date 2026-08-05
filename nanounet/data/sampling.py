@@ -1,6 +1,10 @@
 """Per-click prompt sampling: jitter authored centroids (skippable via select_prompt_points(jitter=
 False)), optional false-positive clicks (gated by probability). Returns click COORDINATES only --
-rendering to heatmaps happens after augmentation, in patch_iterable.py."""
+rendering to heatmaps happens after augmentation, in patch_iterable.py.
+
+When `cfg.sampling.instance_targets` is set, the returned segmentation is click-conditional:
+foreground only for lesion instances that kept their click (nanounet/data/instance_target.py). The
+kept set is drawn once per patch, before displacement, and shared by every prompt variant."""
 
 from __future__ import annotations
 
@@ -11,6 +15,7 @@ from scipy.spatial import cKDTree
 
 from nanounet.config import RoiPromptConfig
 from nanounet.data.error_table import draw_propagated_offset
+from nanounet.data.instance_target import resolve_instance_target
 from nanounet.data.patch_bbox import _sample_bbox, crop_patch
 from nanounet.prompt.centroids import filter_centroids_in_patch
 
@@ -25,6 +30,7 @@ def select_prompt_points(
     jitter: bool = True,
     volumes_vox: List[float | None] | None = None,
     false_pos: List[Tuple[int, int, int]] | None = None,
+    kept: list[int] | None = None,
 ) -> Tuple[List[Tuple[int, int, int]], List[Tuple[int, int, int]], int]:
     """Click SELECTION only -- returns (positive, negative, n_false_pos) patch-local point lists;
     rendering to heatmaps happens later (after augmentation), see nanounet/train/patch_iterable.py.
@@ -36,7 +42,11 @@ def select_prompt_points(
     `false_pos` is drawn ONCE PER PATCH by the caller and shared by every variant, so a consistency
     /agreement pair differs only in lesion-click placement -- never in where the decoy sits. The
     decoys are always the LAST `n_false_pos` entries of `pp`; click_inside_flags relies on that to
-    exclude them from the inside/outside vote."""
+    exclude them from the inside/outside vote.
+
+    `kept` (indices into cts_global, drawn once per patch by build_patch when instance_targets is
+    set) fixes WHICH lesions may click -- the per-variant random dropout below must not re-run, or
+    the target (masked to the same kept set) would disagree with what got clicked."""
     pp: List[Tuple[int, int, int]] = []
     pn: List[Tuple[int, int, int]] = []
     n_fp = 0
@@ -49,10 +59,14 @@ def select_prompt_points(
             displaced = [draw_propagated_offset(c, v, prop, rg2) for c, v in zip(cts_global, vols)]
         else:
             displaced = list(cts_global)
-        inch = filter_centroids_in_patch(displaced, pslc)
-        cm = cfg.sampling.click_modes
-        kept = inch if cm.drop == 0.0 else [p for p in inch if rng.random() < cm.pos]
-        pp = list(kept)
+        if kept is None:
+            inch = filter_centroids_in_patch(displaced, pslc)
+            cm = cfg.sampling.click_modes
+            kept_ = inch if cm.drop == 0.0 else [p for p in inch if rng.random() < cm.pos]
+        else:
+            # Kept set fixed per patch (instance_targets); displace ONLY those, then filter.
+            kept_ = filter_centroids_in_patch([displaced[j] for j in kept], pslc)
+        pp = list(kept_)
         if false_pos:
             n_fp = len(false_pos)
             pp = pp + list(false_pos)
@@ -73,11 +87,12 @@ _FALSE_POS_GUARD_VOX = 5
 
 
 def points_variant(
-    seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox, false_pos=None
+    seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox, false_pos=None,
+    kept=None,
 ):
     """One prompt draw as float (N,3) arrays, ready to ride through the augmentation chain."""
     pp, pn, n_fp = select_prompt_points(
-        seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox, false_pos
+        seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox, false_pos, kept
     )
     return {
         "points_pos": np.asarray(pp, dtype=np.float32).reshape(-1, 3),
@@ -151,18 +166,31 @@ def build_patch(
     # ONE decoy draw for the whole patch, shared by every variant: a consistency/agreement pair must
     # differ only in lesion-click placement, never in where the false-positive click landed.
     fp = draw_false_pos(seg_crop, cfg, force_zero_prompt, rng)
+    seg_out = seg_crop
+    kept: list[int] | None = None
+    if cfg.sampling.instance_targets:
+        raw_seeds = properties.get("seed_zyx") or raw_c
+        seeds_global = [tuple(int(x) for x in c) for c in raw_seeds]
+        seg_out, kept = resolve_instance_target(
+            seg_crop, cts_global, seeds_global, pslc, cfg.sampling.click_modes.pos, rng
+        )
     # N independent click draws over ONE shared crop, so a consistency pair differs only in the click.
+    # `seg_crop` (the REAL seg), not `seg_out`, feeds draw_false_pos above and click_inside_flags
+    # downstream: decoys must avoid real tissue, and the inside/outside vote must reflect the real
+    # lesion, not the click-conditional target.
     variants = [
-        points_variant(seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, True, volumes_vox, fp)
+        points_variant(seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, True, volumes_vox, fp, kept)
         for _ in range(prompts_per_patch)
     ]
     if extra_rng is not None:
         # Val prompt-agreement diagnostic: 1 more draw, same crop, RNG stream never touches `rng`.
         variants.append(
-            points_variant(seg_crop, cts_global, pslc, cfg, force_zero_prompt, extra_rng, True, volumes_vox, fp)
+            points_variant(
+                seg_crop, cts_global, pslc, cfg, force_zero_prompt, extra_rng, True, volumes_vox, fp, kept
+            )
         )
     return {
         "image": data_crop.astype(np.float32),
-        "segmentation": seg_crop.astype(np.int16),
+        "segmentation": seg_out.astype(np.int16),
         "points_variants": variants,
     }

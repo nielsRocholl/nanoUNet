@@ -40,6 +40,7 @@ class SamplingConfig:
     false_pos_probability: float
     large_lesion: LargeLesionConfig
     propagated: PropagatedConfig
+    instance_targets: bool = False
 
 
 @dataclass(frozen=True)
@@ -124,6 +125,7 @@ def _load_sampling(d: dict) -> SamplingConfig:
         false_pos_probability=fp_prob,
         large_lesion=_load_large(ll),
         propagated=_load_prop(d.get("propagated")),
+        instance_targets=bool(d.get("instance_targets", False)),
     )
 
 

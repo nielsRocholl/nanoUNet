@@ -1,4 +1,4 @@
-# Handoff — Step 1+2 shipped, Step 6 is next
+# Handoff — Step 1+2 shipped; Steps 4 and 6 in flight
 
 **Written 2026-08-05.** Audience: an agent with no access to the session that produced this.
 Everything needed is here. Read `docs/handoffs/HANDOFF_training_overhaul.md` (the parent plan) and
@@ -173,20 +173,82 @@ trivial 1.0, inflating it to 0.92.
 
 ---
 
-## 3. Immediate next task — validation cadence
+## 3. State of play — updated 2026-08-05, end of session 1
 
-**Decided by the human: 1500 patches, every 2 epochs.** Not yet implemented.
+### Shipped and committed
 
-Measured overhead: 1500 patches every epoch is +18% total run time; every 2 epochs is **+3%**.
-The rationale is not only cost — dense validation exists to average out resampling noise, and a
-**fixed** val set removes that noise at the source, so half the frequency with 2.5× the patches is
-strictly better information.
+| Item | Commit | Note |
+|---|---|---|
+| balanced 15% split | `2eb2fe1` | applied to disk, old file backed up |
+| fixed val manifest + builder | `5b21ec3` | `valset_1500.json` on disk |
+| manifest wiring + metric layers | `2c2b975` | 98 metrics, determinism verified |
+| `val_prompt_agreement_clicked` | `3a96a8e` | the flat headline was inflated by 601 trivial rows |
+| `--val-every-n-epochs` | `afc4a9f` | **human decided: 1500 patches every 2 epochs** |
+| Step 6 benchmark result | `f1956a3` | the GPU gate is cleared, see §4 |
+| Step 6 plan | `5d4961f` | `docs/handoffs/PLAN_step6_instance_targets.md` |
 
-Implement as `--val-every-n-epochs`, **default 1** so existing runs are unchanged, wired to
-Lightning's `Trainer(check_val_every_n_epoch=...)` in `fit.py`. Add the argument-table row to
-`docs/steps/train.md` in the same change (rule D4).
+**Human pushes; this container has no GitHub credentials.** Check `git status` for unpushed commits
+and say so explicitly.
 
----
+### In flight when session 1 ended
+
+| Step | State | Files it owns |
+|---|---|---|
+| **Step 6** — instance-conditional targets | agent mid-verification; code on disk, docs not written | `data/instance_target.py`, `data/sampling.py`, `config.py`, `configs/instance_conditional.json` |
+| **Step 4** — warmup / EMA / monitor fix | agent dispatched | `model/lr_schedule.py`, `train/ema.py`, `train/fit.py`, `cli/train_parser.py` |
+
+Neither was verified by the orchestrator before the session ended. **Check both yourself** — read the
+diffs, re-run the acceptance checks in `PLAN_step6_instance_targets.md` §6a, and do not trust an
+agent summary (§5).
+
+### Parked by the human, deliberately
+
+**Step 3 — cohort-weighted sampling.** The *code* can be built any time (`config.py` CohortConfig,
+new `nanounet/data/cohorts.py`, `patch_iterable.py:120`), but the **actual per-dataset weights are
+deferred to the last step before the training run**. Do not pick them yourself.
+
+Inputs for that decision when it comes:
+
+| Cohort | train cases | share | val_dice | agreement |
+|---|---|---|---|---|
+| d013 Longitudinal | 456 | 9.1% | 0.826 | 0.755 |
+| d025 RUMC_Bone | 128 | 2.6% | **0.516** | **0.616** |
+| d014 MSD_Colon | 107 | 2.1% | 0.641 | 0.819 |
+| d010 CECT | 917 | 18.4% | 0.821 | 0.902 |
+
+d013 is the deployment target; d025 is the worst performer and independently confirmed worst in
+`/nnunet_data/prompt_sensitivity/FINDINGS.md` (Skeleton 0.39). Both are candidates for
+oversampling. The parent handoff's "0.25 for d013" is an illustration, not a decision.
+
+### To finish Step 6 completely
+
+1. Agent finishes implementation + acceptance checks C1-C6 and the throughput measurement.
+2. **Orchestrator reviews the diff**, specifically the three silent traps in
+   `PLAN_step6_instance_targets.md` §7.
+3. Commit; human pushes.
+4. **Update the real slurm script** at
+   `/home/nielsrocholl/SLURM/jobs/nanoUNet/prompt-robustness/slurm_supervised_999_h200.sh`:
+   - `--config configs/instance_conditional.json`
+   - `--val-manifest ${LOCAL_PREP}/${DS_FOLDER}/valset_1500.json`
+   - `--val-every-n-epochs 2`
+   - add `--include "valset_1500*"` to the `rclone` whitelist near line 91. **Without this the
+     manifest is never staged to the compute node and training fails at startup.**
+5. **Short probe, ~60-100 epochs.** Step 6 changes the objective, so get evidence before spending
+   days. Success criteria in `PLAN_step6_instance_targets.md` §6c; the headline is
+   `val/subset_clicked/val_selectivity_margin` going from **-0.2709** to positive while
+   `val/all_clicked/val_dice` holds at ~0.839.
+
+### Remaining order
+
+Step 6 (probe) -> Step 3 code -> **human picks cohort weights** -> Step 5a LR probe -> Step 5b long
+run. Step 5 is where all the GPU time goes (~8-12 days); everything before it is hours.
+
+Step 5a is three 60-epoch probes at `lr` in {0.005, 0.01, 0.03} compared on the fixed manifest --
+this comparison is only readable *because* of Step 1. Step 5b is 1200-1800 epochs, no finetune
+stage, and `--stretched-k`/`--stretched-ref` **must be re-tuned** for the new horizon (they are
+absolute epoch counts; reusing 188/250 at 1800 epochs puts almost the whole run in the linear tail).
+Optional and reserved for the human: a warmup-stable-decay schedule, which would allow branching and
+annealing a checkpoint to decide whether to continue rather than committing to the horizon up front.
 
 ## 4. Then Step 6 — start with the benchmark, not the code
 
