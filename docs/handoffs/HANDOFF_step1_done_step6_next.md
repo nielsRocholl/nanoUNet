@@ -205,8 +205,29 @@ on-demand cc3d"). Two facts from this session make the benchmark cheap:
 - **Crop-sized `cc3d` is demonstrably fast** — the manifest builder ran 1500 of them inside 214 s
   wall, including full-volume reads. Option 3 is not obviously unaffordable.
 
-Report measured numbers to the human before committing to an option. If none clears >95%, say so
-before writing the four changes, not after.
+### BENCHMARK RESULT — measured 2026-08-05, the gate is CLEARED
+
+Measured over 39 real training patches drawn from the val split, against the real `build_patch`
+cost on the same box:
+
+| Path | mean | p95 | vs `build_patch` | vs per-patch CPU budget @16 workers |
+|---|---|---|---|---|
+| `build_patch` (baseline, dominated by the blosc2 crop read) | 477.1 ms | 1388.3 ms | — | — |
+| **Option 3 — `cc3d` on the crop** + `np.isin` mask | **5.7 ms** | 8.0 ms | **1.2%** | **0.24%** |
+| Option 2 — bbox lookup from the sidecars | 0.3 ms | 0.7 ms | 0.1% | 0.01% |
+
+Budget derivation: the GPU consumes 3 patches per 454 ms step (batch 6, `prompts_per_patch` 2), so
+6.6 patches/s; with 16 dataloader workers each worker has ~2421 ms per patch before it starves the
+GPU. Option 3 uses 0.24% of that.
+
+**Choose option 3.** It is the parent handoff's "last resort", but the measurement says it costs
+~200x less than the budget, and it is the only option that is *exact*: no bbox overlap
+approximation (option 2 is wrong where two lesions' bboxes intersect), no extra storage, no
+re-preprocessing of the 542 GB pool (option 1). The handoff's warning not to assume it was cheap was
+right; it was checked, and it is cheap.
+
+Note `build_patch` p95 is 1388 ms — the per-patch cost is dominated by IO variance, not compute, so
+5.7 ms is inside the noise of what the path already costs.
 
 Judge Step 6 **only** on the Step 1 strata — especially `val/subset_clicked/val_selectivity_margin`
 and `val/none_clicked/val_pred_fg`. Training loss **will rise** relative to the old objective; that
