@@ -39,6 +39,22 @@ no factories, rich CLI output, errors that name the fix, no defensive try/except
 | D12 | Subset targets are **precomputed offline into a packed-bit sidecar** (~92 MB), so there is **zero `cc3d` on the validation path**. | The parent handoff §2 forbids per-patch connected components on any hot path. |
 | D13 | Both prompt draws (for `val_prompt_agreement`) are **stored in the manifest**. No RNG at validation time at all. | Makes two runs on the same manifest bit-identical, which is an acceptance criterion. |
 
+### Correction applied 2026-08-05, after implementation found the plan wrong
+
+An earlier revision of §5.1 gave **every** cohort a `subset_clicked` quota. That is unsatisfiable:
+`d014` (MSD_Colon), `d016` (MSD_Pancreas) and `d020` (WORC_CRLM) have **zero** validation cases with
+two or more lesion instances — every case in those cohorts has exactly one. You cannot click a
+strict subset of one lesion, at any patch position, ever. Verified over the full val split, not a
+sample.
+
+| # | Decision | Rationale |
+|---|---|---|
+| D14 | `subset_clicked` is allocated **in proportion to each cohort's multi-lesion case count**, capped at 30% of that cohort's budget. Single-lesion cohorts get exactly 0. The freed budget goes to the other three scenarios *within the same cohort*. Global scenario totals stay exactly 600/375/300/225. | Selectivity is undefined when there is only one lesion. Supply is ample: 401 multi-lesion val cases for 300 patches. |
+| D15 | Per-cohort metrics (Layer 2) are computed over **`all_clicked` rows only**. | D14 makes each cohort's scenario mix different. Pooling across mixes would compare difficulty, not model quality. `all_clicked` is defined identically everywhere. |
+
+Consequence to state in the results: **`subset_clicked` covers 14 of 17 cohorts**, weighted toward
+`d013`/`d024`/`d027`/`d018`. That is inherent to the question, not a sampling compromise.
+
 ---
 
 ## 1. Verified facts about the current code
@@ -459,8 +475,38 @@ if floor * len(cohort_val_counts) > n_patches:
     )
 ```
 
-Then split each cohort's allocation across the 4 scenarios using `--mix`, again with
-largest-remainder rounding so per-cohort totals are exact.
+Then allocate scenarios in **two stages** (see D14 — a flat per-cohort `--mix` split is wrong,
+because three cohorts cannot supply `subset_clicked` at all).
+
+**Stage A — cohort totals.** `allocate()` above, unchanged: floor plus remainder proportional to
+val-case count, largest-remainder rounding, summing to exactly `--n-patches`.
+
+**Stage B — scenarios.** With `multi_c` = number of val cases in cohort `c` holding ≥2 `cc3d`
+instances, and `cap_c = int(0.30 * total_c)`:
+
+1. Provisional `subset_c` = largest-remainder split of `round(n_patches * mix_subset)` weighted by
+   `multi_c`.
+2. Clamp to `cap_c`; cohorts with `multi_c == 0` get exactly 0.
+3. Redistribute the shortfall over cohorts still under `cap_c` with `multi_c > 0`, proportional to
+   `multi_c`, iterating until placed or no headroom remains.
+4. If headroom runs out first, **do not under-fill silently**:
+   ```python
+   raise RuntimeError(
+       f"subset_clicked target {n_subset_total} exceeds available capacity {placed} "
+       f"(only {n_multi_cohorts}/{n_cohorts} cohorts have multi-lesion cases, each capped at "
+       f"30% of its patch budget).\n"
+       f"Fix: lower the subset_clicked share in --mix, or raise --n-patches"
+   )
+   ```
+5. `rest_c = total_c - subset_c`, split across `all_clicked` / `lesion_free_decoy` /
+   `none_clicked` in the renormalised ratio `0.50 / 0.3125 / 0.1875`, largest-remainder rounding.
+
+Assert the global scenario totals land on exactly `600 / 375 / 300 / 225` at the defaults, and fail
+loudly if not.
+
+`multi_c` comes from a cheap pre-pass over the `*_centroids.json` sidecars — no b2nd opened. Record
+`subset_capable_cohorts` and `cohort_multi_counts` in the manifest header so the consumer can see
+which cohorts the selectivity number is sourced from.
 
 ### 5.2 Per-case preparation (once per case, cached)
 
@@ -704,7 +750,9 @@ Both are computed with `pooled_dice_from_rows`; `vs_all_lesions` reuses the exis
 family, and `vs_clicked_subset` needs a second `get_tp_fp_fn_tn` call against `target_subset`,
 done in `validation_step` (see 7.2) so this module stays free of forward-pass concerns.
 
-**(e) Per cohort** — for each cohort present in the manifest, two keys only:
+**(e) Per cohort** — for each cohort present in the manifest, two keys only, computed over
+**`all_clicked` rows only** (D15: each cohort's scenario mix differs, so pooling across scenarios
+would compare difficulty rather than model quality):
 
 ```
 val/cohort/{name}/val_dice
