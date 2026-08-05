@@ -29,6 +29,9 @@ def build_train_parser() -> argparse.ArgumentParser:
     ap.add_argument("--stretched-k", type=int, default=750)
     ap.add_argument("--stretched-ref", type=int, default=1000)
     ap.add_argument("--stretched-exp", type=float, default=0.9)
+    ap.add_argument("--warmup-epochs", type=int, default=0, help="Linear LR warmup over the first N epochs, applied to either --lr-schedule. 0 disables it and reproduces the pre-warmup LR curve exactly.")
+    ap.add_argument("--ema-decay", type=float, default=0.0, help="Weight EMA decay (e.g. 0.999); logs val_dice_ema next to val_dice. 0 disables EMA.")
+    ap.add_argument("--monitor", default="val_dice", help="Metric ModelCheckpoint tracks for best-* checkpoints.")
     ap.add_argument("--no-wandb", action="store_true")
     ap.add_argument("--wandb-project", default="nanounet")
     ap.add_argument("--wandb-name", default=None)
@@ -118,6 +121,9 @@ def train_config_rows(args, ds: str, out: str) -> list[tuple[str, object, str]]:
         ("longi", args.longi, "cli"),
         ("prompts_per_patch", args.prompts_per_patch, "cli/default"),
         ("consistency_weight", args.consistency_weight, "cli/default"),
+        ("warmup_epochs", args.warmup_epochs, "cli/default"),
+        ("ema_decay", args.ema_decay, "cli/default"),
+        ("monitor", args.monitor, "cli/default"),
         ("val_manifest", args.val_manifest or "legacy random val", "cli/default"),
         ("val_every_n_epochs", args.val_every_n_epochs, "cli/default"),
         ("out", out, "derived"),

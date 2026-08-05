@@ -23,6 +23,7 @@ from nanounet.plan.splits import fold_seed
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
 from nanounet.pretrain.module import NanoMAELM
 from nanounet.train.data_module import NanoDataModule
+from nanounet.train.ema import EMACallback
 from nanounet.train.lightning_module import NanoUNetLM
 
 
@@ -184,19 +185,18 @@ def run_supervised(
         longi=args.longi,
         consistency_weight=args.consistency_weight,
         consistency_warmup_epochs=args.consistency_warmup_epochs,
+        warmup_epochs=args.warmup_epochs,
     )
-    # finetune optimizes hard small lesions + FP suppression; select on macro Dice, not the
-    # big-lesion-dominated global val_dice that the base run uses.
-    mon = "val_dice_macro" if args.init_weights else "val_dice"
     cb = [
         ModelCheckpoint(
             dirpath=join(out, ckpt_dir),
-            filename=f"best-{{epoch}}-{{{mon}:.4f}}",
-            monitor=mon,
+            filename=f"best-{{epoch}}-{{{args.monitor}:.4f}}",
+            monitor=args.monitor,
             mode="max",
             save_top_k=2,
         ),
         ModelCheckpoint(dirpath=join(out, ckpt_dir), save_last=True),
+        EMACallback(decay=args.ema_decay),
     ]
     tr = Trainer(
         max_epochs=args.epochs,

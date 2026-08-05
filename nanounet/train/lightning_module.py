@@ -44,6 +44,7 @@ class NanoUNetLM(pl.LightningModule):
         longi: bool = False,
         consistency_weight: float = 0.0,
         consistency_warmup_epochs: int = 50,
+        warmup_epochs: int = 0,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -75,6 +76,7 @@ class NanoUNetLM(pl.LightningModule):
         self.longi = longi
         self.consistency_weight_max = consistency_weight
         self.consistency_warmup_epochs = consistency_warmup_epochs
+        self.warmup_epochs = warmup_epochs
         # Prompt-heatmap channel indices, per the fixed layouts documented in patch_iterable.py:
         # supervised [CT, hm+, hm-], longi [FU_CT, FU_hm+, FU_hm-, BL_CT, BL_hm+, BL_hm-].
         self._prompt_ch = [1, 2, 4, 5] if longi else [1, 2]
@@ -187,7 +189,8 @@ class NanoUNetLM(pl.LightningModule):
                 k_transition=self.stretched_k,
                 ref_poly_steps=self.stretched_ref,
                 exponent=self.stretched_exp,
+                warmup_epochs=self.warmup_epochs,
             )
         else:
-            sched = PolyLRScheduler(opt, self.initial_lr, self.num_epochs)
+            sched = PolyLRScheduler(opt, self.initial_lr, self.num_epochs, warmup_epochs=self.warmup_epochs)
         return {"optimizer": opt, "lr_scheduler": {"scheduler": sched, "interval": "epoch"}}
