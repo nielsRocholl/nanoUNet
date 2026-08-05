@@ -111,6 +111,11 @@ def log_val_metrics(lm) -> None:
             lm.log(f"val/{s}/val_dice_prompt_ablated", dice_ab, **d)
             lm.log(f"val/{s}/val_prompt_gap", dice_s - dice_ab, **d)
     lm.log("val_prompt_agreement_matched", _agree_sel(agree, draws_matched == 1), **d)
+    # none_clicked and lesion_free_decoy hand BOTH draws an IDENTICAL input -- no lesion click to
+    # displace, and the decoy is shared by construction -- so they score a trivial 1.0 and inflate
+    # the flat headline (0.92 vs 0.87 on the real scenarios). click_inside == -1 marks exactly
+    # those rows; this variant is the number to quote for prompt sensitivity.
+    lm.log("val_prompt_agreement_clicked", _agree_sel(agree, click_in >= 0), **d)
 
     # (d) subset diagnostic -- headline number of this step
     sub_sel = has_subset == 1
