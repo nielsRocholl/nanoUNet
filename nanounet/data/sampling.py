@@ -24,15 +24,22 @@ def select_prompt_points(
     rng: np.random.Generator,
     jitter: bool = True,
     volumes_vox: List[float | None] | None = None,
-) -> Tuple[List[Tuple[int, int, int]], List[Tuple[int, int, int]]]:
-    """Click SELECTION only -- returns (positive, negative) patch-local point lists; rendering to
-    heatmaps happens later (after augmentation), see nanounet/train/patch_iterable.py.
+    false_pos: List[Tuple[int, int, int]] | None = None,
+) -> Tuple[List[Tuple[int, int, int]], List[Tuple[int, int, int]], int]:
+    """Click SELECTION only -- returns (positive, negative, n_false_pos) patch-local point lists;
+    rendering to heatmaps happens later (after augmentation), see nanounet/train/patch_iterable.py.
 
     Order matters: offset applied to the GLOBAL centroid first, THEN filtered into the patch -- a
     displaced click that lands outside the patch is simply not rendered, no clamping to the border.
-    jitter=False for points already real (registered/propagated), not mask-derived guesses."""
+    jitter=False for points already real (registered/propagated), not mask-derived guesses.
+
+    `false_pos` is drawn ONCE PER PATCH by the caller and shared by every variant, so a consistency
+    /agreement pair differs only in lesion-click placement -- never in where the decoy sits. The
+    decoys are always the LAST `n_false_pos` entries of `pp`; click_inside_flags relies on that to
+    exclude them from the inside/outside vote."""
     pp: List[Tuple[int, int, int]] = []
     pn: List[Tuple[int, int, int]] = []
+    n_fp = 0
     if not force_zero_prompt:
         if jitter:
             prop = cfg.sampling.propagated
@@ -46,9 +53,17 @@ def select_prompt_points(
         cm = cfg.sampling.click_modes
         kept = inch if cm.drop == 0.0 else [p for p in inch if rng.random() < cm.pos]
         pp = list(kept)
-        if rng.random() < cfg.sampling.false_pos_probability:
-            pp = pp + _sample_false_pos(seg_crop, rng)
-    return pp, pn
+        if false_pos:
+            n_fp = len(false_pos)
+            pp = pp + list(false_pos)
+    return pp, pn, n_fp
+
+
+def draw_false_pos(seg_crop, cfg: RoiPromptConfig, force_zero_prompt: bool, rng) -> list:
+    """One decoy draw PER PATCH (not per variant) -- see select_prompt_points."""
+    if force_zero_prompt or rng.random() >= cfg.sampling.false_pos_probability:
+        return []
+    return _sample_false_pos(seg_crop, rng)
 
 
 # One decoy for the rare "click on empty tissue" case; not a difficulty knob (at deployment every click
@@ -57,14 +72,17 @@ def select_prompt_points(
 _FALSE_POS_GUARD_VOX = 5
 
 
-def points_variant(seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox):
+def points_variant(
+    seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox, false_pos=None
+):
     """One prompt draw as float (N,3) arrays, ready to ride through the augmentation chain."""
-    pp, pn = select_prompt_points(
-        seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox
+    pp, pn, n_fp = select_prompt_points(
+        seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox, false_pos
     )
     return {
         "points_pos": np.asarray(pp, dtype=np.float32).reshape(-1, 3),
         "points_neg": np.asarray(pn, dtype=np.float32).reshape(-1, 3),
+        "n_false_pos": n_fp,
     }
 
 
@@ -130,15 +148,18 @@ def build_patch(
     )
     bbox = [[a, b] for a, b in zip(bbox_lbs, bbox_ubs)]
     data_crop, seg_crop, _patch_shape, pslc = crop_patch(data, seg, bbox)
+    # ONE decoy draw for the whole patch, shared by every variant: a consistency/agreement pair must
+    # differ only in lesion-click placement, never in where the false-positive click landed.
+    fp = draw_false_pos(seg_crop, cfg, force_zero_prompt, rng)
     # N independent click draws over ONE shared crop, so a consistency pair differs only in the click.
     variants = [
-        points_variant(seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, True, volumes_vox)
+        points_variant(seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, True, volumes_vox, fp)
         for _ in range(prompts_per_patch)
     ]
     if extra_rng is not None:
         # Val prompt-agreement diagnostic: 1 more draw, same crop, RNG stream never touches `rng`.
         variants.append(
-            points_variant(seg_crop, cts_global, pslc, cfg, force_zero_prompt, extra_rng, True, volumes_vox)
+            points_variant(seg_crop, cts_global, pslc, cfg, force_zero_prompt, extra_rng, True, volumes_vox, fp)
         )
     return {
         "image": data_crop.astype(np.float32),

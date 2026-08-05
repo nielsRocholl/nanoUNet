@@ -37,7 +37,7 @@ def split_variant_keypoints(kp: torch.Tensor, variants: list, longi: bool) -> li
         n_pp, n_pn = v["points_pos"].shape[0], v["points_neg"].shape[0]
         pp, off = kp[off : off + n_pp], off + n_pp
         pn, off = kp[off : off + n_pn], off + n_pn
-        entry = {"pp": pp, "pn": pn}
+        entry = {"pp": pp, "pn": pn, "n_fp": int(v.get("n_false_pos", 0))}
         if longi:
             n_bp = v["bl_points_pos"].shape[0]
             entry["bp"], off = kp[off : off + n_bp], off + n_bp
@@ -46,24 +46,32 @@ def split_variant_keypoints(kp: torch.Tensor, variants: list, longi: bool) -> li
 
 
 def click_inside_flags(entries: list, seg0: torch.Tensor) -> list:
-    """Per real-variant row: 1 if a strict majority of its positive (FU) clicks land on
+    """Per real-variant row: 1 if a strict majority of its positive (FU) LESION clicks land on
     foreground in the post-augmentation, finest-resolution segmentation, 0 if the majority land
     on background (including clicks pushed outside the patch entirely), -1 if the row has no
-    positive click at all (excluded from both the inside and outside buckets by the caller)."""
+    lesion click at all (excluded from both the inside and outside buckets by the caller).
+
+    The trailing `n_fp` false-positive decoys are EXCLUDED from the vote. They are background by
+    construction, so counting them made the majority test depend on lesion count: with L correctly
+    placed lesion clicks plus one decoy the test `2*n_in > len(idx)` reduces to `L > 1`, so every
+    single-lesion patch was flagged "outside" no matter where its click landed. Validation forces
+    false_pos_probability=1.0, so that mislabelled every single-lesion val patch."""
     seg_arr = seg0[0] if seg0.ndim == 4 else seg0
     shp = seg_arr.shape
     flags = []
     for e in entries:
         pp = e["pp"]
-        if pp.numel() == 0:
+        n_fp = int(e.get("n_fp", 0))
+        n_les = pp.shape[0] - n_fp  # decoys are always the trailing entries (select_prompt_points)
+        if n_les <= 0:
             flags.append(-1)
             continue
-        idx = torch.round(pp).long().tolist()
+        idx = torch.round(pp[:n_les]).long().tolist()
         n_in = 0
         for z, y, x in idx:
             if 0 <= z < shp[0] and 0 <= y < shp[1] and 0 <= x < shp[2] and seg_arr[z, y, x] > 0:
                 n_in += 1
-        flags.append(1 if 2 * n_in > len(idx) else 0)
+        flags.append(1 if 2 * n_in > n_les else 0)
     return flags
 
 

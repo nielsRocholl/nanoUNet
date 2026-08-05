@@ -17,7 +17,7 @@ import numpy as np
 
 from nanounet.config import RoiPromptConfig
 from nanounet.data.patch_bbox import _sample_bbox, crop_patch
-from nanounet.data.sampling import points_variant
+from nanounet.data.sampling import draw_false_pos, points_variant
 from nanounet.prompt.centroids import filter_centroids_in_patch
 
 _NEAREST_MATCH_MAX_VOX = 20.0
@@ -79,14 +79,16 @@ def build_patch_longi(
         bl_fixed = np.asarray(filter_centroids_in_patch(clicks, pslc), dtype=np.float32).reshape(-1, 3)
     # N independent FU click draws over ONE shared crop (see build_patch). A null baseline duplicates
     # that variant's own FU points -> DWB(x_FU - x_FU)=0 -> identity (single-timepoint).
+    # See build_patch: ONE decoy per patch, shared by every variant.
+    fp = draw_false_pos(seg_crop, cfg, force_zero_prompt, rng)
     variants = []
     for _ in range(prompts_per_patch):
-        v = points_variant(seg_crop, cts, pslc, cfg, force_zero_prompt, rng, True, fu_volumes)
+        v = points_variant(seg_crop, cts, pslc, cfg, force_zero_prompt, rng, True, fu_volumes, fp)
         v["bl_points_pos"] = v["points_pos"] if null_baseline else bl_fixed
         variants.append(v)
     if extra_rng is not None:
         # See build_patch: independent RNG stream, same crop, does not perturb the main sequence.
-        v = points_variant(seg_crop, cts, pslc, cfg, force_zero_prompt, extra_rng, True, fu_volumes)
+        v = points_variant(seg_crop, cts, pslc, cfg, force_zero_prompt, extra_rng, True, fu_volumes, fp)
         v["bl_points_pos"] = v["points_pos"] if null_baseline else bl_fixed
         variants.append(v)
 
