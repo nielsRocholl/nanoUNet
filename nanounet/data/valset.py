@@ -146,6 +146,10 @@ class ValPatchDataset(Dataset):
             "scenario": SCENARIOS.index(e["scenario"]),
             "cohort": self.cohort_index[e["cohort"]],
             "size_bucket": SIZE_BUCKETS.index(e["size_bucket"]),
+            # Displacement can push a lesion click out of the patch in one draw but not the
+            # other (67/1500 on the real manifest); those rows measure "a lesion left the
+            # prompt", not pure placement jitter -- val_metrics reports both variants.
+            "draws_matched": int(len(e["clicks_zyx"]) == len(e["clicks2_zyx"])),
         }
         if e["subset_target_index"] >= 0:
             bits = np.unpackbits(self.manifest.packed[e["subset_target_index"]])

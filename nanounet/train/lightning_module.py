@@ -7,7 +7,6 @@ import shutil
 import time
 from typing import Any, Dict, List
 
-import numpy as np
 import pytorch_lightning as pl
 import torch
 from batchgenerators.utilities.file_and_folder_operations import join, load_json, maybe_mkdir_p
@@ -15,12 +14,13 @@ from torch import autocast
 
 from nanounet.config import RoiPromptConfig, load_config, save_config
 from nanounet.diag import purge_torch_tmp
-from nanounet.model.dice_helpers import agreement_mean, click_split_means, pooled_fg_dice, prompt_pair_dice, val_step_row
+from nanounet.model.dice_helpers import prompt_pair_dice, subset_dice_row, val_step_row
 from nanounet.model.losses import build_loss, consistency_dice_term
 from nanounet.model.lr_schedule import PolyLRScheduler, StretchedTailPolyLRScheduler
 from nanounet.model.mae_transfer import load_full_net, load_mae_encoder
 from nanounet.model.network import build_net, build_net_longi
 from nanounet.plan.plans import Plans
+from nanounet.train.val_metrics import log_val_metrics
 
 class NanoUNetLM(pl.LightningModule):
     def __init__(
@@ -81,6 +81,7 @@ class NanoUNetLM(pl.LightningModule):
         self._val_buf: List[Dict[str, Any]] = []
         self._val_buf_ablated: List[Dict[str, Any]] = []
         self._agreement_buf: List[torch.Tensor] = []
+        self._meta_buf: List[Dict[str, Any]] = []
 
     def forward(self, x: torch.Tensor):
         return self.net(x)
@@ -142,6 +143,16 @@ class NanoUNetLM(pl.LightningModule):
         ds, lm = self.enable_deep_supervision, self.label_manager
         self._val_buf.append(val_step_row(out, y, lm, ds, float(loss.detach()), batch["click_inside"]))
         self._val_buf_ablated.append(val_step_row(out_ablated, y, lm, ds, 0.0))
+        if "scenario" in batch:
+            meta = {
+                k: batch[k].cpu()
+                for k in ("scenario", "cohort", "size_bucket", "has_subset", "draws_matched")
+            }
+            meta["click_inside"] = batch["click_inside"].cpu()
+            if bool(meta["has_subset"].any()):
+                ys = batch["target_subset"].to(self.device, non_blocking=True)
+                meta["subset_row"] = subset_dice_row(out, ys, lm, ds)
+            self._meta_buf.append(meta)
         # val_prompt_agreement: 3rd forward, only when the val dataloader emits a 2nd independent
         # prompt on the same patch (data_module sets emit_prompt2=True for validation only).
         if "data_prompt2" in batch:
@@ -154,31 +165,14 @@ class NanoUNetLM(pl.LightningModule):
         self._val_buf.clear()
         self._val_buf_ablated.clear()
         self._agreement_buf.clear()
+        self._meta_buf.clear()
 
     def on_validation_epoch_end(self) -> None:
         if hasattr(self, "_epoch_t0") and not self.trainer.sanity_checking:
             self.log("epoch_wall_time_sec", float(time.perf_counter() - self._epoch_t0))
         if not self._val_buf:
             return
-        da, fb = (torch.cat([v[k] for v in self._val_buf]) for k in ("dice_a", "fp_b"))
-        val_dice = pooled_fg_dice(self._val_buf)
-        d = dict(sync_dist=True)  # each rank validates its own shard; else metrics are rank 0 only
-        self.log("val_dice", val_dice, prog_bar=True, **d)
-        self.log("val_dice_macro", float(da.mean()) if da.numel() else float("nan"), prog_bar=True, **d)
-        self.log("val_fp", float(fb.mean()) if fb.numel() else 0.0, prog_bar=False, **d)
-        for k, v in (("val_n_a", da.numel()), ("val_n_b", fb.numel())):
-            self.log(k, float(v), reduce_fx="sum", sync_dist=True)
-        self.log("val_loss", float(np.mean([v["loss"] for v in self._val_buf])), prog_bar=False, **d)
-        if self._val_buf_ablated:
-            val_dice_ablated = pooled_fg_dice(self._val_buf_ablated)
-            self.log("val_dice_prompt_ablated", val_dice_ablated, **d)
-            self.log("val_prompt_gap", val_dice - val_dice_ablated, **d)  # METRIC 3: collapse guard
-        # METRIC 2 (deployment split): Dice split by whether the drawn click landed on foreground.
-        din, dout = click_split_means(self._val_buf)
-        self.log("val_dice_click_inside", din, **d)
-        self.log("val_dice_click_outside", dout, **d)
-        # METRIC 1 (headline): pairwise prediction agreement under two independent prompt draws.
-        self.log("val_prompt_agreement", agreement_mean(self._agreement_buf), **d)
+        log_val_metrics(self)
 
     def configure_optimizers(self):
         if self.optimizer == "adamw":

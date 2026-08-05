@@ -15,6 +15,7 @@ def build_train_parser() -> argparse.ArgumentParser:
     ap.add_argument("-f", "--fold", type=parse_fold, default=0, help="Fold 0-4 or 'all'.")
     ap.add_argument("--plans", dest="plans_identifier", required=True)
     ap.add_argument("--config", dest="roi_cfg", default="configs/default.json")
+    ap.add_argument("--val-manifest", default=None, help="fixed validation manifest from nanounet_build_valset; omit for the legacy per-epoch random val sampling")
     ap.add_argument("--epochs", type=int, default=1000)
     ap.add_argument("--lr", type=float, default=0.01)
     ap.add_argument("--wd", type=float, default=3e-5)
@@ -90,6 +91,12 @@ def validate_train_args(args) -> None:
             f"Fix: pick a --batch-size that is a multiple of --prompts-per-patch (e.g. "
             f"{(args.batch_size // args.prompts_per_patch) * args.prompts_per_patch or args.prompts_per_patch})."
         )
+    if args.val_manifest and not os.path.isfile(args.val_manifest):
+        raise FileNotFoundError(
+            f"--val-manifest {args.val_manifest} does not exist.\n"
+            f"Fix: nanounet_build_valset -d {args.dataset_id} --plans {args.plans_identifier} "
+            f"--config {args.roi_cfg} --out {args.val_manifest}"
+        )
     args.roi_cfg = resolve_user_config_path(args.roi_cfg)
 
 
@@ -110,5 +117,6 @@ def train_config_rows(args, ds: str, out: str) -> list[tuple[str, object, str]]:
         ("longi", args.longi, "cli"),
         ("prompts_per_patch", args.prompts_per_patch, "cli/default"),
         ("consistency_weight", args.consistency_weight, "cli/default"),
+        ("val_manifest", args.val_manifest or "legacy random val", "cli/default"),
         ("out", out, "derived"),
     ]

@@ -15,6 +15,7 @@ from nanounet.common import ANISO_THRESHOLD, preprocessed_dir, raw_dir, setup_lo
 from nanounet.config import load_config
 from nanounet.data import augment
 from nanounet.data.blosc2_dataset import Blosc2Folder
+from nanounet.data.valset import build_val_dataloader, load_manifest
 from nanounet.dataloader_prefs import DataloaderBucket, build_iter_dataloader, init_dataloader_ipc
 from nanounet.plan.plans import Plans
 from nanounet.plan.splits import fold_keys, fold_seed, load_or_create_splits
@@ -65,8 +66,10 @@ class NanoDataModule(pl.LightningDataModule):
         longi: bool = False,
         longi_null: bool = False,
         prompts_per_patch: int = 1,
+        val_manifest: str | None = None,
     ):
         super().__init__()
+        self.val_manifest_path = val_manifest
         self.prompts_per_patch, self.dataset_name, self.fold = prompts_per_patch, dataset_name, fold
         self.plans_identifier = plans_identifier
         self.roi_cfg = load_config(roi_cfg_path)
@@ -129,9 +132,8 @@ class NanoDataModule(pl.LightningDataModule):
         ign = self.label_manager.ignore_label
         self.train_tf = augment.train_transforms(ps, rot, dss, mirrors, do_dum, umn, False, fl, reg, ign)
         self.val_tf = augment.val_transforms(dss, False, fl, reg, ign)
-        self.patch_size = ps
-        self.final_ps = ps
-        self.init_patch_size = np.array(init_ps)
+        self.val_manifest = load_manifest(self.val_manifest_path) if self.val_manifest_path else None
+        self.patch_size, self.final_ps, self.init_patch_size = ps, ps, np.array(init_ps)
 
     def train_dataloader(self) -> DataLoader:
         init_dataloader_ipc()
@@ -169,6 +171,11 @@ class NanoDataModule(pl.LightningDataModule):
 
     def val_dataloader(self) -> DataLoader:
         init_dataloader_ipc()
+        if self.val_manifest is not None:
+            return build_val_dataloader(
+                self.val_manifest, self.case_folder, self.roi_cfg, self.val_tf, self.final_ps,
+                self.longi, self.batch_size, self.dl_bucket, self.pin_memory, self.persistent_workers,
+            )
         # emit_prompt2=True: 2nd independent-prompt draw for val_prompt_agreement, own RNG stream
         # (prompts_per_patch stays 1 -- val batch composition, and val_dice, are unaffected).
         it = PatchIterable(

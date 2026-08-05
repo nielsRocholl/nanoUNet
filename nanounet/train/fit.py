@@ -163,6 +163,7 @@ def run_supervised(
         longi=args.longi,
         longi_null=args.longi_null,
         prompts_per_patch=args.prompts_per_patch,
+        val_manifest=args.val_manifest,
     )
     lm = NanoUNetLM(
         plans_path,

@@ -69,6 +69,12 @@ def val_step_row(out, y, label_manager, enable_ds: bool, loss_val: float, click_
     tp_fg, fp_fg, fn_fg = tp[:, 1:], fp[:, 1:], fn[:, 1:]
     tg, pg, ng, da, fb = val_split_metrics(tp_fg, fp_fg, fn_fg, y, output_seg)
     row = {"tp": tg, "fp": pg, "fn": ng, "dice_a": da, "fp_b": fb, "loss": loss_val}
+    # Per-row fg tp/fp/fn kept alongside the batch-pooled sums so val_metrics can re-pool by
+    # scenario/cohort. The pooled keys above are untouched: val_dice must stay byte-identical.
+    row["tp_row"] = tp_fg.detach().cpu()
+    row["fp_row"] = fp_fg.detach().cpu()
+    row["fn_row"] = fn_fg.detach().cpu()
+    row["pred_fg_row"] = (output_seg > 0).float().flatten(1).mean(1).detach().cpu()
     if click_inside is not None:
         has_fg = (y > 0).flatten(1).any(1).cpu()
         ci = click_inside.cpu()
@@ -96,6 +102,29 @@ def agreement_mean(buf) -> float:
     agree = torch.cat(buf)
     valid = agree[~torch.isnan(agree)]
     return float(valid.mean()) if valid.numel() else float("nan")
+
+
+def pooled_dice_from_rows(tp: torch.Tensor, fp: torch.Tensor, fn: torch.Tensor) -> float:
+    """pooled_fg_dice for an arbitrary row subset: same formula, rows selected by a mask."""
+    if tp.numel() == 0:
+        return float("nan")
+    a, b, c = tp.sum(0).numpy(), fp.sum(0).numpy(), fn.sum(0).numpy()
+    dg = [2 * x / (2 * x + y + z) if (2 * x + y + z) > 0 else np.nan for x, y, z in zip(a, b, c)]
+    return float(np.nanmean(dg))
+
+
+def subset_dice_row(out, target_subset, label_manager, enable_ds: bool):
+    """Per-row fg tp/fp/fn of the SAME prediction `out` against the clicked-subset target, for
+    val/subset_clicked/val_dice_vs_clicked_subset. Runs no forward pass -- `out` is already
+    computed by validation_step; this is one extra one-hot scatter."""
+    if enable_ds:
+        out = out[0]
+    output_seg = out.argmax(1)[:, None]
+    oh = torch.zeros_like(out, dtype=torch.float32, device=out.device)
+    oh.scatter_(1, output_seg, 1)
+    y = target_subset.clamp_min(0)
+    tp, fp, fn, _ = get_tp_fp_fn_tn(oh, y, axes=list(range(2, out.ndim)))
+    return tp[:, 1:].detach().cpu(), fp[:, 1:].detach().cpu(), fn[:, 1:].detach().cpu()
 
 
 def prompt_pair_dice(out, out2, enable_ds: bool) -> torch.Tensor:
