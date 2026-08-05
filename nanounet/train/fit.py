@@ -207,6 +207,7 @@ def run_supervised(
         callbacks=cb,
         logger=loggers or False,
         default_root_dir=out,
+        check_val_every_n_epoch=args.val_every_n_epochs,
     )
     cprint(f"[dim]out {out}[/dim]")
     tr.fit(lm, datamodule=dm, ckpt_path=sup_resume)

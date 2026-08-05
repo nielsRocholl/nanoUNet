@@ -58,6 +58,7 @@ def build_train_parser() -> argparse.ArgumentParser:
     ap.add_argument("--prompts-per-patch", type=int, default=1, help="Independent click draws per patch, all sharing one crop and one augmentation pass. >1 pairs rows for the consistency term; batch_size must be divisible by it.")
     ap.add_argument("--consistency-weight", type=float, default=0.0, help="Lambda max for the two-prompt consistency term, ramped linearly over --consistency-warmup-epochs; 0 disables it. Requires --prompts-per-patch >1.")
     ap.add_argument("--consistency-warmup-epochs", type=int, default=50, help="Epochs to linearly ramp lambda from 0 to --consistency-weight.")
+    ap.add_argument("--val-every-n-epochs", type=int, default=1, help="Run validation every N epochs. Dense validation exists to average out resampling noise; a fixed --val-manifest removes that noise at the source, so N=2 with a big manifest beats N=1 with a small random draw at a third of the cost.")
     return ap
 
 
@@ -118,5 +119,6 @@ def train_config_rows(args, ds: str, out: str) -> list[tuple[str, object, str]]:
         ("prompts_per_patch", args.prompts_per_patch, "cli/default"),
         ("consistency_weight", args.consistency_weight, "cli/default"),
         ("val_manifest", args.val_manifest or "legacy random val", "cli/default"),
+        ("val_every_n_epochs", args.val_every_n_epochs, "cli/default"),
         ("out", out, "derived"),
     ]

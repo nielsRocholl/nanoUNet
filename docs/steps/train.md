@@ -36,6 +36,7 @@ nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv \
 | `--plans` | str | (required) | Plans basename without `.json` |
 | `--config` | str | `configs/default.json` | ROI / prompt JSON; relative path tries cwd then repo root |
 | `--val-manifest` | str | none | Fixed validation manifest from `nanounet_build_valset`; omit for legacy per-epoch random val sampling. See [valset.md](valset.md) |
+| `--val-every-n-epochs` | int | 1 | Validate every N epochs. With a fixed `--val-manifest` the per-epoch resampling noise is gone, so `2` costs ~3% of run time instead of ~18% and still gives 600 points over 1200 epochs |
 | `--epochs` | int | `1000` | Supervised epoch budget |
 | `--lr` | float | `0.01` | Supervised initial learning rate |
 | `--wd` | float | `3e-5` | Weight decay |
