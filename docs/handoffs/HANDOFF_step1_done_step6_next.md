@@ -190,6 +190,69 @@ trivial 1.0, inflating it to 0.92.
 **Human pushes; this container has no GitHub credentials.** Check `git status` for unpushed commits
 and say so explicitly.
 
+### Session 1 end state — Steps 4 and 6
+
+**Step 4 — DONE and verified.** Commit `2450134` (`--warmup-epochs`, `--ema-decay`, `--monitor`).
+
+| Check | Result |
+|---|---|
+| `--warmup-epochs 0` vs pre-change LR curve | byte-identical, 600 steps, both schedulers |
+| `--warmup-epochs 10` | linear ramp then unshifted curve |
+| EMA train-step cost | -0.17% / +1.67% across two runs (bound 2%) — inside noise |
+| `best-epoch=570` still loads | 0 missing/unexpected keys |
+
+`--monitor` replaces `val_dice_macro if init_weights else val_dice`. That selector was
+structurally blind to false positives (macro averages over foreground-bearing rows only; every FP
+that matters lives on the rows with none), which is why the d013 finetune's `best-*.ckpt` pointed at
+an epoch where pooled and prompt-ablated Dice were at their worst.
+
+**UNMEASURED, do before the long run:** `EMACallback.on_validation_epoch_end` runs a **second full
+pass over the val set** with the shadow weights to log `val_dice_ema` alongside `val_dice` (swapping
+around the existing loop would replace `val_dice` rather than add to it). At 1500 patches that is an
+estimated +60-100 s per validation, never measured. EMA is opt-in (`--ema-decay 0` default), and the
+comparison is only needed while deciding whether to trust EMA — consider logging it every Nth
+validation.
+
+**Step 6 — code written, checks C1-C6 PASSED, not finished.**
+
+The code is committed inside `fb6f957` (see the git-hygiene note below), files:
+`nanounet/data/instance_target.py`, `nanounet/data/sampling.py`, `nanounet/config.py`,
+`configs/instance_conditional.json`.
+
+| Check | Result |
+|---|---|
+| C1 flag absent ⇒ byte-identical to pre-edit `build_patch` | **250 patches, 0 mismatches** |
+| C2 `pos=1.0` no-op except unmapped components | 24/250 patches differ, 342652 voxels |
+| C3 realised keep fraction at `pos=0.8` | **0.8104** (target 0.80 ± 0.02) |
+| C4 both prompt variants share one target | 500 pairs, 0 mismatches |
+| C5 target fg ⊆ real seg fg | 300 patches, 0 violations |
+| C6 patches with a suppressed visible lesion | 81/300 = **0.270** |
+
+Still outstanding for Step 6:
+1. **Throughput measurement** `build_patch` flag off vs on, mean + p95 over >=100 patches. The
+   isolated benchmark predicts +1.2%; the >95% GPU rule makes this a hard gate. NOT YET RUN.
+2. **C7 + dropout rebalance (human asked for this).** C2 shows the target also loses lesion
+   fragments clipped by the patch boundary — lesions whose centroid is outside the patch are never
+   clicked, so they are correctly background, but that is suppression *on top of* click dropout.
+   C3 (per-lesion) and C2 (per-patch) are different units and cannot be added. Measure at
+   `pos = 1.0` over >=250 patches:
+   `X = foreground voxels removed by boundary clipping / total foreground voxels`
+   then set `pos = 1 - (0.20 - X)` so total suppression lands at ~20%. Caveat to state when
+   reporting: dropout removes whole lesions (a clean "not yours" signal) while clipping removes
+   fragments, so they may not deserve equal weight — give the human the number and let them decide.
+3. `docs/reference/instance_targets.md` was never written.
+4. The `wip/UNVERIFIED` label on the code was lost to a git mishap; treat `fb6f957`'s code half as
+   verified only up to C1-C6 above.
+
+### Git hygiene — a mistake made this session, do not repeat
+
+`git add -A` was run while a subagent had work in progress, sweeping unverified Step 6 code into a
+docs commit (`fb6f957`). The attempted fix — splitting that commit — rewrote history the human had
+already pushed, and the next `git push` was rejected as non-fast-forward. Resolved by resetting to
+`origin/main` and cherry-picking only the genuinely new commit on top (verified the trees were
+identical first, so nothing was lost). **Stage explicit paths, never `-A`, while an agent is
+running. Never rewrite a commit that may have been pushed.**
+
 ### In flight when session 1 ended
 
 | Step | State | Files it owns |
