@@ -397,13 +397,24 @@ Contained to `nanounet/data/sampling.py` and `nanounet/data/instance_target.py`.
 **Do NOT "fix" this by lowering `click_modes.pos` alone.** That treats the symptom. The
 `pos 0.90` run (see below) tests the symptom-level fix and is expected to help only partially.
 
-### In flight when session 3 ended
+### `pos = 0.90` was tested and it does NOT help — the rate is not the lever
 
-A 20-epoch `pos = 0.90` run (`$SCRATCH/pos090run`, otherwise identical to the 20-epoch column
-above) was at epoch 15/20. Its value is now mostly as a data point — it treats the symptom, not the
-cause. Evaluate with a `Trainer.validate` pass on the fixed manifest if the checkpoint survived;
-the scratchpad does not persist across sessions, so it is probably gone. Not worth re-running: build
-the clamping fix and re-probe instead.
+Same warm start, same 20 epochs, same everything except `click_modes.pos`:
+
+| Metric | baseline | `pos 0.80` @20ep | `pos 0.90` @20ep |
+|---|---|---|---|
+| `val/subset_clicked/val_selectivity_margin` | -0.2709 | -0.2377 | **-0.2982** (worse than baseline) |
+| `val/subset_clicked/val_dice_vs_clicked_subset` | 0.4673 | 0.3029 | **0.2464** (worse) |
+| `val/all_clicked/val_dice` | 0.8390 | 0.6775 | 0.6911 (barely better) |
+| `val_prompt_gap` | 0.0819 | 0.1451 | 0.1103 (weaker) |
+| `val/none_clicked/val_pred_fg` | 0.0196 | 0.0127 | 0.0136 |
+
+Halving the deliberate dropout bought ~1.4 Dice points on `all_clicked` and made selectivity
+**worse than the untouched baseline**. So the suppression rate is not what is breaking selectivity —
+the structural problem is which lesions get suppressed. This kills decision D-A2 as a fix and is
+direct evidence for the clamping fix above.
+
+**Do not spend more compute tuning `click_modes.pos`.** Build the clamping fix first.
 
 ### Reusable recipe for the next probe
 
