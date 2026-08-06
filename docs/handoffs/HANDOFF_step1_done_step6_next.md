@@ -229,8 +229,14 @@ The code is committed inside `fb6f957` (see the git-hygiene note below), files:
 | C6 patches with a suppressed visible lesion | 81/300 = **0.270** |
 
 Still outstanding for Step 6:
-1. **Throughput measurement** `build_patch` flag off vs on, mean + p95 over >=100 patches. The
-   isolated benchmark predicts +1.2%; the >95% GPU rule makes this a hard gate. NOT YET RUN.
+1. **Throughput — partially measured, gate NOT formally closed.** Isolated core computation over
+   200 interleaved calls with cases held in RAM (no disk IO): OFF 8.93 ms mean / 19.53 ms p95,
+   ON 18.00 ms / 31.08 ms — **+9.07 ms mean absolute**, i.e. ~**1.9%** of the 477 ms IO-dominated
+   real per-patch budget. Same order as the 1.2% the isolated `cc3d` benchmark predicted, and
+   comfortably small. A full-IO benchmark was attempted and was useless — storage latency on this
+   box swamps the signal (single calls ranged ms to 1.4 s; deltas came out −87% one run, +13% the
+   next). **The literal §6b gate — 3 real training epochs with `nvidia-smi` utilisation sampling
+   and `epoch_wall_time_sec` — has NOT been run.** Do it as part of the Step 6 probe run.
 2. **C7 + dropout rebalance (human asked for this).** C2 shows the target also loses lesion
    fragments clipped by the patch boundary — lesions whose centroid is outside the patch are never
    clicked, so they are correctly background, but that is suppression *on top of* click dropout.
@@ -240,7 +246,7 @@ Still outstanding for Step 6:
    then set `pos = 1 - (0.20 - X)` so total suppression lands at ~20%. Caveat to state when
    reporting: dropout removes whole lesions (a clean "not yours" signal) while clipping removes
    fragments, so they may not deserve equal weight — give the human the number and let them decide.
-3. `docs/reference/instance_targets.md` was never written.
+3. ~~`docs/reference/instance_targets.md`~~ — written, committed.
 4. The `wip/UNVERIFIED` label on the code was lost to a git mishap; treat `fb6f957`'s code half as
    verified only up to C1-C6 above.
 
