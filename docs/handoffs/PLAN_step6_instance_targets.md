@@ -295,3 +295,27 @@ it shows up as false negatives there while `none_clicked` looks great.
 - Do not create a permanent `tests/` folder (R16).
 - If a file or field this plan describes does not exist or differs, **stop and report what you
   found**. Both previous plans in this series had a real error caught this way.
+
+---
+
+## Correction — the §6a rebalancing formula was wrong (measured 2026-08-06)
+
+C7 measured the foreground-voxel fraction removed, over 389 patches:
+
+| `pos` | lesions dropped | fg voxels removed |
+|---|---|---|
+| 1.00 | 0% | **13.69%** (boundary clipping alone) |
+| 0.92 | 8% | 16.15% |
+| 0.80 | 20% | 28.45% |
+
+Two things this plan got wrong:
+
+1. `pos = 1 - (0.20 - X)` assumes dropping 20% of *lesions* removes 20% of *voxels*. It removes
+   14.8 points. **Do not use that formula.**
+2. Linear interpolation from two points predicted `pos = 0.915`; measuring 0.92 returned 16.15%,
+   not ~19%. The relationship is strongly non-linear and noisy — a few very large lesions dominate
+   the voxel count, so which ones the dropout removes swings the result.
+
+Settled at `pos = 0.90` for the long run (interpolated between the two bracketing measurements) and
+`pos = 0.80` for the probe (maximum signal for a mechanism test). Full reasoning, including why the
+two differ and what is traded away, is in `docs/handoffs/DECISIONS_autonomous_session.md` D-A2.
