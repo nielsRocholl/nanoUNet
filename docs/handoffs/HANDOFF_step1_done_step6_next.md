@@ -282,8 +282,10 @@ The human authorised working to completion without feedback, logging every reser
 | Lost commits from session 1 | `docs/reference/instance_targets.md` and the handoff throughput numbers were committed but never pushed, so they died with the container. Both rewritten. |
 | **Step 3 — cohort-weighted sampling** | **DONE**, `5618c55`. `nanounet/data/cohorts.py`; setup 2.6 ms once, 7.09 us/draw; d013 at weight 0.25 draws 0.2512 over 200k; unnamed cohorts hold their proportional share to 0.0012; bad names and >1.0 sums raise at startup. |
 | **Step 6 probe script** | **WRITTEN**, `54295ae`, `scripts/slurm_step6_probe_h200.sh`. Warm-started from `best-epoch=570`, 80 epochs, no cohort weights (one variable at a time), lr 0.003 + 5 warmup epochs, `valset_1500*` added to the rclone whitelist with a loud failure if it did not stage. |
-| C7 / dropout rebalance | measurement running |
-| End-to-end smoke of the Step 6 config | running |
+| **C7 / dropout rebalance** | **DONE.** Boundary clipping alone removes **13.69%** of foreground voxels; the drop-rate relationship is non-linear (pos 0.92 -> 16.15%, pos 0.80 -> 28.45%). Long run set to `pos 0.90`, probe kept at `0.80`. The formula in the Step 6 plan was wrong and is corrected in place. See DECISIONS D-A2. |
+| **End-to-end smoke, Step 6 config** | **PASSED.** `nanounet_train` with `configs/instance_conditional.json` + `--init-weights` + `--val-manifest`: exit 0, checkpoint written, `val_dice 0.7962` (matches the 0.7961 baseline, as it must -- validation is unchanged by a training-target change), `train_loss -0.345` against a baseline `val_loss` of -0.409, i.e. training loss up, as predicted. |
+| **Long run config + script** | **DONE**, `db1b8a4`. `configs/longrun.json` (instance targets, `pos 0.90`, cohorts d013 0.25 / d025 0.08) and `scripts/slurm_longrun_999_h200.sh` (1200 epochs, stretched-tail retuned 376/500, resumable). |
+| **Step 5a LR probe script** | **DONE**, `195800b`. `scripts/slurm_lr_probe_h200.sh`, submitted three times via `PROBE_LR`. |
 
 ### Parked by the human, deliberately
 
@@ -322,7 +324,22 @@ oversampling. The parent handoff's "0.25 for d013" is an illustration, not a dec
    `val/subset_clicked/val_selectivity_margin` going from **-0.2709** to positive while
    `val/all_clicked/val_dice` holds at ~0.839.
 
-### Remaining order
+### Remaining order — everything buildable is built
+
+All code, configs and scripts for Steps 1-6 are written, verified and pushed. What is left needs
+GPU-days, not development:
+
+| # | Action | Cost | Gate |
+|---|---|---|---|
+| 1 | `sbatch scripts/slurm_step6_probe_h200.sh` | ~1 day | selectivity margin -0.2709 -> positive, `val/all_clicked/val_dice` holds ~0.839 |
+| 2 | Close the >95% GPU gate during that probe (`nvidia-smi -l 1`, `epoch_wall_time_sec`) | free, same run | never measured on a real training loop |
+| 3 | `PROBE_LR={0.005,0.01,0.03} sbatch scripts/slurm_lr_probe_h200.sh` | ~1 day (parallel) | report a table, not a recommendation |
+| 4 | Put the winning LR into `slurm_longrun_999_h200.sh`, then launch it | ~7.4 days, **needs one resume** | — |
+
+**If the probe fails**, the first lever is raising `click_modes.pos` back toward 0.80 (D-A2 explains
+why 0.90 weakens the selectivity signal), not abandoning the objective.
+
+### Original remaining order (superseded)
 
 Step 6 (probe) -> Step 3 code -> **human picks cohort weights** -> Step 5a LR probe -> Step 5b long
 run. Step 5 is where all the GPU time goes (~8-12 days); everything before it is hours.
