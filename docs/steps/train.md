@@ -158,3 +158,20 @@ Full write-up: [dev-notes/cgroup_memory.md](../dev-notes/cgroup_memory.md).
 | Missing plans / config | Preprocess or path error | Verify `--plans` basename and `--config` path |
 | `--consistency-weight ... requires --prompts-per-patch >= 2` | Consistency enabled without 2 prompts | Add `--prompts-per-patch 2` |
 | `batch_size ... not divisible by --prompts-per-patch` | Batch size / prompt count mismatch | Pick `--batch-size` as a multiple of `--prompts-per-patch` |
+
+## Cohort-weighted sampling
+
+Control the training mixture explicitly instead of letting it follow dataset sizes. Set in the ROI
+config, not on the CLI, because it changes the data distribution rather than the run:
+
+```json
+"sampling": {
+  "cohorts": { "d013": 0.25, "d025": 0.10 }
+}
+```
+
+Named prefixes take the stated probability; the remaining mass spreads over all other cases in
+proportion to their counts. An absent or empty block reproduces the uniform draw exactly. Names are
+bare dataset prefixes (`d013`, no trailing underscore) — `--only-prefix` still uses the underscored
+form, they are different flags. Composes with the `*_weights.json` lesion weights: cohorts pick
+which case, lesion weights pick where inside it. See `nanounet/data/cohorts.py`.

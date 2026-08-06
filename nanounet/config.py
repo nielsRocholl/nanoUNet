@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Literal, Tuple, cast
+from typing import Literal, Mapping, Tuple, cast
 
 from nanounet.data.error_table import parse_propagated
 
@@ -41,6 +41,8 @@ class SamplingConfig:
     large_lesion: LargeLesionConfig
     propagated: PropagatedConfig
     instance_targets: bool = False
+    # Absent/empty => uniform case draw, exactly. See nanounet/data/cohorts.py.
+    cohorts: Mapping[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -126,6 +128,7 @@ def _load_sampling(d: dict) -> SamplingConfig:
         large_lesion=_load_large(ll),
         propagated=_load_prop(d.get("propagated")),
         instance_targets=bool(d.get("instance_targets", False)),
+        cohorts={str(k): float(v) for k, v in (d.get("cohorts") or {}).items()},
     )
 
 

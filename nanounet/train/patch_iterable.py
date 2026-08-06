@@ -29,6 +29,7 @@ from torch.utils.data import IterableDataset
 
 from nanounet.config import RoiPromptConfig
 from nanounet.data.blosc2_dataset import Blosc2Folder, load_case_properties
+from nanounet.data.cohorts import CohortSampler
 from nanounet.data.sampling import build_patch
 from nanounet.data.sampling_longi import build_patch_longi
 from nanounet.dataloader_prefs import pin_worker_threads
@@ -99,6 +100,8 @@ class PatchIterable(IterableDataset):
         # Diagnostic-only extra variant (val_prompt_agreement); never affects prompts_per_patch,
         # __len__, or batch_size math -- see module docstring.
         self.emit_prompt2 = emit_prompt2
+        # Built ONCE here, not per draw: _producer runs this for every patch.
+        self.cohorts = CohortSampler(keys, roi_cfg.sampling.cohorts) if roi_cfg.sampling.cohorts else None
 
     def __len__(self) -> int:
         # item count == raw-patch count; NanoDataModule uses batch_size // prompts_per_patch.
@@ -117,7 +120,7 @@ class PatchIterable(IterableDataset):
         try:
             for _ in range(n_here):
                 if stop.is_set(): break
-                cid = self.keys[int(rng.integers(0, len(self.keys)))]
+                cid = self.cohorts.draw(rng) if self.cohorts else self.keys[int(rng.integers(0, len(self.keys)))]
                 prop = meta.get(cid) or meta.put(cid, load_case_properties(ds.source_folder, cid))
                 with ds.open_case(cid, need_seg=True) as (data, seg, _, _):
                     common = (data, seg, prop, self.roi_cfg, self.patch_size, self.final_patch_size)
