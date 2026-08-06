@@ -380,6 +380,83 @@ difference is. Expect both to be far below the 600-epoch model. The questions ar
 saved checkpoints with a `Trainer.validate` pass on the manifest (~140 s each). The scratchpad does
 not survive a session — if the checkpoints are gone, re-run both; the recipe is above.
 
+### 3b. A/B RESULT SO FAR — run B done, run A killed mid-flight
+
+Artefacts survived in **persistent** storage (the scratchpad does not):
+
+```
+/nnunet_data/NanoUNet_results/nanounet/step6_ab_probe/
+  B_new_ep49.ckpt              run B, new objective, 50 epochs from MAE
+  metrics_B_new_ep50.json      all 99 manifest metrics for it
+  A_old_ep24_partial.ckpt      run A, control, epoch 24 only -- run was killed at ~epoch 27
+  B_new.log / A_old_partial.log
+```
+
+**Run B (new objective, 50 epochs from MAE), scored on the fixed manifest:**
+
+| Metric | Value |
+|---|---|
+| `val_dice` | 0.3073 |
+| `val/all_clicked/val_dice` | 0.3392 |
+| `val/subset_clicked/val_dice_vs_clicked_subset` | 0.1079 |
+| `val/subset_clicked/val_dice_vs_all_lesions` | 0.2363 |
+| `val/subset_clicked/val_selectivity_margin` | -0.1284 |
+| `val/none_clicked/val_pred_fg` | 0.0123 |
+| `val/lesion_free_decoy/val_pred_fg` | 0.0048 |
+| **`val_prompt_gap`** | **+0.0001** |
+| **`val_prompt_agreement_clicked`** | **+0.9931** |
+
+**The last two mean total prompt collapse: the model ignores the click entirely.** Deleting the
+prompt channels changes the output by 0.0001 Dice, and two different clicks give identical masks.
+`lightning_module.py:136-138` names this failure mode.
+
+**Do NOT read the -0.1284 selectivity margin as an improvement over the baseline's -0.2709.** Both
+component scores are tiny because the model is weak at this budget; a small gap between two small
+numbers is not selectivity.
+
+**Partial control, epoch 25:** A `val_dice` **0.2141** vs B **0.1203**. A is ahead, but a good part
+of that is the metric, not the model: `val_dice` scores against an ALL-lesion target and B is
+trained to suppress unclicked lesions, so it is marked down for doing what it was trained to do.
+The apples-to-apples number is `val/all_clicked/val_dice`, where both objectives want the same
+answer -- **never obtained for A.**
+
+### 3c. THE OPEN QUESTION, and how to answer it
+
+Is the prompt collapse (a) a normal early-training STAGE, or (b) caused by the new objective?
+
+The stage hypothesis is plausible and the human finds it convincing: a model must learn what a
+lesion looks like before a click can help it, so early on "ignore the click" costs nothing on the
+segmentation loss while perfectly satisfying the consistency term. The 600-epoch model reached a
+gap of 0.082, so it clearly escapes eventually.
+
+**Finish the control to settle it:**
+
+```
+export NANOUNET_RAW=/nnunet_data/NanoUNet_raw NANOUNET_PREPROCESSED=/nnunet_data/NanoUNet_preprocessed NANOUNET_RESULTS=/nnunet_data/NanoUNet_results
+MAE=/nnunet_data/NanoUNet_results/nanounet/Dataset999_Merged_nnUNetResEncUNetLPlans_h200_smallpv_f0/mae_pretrain/checkpoints/last.ckpt
+nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv --mae-ckpt $MAE \
+  --val-manifest /nnunet_data/NanoUNet_preprocessed/Dataset999_Merged/valset_1500.json \
+  --val-every-n-epochs 25 --batch-size 6 --epochs 50 --iters-per-epoch 250 \
+  --lr 0.01 --warmup-epochs 5 --lr-schedule poly --monitor val_dice \
+  --prompts-per-patch 2 --consistency-weight 0.02 --dl-bucket l --dl-persistent-workers \
+  --devices 1 --accelerator cuda --precision 16-mixed --no-wandb \
+  --config configs/default.json --out <OUT>
+```
+
+~2 h on a free A100 at batch 6 (12 OOMs on 40 GB). **Write `--out` under `/nnunet_data`, not the
+scratchpad** — that is why this run was lost. Then score with a `Trainer.validate` pass on the
+manifest (~140 s); `--no-wandb` computes the 99 metrics and throws them away.
+
+| A's `val_prompt_gap` @50ep | Conclusion |
+|---|---|
+| also ~0 | collapse is a training STAGE. A 50-epoch probe cannot judge this objective — decide between a much longer probe and accepting the risk on the full run. |
+| healthy (~0.05+) | the new objective and the consistency term are fighting. Re-scope the term, lengthen `--consistency-warmup-epochs` well past 50, or drop it. |
+
+**A cheaper alternative worth considering instead of re-running A:** the consistency term ramps over
+exactly `--consistency-warmup-epochs 50`, so at epoch 50 it is at full strength for a model that
+cannot yet segment. Running B again with `--consistency-weight 0` would test the collapse hypothesis
+directly, and is arguably more informative than the control.
+
 ### 4. Environment notes that bit again this session
 
 - The git remote resets to **HTTPS** on a fresh container and push fails. Fix:
