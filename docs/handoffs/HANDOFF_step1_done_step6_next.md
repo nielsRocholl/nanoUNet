@@ -270,6 +270,21 @@ Neither was verified by the orchestrator before the session ended. **Check both 
 diffs, re-run the acceptance checks in `PLAN_step6_instance_targets.md` §6a, and do not trust an
 agent summary (§5).
 
+### Autonomous session (session 2) — progress
+
+The human authorised working to completion without feedback, logging every reserved decision in
+`docs/handoffs/DECISIONS_autonomous_session.md`. **Read that file when reviewing.**
+
+| Item | State |
+|---|---|
+| Push access | **fixed** — the container's SSH key authenticates as the human; remote switched from HTTPS to `git@github.com`. No more manual pushes. |
+| Container reset recovery | `pip install -e .` restores the console scripts; env vars must be re-exported every shell (they point at a non-existent `/nanounet_data`). |
+| Lost commits from session 1 | `docs/reference/instance_targets.md` and the handoff throughput numbers were committed but never pushed, so they died with the container. Both rewritten. |
+| **Step 3 — cohort-weighted sampling** | **DONE**, `5618c55`. `nanounet/data/cohorts.py`; setup 2.6 ms once, 7.09 us/draw; d013 at weight 0.25 draws 0.2512 over 200k; unnamed cohorts hold their proportional share to 0.0012; bad names and >1.0 sums raise at startup. |
+| **Step 6 probe script** | **WRITTEN**, `54295ae`, `scripts/slurm_step6_probe_h200.sh`. Warm-started from `best-epoch=570`, 80 epochs, no cohort weights (one variable at a time), lr 0.003 + 5 warmup epochs, `valset_1500*` added to the rclone whitelist with a loud failure if it did not stage. |
+| C7 / dropout rebalance | measurement running |
+| End-to-end smoke of the Step 6 config | running |
+
 ### Parked by the human, deliberately
 
 **Step 3 — cohort-weighted sampling.** The *code* can be built any time (`config.py` CohortConfig,
