@@ -1,4 +1,4 @@
-# Handoff — Step 1+2 shipped; Steps 4 and 6 in flight
+# Handoff — Steps 1-6 built; the click-membership fix is in, A/B from MAE running
 
 **Written 2026-08-05.** Audience: an agent with no access to the session that produced this.
 Everything needed is here. Read `docs/handoffs/HANDOFF_training_overhaul.md` (the parent plan) and
@@ -324,7 +324,73 @@ oversampling. The parent handoff's "0.25 for d013" is an illustration, not a dec
    `val/subset_clicked/val_selectivity_margin` going from **-0.2709** to positive while
    `val/all_clicked/val_dice` holds at ~0.839.
 
-## SESSION 3 — GPU PROBE RUN. READ THIS FIRST; IT CHANGES THE DESIGN.
+## SESSION 4 — THE FIX IS BUILT; SESSION 3's PROBE NUMBERS ARE VOID
+
+### 1. The membership/click fix is implemented and verified (`96d4242`)
+
+`nanounet/data/instance_target.py` rewritten, `nanounet/data/sampling.py` wired:
+
+| Was | Now |
+|---|---|
+| A lesion belongs to a patch if its **centroid** is inside | if **any of its voxels** are inside |
+| Kept lesion whose displaced click left the patch: click **dropped**, lesion -> background | click **placed on the lesion's largest in-crop component**, lesion stays foreground |
+
+Components are mapped back to their parent lesion via the sidecar `bboxes_zyx` (a crop can split one
+lesion into several components; each is a subset of exactly one lesion, so bbox containment of the
+component centroid recovers the parent, with nearest-centroid as the tie-break). `seed_zyx` probing
+is gone -- it is no longer needed.
+
+Verified before any GPU spend:
+
+| Check | Result |
+|---|---|
+| Foreground voxels removed at `pos=1.0` (i.e. no deliberate dropout) | **0.0000** (was **0.1369**) |
+| Patches with foreground but zero lesion click | **0 / 170** |
+
+So with dropout off the target is now identical to the old objective: the ONLY tissue removed is
+what we deliberately remove.
+
+### 2. Why session 3's probe numbers are void — the human was right
+
+Every session-3 probe **warm-started from the 600-epoch model** (`best-epoch=570`). That measures
+*how fast a model trained the old way can unlearn it*, not *what the new objective produces*. It
+also does not match the production recipe, which starts from MAE. The `0.839 -> 0.678` drop was
+plausibly a model fighting its previous solution rather than the objective's real cost.
+
+**Do not quote the session-3 probe table.** Kept below only as a record of what was run.
+
+### 3. The correct experiment, running at session-4 end
+
+Two runs from **MAE**, identical except the objective, 50 epochs x 250 iters, batch 6, lr 0.01,
+5 warmup epochs, poly, `--val-every-n-epochs 25`, scored on the fixed 1500-patch manifest:
+
+| Run | Config | Output |
+|---|---|---|
+| **B** (test) | `configs/instance_conditional.json` (instance targets, `pos 0.80`) | `$SCRATCH/B_new` |
+| **A** (control) | `configs/default.json` (old objective) | `$SCRATCH/A_old` |
+
+A control is **required**: at 50 epochs from MAE the absolute numbers are meaningless, only the A-vs-B
+difference is. Expect both to be far below the 600-epoch model. The questions are only:
+
+1. does B buy selectivity (`val/subset_clicked/val_selectivity_margin`, and does
+   `val_dice_vs_clicked_subset` go UP -- that is the un-confounded one), and
+2. what does it cost on `val/all_clicked/val_dice` relative to A at the same budget.
+
+**Scoring:** `--no-wandb` means the 99 per-scenario metrics are computed and discarded. Score the
+saved checkpoints with a `Trainer.validate` pass on the manifest (~140 s each). The scratchpad does
+not survive a session — if the checkpoints are gone, re-run both; the recipe is above.
+
+### 4. Environment notes that bit again this session
+
+- The git remote resets to **HTTPS** on a fresh container and push fails. Fix:
+  `git remote set-url origin git@github.com:nielsRocholl/nanoUNet.git` — the container's SSH key
+  authenticates as the human, so pushes then work without asking.
+- `pip install -e .` is needed again for the console scripts; the three `NANOUNET_*` env vars still
+  point at a non-existent `/nanounet_data`.
+
+---
+
+## SESSION 3 — probe run (NUMBERS VOID, see session 4 §2; kept as a record)
 
 Three runs on an exclusively-available A100-40GB (batch 6; 12 OOMs on 40 GB), warm-started from
 `best-epoch=570-val_dice=0.8030.ckpt`, `configs/instance_conditional.json` (`pos 0.80`),
