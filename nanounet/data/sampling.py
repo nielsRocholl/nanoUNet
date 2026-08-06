@@ -15,7 +15,7 @@ from scipy.spatial import cKDTree
 
 from nanounet.config import RoiPromptConfig
 from nanounet.data.error_table import draw_propagated_offset
-from nanounet.data.instance_target import resolve_instance_target
+from nanounet.data.instance_target import kept_clicks, resolve_instance_target
 from nanounet.data.patch_bbox import _sample_bbox, crop_patch
 from nanounet.prompt.centroids import filter_centroids_in_patch
 
@@ -31,6 +31,7 @@ def select_prompt_points(
     volumes_vox: List[float | None] | None = None,
     false_pos: List[Tuple[int, int, int]] | None = None,
     kept: list[int] | None = None,
+    fallback: dict | None = None,
 ) -> Tuple[List[Tuple[int, int, int]], List[Tuple[int, int, int]], int]:
     """Click SELECTION only -- returns (positive, negative, n_false_pos) patch-local point lists;
     rendering to heatmaps happens later (after augmentation), see nanounet/train/patch_iterable.py.
@@ -64,8 +65,11 @@ def select_prompt_points(
             cm = cfg.sampling.click_modes
             kept_ = inch if cm.drop == 0.0 else [p for p in inch if rng.random() < cm.pos]
         else:
-            # Kept set fixed per patch (instance_targets); displace ONLY those, then filter.
-            kept_ = filter_centroids_in_patch([displaced[j] for j in kept], pslc)
+            # Kept set fixed per patch (instance_targets). A kept lesion ALWAYS gets a click: if
+            # displacement threw it out of the patch, fall back to a point on its own tissue
+            # instead of dropping it. Inference does the same (longi_row.py:37-39), and dropping
+            # here trained "no click => background" for patches that at inference DO get a click.
+            kept_ = kept_clicks(displaced, kept, pslc, fallback)
         pp = list(kept_)
         if false_pos:
             n_fp = len(false_pos)
@@ -88,11 +92,11 @@ _FALSE_POS_GUARD_VOX = 5
 
 def points_variant(
     seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox, false_pos=None,
-    kept=None,
+    kept=None, fallback=None,
 ):
     """One prompt draw as float (N,3) arrays, ready to ride through the augmentation chain."""
     pp, pn, n_fp = select_prompt_points(
-        seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox, false_pos, kept
+        seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox, false_pos, kept, fallback
     )
     return {
         "points_pos": np.asarray(pp, dtype=np.float32).reshape(-1, 3),
@@ -168,25 +172,32 @@ def build_patch(
     fp = draw_false_pos(seg_crop, cfg, force_zero_prompt, rng)
     seg_out = seg_crop
     kept: list[int] | None = None
+    fallback: dict | None = None
     if cfg.sampling.instance_targets:
-        raw_seeds = properties.get("seed_zyx") or raw_c
-        seeds_global = [tuple(int(x) for x in c) for c in raw_seeds]
-        seg_out, kept = resolve_instance_target(
-            seg_crop, cts_global, seeds_global, pslc, cfg.sampling.click_modes.pos, rng
+        raw_bb = properties.get("bboxes_zyx")
+        if raw_bb is None:
+            raise KeyError(
+                "bboxes_zyx missing from case properties (needed to map each cc3d component in the "
+                "crop back to its parent lesion). Fix: nanounet_preprocess --sidecars-only"
+            )
+        bboxes_global = [[int(v) for v in b] for b in raw_bb]
+        assert len(bboxes_global) == len(cts_global), (len(bboxes_global), len(cts_global))
+        seg_out, kept, fallback = resolve_instance_target(
+            seg_crop, cts_global, bboxes_global, pslc, cfg.sampling.click_modes.pos, rng
         )
     # N independent click draws over ONE shared crop, so a consistency pair differs only in the click.
     # `seg_crop` (the REAL seg), not `seg_out`, feeds draw_false_pos above and click_inside_flags
     # downstream: decoys must avoid real tissue, and the inside/outside vote must reflect the real
     # lesion, not the click-conditional target.
     variants = [
-        points_variant(seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, True, volumes_vox, fp, kept)
+        points_variant(seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, True, volumes_vox, fp, kept, fallback)
         for _ in range(prompts_per_patch)
     ]
     if extra_rng is not None:
         # Val prompt-agreement diagnostic: 1 more draw, same crop, RNG stream never touches `rng`.
         variants.append(
             points_variant(
-                seg_crop, cts_global, pslc, cfg, force_zero_prompt, extra_rng, True, volumes_vox, fp, kept
+                seg_crop, cts_global, pslc, cfg, force_zero_prompt, extra_rng, True, volumes_vox, fp, kept, fallback
             )
         )
     return {
