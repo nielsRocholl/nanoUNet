@@ -324,6 +324,105 @@ oversampling. The parent handoff's "0.25 for d013" is an illustration, not a dec
    `val/subset_clicked/val_selectivity_margin` going from **-0.2709** to positive while
    `val/all_clicked/val_dice` holds at ~0.839.
 
+## SESSION 3 — GPU PROBE RUN. READ THIS FIRST; IT CHANGES THE DESIGN.
+
+Three runs on an exclusively-available A100-40GB (batch 6; 12 OOMs on 40 GB), warm-started from
+`best-epoch=570-val_dice=0.8030.ckpt`, `configs/instance_conditional.json` (`pos 0.80`),
+`--lr 0.003`, 250 iters/epoch, scored on the fixed 1500-patch manifest.
+
+### Results
+
+| Metric | baseline | 20 ep | 40 ep | direction |
+|---|---|---|---|---|
+| `val_prompt_gap` | 0.0819 | 0.1451 | **0.1591** | up 94% — the click matters much more |
+| `val/none_clicked/val_pred_fg` | 0.0196 | 0.0127 | **0.0104** | down 47% — quieter when told nothing |
+| `val/subset_clicked/val_selectivity_margin` | -0.2709 | -0.2377 | **-0.1329** | improving |
+| `val/all_clicked/val_dice` | 0.8390 | 0.6775 | **0.6620** | **down 21%** |
+| `val/subset_clicked/val_dice_vs_clicked_subset` | 0.4673 | 0.3029 | **0.2910** | **down** |
+| `val/subset_clicked/val_dice_vs_all_lesions` | 0.7382 | 0.5406 | **0.4238** | down |
+| `val_prompt_agreement_clicked` | ~0.87 | 0.7753 | 0.7293 | down |
+
+**The mechanism works — but the model is over-suppressing, not learning to select.** The
+selectivity margin closes because `vs_all_lesions` falls faster than `vs_clicked_subset`; the
+clicked-subset score falls too. If it were learning selection that number would RISE. This is the
+exact failure mode the Step 6 plan named in advance ("false negatives on all_clicked while
+none_clicked looks great").
+
+### GPU gate — CLOSED
+
+Sampled `nvidia-smi -l 2` across the whole 20-epoch run, 1666 samples: **median 98%**, mean 90.8%
+(dragged by the 1500-patch validation passes), 83.6% of samples >=95%, peak memory 25.9/40 GB.
+Median 98% during training clears the >95% bar. Bucket `l` (8 workers) was used because this box
+has 32 cores; production uses `xl`/16 on 64.
+
+## THE ROOT CAUSE — a train/inference mismatch, and a design error of mine
+
+`nanounet/infer/border_expand.py` exists precisely so a lesion spanning several patches is fully
+segmented: when the prediction **touches a patch face**, inference places another patch beside it
+and continues. **That only fires if the model segments up to the patch edge.**
+
+Step 6 as built trains the opposite. Membership is decided by whether a lesion's *centroid* is in
+the patch, so a lesion clipped by the patch boundary is "unclicked" and becomes background —
+measured at **13.69% of all foreground voxels** (C7), on top of the deliberate 20% dropout.
+
+And `nanounet/infer/longi_row.py:37-39` shows the mismatch outright:
+
+```python
+loc = cluster_prompts_patch_local(cluster, sz, sy, sx)
+if not loc:                                    # no click inside this patch
+    loc = local_prompt_points_for_patch(...)   # clamp one in anyway
+```
+
+| | click falls outside the patch |
+|---|---|
+| inference | **clamps** a click into the patch — there is always a prompt |
+| training | **drops** it — no prompt at all |
+
+So the case Step 6 trains as "no click => background" is one where deployment hands the model a
+click. This is not a tuning knob; it is wrong, and it would truncate large lesions in production.
+
+### THE FIX — do this next (human's idea, confirmed by the code)
+
+1. A lesion counts as present in a patch if its **voxels/bbox intersect the crop**, not if its
+   **centroid** does. Centroid-based membership is the root cause of the 13.69%.
+2. If a kept lesion's displaced click lands outside the patch, **clamp it into the patch**, mirroring
+   `local_prompt_points_for_patch` (`nanounet/infer/roi_slices.py:66`) exactly.
+3. The lesion stays **foreground**. The model sees a border-clamped prompt, identical to deployment.
+
+This removes the accidental suppression, keeps the deliberate dropout (the real selectivity signal)
+untouched, and aligns training with inference — a mismatch that exists independently of Step 6.
+
+Contained to `nanounet/data/sampling.py` and `nanounet/data/instance_target.py`. Nothing else.
+
+**Do NOT "fix" this by lowering `click_modes.pos` alone.** That treats the symptom. The
+`pos 0.90` run (see below) tests the symptom-level fix and is expected to help only partially.
+
+### In flight when session 3 ended
+
+A 20-epoch `pos = 0.90` run (`$SCRATCH/pos090run`, otherwise identical to the 20-epoch column
+above) was at epoch 15/20. Its value is now mostly as a data point — it treats the symptom, not the
+cause. Evaluate with a `Trainer.validate` pass on the fixed manifest if the checkpoint survived;
+the scratchpad does not persist across sessions, so it is probably gone. Not worth re-running: build
+the clamping fix and re-probe instead.
+
+### Reusable recipe for the next probe
+
+```
+nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv \
+  --config configs/instance_conditional.json \
+  --init-weights <baseline ckpt> \
+  --val-manifest /nnunet_data/NanoUNet_preprocessed/Dataset999_Merged/valset_1500.json \
+  --val-every-n-epochs 5 --batch-size 6 --epochs 20 --iters-per-epoch 250 \
+  --lr 0.003 --warmup-epochs 2 --lr-schedule poly --monitor val_dice \
+  --prompts-per-patch 2 --consistency-weight 0.02 --dl-bucket l --dl-persistent-workers \
+  --devices 1 --accelerator cuda --precision 16-mixed --no-wandb
+```
+
+**Use `--no-wandb` only if you then re-run `Trainer.validate` on the checkpoint** — with no logger
+the 99 per-scenario metrics are computed and thrown away. 20 epochs ~= 25 min, evaluation ~140 s.
+
+---
+
 ### Remaining order — everything buildable is built
 
 All code, configs and scripts for Steps 1-6 are written, verified and pushed. What is left needs
