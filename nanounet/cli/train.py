@@ -28,7 +28,7 @@ from nanounet.runtime import assert_mem_diag_cgroup, runtime_banner
 
 quiet_lightning_runtime()
 
-from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.loggers import CSVLogger, WandbLogger
 
 from nanounet.dataloader_prefs import dataloader_bucket, init_dataloader_ipc
 from nanounet.plan.dataset_id import convert_id_to_dataset_name
@@ -58,7 +58,10 @@ def main() -> None:
     assert_mem_diag_cgroup()
     runtime_banner(join(out, "mae_pretrain") if args.mae_pretrain else out)
 
-    loggers = []
+    # CSVLogger is ALWAYS on: without a logger Lightning computes every val metric and discards it,
+    # so a --no-wandb run silently threw away all 99 per-scenario numbers and the only way to see
+    # them was to re-run validation on a checkpoint -- which gives snapshots, never a curve.
+    loggers = [CSVLogger(save_dir=out, name="metrics")]
     if not args.no_wandb:
         loggers.append(WandbLogger(project=args.wandb_project, name=args.wandb_name or f"{ds}_f{args.fold}"))
     accel = "cuda" if args.accelerator == "gpu" else args.accelerator
