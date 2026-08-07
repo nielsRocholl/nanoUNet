@@ -23,10 +23,18 @@ from torch import autocast
 from nanounet.model.dice_helpers import pooled_fg_dice, val_step_row
 
 
+# The shadow weights themselves are free -- one multiply-add per step, no extra pass. Logging
+# val_dice_ema is NOT: it needs a second full pass over the val set. So log it rarely. At
+# --val-every-n-epochs 2 over 1200 epochs this is ~24 extra passes, ~40 min across a 7-day run,
+# which is enough to watch whether EMA is helping without paying for it every time.
+EMA_VAL_EVERY = 25
+
+
 class EMACallback(pl.Callback):
     def __init__(self, decay: float = 0.999):
         self.decay = decay
         self.shadow: dict[str, torch.Tensor] = {}
+        self._n_val = 0
 
     @torch.no_grad()
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx) -> None:
@@ -47,6 +55,10 @@ class EMACallback(pl.Callback):
     def on_validation_epoch_end(self, trainer, pl_module) -> None:
         if self.decay <= 0 or not self.shadow or trainer.sanity_checking:
             return
+        self._n_val += 1
+        # The shadow always rides along in the checkpoint; only the DIAGNOSTIC costs a second pass.
+        if self._n_val % EMA_VAL_EVERY and self._n_val != 1:
+            return
         raw = {k: v.detach().clone() for k, v in pl_module.net.state_dict().items()}
         pl_module.net.load_state_dict(self.shadow)
         buf = []
@@ -66,7 +78,8 @@ class EMACallback(pl.Callback):
         pl_module.log("val_dice_ema", pooled_fg_dice(buf), sync_dist=True)
 
     def state_dict(self) -> dict[str, Any]:
-        return {"shadow": self.shadow}
+        return {"shadow": self.shadow, "n_val": self._n_val}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         self.shadow = state_dict["shadow"]
+        self._n_val = int(state_dict.get("n_val", 0))

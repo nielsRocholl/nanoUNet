@@ -44,8 +44,13 @@
 #     epoch. Not used here (no --init-weights) but the flag is now explicit rather than implied.
 #  7. LR left at 0.01. The probe was skipped deliberately -- U-Nets are LR-robust and 0.01 trained
 #     the current 0.80-Dice model. What matters is time at low LR, which item 4 handles.
-#  8. EMA left off. The callback runs a SECOND full pass over the 1500-patch manifest to log
-#     val_dice_ema, and that cost was never measured. Do not enable it on a 7-day run untested.
+#  8. --ema-decay 0.999. The shadow weights are FREE (one multiply-add per step) and ride in the
+#     same .ckpt as the raw weights -- verified: 956 tensors stored under callbacks/EMACallback,
+#     all differing from raw, and restored on resume. Only the val_dice_ema DIAGNOSTIC costs a
+#     second pass over the manifest, so it now runs every 25th validation (~24 times over the run,
+#     ~40 min total) instead of every one (~17 h). At the end, score BOTH sets of weights on the
+#     manifest and keep the better; in a noise-dominated regime EMA is typically worth a few
+#     hundred epochs for nothing.
 #
 # EXPECT val_dice TO SIT BELOW THE OLD RUN and train loss to be higher. The target no longer
 # contains unclicked lesions, so the model is scored against a harder objective. Judge on the
@@ -101,6 +106,7 @@ CONSISTENCY_WEIGHT=0.02   # measured, not guessed: train_loss_seg averages ~0.04
                           # of total loss. A probe with this term REMOVED was strictly worse
                           # (val_dice 0.175 vs 0.307 at 50 epochs), so keep it.
 WARMUP_EPOCHS=10
+EMA_DECAY=0.999           # shadow weights are free; see item 8 above
 STRETCHED_K=376
 STRETCHED_REF=500
 VAL_EVERY_N=2
@@ -203,6 +209,7 @@ if ! nanounet_train \
   --iters-per-epoch "$ITERS_PER_EPOCH" \
   --lr 0.01 \
   --warmup-epochs "$WARMUP_EPOCHS" \
+  --ema-decay "$EMA_DECAY" \
   --monitor val_dice \
   --lr-schedule stretched_tail_poly \
   --stretched-k "$STRETCHED_K" \
