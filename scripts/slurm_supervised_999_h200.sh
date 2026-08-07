@@ -117,12 +117,12 @@ export PIP_CACHE_DIR=/root/.pip-cache
 export NANOUNET_RAW="${STORAGE}/NanoUNet_raw"
 export NANOUNET_RESULTS="${STORAGE}/NanoUNet_results"
 export NANOUNET_TMPDIR=/root/.cache/nanounet_tmp
+# No nnUNet_* exports: nanounet never imports nnunetv2 and reads only NANOUNET_*.
+# Verified by running data_module.setup() with all three unset.
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
-export nnUNet_raw="$NANOUNET_RAW"
-export nnUNet_results="$NANOUNET_RESULTS"
 mkdir -p "$PIP_CACHE_DIR" "$NANOUNET_RESULTS" "$NANOUNET_TMPDIR"
 
 if ! nanounet_train --help &>/dev/null; then
@@ -151,7 +151,6 @@ if ! rclone copy "$REMOTE_PREP/" "$LOCAL_PREP/${DS_FOLDER}" \
 fi
 
 export NANOUNET_PREPROCESSED="$LOCAL_PREP"
-export nnUNet_preprocessed="$LOCAL_PREP"
 
 VAL_MANIFEST="${LOCAL_PREP}/${DS_FOLDER}/valset_1500.json"
 if [ ! -f "$VAL_MANIFEST" ] || [ ! -f "${LOCAL_PREP}/${DS_FOLDER}/valset_1500.targets.npz" ]; then
