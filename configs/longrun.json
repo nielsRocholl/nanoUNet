@@ -13,8 +13,8 @@
       "d025": 0.08
     },
     "click_modes": {
-      "pos": 0.90,
-      "drop": 0.10
+      "pos": 0.8,
+      "drop": 0.2
     },
     "false_pos_probability": 0.05,
     "large_lesion": {
@@ -26,7 +26,10 @@
     "propagated": {
       "mode": "empirical",
       "error_table": "/nnunet_data/Longitudinal-CT/derivatives/registration_error_table.json",
-      "backends": ["original", "unigradicon"],
+      "backends": [
+        "original",
+        "unigradicon"
+      ],
       "sigma_per_axis": [
         5.95,
         6.39,

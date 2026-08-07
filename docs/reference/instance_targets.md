@@ -11,7 +11,7 @@ click.** Off by default; enabled per-config, not per-flag.
 |---|---|---|
 | annotated | yes | foreground |
 | annotated | no | **background** |
-| centroid outside the patch | no (by construction) | **background** |
+| tissue in the patch, lesion clicked elsewhere | yes (click moved into the patch) | **foreground** |
 | nothing there (decoy click) | yes | background |
 
 Unannotated lesions need no special handling: they are not in the segmentation at all, and the
@@ -50,7 +50,7 @@ nanounet_train -d 999 --plans nnUNetResEncUNetLPlans_h200_smallpv \
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `sampling.instance_targets` | bool | `false` | Mask the target down to clicked instances. Absent ⇒ current behaviour, byte-identical |
-| `sampling.click_modes.pos` | float | `1.0` | Probability an in-patch lesion keeps its click. `0.8` drops 20% |
+| `sampling.click_modes.pos` | float | `1.0` | Probability a lesion present in the patch keeps its click. `0.8` drops 20% of lesions, which is now also 20% of the suppression signal -- boundary clipping no longer contributes |
 | `sampling.click_modes.drop` | float | `0.0` | Must satisfy `pos + drop == 1` (validated in `config.py`) |
 
 `configs/default.json` is deliberately untouched, so the 600-epoch baseline stays reproducible.
@@ -60,29 +60,38 @@ nanounet_train -d 999 --plans nnUNetResEncUNetLPlans_h200_smallpv \
 Per training patch, in `build_patch` (`nanounet/data/sampling.py`) via
 `nanounet/data/instance_target.py`:
 
-1. `cc3d.connected_components` on the **crop** (not the volume) → instance labels.
-2. In-patch lesions = **undisplaced** centroids inside the patch. Undisplaced on purpose: the kept
-   set must not depend on the random displacement, which differs per prompt variant.
-3. **Draw the kept set once per patch**, each lesion kept with probability `click_modes.pos`.
-4. Map kept lesions to labels by probing `seed_zyx` **first**, then `centroids_zyx`. The plain
-   centroid falls outside its own lesion ~12% of the time on concave shapes; `seed_zyx` is the
-   argmax-EDT interior point and is guaranteed inside.
-5. Target = those instances only. `-1` padding preserved.
+1. `cc3d.connected_components` on the **crop** (not the volume) -> instance labels.
+2. Each component is mapped back to its **parent lesion** via the sidecar `bboxes_zyx`. A crop can
+   split one lesion into several components, and every component is a subset of exactly one lesion
+   (lesions are disjoint), so bbox containment of the component centroid recovers the parent, with
+   nearest-lesion-centroid as the tie-break.
+3. A lesion is **present in the patch if any of its voxels are** -- NOT if its centroid is. This is
+   the load-bearing rule; see the two consequences below.
+4. **Draw the kept set once per patch**, each present lesion kept with probability
+   `click_modes.pos`. Drawn before displacement, so it cannot differ between prompt variants.
+5. Every kept lesion **always gets a click**. If displacement threw its click out of the patch, the
+   click is placed on the centroid of that lesion's largest component in this crop.
+6. Target = the components of kept lesions only. `-1` padding preserved.
 
 Cost: `cc3d` on a 96×160×160 crop is **5.7 ms** mean, ~1.9% of the IO-dominated per-patch budget.
 Full-volume connected components would not be affordable.
 
 ### Two consequences worth knowing
 
-**A displaced click that leaves the patch keeps its lesion as foreground.** The kept set is drawn
-before displacement, so the lesion is "clicked" even if the click lands outside the visible patch.
-This is the deployment-realistic case already tracked by `val_dice_click_outside`, and it keeps both
-prompt variants' targets identical — which is what makes the consistency term correct.
+**A kept lesion is never left unclicked, and never becomes background by accident.** Both rules
+above exist because training previously contradicted inference:
 
-**Boundary-clipped lesions become background even at `pos = 1.0`.** A lesion whose centroid falls
-outside the patch is never clicked, so its voxels inside the crop are correctly background.
-Measured: **24 of 250 patches (9.6%)**. This is suppression *on top of* click dropout, so the
-effective signal is stronger than `1 - pos` alone suggests.
+- `nanounet/infer/border_expand.py` finishes a lesion that spans several patches by placing another
+  patch wherever the prediction **touches a patch face**. That only fires if the model segments up
+  to the edge. Centroid-based membership trained the opposite, suppressing **13.69% of all
+  foreground voxels** (measured) and teaching "ignore anything near the patch boundary".
+- `nanounet/infer/longi_row.py:37-39` clamps a click into any patch that contains none, so a patch
+  with no in-bounds click still gets a prompt at inference. Dropping the click during training made
+  that same situation mean "background".
+
+After the fix, at `pos = 1.0` the target is **identical to the old all-lesion objective**
+(0.0000 of foreground removed, verified over 250 patches) and **0 / 170** patches with foreground
+have zero lesion clicks. The only tissue removed is what `click_modes.pos` deliberately removes.
 
 ## Interaction with the consistency term
 

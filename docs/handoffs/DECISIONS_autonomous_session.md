@@ -22,7 +22,17 @@ cohorts, so a stale `"d013_"` fails loudly.
 
 ---
 
-## D-A2 — Click dropout: `pos = 0.90` for the long run, `pos = 0.80` for the probe
+## D-A2 — SUPERSEDED by the membership fix. `pos = 0.80` everywhere.
+
+**The whole reason 0.90 existed is gone.** 0.90 was chosen to offset boundary clipping, which was
+silently removing 13.69% of foreground on top of the deliberate dropout. The membership fix
+(`96d4242`) took that to **0.00%**, so at `pos = 0.80` the total suppression signal is now exactly
+the 20% the human asked for — and 0.90 would undershoot to ~10%.
+
+`configs/longrun.json` reverted to `pos 0.80 / drop 0.20`. The original entry is kept below for the
+measurements it records, which are still the evidence for why the fix mattered.
+
+### Original entry (numbers still valid, conclusion no longer)
 
 ### What was measured (C7, 389 patches, foreground voxels removed vs the old target)
 
