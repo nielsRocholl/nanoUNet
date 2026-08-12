@@ -36,6 +36,11 @@ class EMACallback(pl.Callback):
         self.shadow: dict[str, torch.Tensor] = {}
         self._n_val = 0
 
+    def on_train_start(self, trainer, pl_module) -> None:
+        # A shadow restored from a checkpoint arrives on CPU (Lightning maps to CPU); the net is
+        # already on its final device by now. Empty on a fresh run, so this is a no-op there.
+        self.shadow = {k: v.to(pl_module.device) for k, v in self.shadow.items()}
+
     @torch.no_grad()
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx) -> None:
         if self.decay <= 0:
