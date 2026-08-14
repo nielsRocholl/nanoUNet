@@ -120,7 +120,7 @@ def main() -> None:
         t0 = time.perf_counter()
         pad_cpu, slicer_revert, props, fu_xyz, bl_xyz, has_bl = pack
         pad = pad_cpu.pin_memory().to(dev, non_blocking=True) if dev.type == "cuda" else pad_cpu.to(dev)
-        logits = predict_case_logits(
+        logits, _ = predict_case_logits(
             net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dev=dev,
             pad=pad, slicer_revert=slicer_revert, props=props,
             points_xyz=fu_xyz, encode_prompt=True, use_tta=use_tta,

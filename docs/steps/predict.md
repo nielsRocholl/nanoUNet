@@ -2,7 +2,7 @@
 
 Prompt-driven GPU-batched inference over a dataset folder or a single case. Points are native scanner voxels `(x,y,z)`; mapping to preprocessed space is automatic.
 
-Default: clustered covering tiles, face-grid expand on, max-merge, TTA from `nano_config.json`. TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the engine may clamp further. Folder mode prefetches the next case on CPU and writes the previous seg on a side thread so the GPU does not wait.
+Default: clustered covering tiles, face-grid expand on, max-merge, TTA from `nano_config.json`. TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the engine may clamp further. Folder mode prefetches the next case on CPU and writes the previous seg on a side thread so the GPU does not wait. Native `.nii.gz` is a per-tile nearest paste (not a full-volume logit resample).
 
 ## Command
 
@@ -162,8 +162,8 @@ Not a CLI flag. Radiom remote interactive session calls these in-process:
 
 | Function | Module | Description |
 |----------|--------|-------------|
-| `predict_patch_logits` | `nanounet.infer.predict_patch` | One centered patch forward; returns `(logits, slices)`. TTA/expand off. Large lesions: `predict_case_logits`. |
-| `patch_logits_to_native_seg` | `nanounet.infer.patch_export` | Argmax patch → native scanner-space seg array |
+| `predict_patch_logits` | `nanounet.infer.predict_patch` | One centered patch forward; returns `(logits, slices)`. TTA/expand off. Large lesions: `predict_case_logits` → `(logits, tiles)`. |
+| `patch_logits_to_native_seg` | `nanounet.infer.patch_export` | Argmax patch → per-tile native paste |
 | `native_seg_to_nifti_bytes` | `nanounet.infer.patch_export` | Gzip NIfTI bytes from native seg + `props["sitk_stuff"]` |
 
 See also [radiom_embed_api.md](../dev-notes/radiom_embed_api.md).

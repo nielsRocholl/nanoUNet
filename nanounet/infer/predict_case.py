@@ -18,6 +18,7 @@ from nanounet.infer.roi_slices import (
     fg_face_touch,
     map_points_zyx_unpadded_to_padded,
 )
+from nanounet.infer.patch_export import patch_unpadded_overlap
 from nanounet.infer.tta import max_cat, predict_batch_with_tta
 from nanounet.prompt.cluster import (
     cell_slices,
@@ -65,7 +66,7 @@ def predict_case_logits(
     bl_points_xyz: list | None = None,
     points_zyx_unpadded: list[tuple[int, int, int]] | None = None,
     on_forward: Callable[[int, int], None] | None = None,
-) -> torch.Tensor:
+) -> tuple[torch.Tensor, list[tuple[slice, slice, slice]]]:
     assert mode in ("clustered", "centered")
     patch_size = tuple(cm.patch_size)
     padded_shape = tuple(pad.shape[1:])
@@ -86,7 +87,7 @@ def predict_case_logits(
         slicer_revert=slicer_revert,
     )
     if not pts_pad:
-        return bg_vec.view(-1, 1, 1, 1).expand(nh, *unpadded_shape).contiguous().float().cpu()
+        return bg_vec.view(-1, 1, 1, 1).expand(nh, *unpadded_shape).contiguous().float().cpu(), []
 
     bl_pts_pad = None
     if is_longi and bl_present and bl_points_xyz:
@@ -126,6 +127,7 @@ def predict_case_logits(
     margin_buf = torch.full(padded_shape, neg, dtype=acc_dtype, device=dev)
     logits_acc = bg_vec.view(-1, 1, 1, 1).to(acc_dtype).expand(nh, *padded_shape).contiguous()
     fwd_done = 0
+    written: list = []
     enc_kw = dict(
         is_longi=is_longi, bl_present=bl_present, bl_pts_pad=bl_pts_pad,
     )
@@ -155,6 +157,7 @@ def predict_case_logits(
                 keep.unsqueeze(0), raw.to(acc_dtype), logits_acc[:, sz, sy, sx]
             )
             margin_buf[sz, sy, sx] = torch.where(keep, m, sub_m)
+            written.append(sl)
             fwd_done += 1
             if on_forward is not None:
                 on_forward(fwd_done, fwd_done + len(pending))
@@ -177,4 +180,16 @@ def predict_case_logits(
                 pending.append((ci, nijk, nsl, extra_c))
                 extras_done[ci] += 1
 
-    return logits_acc[(slice(None), *slicer_revert[1:])].float().cpu()
+    tiles: list[tuple[slice, slice, slice]] = []
+    seen_u: set = set()
+    for sl in written:
+        ov = patch_unpadded_overlap(sl[0], sl[1], sl[2], slicer_revert)
+        if ov is None:
+            continue
+        u = ov[0]
+        key = (u[0].start, u[0].stop, u[1].start, u[1].stop, u[2].start, u[2].stop)
+        if key in seen_u:
+            continue
+        seen_u.add(key)
+        tiles.append(u)
+    return logits_acc[(slice(None), *slicer_revert[1:])].float().cpu(), tiles

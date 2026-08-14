@@ -30,7 +30,8 @@ For warm-session click inference (Radiom remote `/session/click`):
 | Function | Module | Description |
 |----------|--------|-------------|
 | `predict_patch_logits` | `nanounet.infer.predict_patch` | Single centered patch; `(logits CPU, padded slices)`. Prefer `use_tta=False`. Unchanged signature. Large lesions: call `predict_case_logits` (expand is on by default). |
-| `patch_logits_to_native_seg` | `nanounet.infer.patch_export` | Patch logits → native seg `np.ndarray` |
+| `predict_case_logits` | `nanounet.infer.predict_case` | Full-case ROI engine. Returns `(logits CPU, tiles)` — `tiles` is a list of unpadded plan-space slices for native paste. |
+| `patch_logits_to_native_seg` | `nanounet.infer.patch_export` | Patch logits → native seg `np.ndarray` (per-tile paste) |
 | `native_seg_to_nifti_bytes` | `nanounet.infer.patch_export` | Native seg → gzip `.nii.gz` bytes |
 
 Map viewer clicks to padded `(z,y,x)` via `resolve_pts_pad` / `points_to_centers_zyx` (same as batch), then call `predict_patch_logits`.

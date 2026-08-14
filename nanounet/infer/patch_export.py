@@ -1,4 +1,7 @@
-"""Patch logits → native scanner-space seg array + optional gzip NIfTI bytes."""
+"""Patch / tile segs → native scanner-space array + optional gzip NIfTI bytes.
+
+Native paste is per-tile (nnInteractive-style), not a full-volume logit resample.
+"""
 
 from __future__ import annotations
 
@@ -38,16 +41,52 @@ def _unpadded_shape(slicer_revert: tuple) -> tuple[int, int, int]:
     )
 
 
-def _convert_preprocessed_seg_to_native(seg_pp: np.ndarray, pl, cm, props: dict) -> np.ndarray:
-    from acvl_utils.cropping_and_padding.bounding_boxes import insert_crop_into_image
+def _map_ix(i: int, p: int, n: int) -> int:
+    return int(round(i * n / p)) if p else 0
 
-    sp_t = [props["spacing"][i] for i in pl.transpose_forward]
+
+def _paste_max(full: np.ndarray, crop: np.ndarray, bbox: list[list[int]]) -> None:
+    img_sl, cr_sl = [], []
+    for i, (mn, mx) in enumerate(bbox):
+        t0, t1 = max(0, mn), min(mx, full.shape[i])
+        c0 = max(0, -mn)
+        if t1 <= t0:
+            return
+        img_sl.append(slice(t0, t1))
+        cr_sl.append(slice(c0, c0 + (t1 - t0)))
+    sub = full[tuple(img_sl)]
+    src = crop[tuple(cr_sl)].astype(full.dtype, copy=False)
+    np.maximum(sub, src, out=sub)
+
+
+def tiles_to_native_seg(
+    crops: list[tuple[np.ndarray, tuple[slice, slice, slice]]],
+    pl,
+    cm,
+    props: dict,
+    pp_shape: tuple[int, int, int],
+) -> np.ndarray:
+    """Nearest-resample each plan-space crop into native scanner zeros (per-tile paste)."""
     sh = props["shape_after_cropping_and_before_resampling"]
+    sp_t = [props["spacing"][i] for i in pl.transpose_forward]
     cur_sp = cm.spacing if len(cm.spacing) == len(sh) else [sp_t[0], *cm.spacing]
     tgt_sp = [props["spacing"][i] for i in pl.transpose_forward]
-    seg_rs = cm.resampling_fn_seg(seg_pp[np.newaxis, ...], sh, cur_sp, tgt_sp)[0]
-    full = np.zeros(props["shape_before_cropping"], dtype=seg_rs.dtype)
-    full = insert_crop_into_image(full, seg_rs, props["bbox_used_for_cropping"])
+    P, N = np.array(pp_shape, dtype=np.int64), np.array(sh, dtype=np.int64)
+    crop_bb = props["bbox_used_for_cropping"]
+    full = np.zeros(props["shape_before_cropping"], dtype=np.uint8)
+    for crop, sl in crops:
+        if crop.size == 0 or not np.any(crop):
+            continue
+        lo = [sl[d].start for d in range(3)]
+        hi = [sl[d].stop for d in range(3)]
+        nlo = [_map_ix(lo[d], int(P[d]), int(N[d])) for d in range(3)]
+        nhi = [_map_ix(hi[d], int(P[d]), int(N[d])) for d in range(3)]
+        ns = tuple(max(1, min(int(N[d]), nhi[d]) - max(0, nlo[d])) for d in range(3))
+        nlo_c = [max(0, nlo[d]) for d in range(3)]
+        nhi_c = [nlo_c[d] + ns[d] for d in range(3)]
+        rs = np.asarray(cm.resampling_fn_seg(crop[None].astype(np.float32), ns, cur_sp, tgt_sp))[0]
+        bb = [[int(crop_bb[d][0] + nlo_c[d]), int(crop_bb[d][0] + nhi_c[d])] for d in range(3)]
+        _paste_max(full, rs, bb)
     return full.transpose(tuple(pl.transpose_backward))
 
 
@@ -62,7 +101,7 @@ def patch_logits_to_native_seg(
     pl,
     cm,
 ) -> np.ndarray:
-    """Argmax patch → scatter into unpadded pp volume → resample to native array."""
+    """Argmax patch → per-tile native paste (no full pp zeros volume)."""
     ov = patch_unpadded_overlap(sz, sy, sx, slicer_revert)
     if ov is None:
         raise ValueError(
@@ -80,10 +119,8 @@ def patch_logits_to_native_seg(
         patch_seg = m.argmax(dim=0)
     else:
         raise ValueError(f"unexpected patch_logits shape {tuple(patch_logits.shape)}")
-    patch_np = patch_seg.to(torch.uint8).cpu().numpy()
-    seg_pp = np.zeros(_unpadded_shape(slicer_revert), dtype=np.uint8)
-    seg_pp[uz, uy, ux] = patch_np[pz, py, px]
-    return _convert_preprocessed_seg_to_native(seg_pp, pl, cm, props)
+    crop = patch_seg.to(torch.uint8).cpu().numpy()[pz, py, px]
+    return tiles_to_native_seg([(crop, (uz, uy, ux))], pl, cm, props, _unpadded_shape(slicer_revert))
 
 
 def native_seg_to_nifti_bytes(seg: np.ndarray, props: dict) -> bytes:

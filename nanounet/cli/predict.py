@@ -143,7 +143,7 @@ def main() -> None:
         t0 = time.perf_counter()
         pad_cpu, slicer_revert, props, points_xyz, bl_points = pack
         pad = pad_cpu.pin_memory().to(dev, non_blocking=True) if dev.type == "cuda" else pad_cpu.to(dev)
-        logits = predict_case_logits(
+        logits, tiles = predict_case_logits(
             net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dev=dev,
             pad=pad, slicer_revert=slicer_revert, props=props, points_xyz=points_xyz,
             encode_prompt=not args.no_prompt_encode, use_tta=use_tta,
@@ -157,7 +157,7 @@ def main() -> None:
             if s:
                 cprint(f"[dim]{s}[/dim]")
             logged = True
-        push(export_prediction_from_logits, logits, props, cm, pl, dj, out_trunc)
+        push(export_prediction_from_logits, logits, props, cm, pl, dj, out_trunc, tiles)
         cprint(f"[bold green][{idx}/{n}] {case_id} ({time.perf_counter() - t0:.1f}s)[/bold green]")
 
     if n == 1 or args.num_workers <= 0:
