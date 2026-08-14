@@ -1,6 +1,6 @@
 """Test-time mirroring: identity + all axis combinations, fused into as few net() calls as possible.
 
-Cat size is probed once from free VRAM (HEADROOM of leftover after logits_acc). Silent; CLI reads last_*.
+Cat size from free VRAM after logits_acc. Bytes/fwd = incremental B=2−B=1 after a warmup forward. Silent; CLI reads last_*.
 """
 
 from __future__ import annotations
@@ -26,14 +26,26 @@ def max_cat(net: torch.nn.Module, x: torch.Tensor, dev: torch.device) -> int:
         last_bytes_per = last_free = None
         return MAX_CAT
     if _BYTES_PER is None:
-        torch.cuda.synchronize(dev)
-        torch.cuda.reset_peak_memory_stats(dev)
-        base = torch.cuda.memory_allocated(dev)
-        y = net(x[:1])
-        torch.cuda.synchronize(dev)
-        _BYTES_PER = torch.cuda.max_memory_allocated(dev) - base
+        x1 = x[:1]
+        y = net(x1)
         del y
+        torch.cuda.synchronize(dev)
+
+        def _peak(b):
+            xb = x1 if b == 1 else x1.expand(b, *x1.shape[1:]).contiguous()
+            torch.cuda.reset_peak_memory_stats(dev)
+            base = torch.cuda.memory_allocated(dev)
+            y = net(xb)
+            torch.cuda.synchronize(dev)
+            peak = torch.cuda.max_memory_allocated(dev) - base
+            del y
+            if b > 1:
+                del xb
+            return peak
+
+        _BYTES_PER = max(_peak(2) - _peak(1), 1)
         assert _BYTES_PER > 0
+        torch.cuda.empty_cache()
     free, _ = torch.cuda.mem_get_info(dev)
     last_max_cat = max(1, min(MAX_CAT, int(free * HEADROOM / _BYTES_PER)))
     last_bytes_per, last_free = _BYTES_PER, free
