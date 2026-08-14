@@ -21,6 +21,7 @@ from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
 from nanounet.model.dwb import LongiResEncUNet
 from nanounet.plan.labels import labels_from_dataset_json
 from nanounet.plan.plans import Plans
+from nanounet.score import check_gt_dir, report, score_case, write
 
 
 def main() -> None:
@@ -31,10 +32,8 @@ def main() -> None:
     ap.add_argument("--ckpt", default=None)
     ap.add_argument("--points", default=None, help="points JSON (single mode)")
     ap.add_argument("--baseline-image", default=None, help="sibling BL .nii.gz for two-stream longi inference")
-    ap.add_argument("--baseline-points", default=None,
-                    help="BL click set JSON (single mode), same format as --points (native voxel x,y,z, FU-registered frame)")
-    ap.add_argument("--baseline-dir", default=None,
-                    help="dataset mode: dir with per-case BL <cid>.nii.gz + <cid>.json (longi)")
+    ap.add_argument("--baseline-points", default=None, help="BL click JSON (single mode); native voxel x,y,z")
+    ap.add_argument("--baseline-dir", default=None, help="dataset mode: per-case BL <cid>.nii.gz + <cid>.json")
     ap.add_argument("--longi", action="store_true", help="force two-stream net build (else auto-detect from ckpt)")
     ap.add_argument("--no-prompt-encode", action="store_true")
     ap.add_argument("--no-border-expand", dest="border_expand", action="store_false")
@@ -46,34 +45,30 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--num-workers", type=int, default=4)
     ap.add_argument("--cluster-margin-frac", type=float, default=0.1)
-    ap.add_argument("--inference-mode", choices=("clustered", "centered"), default="clustered",
-                    help="patch placement: 'clustered' packs clicks, 'centered' = one patch per click")
+    ap.add_argument("--inference-mode", choices=("clustered", "centered"), default="clustered")
     ap.add_argument("--device", choices=("cuda", "cpu", "mps"), default="cuda")
     ap.add_argument("--no-amp", action="store_true")
     ap.add_argument("--overwrite", action="store_true")
     ap.add_argument("--patients-csv", default=None, help="CSV with patient column; keep cases whose id prefix matches")
+    ap.add_argument("--gt-dir", default=None, help="instance-labeled native GT folder (same stems as -i)")
+    ap.add_argument("--metrics-out", default=None, help="write {stem}.json and {stem}.csv; requires --gt-dir")
     args = ap.parse_args()
+    if args.metrics_out and not args.gt_dir:
+        raise SystemExit(
+            "--metrics-out was set without --gt-dir.\n"
+            "Scoring needs instance-labeled native GT with the same stems as -i.\n"
+            "Fix: nanounet_predict ... --gt-dir <targetsTrFU> --metrics-out <stem>   (see docs/steps/predict.md)"
+        )
 
     nano_header("nanoUNet predict", color="blue")
-    config_table(
-        [("model_dir", args.model_dir, "cli"), ("ckpt", args.ckpt or "auto", "cli/default"),
-         ("device", args.device, "cli/default"), ("inference_mode", args.inference_mode, "cli/default"),
-         ("border_expand", args.border_expand, "cli/default"),
-         ("batch_size", args.batch_size, "cli/default"),
-         ("tta", "auto" if args.tta_flag is None else args.tta_flag, "cli/config")],
-        title="nanoUNet predict",
-    )
     md = args.model_dir
     pl = Plans(join(md, "plans.json"))
     cm = pl.get_configuration("3d_fullres")
     dj = load_json(join(md, "dataset.json"))
     cfg = load_config(join(md, "nano_config.json"))
     labels_from_dataset_json(dj)
-
-    if args.baseline_points and not args.baseline_image:
+    if bool(args.baseline_points) != bool(args.baseline_image):
         raise SystemExit("--baseline-points requires --baseline-image")
-    if args.baseline_image and not args.baseline_points:
-        raise SystemExit("--baseline-image requires --baseline-points")
 
     d = args.device
     if d == "cuda" and not torch.cuda.is_available():
@@ -83,7 +78,6 @@ def main() -> None:
     dev = torch.device(d)
     net, lm = load_net_from_ckpt(pick_checkpoint(md, args.ckpt), cm, dj, dev, longi=args.longi)
     use_tta = (not cfg.inference.disable_tta_default) if args.tta_flag is None else args.tta_flag
-
     end = dj["file_ending"]
     single_mode = not os.path.isdir(args.input)
     if not single_mode:
@@ -121,15 +115,20 @@ def main() -> None:
         raise SystemExit("baseline given but checkpoint is not longi (no dwb.* keys). Drop --baseline-* or pass a longi ckpt.")
     if is_longi and not bl_present:
         cprint("[yellow]longi checkpoint without a baseline: running null-baseline (single-timepoint identity)[/yellow]")
-    if args.baseline_dir:
-        check_baseline_files(cases, resolve_bl, args.baseline_dir, end)
-
+    if args.baseline_dir: check_baseline_files(cases, resolve_bl, args.baseline_dir, end)
+    if args.gt_dir: check_gt_dir(args.gt_dir, cases, end)
     config_table(
-        [("longi", "on" if bl_present else ("null-baseline" if is_longi else "off"), "cli/ckpt")],
+        [("model_dir", args.model_dir, "cli"), ("ckpt", args.ckpt or "auto", "cli/default"),
+         ("device", args.device, "cli/default"), ("inference_mode", args.inference_mode, "cli/default"),
+         ("border_expand", args.border_expand, "cli/default"), ("batch_size", args.batch_size, "cli/default"),
+         ("tta", "auto" if args.tta_flag is None else args.tta_flag, "cli/config"),
+         ("longi", "on" if bl_present else ("null-baseline" if is_longi else "off"), "cli/ckpt"),
+         ("gt_dir", args.gt_dir or "off", "cli" if args.gt_dir else "default"),
+         ("metrics_out", args.metrics_out or "off", "cli" if args.metrics_out else "default")],
         title="nanoUNet predict",
     )
-
     n = len(cases)
+    scored = [(c, (o if o is not None else join(out_dir, c)) + end, j) for c, _, j, o in cases]
     ex, prev, logged = ThreadPoolExecutor(max_workers=1), None, False
 
     def push(fn, *a):
@@ -153,10 +152,9 @@ def main() -> None:
             is_longi=is_longi, bl_present=bl_case, bl_points_xyz=bl_points,
         )
         if not logged:
-            s = cat_status()
+            logged, s = True, cat_status()
             if s:
                 cprint(f"[dim]{s}[/dim]")
-            logged = True
         push(export_prediction_from_logits, logits, props, cm, pl, dj, out_trunc, tiles)
         cprint(f"[bold green][{idx}/{n}] {case_id} ({time.perf_counter() - t0:.1f}s)[/bold green]")
 
@@ -189,6 +187,10 @@ def main() -> None:
     if prev is not None:
         prev.result()
     ex.shutdown(wait=True)
+    if args.gt_dir:
+        rows = [score_case(cid, pred, join(args.gt_dir, cid + end), jp) for cid, pred, jp in scored]
+        report(rows)
+        if args.metrics_out: write(rows, args.metrics_out)
     cprint(f"[green]done — {n} case(s) → {out_dir}[/green]")
 
 

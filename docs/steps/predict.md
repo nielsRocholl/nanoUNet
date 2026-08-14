@@ -2,15 +2,20 @@
 
 Prompt-driven GPU-batched inference over a dataset folder or a single case. Points are native scanner voxels `(x,y,z)`; mapping to preprocessed space is automatic.
 
-Default: clustered covering tiles, face-grid expand on, max-merge, TTA from `nano_config.json`. TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the engine may clamp further. Folder mode prefetches the next case on CPU and writes the previous seg on a side thread so the GPU does not wait. Native `.nii.gz` is a per-tile nearest paste (not a full-volume logit resample).
+Default: clustered covering tiles, face-grid expand on, max-merge, TTA from `nano_config.json`. TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the engine may clamp further. Folder mode prefetches the next case on CPU and writes the previous seg on a side thread so the GPU does not wait. Native `.nii.gz` is a per-tile nearest paste (not a full-volume logit resample). `--gt-dir` scores LongiSeg DSC/NSD/LDR from those niftis after export drains (GPU path unchanged).
 
 ## Command
 
 Dataset mode (folder of scans + sibling JSON):
 
 ```bash
-nanounet_predict -i /path/to/scans -o /path/to/out -m /path/to/run \
-  --ckpt last.ckpt --batch-size 8 --device cuda
+nanounet_predict \
+  -i /nnunet_data/Longitudinal-CT/inputsTrFU \
+  -o /tmp/preds \
+  -m /nnunet_data/NanoUNet_results/nanounet/Dataset999_Merged_nnUNetResEncUNetLPlans_h200_smallpv_f0_h200_instance_1200ep \
+  --ckpt last.ckpt \
+  --gt-dir /nnunet_data/Longitudinal-CT/targetsTrFU \
+  --metrics-out /tmp/preds/metrics
 ```
 
 Single case:
@@ -52,6 +57,8 @@ nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
 | `--no-amp` | flag | off | Disable autocast (fp32) |
 | `--overwrite` | flag | off | Re-run cases whose output exists |
 | `--patients-csv` | str | none | CSV with patient column; filter cases by id prefix |
+| `--gt-dir` | str | none | Instance-labeled native GT folder (same stems as `-i`). Enables scoring. |
+| `--metrics-out` | str | none | Write `{stem}.json` and `{stem}.csv`. Requires `--gt-dir`. |
 
 Points JSON format: `{"points": [{"name": "1", "point": [x, y, z]}, ...]}`. Empty `points` → all-background output.
 
@@ -85,6 +92,8 @@ Points JSON format: `{"points": [{"name": "1", "point": [x, y, z]}, ...]}`. Empt
 | `Missing baseline files for longi dataset inference` | Missing BL siblings in `--baseline-dir` | Build with `nanounet_register_longi` |
 | Missing checkpoint | Wrong `--ckpt` or incomplete train | Verify path under `checkpoints/` or `finetune/` |
 | CUDA unavailable | No GPU | Use `--device cpu` or `mps` |
+| `--metrics-out was set without --gt-dir` | `--metrics-out` without scoring GT | Pass `--gt-dir` (instance labels, same stems as `-i`) |
+| `GT at '…' looks binary` | Union/binary masks in `--gt-dir` | Use instance-labeled `targetsTrFU` (voxel value = lesion_id) |
 
 Longitudinal two-stream inference: [longi.md](longi.md).
 
@@ -129,7 +138,7 @@ nanounet_predict_preprocessed \
 
 ## Viewer export (`export_d115_viewer_bundle.py`)
 
-After preprocessed inference, build a viewer-ready bundle with the registered-dataset folder layout. Native scans + union-click JSONs are copied; preprocessed preds are warped back to scanner space.
+After preprocessed inference, build a viewer-ready bundle with the registered-dataset folder layout.
 
 ```bash
 python3 scripts/export_d115_viewer_bundle.py \
