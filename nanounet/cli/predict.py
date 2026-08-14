@@ -17,6 +17,7 @@ from nanounet.infer.predict_case import MAX_BORDER_EXTRA, predict_case_logits
 from nanounet.infer.tta import cat_status
 from nanounet.infer.export import export_prediction_from_logits
 from nanounet.infer.predict_io import baseline_resolver, check_baseline_files, patient_ids_from_csv, preprocess_case
+from nanounet.data.resampling import set_resample_device
 from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
 from nanounet.model.dwb import LongiResEncUNet
 from nanounet.plan.labels import labels_from_dataset_json
@@ -71,11 +72,9 @@ def main() -> None:
         raise SystemExit("--baseline-points requires --baseline-image")
 
     d = args.device
-    if d == "cuda" and not torch.cuda.is_available():
+    if (d == "cuda" and not torch.cuda.is_available()) or (d == "mps" and not torch.backends.mps.is_available()):
         d = "cpu"
-    if d == "mps" and not torch.backends.mps.is_available():
-        d = "cpu"
-    dev = torch.device(d)
+    set_resample_device(dev := torch.device(d))
     net, lm = load_net_from_ckpt(pick_checkpoint(md, args.ckpt), cm, dj, dev, longi=args.longi)
     use_tta = (not cfg.inference.disable_tta_default) if args.tta_flag is None else args.tta_flag
     end = dj["file_ending"]
@@ -165,6 +164,7 @@ def main() -> None:
                 cprint(f"[dim][{i}/{n}] skip {cid} (exists)[/dim]")
                 continue
             bs, bj = resolve_bl(cid)
+            cprint(f"[dim][{i}/{n}] {cid}[/dim]")
             gpu(cid, i, out, preprocess_case(scan, jp, pl, cm, dj, bs, bj), bs is not None)
     else:
         pool = ThreadPoolExecutor(max_workers=args.num_workers)
@@ -175,6 +175,7 @@ def main() -> None:
                 cprint(f"[dim][{i}/{n}] skip {cid} (exists)[/dim]")
                 continue
             bs, bj = resolve_bl(cid)
+            cprint(f"[dim][{i}/{n}] {cid}[/dim]")
             inflight.append((i, cid, out, bs is not None,
                              pool.submit(preprocess_case, scan, jp, pl, cm, dj, bs, bj)))
             if len(inflight) > args.num_workers:

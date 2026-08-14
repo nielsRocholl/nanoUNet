@@ -51,7 +51,7 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetTinyPlans --config configs/de
 | Planning knobs | [steps/plan.md](steps/plan.md) |
 | MAE pretrain | [steps/pretrain.md](steps/pretrain.md) |
 | Supervised train | [steps/train.md](steps/train.md) |
-| Inference | [steps/predict.md](steps/predict.md) |
+| Inference (clustered + scores) | [steps/predict.md](steps/predict.md) |
 | Longitudinal workflow | [steps/longi.md](steps/longi.md) |
 | ROI / prompt config | [reference/config.md](reference/config.md) |
 | Patch size playbook | [reference/patch_size.md](reference/patch_size.md) |

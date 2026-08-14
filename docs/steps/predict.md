@@ -2,7 +2,7 @@
 
 Prompt-driven GPU-batched inference over a dataset folder or a single case. Points are native scanner voxels `(x,y,z)`; mapping to preprocessed space is automatic.
 
-Default: clustered covering tiles, face-grid expand on, max-merge, TTA from `nano_config.json`. TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the engine may clamp further. Folder mode prefetches the next case on CPU and writes the previous seg on a side thread so the GPU does not wait. Native `.nii.gz` is a per-tile nearest paste (not a full-volume logit resample). `--gt-dir` scores LongiSeg DSC/NSD/LDR from those niftis after export drains (GPU path unchanged).
+Default engine: clustered covering tiles, face-grid expand, max-merge, TTA from `nano_config.json`. `--gt-dir` scores LongiSeg DSC/NSD/LDR from written niftis after export drains.
 
 ## Command
 
@@ -40,7 +40,7 @@ nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
 | `-i`, `--input` | str | (required) | Folder (dataset) or single `.nii.gz` |
 | `-o`, `--output` | str | (required) | Output folder (dataset) or single `.nii.gz` |
 | `-m`, `--model-dir` | str | (required) | Run dir with `plans.json`, `dataset.json`, `nano_config.json`, checkpoint |
-| `--ckpt` | str | auto | Checkpoint name/path; `auto` → `checkpoints/last.ckpt` |
+| `--ckpt` | str | auto | Basename or path; `auto` / `last.ckpt` → `checkpoints/` then `finetune/` |
 | `--points` | str | none | Points JSON (**single mode only**) |
 | `--baseline-image` | str | none | Sibling BL `.nii.gz` for two-stream longi inference |
 | `--baseline-points` | str | none | BL click set JSON (**single mode**), same format as `--points`; native voxel `(x,y,z)` in the FU-registered frame |
@@ -51,9 +51,9 @@ nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
 | `--max-border-extra` | int | `16` | Max extra grid tiles per click cluster |
 | `--tta` / `--disable-tta` | flag | from config | Force test-time augmentation on / off |
 | `--batch-size` | int | `8` | GPU patch cap per forward; clamped to free VRAM, never auto-raised |
-| `--num-workers` | int | `4` | CPU preprocess prefetch threads (dataset mode); export overlaps on a side thread |
+| `--num-workers` | int | `4` | Prefetch threads (dataset mode). Native CT resample is GPU (not CPU cubic) |
 | `--cluster-margin-frac` | float | `0.1` | Cluster bbox margin as fraction of patch size |
-| `--inference-mode` | choice | `clustered` | `clustered` \| `centered` |
+| `--inference-mode` | choice | `clustered` | `clustered` (covering tiles) \| `centered` (one tile per click) |
 | `--device` | choice | `cuda` | `cuda` \| `cpu` \| `mps` (falls back if unavailable) |
 | `--no-amp` | flag | off | Disable autocast (fp32) |
 | `--overwrite` | flag | off | Re-run cases whose output exists |
@@ -61,11 +61,17 @@ nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
 | `--gt-dir` | str | none | Instance-labeled native GT folder (same stems as `-i`). Enables scoring. |
 | `--metrics-out` | str | none | Write `{stem}.json` and `{stem}.csv`. Requires `--gt-dir`. |
 
-Points JSON format: `{"points": [{"name": "1", "point": [x, y, z]}, ...]}`. Empty `points` → all-background output.
+Points JSON format: `{"points": [{"name": "1", "point": [x, y, z]}, ...]}`. Empty `points` → all-background output. `name` is the lesion id (integer); required for `--gt-dir` scoring.
+
+## Engine
+
+Not a sliding window. Clicks pack into the fewest covering tiles (`clustered`). `--inference-mode centered` is the same path with one tile per click. Face-grid expand grows a per-cluster lattice where predicted FG hits a tile face (`--no-border-expand` disables it). Overlaps max-merge. Native `.nii.gz` is a per-tile nearest paste, not a full-volume logit resample.
+
+TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the engine may clamp further. Folder mode prefetches the next case and writes the previous seg on a side thread. Dim `[i/n] case` prints when preprocess **starts**; the green timing line is after that case's GPU forward.
 
 ## Checkpoint selection
 
-`--ckpt auto` resolves to `last.ckpt` — correct for `-f all` runs but not always for holdout finetunes. For finetunes with real validation, pick the empirically best checkpoint (validation macro-Dice does not always track per-lesion DSC).
+`--ckpt last.ckpt` (or any basename) is tried as a path, then `-m/<name>`, `-m/checkpoints/<name>`, `-m/finetune/<name>`. Omit `--ckpt` for the same search with `last.ckpt`. For holdout finetunes, pick the empirically best checkpoint (validation macro-Dice does not always track per-lesion DSC).
 
 ## Inputs / outputs
 
@@ -73,11 +79,13 @@ Points JSON format: `{"points": [{"name": "1", "point": [x, y, z]}, ...]}`. Empt
 
 - Model run dir (`plans.json`, `dataset.json`, `nano_config.json`, checkpoint)
 - Scans (`.nii.gz`) and points JSON (dataset: sibling `<name>.json`; single: `--points`)
+- Optional `--patients-csv` (`patient` column) and `--gt-dir` instance masks (same stems as `-i`)
 
 **Outputs**
 
 - Dataset: `<out>/<case>.nii.gz` per input scan
 - Single: `-o` segmentation file
+- `--gt-dir`: after exports drain, one cases table + panel. **Dice vol** = whole-volume FG (`P>0` vs `G>0`; empty∩empty → 1). **DSC / NSD (1 mm) / LDR (IoU>0.1)** = clicked GT instance vs the pred cc3d-18 component at that click. Empty GT instance dropped; empty pred → 0. Headline is case-mean then mean-over-cases. `--metrics-out` writes `{stem}.json` + `{stem}.csv`
 
 ## Common errors
 
@@ -140,7 +148,7 @@ nanounet_predict_preprocessed \
 
 ## Viewer export (`export_d115_viewer_bundle.py`)
 
-After preprocessed inference, build a viewer-ready bundle with the registered-dataset folder layout.
+After preprocessed inference, build a viewer-ready bundle (`inputsTsFU` / `predsTsFU` / …).
 
 ```bash
 python3 scripts/export_d115_viewer_bundle.py \

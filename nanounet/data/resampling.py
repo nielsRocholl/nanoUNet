@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from collections import OrderedDict
 from copy import deepcopy
 from typing import List, Tuple, Union
@@ -16,11 +17,9 @@ from skimage.transform import resize
 
 from nanounet.common import ANISO_THRESHOLD
 
-# Inference (viewer) routes resampling to GPU via set_resample_device(); training leaves this
-# None so preprocessing stays on the exact order=3 cubic path used to build the trained data.
-RESAMPLE_DEVICE = None
-# large CT + interpolate workspace can OOM 8GB unified-memory Macs
-RESAMPLE_MAX_VOXELS = 256_000_000
+RESAMPLE_DEVICE = None  # None = CPU cubic (train); set_resample_device() for infer
+RESAMPLE_MAX_VOXELS = 256_000_000  # large CT + interpolate workspace can OOM 8GB Macs
+_RESAMPLE_LOCK = threading.Lock()
 
 
 def set_resample_device(device: "torch.device | None") -> None:
@@ -189,7 +188,8 @@ def resample_data_or_seg_to_shape(
             data = data.numpy()
         if tuple(new_shape) == tuple(data.shape[1:]):
             return data
-        return resample_torch_to_shape(data, new_shape, is_seg, RESAMPLE_DEVICE)
+        with _RESAMPLE_LOCK:
+            return resample_torch_to_shape(data, new_shape, is_seg, RESAMPLE_DEVICE)
     if isinstance(data, torch.Tensor):
         data = data.numpy()
     do_sep, axis = determine_do_sep_z_and_axis(force_separate_z, current_spacing, new_spacing, separate_z_anisotropy_threshold)
