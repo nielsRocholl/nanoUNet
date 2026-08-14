@@ -18,7 +18,7 @@ from nanounet.infer.roi_slices import (
     fg_face_touch,
     map_points_zyx_unpadded_to_padded,
 )
-from nanounet.infer.tta import predict_batch_with_tta
+from nanounet.infer.tta import max_cat, predict_batch_with_tta
 from nanounet.prompt.cluster import (
     cell_slices,
     cluster_points_for_patch_size,
@@ -129,6 +129,8 @@ def predict_case_logits(
     enc_kw = dict(
         is_longi=is_longi, bl_present=bl_present, bl_pts_pad=bl_pts_pad,
     )
+    with autocast(dev.type, enabled=amp_on):
+        batch_size = min(batch_size, max_cat(net, torch.empty((1, row_ch, *patch_size), device=dev), dev))
 
     while pending:
         batch = pending[:batch_size]

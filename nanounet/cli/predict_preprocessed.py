@@ -1,4 +1,4 @@
-"""Longi inference on preprocessed b2nd cases: CPU prefetch, GPU batched, no raw pre/post."""
+"""Longi inference on preprocessed b2nd cases: CPU prefetch, depth-1 export overlap."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from nanounet.common import config_table, cprint, nano_header, nano_progress
 from nanounet.config import load_config
 from nanounet.infer.predict_case import MAX_BORDER_EXTRA, predict_case_logits
+from nanounet.infer.tta import cat_status
 from nanounet.infer.export import save_preprocessed_seg
 from nanounet.infer.predict_io import check_preprocessed_folder, preprocess_preprocessed_case
 from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
@@ -101,23 +102,39 @@ def main() -> None:
 
     timings: list[tuple[str, float]] = []
     t_all = time.perf_counter()
+    ex, prev, logged = ThreadPoolExecutor(max_workers=1), None, False
+
+    def push(fn, *a):
+        nonlocal prev
+        if prev is not None:
+            prev.result()
+        prev = ex.submit(fn, *a)
+
+    def _export(logits, cid, out_trunc, t0):
+        seg = lm.convert_logits_to_segmentation(logits).numpy().astype(np.uint8)
+        save_preprocessed_seg(seg, spacing, out_trunc + end)
+        timings.append((cid, time.perf_counter() - t0))
 
     def gpu_case(idx: int, cid: str, out_trunc: str, pack) -> None:
+        nonlocal logged
         t0 = time.perf_counter()
         pad_cpu, slicer_revert, props, fu_xyz, bl_xyz, has_bl = pack
+        pad = pad_cpu.pin_memory().to(dev, non_blocking=True) if dev.type == "cuda" else pad_cpu.to(dev)
         logits = predict_case_logits(
             net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dev=dev,
-            pad=pad_cpu.to(dev, non_blocking=True), slicer_revert=slicer_revert, props=props,
+            pad=pad, slicer_revert=slicer_revert, props=props,
             points_xyz=fu_xyz, encode_prompt=True, use_tta=use_tta,
             border_expand=args.border_expand, max_border_expand_extra=args.max_border_extra,
             batch_size=args.batch_size, use_amp=not args.no_amp,
             cluster_margin_frac=args.cluster_margin_frac, mode=args.inference_mode,
             is_longi=True, bl_present=has_bl, bl_points_xyz=bl_xyz if has_bl else None,
         )
-        seg = lm.convert_logits_to_segmentation(logits).numpy().astype(np.uint8)
-        save_preprocessed_seg(seg, spacing, out_trunc + end)
-        dt = time.perf_counter() - t0
-        timings.append((cid, dt))
+        if not logged:
+            s = cat_status()
+            if s:
+                cprint(f"[dim]{s}[/dim]")
+            logged = True
+        push(_export, logits, cid, out_trunc, t0)
 
     with nano_progress(len(todo), "predict preprocessed") as advance:
         if len(todo) == 1 or args.num_workers <= 0:
@@ -139,6 +156,9 @@ def main() -> None:
                 gpu_case(idx, case_id, ot, fut.result())
                 advance()
             pool.shutdown(wait=True)
+    if prev is not None:
+        prev.result()
+    ex.shutdown(wait=True)
 
     total_s = time.perf_counter() - t_all
     mean_s = sum(t for _, t in timings) / len(timings)

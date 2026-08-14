@@ -2,7 +2,7 @@
 
 Prompt-driven GPU-batched inference over a dataset folder or a single case. Points are native scanner voxels `(x,y,z)`; mapping to preprocessed space is automatic.
 
-Default: clustered covering tiles, face-grid expand on, max-merge, TTA from `nano_config.json`.
+Default: clustered covering tiles, face-grid expand on, max-merge, TTA from `nano_config.json`. TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the engine may clamp further. Folder mode prefetches the next case on CPU and writes the previous seg on a side thread so the GPU does not wait.
 
 ## Command
 
@@ -44,8 +44,8 @@ nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
 | `--no-border-expand` | flag | off | Disable large-lesion face-grid expand (on by default) |
 | `--max-border-extra` | int | `16` | Max extra grid tiles per click cluster |
 | `--tta` / `--disable-tta` | flag | from config | Force test-time augmentation on / off |
-| `--batch-size` | int | `8` | GPU mini-batch (patches per forward) |
-| `--num-workers` | int | `4` | CPU preprocess prefetch threads (dataset mode) |
+| `--batch-size` | int | `8` | GPU patch cap per forward; clamped to free VRAM, never auto-raised |
+| `--num-workers` | int | `4` | CPU preprocess prefetch threads (dataset mode); export overlaps on a side thread |
 | `--cluster-margin-frac` | float | `0.1` | Cluster bbox margin as fraction of patch size |
 | `--inference-mode` | choice | `clustered` | `clustered` \| `centered` |
 | `--device` | choice | `cuda` | `cuda` \| `cpu` \| `mps` (falls back if unavailable) |
@@ -110,8 +110,8 @@ nanounet_predict_preprocessed \
 | `--no-border-expand` | flag | off | Disable large-lesion face-grid expand (on by default) |
 | `--max-border-extra` | int | `16` | Max extra grid tiles per cluster |
 | `--tta` / `--disable-tta` | flag | from config | Force TTA on / off |
-| `--batch-size` | int | `16` | GPU patch mini-batch |
-| `--num-workers` | int | `8` | CPU blosc2+pad prefetch threads |
+| `--batch-size` | int | `16` | GPU patch cap per forward; clamped to free VRAM, never auto-raised |
+| `--num-workers` | int | `8` | CPU blosc2+pad prefetch threads; export overlaps on a side thread |
 | `--inference-mode` | choice | `clustered` | `clustered` \| `centered` |
 | `--device` | choice | `cuda` | `cuda` \| `cpu` (CUDA required for practical throughput) |
 | `--no-amp` | flag | off | Disable autocast |

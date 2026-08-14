@@ -1,4 +1,4 @@
-"""Dataset / single-case prompt-driven inference with CPU prefetch."""
+"""Dataset / single-case prompt-driven inference: CPU prefetch, depth-1 export overlap."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from nanounet.common import config_table, cprint, nano_header
 from nanounet.config import load_config
 from nanounet.infer.predict_case import MAX_BORDER_EXTRA, predict_case_logits
+from nanounet.infer.tta import cat_status
 from nanounet.infer.export import export_prediction_from_logits
 from nanounet.infer.predict_io import baseline_resolver, check_baseline_files, patient_ids_from_csv, preprocess_case
 from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
@@ -129,60 +130,65 @@ def main() -> None:
     )
 
     n = len(cases)
+    ex, prev, logged = ThreadPoolExecutor(max_workers=1), None, False
 
-    def out_trunc_for(ot: str | None, case_id: str) -> str:
-        return ot if ot is not None else join(out_dir, case_id)
+    def push(fn, *a):
+        nonlocal prev
+        if prev is not None:
+            prev.result()
+        prev = ex.submit(fn, *a)
 
-    def skip_case(case_id: str, idx: int, out_trunc: str) -> bool:
-        if args.overwrite or not os.path.isfile(out_trunc + end):
-            return False
-        cprint(f"[dim][{idx}/{n}] skip {case_id} (exists)[/dim]")
-        return True
-
-    def gpu_export(case_id: str, idx: int, out_trunc: str, pack, bl_case: bool) -> None:
+    def gpu(case_id, idx, out_trunc, pack, bl_case):
+        nonlocal logged
         t0 = time.perf_counter()
         pad_cpu, slicer_revert, props, points_xyz, bl_points = pack
+        pad = pad_cpu.pin_memory().to(dev, non_blocking=True) if dev.type == "cuda" else pad_cpu.to(dev)
         logits = predict_case_logits(
             net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dev=dev,
-            pad=pad_cpu.to(dev), slicer_revert=slicer_revert, props=props, points_xyz=points_xyz,
+            pad=pad, slicer_revert=slicer_revert, props=props, points_xyz=points_xyz,
             encode_prompt=not args.no_prompt_encode, use_tta=use_tta,
             border_expand=args.border_expand, max_border_expand_extra=args.max_border_extra,
             batch_size=args.batch_size, use_amp=not args.no_amp,
             cluster_margin_frac=args.cluster_margin_frac, mode=args.inference_mode,
             is_longi=is_longi, bl_present=bl_case, bl_points_xyz=bl_points,
         )
-        export_prediction_from_logits(logits, props, cm, pl, dj, out_trunc)
+        if not logged:
+            s = cat_status()
+            if s:
+                cprint(f"[dim]{s}[/dim]")
+            logged = True
+        push(export_prediction_from_logits, logits, props, cm, pl, dj, out_trunc)
         cprint(f"[bold green][{idx}/{n}] {case_id} ({time.perf_counter() - t0:.1f}s)[/bold green]")
-
-    def consume(idx: int, case_id: str, out_trunc: str, pack, bl_case: bool) -> None:
-        gpu_export(case_id, idx, out_trunc, pack, bl_case)
 
     if n == 1 or args.num_workers <= 0:
         for i, (cid, scan, jp, ot) in enumerate(cases, 1):
-            out = out_trunc_for(ot, cid)
-            if skip_case(cid, i, out):
+            out = ot if ot is not None else join(out_dir, cid)
+            if not args.overwrite and os.path.isfile(out + end):
+                cprint(f"[dim][{i}/{n}] skip {cid} (exists)[/dim]")
                 continue
             bs, bj = resolve_bl(cid)
-            consume(i, cid, out, preprocess_case(scan, jp, pl, cm, dj, bs, bj), bs is not None)
-        cprint(f"[green]done — {n} case(s) → {out_dir}[/green]")
-        return
-
-    pool = ThreadPoolExecutor(max_workers=args.num_workers)
-    inflight: deque = deque()
-    for i, (cid, scan, jp, ot) in enumerate(cases, 1):
-        out = out_trunc_for(ot, cid)
-        if skip_case(cid, i, out):
-            continue
-        bs, bj = resolve_bl(cid)
-        inflight.append((i, cid, out, bs is not None,
-                         pool.submit(preprocess_case, scan, jp, pl, cm, dj, bs, bj)))
-        if len(inflight) > args.num_workers:
+            gpu(cid, i, out, preprocess_case(scan, jp, pl, cm, dj, bs, bj), bs is not None)
+    else:
+        pool = ThreadPoolExecutor(max_workers=args.num_workers)
+        inflight: deque = deque()
+        for i, (cid, scan, jp, ot) in enumerate(cases, 1):
+            out = ot if ot is not None else join(out_dir, cid)
+            if not args.overwrite and os.path.isfile(out + end):
+                cprint(f"[dim][{i}/{n}] skip {cid} (exists)[/dim]")
+                continue
+            bs, bj = resolve_bl(cid)
+            inflight.append((i, cid, out, bs is not None,
+                             pool.submit(preprocess_case, scan, jp, pl, cm, dj, bs, bj)))
+            if len(inflight) > args.num_workers:
+                idx, case_id, ot, bl_case, fut = inflight.popleft()
+                gpu(case_id, idx, ot, fut.result(), bl_case)
+        while inflight:
             idx, case_id, ot, bl_case, fut = inflight.popleft()
-            consume(idx, case_id, ot, fut.result(), bl_case)
-    while inflight:
-        idx, case_id, ot, bl_case, fut = inflight.popleft()
-        consume(idx, case_id, ot, fut.result(), bl_case)
-    pool.shutdown(wait=True)
+            gpu(case_id, idx, ot, fut.result(), bl_case)
+        pool.shutdown(wait=True)
+    if prev is not None:
+        prev.result()
+    ex.shutdown(wait=True)
     cprint(f"[green]done — {n} case(s) → {out_dir}[/green]")
 
 
