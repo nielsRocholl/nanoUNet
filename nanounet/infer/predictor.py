@@ -30,22 +30,12 @@ def load_net_from_ckpt(ckpt_path: str, cm, dj: dict, dev: torch.device, longi: b
 
 
 def pick_checkpoint(model_dir: str, ckpt: str | None) -> str:
-    if ckpt:
-        if os.path.isfile(ckpt):
-            return ckpt
-        p2 = join(model_dir, ckpt)
-        if os.path.isfile(p2):
-            return p2
-        raise FileNotFoundError(ckpt)
-    cdir = join(model_dir, "checkpoints")
-    p = join(cdir, "last.ckpt")
-    if os.path.isfile(p):
-        return p
-    fin = join(model_dir, "finetune", "last.ckpt")
-    if os.path.isfile(fin):
-        return fin
-    raise FileNotFoundError(
-        f"No checkpoint found in {cdir} or {cdir}/finetune/.\n"
-        f"nanounet_predict needs a Lightning .ckpt from a completed train run.\n"
-        f"Fix: pass --ckpt <name>.ckpt, or point -m at a run dir containing checkpoints/. See docs/steps/predict.md"
+    name = ckpt or "last.ckpt"
+    for p in (name, join(model_dir, name), join(model_dir, "checkpoints", name), join(model_dir, "finetune", name)):
+        if os.path.isfile(p):
+            return p
+    raise SystemExit(
+        f"No checkpoint '{name}' under '{model_dir}'.\n"
+        f"Expected a Lightning .ckpt at checkpoints/{name} or finetune/{name}.\n"
+        f"Fix: pass --ckpt <path-or-name>.ckpt  (see docs/steps/predict.md)"
     )
