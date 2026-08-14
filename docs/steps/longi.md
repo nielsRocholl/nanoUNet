@@ -16,7 +16,7 @@ flowchart LR
 ## Two-stream inference
 
 FU + baseline are preprocessed **jointly as one 2-channel case** at inference (same as training):
-one nonzero crop → FU/BL voxel-aligned → clustered mode and `--border-expand` (large-lesion
+one nonzero crop → FU/BL voxel-aligned → clustered mode and face-grid expand (large-lesion
 oversampling) behave exactly like the normal promptable model, and output is the **FU**
 segmentation.
 
@@ -26,7 +26,7 @@ nanounet_predict \
   -m "$MODEL_DIR" --ckpt finetune/best.ckpt \
   --points fu_points.json \
   --baseline-image baseline.nii.gz --baseline-points bl_clicks.json \
-  --inference-mode clustered --merge max --border-expand
+  --inference-mode clustered
 ```
 
 - `--baseline-image`: sibling BL `.nii.gz`, **already registered into the FU frame** (same

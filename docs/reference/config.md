@@ -89,10 +89,10 @@ If `propagated` is omitted entirely, `mode: "empirical"` with the defaults above
 
 | Field | Type | Default in `default.json` | Description |
 |-------|------|----------------------------|-------------|
-| `tile_step_size` | float | `0.75` | Sliding-window stride as fraction of patch size |
+| `tile_step_size` | float | `0.5` | Expand-grid stride as a fraction of patch size (0.5 = half-patch neighbours) |
 | `disable_tta_default` | bool | `false` | When `true`, predict disables TTA unless `--tta` passed |
 
-Smaller `tile_step_size` → more overlap → higher compute. Interacts with planner patch size; see [patch_size.md](patch_size.md).
+Smaller `tile_step_size` → more overlap → more expand tiles. Not a sliding-window over the volume; see [predict.md](../steps/predict.md).
 
 ---
 

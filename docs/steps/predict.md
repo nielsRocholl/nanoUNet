@@ -2,7 +2,7 @@
 
 Prompt-driven GPU-batched inference over a dataset folder or a single case. Points are native scanner voxels `(x,y,z)`; mapping to preprocessed space is automatic.
 
-Recommended: `--inference-mode clustered --merge max --border-expand` (TTA from `nano_config.json` unless overridden).
+Default: clustered covering tiles, face-grid expand on, max-merge, TTA from `nano_config.json`.
 
 ## Command
 
@@ -10,21 +10,21 @@ Dataset mode (folder of scans + sibling JSON):
 
 ```bash
 nanounet_predict -i /path/to/scans -o /path/to/out -m /path/to/run \
-  --ckpt last.ckpt --border-expand --batch-size 8 --device cuda
+  --ckpt last.ckpt --batch-size 8 --device cuda
 ```
 
 Single case:
 
 ```bash
 nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
-  -m /path/to/run --ckpt last.ckpt --border-expand
+  -m /path/to/run --ckpt last.ckpt
 ```
 
 Centered mode (one patch per click):
 
 ```bash
 nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
-  -m /path/to/run --ckpt last.ckpt --inference-mode centered --border-expand
+  -m /path/to/run --ckpt last.ckpt --inference-mode centered
 ```
 
 ## Arguments
@@ -41,14 +41,13 @@ nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
 | `--baseline-dir` | str | none | **Dataset mode** longi: dir with per-case BL `<cid>.nii.gz` + `<cid>.json` |
 | `--longi` | flag | off | Force two-stream net build (else auto-detect from ckpt) |
 | `--no-prompt-encode` | flag | off | Zero the 2 prompt channels |
-| `--border-expand` | flag | off | Large-lesion extra border patches (BFS per cluster) |
-| `--max-border-extra` | int | `16` | Max extra patches per cluster |
+| `--no-border-expand` | flag | off | Disable large-lesion face-grid expand (on by default) |
+| `--max-border-extra` | int | `16` | Max extra grid tiles per click cluster |
 | `--tta` / `--disable-tta` | flag | from config | Force test-time augmentation on / off |
-| `--batch-size` | int | `8` | GPU seed mini-batch (patches per forward) |
+| `--batch-size` | int | `8` | GPU mini-batch (patches per forward) |
 | `--num-workers` | int | `4` | CPU preprocess prefetch threads (dataset mode) |
 | `--cluster-margin-frac` | float | `0.1` | Cluster bbox margin as fraction of patch size |
 | `--inference-mode` | choice | `clustered` | `clustered` \| `centered` |
-| `--merge` | choice | `max` | `max` = union (foreground-confident patch wins); `average` = legacy gaussian mean |
 | `--device` | choice | `cuda` | `cuda` \| `cpu` \| `mps` (falls back if unavailable) |
 | `--no-amp` | flag | off | Disable autocast (fp32) |
 | `--overwrite` | flag | off | Re-run cases whose output exists |
@@ -99,7 +98,7 @@ nanounet_predict_preprocessed \
   --ckpt finetune/last.ckpt \
   -i /nnunet_data/NanoUNet_preprocessed/Dataset115_longi_test/nnUNetPlans_3d_fullres \
   -o /nnunet_data/NanoUNet_preprocessed/Dataset115_longi_test/preds \
-  --border-expand --batch-size 16 --num-workers 8
+  --batch-size 16 --num-workers 8
 ```
 
 | Argument | Type | Default | Description |
@@ -108,13 +107,12 @@ nanounet_predict_preprocessed \
 | `-i`, `--input` | str | (required) | Preprocessed `data_identifier` folder (`nnUNetPlans_3d_fullres`) |
 | `-o`, `--output` | str | (required) | Output preds folder (`<case>.nii.gz` per case) |
 | `--ckpt` | str | auto | Checkpoint; finetune runs live under `finetune/` |
-| `--border-expand` | flag | off | Large-lesion extra border patches |
-| `--max-border-extra` | int | `16` | Max extra patches per cluster |
+| `--no-border-expand` | flag | off | Disable large-lesion face-grid expand (on by default) |
+| `--max-border-extra` | int | `16` | Max extra grid tiles per cluster |
 | `--tta` / `--disable-tta` | flag | from config | Force TTA on / off |
 | `--batch-size` | int | `16` | GPU patch mini-batch |
 | `--num-workers` | int | `8` | CPU blosc2+pad prefetch threads |
 | `--inference-mode` | choice | `clustered` | `clustered` \| `centered` |
-| `--merge` | choice | `max` | `max` \| `average` |
 | `--device` | choice | `cuda` | `cuda` \| `cpu` (CUDA required for practical throughput) |
 | `--no-amp` | flag | off | Disable autocast |
 | `--overwrite` | flag | off | Re-run cases whose output exists |
@@ -164,7 +162,7 @@ Not a CLI flag. Radiom remote interactive session calls these in-process:
 
 | Function | Module | Description |
 |----------|--------|-------------|
-| `predict_patch_logits` | `nanounet.infer.predict_patch` | One centered patch forward; returns `(logits, slices)`. TTA/border-expand off by default. |
+| `predict_patch_logits` | `nanounet.infer.predict_patch` | One centered patch forward; returns `(logits, slices)`. TTA/expand off. Large lesions: `predict_case_logits`. |
 | `patch_logits_to_native_seg` | `nanounet.infer.patch_export` | Argmax patch → native scanner-space seg array |
 | `native_seg_to_nifti_bytes` | `nanounet.infer.patch_export` | Gzip NIfTI bytes from native seg + `props["sitk_stuff"]` |
 

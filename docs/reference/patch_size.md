@@ -10,7 +10,7 @@ This note ties together what the **patch size** knobs in nanoUNet do, what the l
   - `--patch-vol small|medium|large|xlarge` — starting isotropic edge before the VRAM shrink loop.
   - `--gpu-memory-gb` — VRAM budget the planner targets (use the **GPU you train on**, not a random CPU node).
 - The ResEnc planner implementation is in [`planner_resenc.py`](../../nanounet/plan/resenc/planner_resenc.py): it may **shrink** the patch further if footprint × network width exceeds VRAM **or** enlarge if memory allows starting from `--patch-vol`.
-- Inference **sliding-window** spacing (`tile_step_size` in `configs/default.json`) interacts with patch size — smaller footprints mean more sliding tiles and higher compute cost for the same overlap policy.
+- Inference expand-grid stride (`tile_step_size` in `configs/default.json`) is a fraction of patch size — smaller values add more overlapping neighbour tiles when a prediction hits a patch face.
 
 Empirically patch size couples **everything**: "larger everywhere" rarely holds; you optimise the quadruple (FOV × memory × batch × pyramid depth).
 

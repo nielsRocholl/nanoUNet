@@ -14,9 +14,8 @@ from batchgenerators.utilities.file_and_folder_operations import join, load_json
 
 from nanounet.common import config_table, cprint, nano_header, nano_progress
 from nanounet.config import load_config
-from nanounet.infer.border_expand import DEFAULT_MAX_BORDER_EXPAND_EXTRA
+from nanounet.infer.predict_case import MAX_BORDER_EXTRA, predict_case_logits
 from nanounet.infer.export import save_preprocessed_seg
-from nanounet.infer.predict_case import predict_case_logits
 from nanounet.infer.predict_io import check_preprocessed_folder, preprocess_preprocessed_case
 from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
 from nanounet.plan.labels import labels_from_dataset_json
@@ -32,13 +31,13 @@ def main() -> None:
     ap.add_argument("-i", "--input", required=True, help="preprocessed data_identifier folder")
     ap.add_argument("-o", "--output", required=True, help="output preds folder")
     ap.add_argument("--ckpt", default=None)
-    ap.add_argument("--border-expand", action="store_true")
-    ap.add_argument("--max-border-extra", type=int, default=DEFAULT_MAX_BORDER_EXPAND_EXTRA)
+    ap.add_argument("--no-border-expand", dest="border_expand", action="store_false")
+    ap.set_defaults(border_expand=True)
+    ap.add_argument("--max-border-extra", type=int, default=MAX_BORDER_EXTRA)
     tta_g = ap.add_mutually_exclusive_group()
     tta_g.add_argument("--disable-tta", dest="tta_flag", action="store_false", default=None)
     tta_g.add_argument("--tta", dest="tta_flag", action="store_true", default=None)
     ap.add_argument("--inference-mode", choices=("clustered", "centered"), default="clustered")
-    ap.add_argument("--merge", choices=("max", "average"), default="max")
     ap.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     ap.add_argument("--num-workers", type=int, default=DEFAULT_NUM_WORKERS,
                     help="CPU blosc2+pad prefetch threads (keep GPU fed)")
@@ -75,9 +74,10 @@ def main() -> None:
         [("model_dir", md, "cli"), ("ckpt", args.ckpt or ckpt_path, "cli/auto"),
          ("input", args.input, "cli"), ("output", args.output, "cli"),
          ("cases", len(case_ids), "input"), ("device", dev, "cli"),
-         ("inference_mode", args.inference_mode, "cli/default"), ("merge", args.merge, "cli/default"),
+         ("inference_mode", args.inference_mode, "cli/default"),
+         ("border_expand", args.border_expand, "cli/default"),
          ("batch_size", args.batch_size, "cli/default"), ("num_workers", args.num_workers, "cli/default"),
-         ("tta", use_tta, "cli/config"), ("border_expand", args.border_expand, "cli")],
+         ("tta", use_tta, "cli/config")],
         title="nanoUNet predict (preprocessed)",
     )
 
@@ -106,12 +106,12 @@ def main() -> None:
         t0 = time.perf_counter()
         pad_cpu, slicer_revert, props, fu_xyz, bl_xyz, has_bl = pack
         logits = predict_case_logits(
-            net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dj=dj, dev=dev,
+            net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dev=dev,
             pad=pad_cpu.to(dev, non_blocking=True), slicer_revert=slicer_revert, props=props,
             points_xyz=fu_xyz, encode_prompt=True, use_tta=use_tta,
             border_expand=args.border_expand, max_border_expand_extra=args.max_border_extra,
             batch_size=args.batch_size, use_amp=not args.no_amp,
-            cluster_margin_frac=args.cluster_margin_frac, mode=args.inference_mode, merge=args.merge,
+            cluster_margin_frac=args.cluster_margin_frac, mode=args.inference_mode,
             is_longi=True, bl_present=has_bl, bl_points_xyz=bl_xyz if has_bl else None,
         )
         seg = lm.convert_logits_to_segmentation(logits).numpy().astype(np.uint8)

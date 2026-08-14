@@ -1,16 +1,17 @@
-"""Padding offset math for ROI tiles: slice helpers, bg logits vector, merge normalization."""
+"""Padding offset math for ROI tiles: slice helpers, bg logits, face-FG expand clicks."""
 
 from __future__ import annotations
 
 from typing import List, Tuple
 
-import numpy as np
 import torch
 
 from nanounet.plan.labels import Labels
 
+ZYX = Tuple[int, int, int]
 
-def map_points_zyx_unpadded_to_padded(points: List[Tuple[int, int, int]], slicer_revert: tuple) -> List[Tuple[int, int, int]]:
+
+def map_points_zyx_unpadded_to_padded(points: List[ZYX], slicer_revert: tuple) -> List[ZYX]:
     dz, dy, dx = slicer_revert[1].start, slicer_revert[2].start, slicer_revert[3].start
     return [(z + dz, y + dy, x + dx) for z, y, x in points]
 
@@ -26,77 +27,69 @@ def centered_spatial_slices_at_point(
     return tuple(slice(starts[i], starts[i] + patch_size[i]) for i in range(3))
 
 
-def spatial_slices_from_lbs(
-    z0: int, y0: int, x0: int, patch_size: Tuple[int, int, int], padded_shape: Tuple[int, int, int]
-) -> tuple[slice, slice, slice]:
-    starts = []
-    for s, ps, dim in zip((z0, y0, x0), patch_size, padded_shape):
-        s = max(0, min(s, dim - ps))
-        starts.append(s)
-    return tuple(slice(starts[i], starts[i] + patch_size[i]) for i in range(3))
-
-
-def spatial_slices_to_tuple(sz: slice, sy: slice, sx: slice) -> Tuple[int, int, int, int, int, int]:
-    return (sz.start, sz.stop, sy.start, sy.stop, sx.start, sx.stop)
-
-
-def shift_spatial_slices(
-    sz: slice,
-    sy: slice,
-    sx: slice,
-    axis: int,
-    is_low_face: bool,
-    patch_size: Tuple[int, int, int],
-    padded_shape: Tuple[int, int, int],
-) -> tuple[slice, slice, slice]:
-    z0, y0, x0 = sz.start, sy.start, sx.start
-    half = [patch_size[i] // 2 for i in range(3)]
-    if axis == 0:
-        z0 = z0 - half[0] if is_low_face else z0 + half[0]
-    elif axis == 1:
-        y0 = y0 - half[1] if is_low_face else y0 + half[1]
-    else:
-        x0 = x0 - half[2] if is_low_face else x0 + half[2]
-    z0 = max(0, min(z0, padded_shape[0] - patch_size[0]))
-    y0 = max(0, min(y0, padded_shape[1] - patch_size[1]))
-    x0 = max(0, min(x0, padded_shape[2] - patch_size[2]))
-    return slice(z0, z0 + patch_size[0]), slice(y0, y0 + patch_size[1]), slice(x0, x0 + patch_size[2])
-
-
-def local_prompt_points_for_patch(
-    seed_padded: Tuple[int, int, int] | None,
-    sz: slice,
-    sy: slice,
-    sx: slice,
-    patch_size: Tuple[int, int, int],
-) -> List[Tuple[int, int, int]]:
-    if seed_padded is None:
-        return []
-    pz, py, px = seed_padded
-    if sz.start <= pz < sz.stop and sy.start <= py < sy.stop and sx.start <= px < sx.stop:
-        return [(pz - sz.start, py - sy.start, px - sx.start)]
-    return [(patch_size[0] // 2, patch_size[1] // 2, patch_size[2] // 2)]
-
-
 def background_logits_vector(lm: Labels, num_heads: int, device: torch.device, dtype=torch.float32) -> torch.Tensor:
     v = torch.full((num_heads,), -10.0, device=device, dtype=dtype)
     v[0] = 10.0
     return v
 
 
-def safe_divide_merged_logits(logits: torch.Tensor, n_pred: torch.Tensor, bg: torch.Tensor, eps: float = 1e-6) -> None:
-    valid = n_pred > eps
-    inv = torch.clamp(n_pred, min=eps)
-    scaled = logits / inv
-    bg_e = bg.view(-1, 1, 1, 1).expand_as(logits)
-    ve = valid.unsqueeze(0).expand_as(logits)
-    logits.copy_(torch.where(ve, scaled, bg_e))
-
-
-@torch.inference_mode()
-def patch_fg_mask_from_logits(patch_logits: torch.Tensor, lm: Labels) -> np.ndarray:
-    seg = patch_logits.argmax(0)
-    fg = torch.zeros_like(seg, dtype=torch.bool)
+def _fg_mask(logits: torch.Tensor, lm: Labels) -> torch.Tensor:
+    seg = logits.argmax(0)
+    fg = torch.zeros(seg.shape, dtype=torch.bool, device=seg.device)
     for fl in lm.foreground_labels:
         fg |= seg == int(fl)
-    return fg.cpu().numpy()
+    return fg
+
+
+def fg_face_touch(logits: torch.Tensor, lm: Labels) -> Tuple[bool, ...]:
+    fg = _fg_mask(logits, lm)
+    t = torch.stack([
+        fg[0].any(), fg[-1].any(),
+        fg[:, 0].any(), fg[:, -1].any(),
+        fg[:, :, 0].any(), fg[:, :, -1].any(),
+    ])
+    return tuple(bool(x) for x in t.tolist())
+
+
+def face_fg_click_global(
+    logits: torch.Tensor, sl: Tuple[slice, slice, slice], face_i: int, lm: Labels
+) -> ZYX | None:
+    """Centroid of FG on parent face `face_i`, in padded global coords. None if the face is empty."""
+    fg = _fg_mask(logits, lm)
+    loc = _face_centroid_local(fg, face_i)
+    if loc is None:
+        return None
+    return (sl[0].start + loc[0], sl[1].start + loc[1], sl[2].start + loc[2])
+
+
+def _face_centroid_local(fg: torch.Tensor, face_i: int) -> ZYX | None:
+    d0, d1, d2 = fg.shape
+    if face_i == 0:
+        slc, a0 = fg[0], 0
+    elif face_i == 1:
+        slc, a0 = fg[-1], d0 - 1
+    elif face_i == 2:
+        slc, a0 = fg[:, 0], 0
+    elif face_i == 3:
+        slc, a0 = fg[:, -1], d1 - 1
+    elif face_i == 4:
+        slc, a0 = fg[:, :, 0], 0
+    else:
+        slc, a0 = fg[:, :, -1], d2 - 1
+    if not slc.any():
+        return None
+    idx = torch.nonzero(slc, as_tuple=False).float().mean(0)
+    b, c = int(idx[0].round()), int(idx[1].round())
+    if face_i <= 1:
+        return (a0, b, c)
+    if face_i <= 3:
+        return (b, a0, c)
+    return (b, c, a0)
+
+
+def extra_click_in_tile(gxyz: ZYX, sl: Tuple[slice, slice, slice], patch_size: Tuple[int, int, int]) -> ZYX:
+    """Parent-face click → child-tile local, clamped into the patch."""
+    lz = min(max(gxyz[0] - sl[0].start, 0), patch_size[0] - 1)
+    ly = min(max(gxyz[1] - sl[1].start, 0), patch_size[1] - 1)
+    lx = min(max(gxyz[2] - sl[2].start, 0), patch_size[2] - 1)
+    return (lz, ly, lx)

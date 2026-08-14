@@ -1,4 +1,4 @@
-"""Single centered patch forward for interactive viewers (TTA/border-expand off hot path)."""
+"""Single centered patch forward for interactive viewers (TTA/expand off). Large lesions: predict_case_logits."""
 
 from __future__ import annotations
 

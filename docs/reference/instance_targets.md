@@ -81,13 +81,13 @@ Full-volume connected components would not be affordable.
 **A kept lesion is never left unclicked, and never becomes background by accident.** Both rules
 above exist because training previously contradicted inference:
 
-- `nanounet/infer/border_expand.py` finishes a lesion that spans several patches by placing another
-  patch wherever the prediction **touches a patch face**. That only fires if the model segments up
-  to the edge. Centroid-based membership trained the opposite, suppressing **13.69% of all
-  foreground voxels** (measured) and teaching "ignore anything near the patch boundary".
-- `nanounet/infer/longi_row.py:37-39` clamps a click into any patch that contains none, so a patch
-  with no in-bounds click still gets a prompt at inference. Dropping the click during training made
-  that same situation mean "background".
+- `nanounet/infer/predict_case.py` finishes a lesion that spans several patches by growing a
+  face-neighbour grid wherever the prediction **touches a patch face**. That only fires if the model
+  segments up to the edge. Centroid-based membership trained the opposite, suppressing **13.69% of
+  all foreground voxels** (measured) and teaching "ignore anything near the patch boundary".
+- Expand tiles encode a click on the parent-face FG centroid when no user click lands in the tile,
+  so a patch with no in-bounds click still gets a prompt at inference. Dropping the click during
+  training made that same situation mean "background".
 
 After the fix, at `pos = 1.0` the target is **identical to the old all-lesion objective**
 (0.0000 of foreground removed, verified over 250 patches) and **0 / 170** patches with foreground

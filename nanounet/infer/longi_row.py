@@ -1,13 +1,13 @@
 """Two-stream inference row on a JOINT 2-channel volume (ch0 FU CT, ch1 BL CT sharing one
 preprocessing crop, so FU/BL are voxel-aligned — same grid as training's build_patch_longi).
 BL stream = same-bbox crop of ch1 + all in-patch BL clicks. Null baseline (no BL image, or prompts
-disabled) duplicates the FU stream -> DWB(x_FU - x_FU)=0 -> identity (single-timepoint fallback)."""
+disabled) duplicates the FU stream -> DWB(x_FU - x_FU)=0 -> identity (single-timepoint fallback).
+extra_clicks: patch-local points used when no user click lands in the tile (expand face-FG)."""
 
 from __future__ import annotations
 
 import torch
 
-from nanounet.infer.roi_slices import local_prompt_points_for_patch
 from nanounet.prompt.cluster import cluster_prompts_patch_local
 from nanounet.prompt.encoding import encode_points_to_heatmap_pair
 
@@ -28,6 +28,7 @@ def encode_inference_row(
     is_longi: bool = False,
     bl_present: bool = False,
     bl_pts_pad: list[tuple[int, int, int]] | None = None,
+    extra_clicks: tuple[tuple[int, int, int], ...] = (),
 ) -> None:
     n_stream = n_img + 2
     row[:n_img] = pad[:n_img, sz, sy, sx]
@@ -36,7 +37,8 @@ def encode_inference_row(
     else:
         loc = cluster_prompts_patch_local(cluster, sz, sy, sx)
         if not loc:
-            loc = local_prompt_points_for_patch(cluster[0], sz, sy, sx, patch_size)
+            loc = list(extra_clicks)
+        assert loc, "seed tile must contain a click"
         pr = encode_points_to_heatmap_pair(
             loc, [], patch_size, cfg.prompt.point_radius_vox, cfg.prompt.encoding,
             device=dev, intensity_scale=cfg.prompt.prompt_intensity_scale,

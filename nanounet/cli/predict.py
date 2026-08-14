@@ -13,9 +13,8 @@ from batchgenerators.utilities.file_and_folder_operations import join, load_json
 
 from nanounet.common import config_table, cprint, nano_header
 from nanounet.config import load_config
-from nanounet.infer.border_expand import DEFAULT_MAX_BORDER_EXPAND_EXTRA
+from nanounet.infer.predict_case import MAX_BORDER_EXTRA, predict_case_logits
 from nanounet.infer.export import export_prediction_from_logits
-from nanounet.infer.predict_case import predict_case_logits
 from nanounet.infer.predict_io import baseline_resolver, check_baseline_files, patient_ids_from_csv, preprocess_case
 from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
 from nanounet.model.dwb import LongiResEncUNet
@@ -37,8 +36,9 @@ def main() -> None:
                     help="dataset mode: dir with per-case BL <cid>.nii.gz + <cid>.json (longi)")
     ap.add_argument("--longi", action="store_true", help="force two-stream net build (else auto-detect from ckpt)")
     ap.add_argument("--no-prompt-encode", action="store_true")
-    ap.add_argument("--border-expand", action="store_true")
-    ap.add_argument("--max-border-extra", type=int, default=DEFAULT_MAX_BORDER_EXPAND_EXTRA)
+    ap.add_argument("--no-border-expand", dest="border_expand", action="store_false")
+    ap.set_defaults(border_expand=True)
+    ap.add_argument("--max-border-extra", type=int, default=MAX_BORDER_EXTRA)
     tta_g = ap.add_mutually_exclusive_group()
     tta_g.add_argument("--disable-tta", dest="tta_flag", action="store_false", default=None)
     tta_g.add_argument("--tta", dest="tta_flag", action="store_true", default=None)
@@ -47,9 +47,6 @@ def main() -> None:
     ap.add_argument("--cluster-margin-frac", type=float, default=0.1)
     ap.add_argument("--inference-mode", choices=("clustered", "centered"), default="clustered",
                     help="patch placement: 'clustered' packs clicks, 'centered' = one patch per click")
-    ap.add_argument("--merge", choices=("max", "average"), default="max",
-                    help="cross-patch merge: 'max' = union (per-voxel most-foreground patch wins; "
-                         "avoids washout), 'average' = legacy gaussian-weighted mean")
     ap.add_argument("--device", choices=("cuda", "cpu", "mps"), default="cuda")
     ap.add_argument("--no-amp", action="store_true")
     ap.add_argument("--overwrite", action="store_true")
@@ -60,7 +57,8 @@ def main() -> None:
     config_table(
         [("model_dir", args.model_dir, "cli"), ("ckpt", args.ckpt or "auto", "cli/default"),
          ("device", args.device, "cli/default"), ("inference_mode", args.inference_mode, "cli/default"),
-         ("merge", args.merge, "cli/default"), ("batch_size", args.batch_size, "cli/default"),
+         ("border_expand", args.border_expand, "cli/default"),
+         ("batch_size", args.batch_size, "cli/default"),
          ("tta", "auto" if args.tta_flag is None else args.tta_flag, "cli/config")],
         title="nanoUNet predict",
     )
@@ -145,12 +143,12 @@ def main() -> None:
         t0 = time.perf_counter()
         pad_cpu, slicer_revert, props, points_xyz, bl_points = pack
         logits = predict_case_logits(
-            net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dj=dj, dev=dev,
+            net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dev=dev,
             pad=pad_cpu.to(dev), slicer_revert=slicer_revert, props=props, points_xyz=points_xyz,
             encode_prompt=not args.no_prompt_encode, use_tta=use_tta,
             border_expand=args.border_expand, max_border_expand_extra=args.max_border_extra,
             batch_size=args.batch_size, use_amp=not args.no_amp,
-            cluster_margin_frac=args.cluster_margin_frac, mode=args.inference_mode, merge=args.merge,
+            cluster_margin_frac=args.cluster_margin_frac, mode=args.inference_mode,
             is_longi=is_longi, bl_present=bl_case, bl_points_xyz=bl_points,
         )
         export_prediction_from_logits(logits, props, cm, pl, dj, out_trunc)

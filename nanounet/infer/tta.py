@@ -1,4 +1,4 @@
-"""Test-time mirroring over spatial axes (combinations, nnU-Net TTA)."""
+"""Test-time mirroring: identity + all axis combinations, fused into as few net() calls as possible."""
 
 from __future__ import annotations
 
@@ -6,18 +6,9 @@ import itertools
 
 import torch
 
-
-@torch.inference_mode()
-def predict_with_optional_tta(net: torch.nn.Module, x: torch.Tensor, use_mirroring: bool, mirror_axes=(0, 1, 2)):
-    if not use_mirroring:
-        return net(x)
-    ma = [m + 2 for m in mirror_axes]
-    combs = [c for i in range(len(ma)) for c in itertools.combinations(ma, i + 1)]
-    pred = net(x)
-    for axes in combs:
-        pred = pred + torch.flip(net(torch.flip(x, axes)), axes)
-    pred = pred / (len(combs) + 1)
-    return pred
+# Cap concatenated patches per net() so TTA on a large seed batch fits a 10 GB GPU.
+# B=1 still fuses all 8 mirrors; B=8 falls back to 8 calls of size B (old TTA occupancy).
+_MAX_CAT = 8
 
 
 @torch.inference_mode()
@@ -26,8 +17,15 @@ def predict_batch_with_tta(net: torch.nn.Module, x: torch.Tensor, use_mirroring:
     if not use_mirroring:
         return net(x)
     ma = [m + 2 for m in mirror_axes]
-    combs = [c for i in range(len(ma)) for c in itertools.combinations(ma, i + 1)]
-    out = net(x)
-    for axes in combs:
-        out = out + torch.flip(net(torch.flip(x, axes)), axes)
-    return out / (len(combs) + 1)
+    axes_list: list[tuple[int, ...]] = [()]
+    axes_list.extend(c for i in range(len(ma)) for c in itertools.combinations(ma, i + 1))
+    n, b = len(axes_list), x.shape[0]
+    chunk = max(1, min(n, _MAX_CAT // max(b, 1)))
+    acc = None
+    for i in range(0, n, chunk):
+        views = [x if not ax else torch.flip(x, ax) for ax in axes_list[i : i + chunk]]
+        parts = net(torch.cat(views, 0)).split(b, 0)
+        for ax, p in zip(axes_list[i : i + chunk], parts):
+            u = p if not ax else torch.flip(p, ax)
+            acc = u if acc is None else acc + u
+    return acc / n

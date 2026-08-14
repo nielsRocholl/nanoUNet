@@ -33,7 +33,7 @@ Set environment variables (see [README](../README.md#environment)) then run:
 ```bash
 nanounet_preprocess -d 001 --planner nnUNetPlannerResEncL -np 8
 nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/default.json
-nanounet_predict -i /path/to/scans -o /path/to/out -m /path/to/run --ckpt last.ckpt --border-expand
+nanounet_predict -i /path/to/scans -o /path/to/out -m /path/to/run --ckpt last.ckpt
 ```
 
 Tiny laptop smoke train:

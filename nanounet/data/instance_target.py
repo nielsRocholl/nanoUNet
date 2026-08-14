@@ -10,14 +10,14 @@ did not:
 1. Membership is by VOXEL OVERLAP, not by whether a lesion's centroid lands in the patch. A large
    lesion spans several patches; in the neighbouring ones its centroid is outside, and the old rule
    made all of it background. That taught "suppress anything touching the patch face" -- and
-   nanounet/infer/border_expand.py works by continuing exactly where the prediction touches a patch
+   nanounet/infer/predict_case.py grows a face-neighbour grid exactly where FG touches a patch
    face, so the model was being trained to break its own inference path. Measured cost of the old
    rule: 13.7% of all foreground voxels silently suppressed.
 
 2. Every kept lesion ALWAYS gets a click. If displacement pushes its click out of the patch, the
    click is placed on the lesion's largest in-crop component instead of dropped. Inference does the
-   same thing (nanounet/infer/longi_row.py:37-39 falls back to local_prompt_points_for_patch when
-   no click lands inside a patch), so dropping it here trained the opposite of deployment.
+   same thing (expand tiles encode a click on the parent-face FG centroid when no user click
+   lands in the tile), so dropping it here trained the opposite of deployment.
 
 The kept set is drawn ONCE per patch, before displacement, so every prompt variant shares one
 target: that is what keeps the consistency term measuring click PLACEMENT rather than penalising
@@ -135,8 +135,8 @@ def draw_kept(in_patch: list[int], keep_prob: float, rng: np.random.Generator) -
 def kept_clicks(displaced, kept, pslc, fallback) -> list:
     """Patch-local click for every kept lesion. A kept lesion is NEVER left unclicked: if its
     displaced click landed outside the patch, its fallback point (a voxel on its own tissue in this
-    crop) is used instead -- mirroring inference, which clamps a click into any patch that contains
-    none (longi_row.py:37-39)."""
+    crop) is used instead -- mirroring inference, which encodes a face-FG click on expand tiles
+    that contain no user click."""
     out = []
     for j in kept:
         inp = filter_centroids_in_patch([displaced[j]], pslc)

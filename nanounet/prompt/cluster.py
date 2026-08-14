@@ -1,4 +1,4 @@
-"""Greedy point clustering for patch-sized 'infer all' seed batches."""
+"""Greedy point clustering for seed tiles, plus the per-cluster expand lattice."""
 
 from __future__ import annotations
 
@@ -90,4 +90,39 @@ def cluster_prompts_patch_local(
     for pz, py, px in pts_pad:
         if sz.start <= pz < sz.stop and sy.start <= py < sy.stop and sx.start <= px < sx.stop:
             out.append((pz - sz.start, py - sy.start, px - sx.start))
+    return out
+
+
+def grid_stride(patch_size: Tuple[int, int, int], tile_step_size: float) -> Tuple[int, int, int]:
+    t = float(tile_step_size)
+    assert 0.0 < t <= 1.0, t
+    return tuple(max(1, int(round(p * t))) for p in patch_size)
+
+
+def cell_slices(
+    origin: Tuple[int, int, int],
+    ijk: Tuple[int, int, int],
+    stride: Tuple[int, int, int],
+    patch_size: Tuple[int, int, int],
+    padded_shape: Tuple[int, int, int],
+) -> Tuple[slice, slice, slice]:
+    starts = []
+    for o, idx, st, ps, dim in zip(origin, ijk, stride, patch_size, padded_shape):
+        s = int(o + idx * st)
+        s = max(0, min(s, dim - ps))
+        starts.append(s)
+    return tuple(slice(s, s + ps) for s, ps in zip(starts, patch_size))
+
+
+# (-z, +z, -y, +y, -x, +x) — same order as roi_slices.fg_face_touch
+_FACE_DELTA = ((-1, 0, 0), (1, 0, 0), (0, -1, 0), (0, 1, 0), (0, 0, -1), (0, 0, 1))
+
+
+def face_neighbours(ijk: Tuple[int, int, int], touch6: Tuple[bool, ...]) -> List[Tuple[Tuple[int, int, int], int]]:
+    i, j, k = ijk
+    out: List[Tuple[Tuple[int, int, int], int]] = []
+    for fi, t in enumerate(touch6):
+        if t:
+            di, dj, dk = _FACE_DELTA[fi]
+            out.append(((i + di, j + dj, k + dk), fi))
     return out

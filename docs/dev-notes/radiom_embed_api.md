@@ -14,7 +14,7 @@ Preprocessed-volume indices `(z, y, x)` in **unpadded** crop space — same fram
 
 ## `on_forward`
 
-Optional `(done, total)` callback after each completed patch forward (seed or border-expand).
+Optional `(done, total)` callback after each completed patch forward (seed or expand tile).
 Not called inside TTA mirror passes — once per stacked batch output patch.
 
 | Parameter | Type | Default | Description |
@@ -29,7 +29,7 @@ For warm-session click inference (Radiom remote `/session/click`):
 
 | Function | Module | Description |
 |----------|--------|-------------|
-| `predict_patch_logits` | `nanounet.infer.predict_patch` | Single centered patch; `(logits CPU, padded slices)`. Prefer `use_tta=False`. |
+| `predict_patch_logits` | `nanounet.infer.predict_patch` | Single centered patch; `(logits CPU, padded slices)`. Prefer `use_tta=False`. Unchanged signature. Large lesions: call `predict_case_logits` (expand is on by default). |
 | `patch_logits_to_native_seg` | `nanounet.infer.patch_export` | Patch logits → native seg `np.ndarray` |
 | `native_seg_to_nifti_bytes` | `nanounet.infer.patch_export` | Native seg → gzip `.nii.gz` bytes |
 

@@ -1,1 +1,1 @@
-"""Inference: predictor, export, patch placement, border expand, predict IO."""
+"""Inference: predictor, export, prompt-ROI grid, predict IO."""
