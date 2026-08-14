@@ -51,7 +51,7 @@ nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
 | `--max-border-extra` | int | `16` | Max extra grid tiles per click cluster |
 | `--tta` / `--disable-tta` | flag | from config | Force test-time augmentation on / off |
 | `--batch-size` | int | `8` | GPU patch cap per forward; clamped to free VRAM, never auto-raised |
-| `--num-workers` | int | `4` | Prefetch threads (dataset mode). Native CT resample is GPU (not CPU cubic) |
+| `--num-workers` | int | `1` | Prefetch threads. Depth-1: one case on GPU, one preprocessing (32G cgroup) |
 | `--cluster-margin-frac` | float | `0.1` | Cluster bbox margin as fraction of patch size |
 | `--inference-mode` | choice | `clustered` | `clustered` (covering tiles) \| `centered` (one tile per click) |
 | `--device` | choice | `cuda` | `cuda` \| `cpu` \| `mps` (falls back if unavailable) |
@@ -67,7 +67,7 @@ Points JSON format: `{"points": [{"name": "1", "point": [x, y, z]}, ...]}`. Empt
 
 Not a sliding window. Clicks pack into the fewest covering tiles (`clustered`). `--inference-mode centered` is the same path with one tile per click. Face-grid expand grows a per-cluster lattice where predicted FG hits a tile face (`--no-border-expand` disables it). Overlaps max-merge. Native `.nii.gz` is a per-tile nearest paste, not a full-volume logit resample.
 
-TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the engine may clamp further. Folder mode prefetches the next case and writes the previous seg on a side thread. Dim `[i/n] case` prints when preprocess **starts**; the green timing line is after that case's GPU forward.
+TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the engine may clamp further. Folder mode prefetches **one** next case (depth-1; `--num-workers` default 1 — this Docker cgroup is 32G). Dim `[i/n] case` prints when preprocess **starts**; the green timing line is after GPU+export; with `--gt-dir`, Dice vol / DSC / NSD / LDR print on the next line. Omit `--overwrite` to skip existing preds (those still score immediately).
 
 ## Checkpoint selection
 
@@ -85,7 +85,7 @@ TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the eng
 
 - Dataset: `<out>/<case>.nii.gz` per input scan
 - Single: `-o` segmentation file
-- `--gt-dir`: after exports drain, one cases table + panel. **Dice vol** = whole-volume FG (`P>0` vs `G>0`; empty∩empty → 1). **DSC / NSD (1 mm) / LDR (IoU>0.1)** = clicked GT instance vs the pred cc3d-18 component at that click. Empty GT instance dropped; empty pred → 0. Headline is case-mean then mean-over-cases. `--metrics-out` writes `{stem}.json` + `{stem}.csv`
+- `--gt-dir`: per-case Dice vol / DSC / NSD / LDR after each export; summary panel at the end. **Dice vol** = whole-volume FG (`P>0` vs `G>0`; empty∩empty → 1). **DSC / NSD (1 mm) / LDR (IoU>0.1)** = clicked GT instance vs the pred cc3d-18 component at that click. Empty GT instance dropped; empty pred → 0. Headline is case-mean then mean-over-cases. `--metrics-out` writes `{stem}.json` + `{stem}.csv`
 
 ## Common errors
 
@@ -104,6 +104,7 @@ TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the eng
 | `--metrics-out was set without --gt-dir` | `--metrics-out` without scoring GT | Pass `--gt-dir` (instance labels, same stems as `-i`) |
 | `GT at '…' looks binary` | Union/binary masks in `--gt-dir` | Use instance-labeled `targetsTrFU` (voxel value = lesion_id) |
 | `no cases match --patients-csv` | CSV ids do not match `-i` stem prefixes | Use `test_patients.csv`; ids are `03b90eb112`, not `03b90eb112_00` |
+| `Killed` (no traceback) | Host OOM / 32G cgroup; too many inflight volumes | Rerun without `--overwrite` (skips written preds). Default `--num-workers 1` |
 
 Longitudinal two-stream inference: [longi.md](longi.md).
 

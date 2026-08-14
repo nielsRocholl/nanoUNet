@@ -22,7 +22,7 @@ from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
 from nanounet.model.dwb import LongiResEncUNet
 from nanounet.plan.labels import labels_from_dataset_json
 from nanounet.plan.plans import Plans
-from nanounet.score import check_gt_dir, report, score_case, write
+from nanounet.score import check_gt_dir, report, report_case, score_case, write
 
 
 def main() -> None:
@@ -44,7 +44,7 @@ def main() -> None:
     tta_g.add_argument("--disable-tta", dest="tta_flag", action="store_false", default=None)
     tta_g.add_argument("--tta", dest="tta_flag", action="store_true", default=None)
     ap.add_argument("--batch-size", type=int, default=8)
-    ap.add_argument("--num-workers", type=int, default=4)
+    ap.add_argument("--num-workers", type=int, default=1)
     ap.add_argument("--cluster-margin-frac", type=float, default=0.1)
     ap.add_argument("--inference-mode", choices=("clustered", "centered"), default="clustered")
     ap.add_argument("--device", choices=("cuda", "cpu", "mps"), default="cuda")
@@ -127,16 +127,14 @@ def main() -> None:
         title="nanoUNet predict",
     )
     n = len(cases)
-    scored = [(c, (o if o is not None else join(out_dir, c)) + end, j) for c, _, j, o in cases]
-    ex, prev, logged = ThreadPoolExecutor(max_workers=1), None, False
+    rows, logged = [], False
 
-    def push(fn, *a):
-        nonlocal prev
-        if prev is not None:
-            prev.result()
-        prev = ex.submit(fn, *a)
+    def emit(cid, pred, jp):
+        if args.gt_dir:
+            rows.append(r := score_case(cid, pred, join(args.gt_dir, cid + end), jp))
+            report_case(r)
 
-    def gpu(case_id, idx, out_trunc, pack, bl_case):
+    def gpu(case_id, idx, out_trunc, pack, bl_case, jp):
         nonlocal logged
         t0 = time.perf_counter()
         pad_cpu, slicer_revert, props, points_xyz, bl_points = pack
@@ -151,21 +149,23 @@ def main() -> None:
             is_longi=is_longi, bl_present=bl_case, bl_points_xyz=bl_points,
         )
         if not logged:
-            logged, s = True, cat_status()
-            if s:
+            logged = True
+            if (s := cat_status()):
                 cprint(f"[dim]{s}[/dim]")
-        push(export_prediction_from_logits, logits, props, cm, pl, dj, out_trunc, tiles)
+        export_prediction_from_logits(logits, props, cm, pl, dj, out_trunc, tiles)
         cprint(f"[bold green][{idx}/{n}] {case_id} ({time.perf_counter() - t0:.1f}s)[/bold green]")
+        emit(case_id, out_trunc + end, jp)
 
     if n == 1 or args.num_workers <= 0:
         for i, (cid, scan, jp, ot) in enumerate(cases, 1):
             out = ot if ot is not None else join(out_dir, cid)
             if not args.overwrite and os.path.isfile(out + end):
                 cprint(f"[dim][{i}/{n}] skip {cid} (exists)[/dim]")
+                emit(cid, out + end, jp)
                 continue
             bs, bj = resolve_bl(cid)
             cprint(f"[dim][{i}/{n}] {cid}[/dim]")
-            gpu(cid, i, out, preprocess_case(scan, jp, pl, cm, dj, bs, bj), bs is not None)
+            gpu(cid, i, out, preprocess_case(scan, jp, pl, cm, dj, bs, bj), bs is not None, jp)
     else:
         pool = ThreadPoolExecutor(max_workers=args.num_workers)
         inflight: deque = deque()
@@ -173,23 +173,20 @@ def main() -> None:
             out = ot if ot is not None else join(out_dir, cid)
             if not args.overwrite and os.path.isfile(out + end):
                 cprint(f"[dim][{i}/{n}] skip {cid} (exists)[/dim]")
+                emit(cid, out + end, jp)
                 continue
             bs, bj = resolve_bl(cid)
             cprint(f"[dim][{i}/{n}] {cid}[/dim]")
-            inflight.append((i, cid, out, bs is not None,
+            inflight.append((i, cid, out, bs is not None, jp,
                              pool.submit(preprocess_case, scan, jp, pl, cm, dj, bs, bj)))
-            if len(inflight) > args.num_workers:
-                idx, case_id, ot, bl_case, fut = inflight.popleft()
-                gpu(case_id, idx, ot, fut.result(), bl_case)
+            if len(inflight) > 1:
+                idx, case_id, ot, bl_case, j, fut = inflight.popleft()
+                gpu(case_id, idx, ot, fut.result(), bl_case, j)
         while inflight:
-            idx, case_id, ot, bl_case, fut = inflight.popleft()
-            gpu(case_id, idx, ot, fut.result(), bl_case)
+            idx, case_id, ot, bl_case, j, fut = inflight.popleft()
+            gpu(case_id, idx, ot, fut.result(), bl_case, j)
         pool.shutdown(wait=True)
-    if prev is not None:
-        prev.result()
-    ex.shutdown(wait=True)
     if args.gt_dir:
-        rows = [score_case(cid, pred, join(args.gt_dir, cid + end), jp) for cid, pred, jp in scored]
         report(rows)
     cprint(f"[green]done — {n} case(s) → {out_dir}[/green]")
     if args.metrics_out: write(rows, args.metrics_out)

@@ -14,7 +14,6 @@ import cc3d
 import numpy as np
 import SimpleITK as sitk
 from rich.panel import Panel
-from rich.table import Table
 from scipy.ndimage import binary_erosion, distance_transform_edt
 
 from nanounet.common import cprint
@@ -155,14 +154,12 @@ def _agg(rows: list[dict]) -> dict:
     }
 
 
+def report_case(r: dict) -> None:
+    ldr = f"[dim]{_f(r['ldr'])}[/dim]" if r["n"] == 0 else _f(r["ldr"])
+    cprint(f"         n={r['n']}  Dice vol {_f(r['volume_dice'])}  DSC {_dsc_cell(r['dsc'])}  NSD {_f(r['nsd'])}  LDR {ldr}")
+
+
 def report(rows: list[dict]) -> None:
-    t = Table(title="cases", box=None, padding=(0, 2))
-    for c in ("case", "n", "Dice vol", "DSC", "NSD", "LDR"):
-        t.add_column(c)
-    for r in rows:
-        ldr = f"[dim]{_f(r['ldr'])}[/dim]" if r["n"] == 0 else _f(r["ldr"])
-        t.add_row(r["case_id"], str(r["n"]), _f(r["volume_dice"]), _dsc_cell(r["dsc"]), _f(r["nsd"]), ldr)
-    cprint(t)
     a = _agg(rows)
     cprint(Panel(
         f"Dice vol     {_f(a['volume_dice_mean'])}    case-mean whole-volume (not comparable to LongiSeg)\n"
