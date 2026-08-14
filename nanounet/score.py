@@ -1,10 +1,8 @@
-"""Native lesion metrics for nanounet_predict: volume Dice + LongiSeg DSC/NSD/LDR.
+"""Native lesion metrics: volume Dice + per-lesion DSC/NSD/LDR.
 
 Empty GT instance → NaN (dropped). Empty pred + nonempty GT → 0.
-Pred side is the cc3d-18 component containing the click, not the merged volume.
+Pred CC = click voxel if on FG, else the cc3d-18 component with max overlap vs that GT instance.
 """
-
-from __future__ import annotations
 
 import csv
 import json
@@ -23,9 +21,8 @@ NSD_TOL_MM = 1.0
 _DOC = "docs/steps/predict.md"
 
 def dice(gt: np.ndarray, pred: np.ndarray) -> float:
-    inter = float(np.logical_and(gt, pred).sum())
     den = float(gt.sum() + pred.sum())
-    return 1.0 if den == 0.0 else 2.0 * inter / den
+    return 1.0 if den == 0.0 else 2.0 * float(np.logical_and(gt, pred).sum()) / den
 
 def iou(gt: np.ndarray, pred: np.ndarray) -> float:
     if not gt.any():
@@ -39,26 +36,23 @@ def nsd(gt: np.ndarray, pred: np.ndarray, spacing_zyx: tuple[float, float, float
         return float("nan")
     if not pred.any():
         return 0.0
-    def surf(m):
-        s = m & ~binary_erosion(m)
-        return s if s.any() else m
+    m = 1 + max(int(np.ceil(tol / s)) for s in spacing_zyx)
+    sl = tuple(slice(max(0, int(c.min()) - m), min(d, int(c.max()) + 1 + m)) for c, d in zip(np.where(gt | pred), gt.shape))
+    gt, pred = gt[sl], pred[sl]
+    def surf(mask):
+        s = mask & ~binary_erosion(mask)
+        return s if s.any() else mask
     sg, sp = surf(gt), surf(pred)
     d_g = distance_transform_edt(~sp, sampling=spacing_zyx)[sg]
     d_p = distance_transform_edt(~sg, sampling=spacing_zyx)[sp]
     n = int(d_g.size + d_p.size)
     return 1.0 if n == 0 else float(((d_g <= tol).sum() + (d_p <= tol).sum()) / n)
 
-def pred_cc_at(pred_bin: np.ndarray, z: int, y: int, x: int) -> np.ndarray:
-    lab = cc3d.connected_components(pred_bin.astype(np.uint8), connectivity=18)
-    v = int(lab[z, y, x])
-    return lab == v if v != 0 else np.zeros_like(pred_bin, dtype=bool)
-
 def check_gt_dir(gt_dir: str, cases: list, end: str) -> None:
     missing = [cid for cid, *_ in cases if not os.path.isfile(os.path.join(gt_dir, cid + end))]
     if missing:
         raise FileNotFoundError(
-            f"No GT for: {', '.join(missing)}.\n"
-            f"Expected instance-labeled '{{stem}}{end}' in '{gt_dir}' (same stems as -i).\n"
+            f"No GT for: {', '.join(missing)}.\nExpected instance-labeled '{{stem}}{end}' in '{gt_dir}' (same stems as -i).\n"
             f"Fix: pass --gt-dir /nnunet_data/Longitudinal-CT/targetsTrFU   (see {_DOC})"
         )
 
@@ -68,8 +62,7 @@ def _clicks(path: str) -> dict[int, tuple[int, int, int]]:
         pts = json.load(f).get("points")
     if not isinstance(pts, list):
         raise KeyError(
-            f"'points' missing or not a list in '{path}'.\n"
-            f"Expected {{'points': [{{'name': '<id>', 'point': [x,y,z]}}, ...]}}.\n"
+            f"'points' missing or not a list in '{path}'.\nExpected {{'points': [{{'name': '<id>', 'point': [x,y,z]}}, ...]}}.\n"
             f"Fix: sibling <case>.json next to each scan   (see {_DOC})"
         )
     out: dict[int, tuple[int, int, int]] = {}
@@ -79,8 +72,7 @@ def _clicks(path: str) -> dict[int, tuple[int, int, int]]:
             lid = int(raw)
         except (TypeError, ValueError):
             raise ValueError(
-                f"Click in '{path}' has missing or non-integer name: {item!r}.\n"
-                f"Expected points[].name to be the lesion_id integer.\n"
+                f"Click in '{path}' has missing or non-integer name: {item!r}.\nExpected points[].name to be the lesion_id integer.\n"
                 f"Fix: use sibling JSON from inputsTrFU   (see {_DOC})"
             ) from None
         p = item["point"]
@@ -93,42 +85,49 @@ def score_case(case_id: str, pred_path: str, gt_path: str, clicks_json: str) -> 
     pred, gt = sitk.GetArrayFromImage(pimg) > 0, np.asarray(sitk.GetArrayFromImage(gimg))
     if pred.shape != gt.shape:
         raise ValueError(
-            f"Shape mismatch for '{case_id}': pred {pred.shape} vs GT {gt.shape}.\n"
-            f"Expected native GT on the same grid as the prediction.\n"
+            f"Shape mismatch for '{case_id}': pred {pred.shape} vs GT {gt.shape}.\nExpected native GT on the same grid as the prediction.\n"
             f"Fix: pass --gt-dir with instance masks matching -i   (see {_DOC})"
         )
     clicks = _clicks(clicks_json)
-    if float(gt.max()) <= 1 and len(clicks) >= 2:
+    if float(gt.max()) == 1 and len(clicks) >= 2:
         raise ValueError(
             f"GT at '{gt_path}' looks binary (max={gt.max()}).\n"
             f"Expected instance-labeled masks (voxel value = lesion_id), e.g. targetsTrFU.\n"
             f"Fix: pass --gt-dir /nnunet_data/Longitudinal-CT/targetsTrFU   (see {_DOC})"
         )
-    sp, sh = pimg.GetSpacing(), pred.shape
+    osh, sp = pred.shape, pimg.GetSpacing()
     spacing = (float(sp[2]), float(sp[1]), float(sp[0]))
+    fg = np.where(pred | (gt > 0))
+    z0 = y0 = x0 = 0
+    if fg[0].size:
+        z0, y0, x0 = int(fg[0].min()), int(fg[1].min()), int(fg[2].min())
+        sl = (slice(z0, int(fg[0].max()) + 1), slice(y0, int(fg[1].max()) + 1), slice(x0, int(fg[2].max()) + 1))
+        pred, gt = pred[sl], gt[sl]
+    sh = pred.shape
+    lab = cc3d.connected_components(pred.astype(np.uint8), connectivity=18)
     lesions, n_skip = [], 0
     for lid, (z, y, x) in clicks.items():
-        if not (0 <= z < sh[0] and 0 <= y < sh[1] and 0 <= x < sh[2]):
+        if not (0 <= z < osh[0] and 0 <= y < osh[1] and 0 <= x < osh[2]):
             raise ValueError(
-                f"Click {lid} at (x,y,z)=({x},{y},{z}) is outside shape {sh} in '{pred_path}'.\n"
-                f"Expected native voxel coordinates inside the volume.\n"
+                f"Click {lid} at (x,y,z)=({x},{y},{z}) is outside shape {osh} in '{pred_path}'.\nExpected native voxel coordinates inside the volume.\n"
                 f"Fix: confirm sibling JSON is native (x,y,z)   (see {_DOC})"
             )
         gt_i = gt == lid
         if not gt_i.any():
             n_skip += 1
             continue
-        pred_i = pred_cc_at(pred, z, y, x)
+        hit = lab[gt_i]
+        hit = hit[hit != 0]
+        pred_i = (lab == np.bincount(hit).argmax()) if hit.size else np.zeros(sh, dtype=bool)
         j = iou(gt_i, pred_i)
         lesions.append({"id": lid, "dsc": dice(gt_i, pred_i), "nsd": nsd(gt_i, pred_i, spacing),
                         "iou": j, "ldr": float(j > IOU_HIT)})
-    ds = [x["dsc"] for x in lesions]
     nan = float("nan")
     return {
         "case_id": case_id, "volume_dice": dice(gt > 0, pred), "lesions": lesions,
-        "dsc": float(np.nanmean(ds)) if ds else nan,
-        "nsd": float(np.nanmean([x["nsd"] for x in lesions])) if ds else nan,
-        "ldr": float(np.nanmean([x["ldr"] for x in lesions])) if ds else nan,
+        "dsc": float(np.nanmean([x["dsc"] for x in lesions])) if lesions else nan,
+        "nsd": float(np.nanmean([x["nsd"] for x in lesions])) if lesions else nan,
+        "ldr": float(np.nanmean([x["ldr"] for x in lesions])) if lesions else nan,
         "n": len(lesions), "n_skip": n_skip,
     }
 
@@ -192,5 +191,4 @@ def write(rows: list[dict], path: str) -> None:
         for r in rows:
             for L in r["lesions"]:
                 w.writerow([r["case_id"], L["id"], L["dsc"], L["nsd"], L["iou"], L["ldr"], r["volume_dice"]])
-    cprint(f"[dim]wrote {stem}.json  {stem}.csv[/dim]")
-    cprint(f"[dim]next: {stem}.json[/dim]")
+    cprint(f"[dim]wrote {stem}.json  {stem}.csv\nnext: {stem}.json[/dim]")

@@ -85,7 +85,7 @@ TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the eng
 
 - Dataset: `<out>/<case>.nii.gz` per input scan
 - Single: `-o` segmentation file
-- `--gt-dir`: per-case Dice vol / DSC / NSD / LDR after each export; summary panel at the end. **Dice vol** = whole-volume FG (`P>0` vs `G>0`; empty∩empty → 1). **DSC / NSD (1 mm) / LDR (IoU>0.1)** = clicked GT instance vs the pred cc3d-18 component at that click. Empty GT instance dropped; empty pred → 0. Headline is case-mean then mean-over-cases. `--metrics-out` writes `{stem}.json` + `{stem}.csv`
+- `--gt-dir`: per-case Dice vol / DSC / NSD / LDR after each export; summary panel at the end. **Dice vol** = whole-volume FG (`P>0` vs `G>0`; empty∩empty → 1). **DSC / NSD (1 mm) / LDR (IoU>0.1)** = named GT instance vs pred cc3d-18 (click voxel if on pred, else the component with max overlap vs that instance). Empty GT dropped; empty pred → 0. Headline is case-mean then mean-over-cases. `--metrics-out` writes `{stem}.json` + `{stem}.csv`
 
 ## Common errors
 
