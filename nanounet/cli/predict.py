@@ -190,8 +190,8 @@ def main() -> None:
     if args.gt_dir:
         rows = [score_case(cid, pred, join(args.gt_dir, cid + end), jp) for cid, pred, jp in scored]
         report(rows)
-        if args.metrics_out: write(rows, args.metrics_out)
     cprint(f"[green]done — {n} case(s) → {out_dir}[/green]")
+    if args.metrics_out: write(rows, args.metrics_out)
 
 
 if __name__ == "__main__":
