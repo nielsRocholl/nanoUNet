@@ -14,6 +14,7 @@ nanounet_predict \
   -o /tmp/preds \
   -m /nnunet_data/NanoUNet_results/nanounet/Dataset999_Merged_nnUNetResEncUNetLPlans_h200_smallpv_f0_h200_instance_1200ep \
   --ckpt last.ckpt \
+  --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv \
   --gt-dir /nnunet_data/Longitudinal-CT/targetsTrFU \
   --metrics-out /tmp/preds/metrics
 ```
@@ -56,7 +57,7 @@ nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
 | `--device` | choice | `cuda` | `cuda` \| `cpu` \| `mps` (falls back if unavailable) |
 | `--no-amp` | flag | off | Disable autocast (fp32) |
 | `--overwrite` | flag | off | Re-run cases whose output exists |
-| `--patients-csv` | str | none | CSV with patient column; filter cases by id prefix |
+| `--patients-csv` | str | none | CSV `patient` column; keep `<id>_*.nii.gz` whose prefix matches |
 | `--gt-dir` | str | none | Instance-labeled native GT folder (same stems as `-i`). Enables scoring. |
 | `--metrics-out` | str | none | Write `{stem}.json` and `{stem}.csv`. Requires `--gt-dir`. |
 
@@ -94,6 +95,7 @@ Points JSON format: `{"points": [{"name": "1", "point": [x, y, z]}, ...]}`. Empt
 | CUDA unavailable | No GPU | Use `--device cpu` or `mps` |
 | `--metrics-out was set without --gt-dir` | `--metrics-out` without scoring GT | Pass `--gt-dir` (instance labels, same stems as `-i`) |
 | `GT at '…' looks binary` | Union/binary masks in `--gt-dir` | Use instance-labeled `targetsTrFU` (voxel value = lesion_id) |
+| `no cases match --patients-csv` | CSV ids do not match `-i` stem prefixes | Use `test_patients.csv`; ids are `03b90eb112`, not `03b90eb112_00` |
 
 Longitudinal two-stream inference: [longi.md](longi.md).
 

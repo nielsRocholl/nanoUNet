@@ -87,10 +87,10 @@ def main() -> None:
             pids = patient_ids_from_csv(args.patients_csv)
             cases = [(cid, scan, jp, ot) for cid, scan, jp, ot in cases if cid.split("_", 1)[0] in pids]
             if not cases:
-                raise SystemExit(f"no cases match --patients-csv {args.patients_csv}")
+                raise SystemExit(f"no cases match --patients-csv '{args.patients_csv}'.\nExpected CSV column 'patient' matching -i id prefix (e.g. 03b90eb112_00).\nFix: --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv  (see docs/steps/predict.md)")
         missing = [cid for cid, _, jp, _ in cases if not os.path.isfile(jp)]
         if missing:
-            raise FileNotFoundError(f"missing points JSON for: {', '.join(missing)}")
+            raise SystemExit(f"missing points JSON for: {', '.join(missing)}.\nExpected sibling <case>.json next to each scan in -i.\nFix: add the JSON (empty points [] if no clicks)  (see docs/steps/predict.md)")
         out_dir = args.output
         maybe_mkdir_p(out_dir)
     else:
@@ -113,8 +113,7 @@ def main() -> None:
     resolve_bl, bl_present = baseline_resolver(args.baseline_image, args.baseline_points, args.baseline_dir, end)
     if bl_present and not is_longi:
         raise SystemExit("baseline given but checkpoint is not longi (no dwb.* keys). Drop --baseline-* or pass a longi ckpt.")
-    if is_longi and not bl_present:
-        cprint("[yellow]longi checkpoint without a baseline: running null-baseline (single-timepoint identity)[/yellow]")
+    if is_longi and not bl_present: cprint("[yellow]longi checkpoint without a baseline: running null-baseline (single-timepoint identity)[/yellow]")
     if args.baseline_dir: check_baseline_files(cases, resolve_bl, args.baseline_dir, end)
     if args.gt_dir: check_gt_dir(args.gt_dir, cases, end)
     config_table(
@@ -123,6 +122,7 @@ def main() -> None:
          ("border_expand", args.border_expand, "cli/default"), ("batch_size", args.batch_size, "cli/default"),
          ("tta", "auto" if args.tta_flag is None else args.tta_flag, "cli/config"),
          ("longi", "on" if bl_present else ("null-baseline" if is_longi else "off"), "cli/ckpt"),
+         ("patients_csv", args.patients_csv or "off", "cli" if args.patients_csv else "default"),
          ("gt_dir", args.gt_dir or "off", "cli" if args.gt_dir else "default"),
          ("metrics_out", args.metrics_out or "off", "cli" if args.metrics_out else "default")],
         title="nanoUNet predict",
