@@ -107,11 +107,11 @@ def score_case(case_id: str, pred_path: str, gt_path: str, clicks_json: str) -> 
     lab = cc3d.connected_components(pred.astype(np.uint8), connectivity=18)
     lesions, n_skip = [], 0
     for lid, (z, y, x) in clicks.items():
-        if not (0 <= z < osh[0] and 0 <= y < osh[1] and 0 <= x < osh[2]):
-            raise ValueError(
-                f"Click {lid} at (x,y,z)=({x},{y},{z}) is outside shape {osh} in '{pred_path}'.\nExpected native voxel coordinates inside the volume.\n"
-                f"Fix: confirm sibling JSON is native (x,y,z)   (see {_DOC})"
-            )
+        # round-then-clip, matching the encoding convention in prompt/coords.py:53-56 —
+        # sub-voxel float noise from the click pipeline can land right on a boundary.
+        z = min(max(z, 0), osh[0] - 1)
+        y = min(max(y, 0), osh[1] - 1)
+        x = min(max(x, 0), osh[2] - 1)
         gt_i = gt == lid
         if not gt_i.any():
             n_skip += 1
