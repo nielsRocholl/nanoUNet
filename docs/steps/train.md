@@ -78,7 +78,7 @@ nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv \
 | `--consistency-weight` | float | `0.0` | Lambda max for the two-prompt consistency term; `0` disables it. Requires `--prompts-per-patch >= 2` |
 | `--consistency-warmup-epochs` | int | `50` | Epochs to linearly ramp lambda from 0 to `--consistency-weight` |
 | `--warmup-epochs` | int | `0` | Linear LR warmup over the first N epochs, applied to either `--lr-schedule`. `0` reproduces the pre-warmup LR curve exactly |
-| `--ema-decay` | float | `0.0` | Weight EMA decay (e.g. `0.999`); logs `val_dice_ema` next to `val_dice`. `0` disables EMA |
+| `--ema-decay` | float | `0.0` | Weight EMA decay (e.g. `0.999`); logs `val_dice_ema` next to `val_dice`. `0` disables EMA. Predict the shadow with `nanounet_predict --ema`. |
 | `--monitor` | str | `val_dice` | Metric `ModelCheckpoint` tracks for `best-*.ckpt` |
 
 Checkpoints: `<run>/checkpoints/` (supervised); `<run>/mae_pretrain/checkpoints/` (integrated MAE). Finetune with `--init-weights` writes to `<run>/finetune/`.

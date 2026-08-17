@@ -32,6 +32,7 @@ def main() -> None:
     ap.add_argument("-i", "--input", required=True, help="preprocessed data_identifier folder")
     ap.add_argument("-o", "--output", required=True, help="output preds folder")
     ap.add_argument("--ckpt", default=None)
+    ap.add_argument("--ema", action="store_true", help="Load EMACallback.shadow instead of raw net.*")
     ap.add_argument("--no-border-expand", dest="border_expand", action="store_false")
     ap.set_defaults(border_expand=True)
     ap.add_argument("--max-border-extra", type=int, default=MAX_BORDER_EXTRA)
@@ -72,7 +73,7 @@ def main() -> None:
     dev = torch.device(d)
     use_tta = (not cfg.inference.disable_tta_default) if args.tta_flag is None else args.tta_flag
     config_table(
-        [("model_dir", md, "cli"), ("ckpt", args.ckpt or ckpt_path, "cli/auto"),
+        [("model_dir", md, "cli"), ("ckpt", args.ckpt or ckpt_path, "cli/auto"), ("ema", "on" if args.ema else "off", "cli"),
          ("input", args.input, "cli"), ("output", args.output, "cli"),
          ("cases", len(case_ids), "input"), ("device", dev, "cli"),
          ("inference_mode", args.inference_mode, "cli/default"),
@@ -82,7 +83,7 @@ def main() -> None:
         title="nanoUNet predict (preprocessed)",
     )
 
-    net, lm = load_net_from_ckpt(ckpt_path, cm, dj, dev, longi=True)
+    net, lm = load_net_from_ckpt(ckpt_path, cm, dj, dev, longi=True, ema=args.ema)
     labels_from_dataset_json(dj)
     maybe_mkdir_p(args.output)
     end = dj["file_ending"]

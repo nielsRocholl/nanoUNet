@@ -31,6 +31,7 @@ def main() -> None:
     ap.add_argument("-o", "--output", required=True, help="output folder or single .nii.gz")
     ap.add_argument("-m", "--model-dir", required=True)
     ap.add_argument("--ckpt", default=None)
+    ap.add_argument("--ema", action="store_true", help="Load EMACallback.shadow instead of raw net.*")
     ap.add_argument("--points", default=None, help="points JSON (single mode)")
     ap.add_argument("--baseline-image", default=None, help="sibling BL .nii.gz for two-stream longi inference")
     ap.add_argument("--baseline-points", default=None, help="BL click JSON (single mode); native voxel x,y,z")
@@ -75,7 +76,7 @@ def main() -> None:
     if (d == "cuda" and not torch.cuda.is_available()) or (d == "mps" and not torch.backends.mps.is_available()):
         d = "cpu"
     set_resample_device(dev := torch.device(d))
-    net, lm = load_net_from_ckpt(pick_checkpoint(md, args.ckpt), cm, dj, dev, longi=args.longi)
+    net, lm = load_net_from_ckpt(pick_checkpoint(md, args.ckpt), cm, dj, dev, longi=args.longi, ema=args.ema)
     use_tta = (not cfg.inference.disable_tta_default) if args.tta_flag is None else args.tta_flag
     end = dj["file_ending"]
     single_mode = not os.path.isdir(args.input)
@@ -116,7 +117,7 @@ def main() -> None:
     if args.baseline_dir: check_baseline_files(cases, resolve_bl, args.baseline_dir, end)
     if args.gt_dir: check_gt_dir(args.gt_dir, cases, end)
     config_table(
-        [("model_dir", args.model_dir, "cli"), ("ckpt", args.ckpt or "auto", "cli/default"),
+        [("model_dir", args.model_dir, "cli"), ("ckpt", args.ckpt or "auto", "cli/default"), ("ema", "on" if args.ema else "off", "cli"),
          ("device", args.device, "cli/default"), ("inference_mode", args.inference_mode, "cli/default"),
          ("border_expand", args.border_expand, "cli/default"), ("batch_size", args.batch_size, "cli/default"),
          ("tta", "auto" if args.tta_flag is None else args.tta_flag, "cli/config"),

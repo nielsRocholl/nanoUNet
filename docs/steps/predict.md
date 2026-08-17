@@ -41,6 +41,7 @@ nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
 | `-o`, `--output` | str | (required) | Output folder (dataset) or single `.nii.gz` |
 | `-m`, `--model-dir` | str | (required) | Run dir with `plans.json`, `dataset.json`, `nano_config.json`, checkpoint |
 | `--ckpt` | str | auto | Basename or path; `auto` / `last.ckpt` → `checkpoints/` then `finetune/` |
+| `--ema` | flag | off | Load `callbacks/EMACallback/shadow` from the same `.ckpt` instead of raw `net.*`. Empty/missing shadow is an error. Use a different `-o` than the raw run. |
 | `--points` | str | none | Points JSON (**single mode only**) |
 | `--baseline-image` | str | none | Sibling BL `.nii.gz` for two-stream longi inference |
 | `--baseline-points` | str | none | BL click set JSON (**single mode**), same format as `--points`; native voxel `(x,y,z)` in the FU-registered frame |
@@ -71,7 +72,7 @@ TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the eng
 
 ## Checkpoint selection
 
-`--ckpt last.ckpt` (or any basename) is tried as a path, then `-m/<name>`, `-m/checkpoints/<name>`, `-m/finetune/<name>`. Omit `--ckpt` for the same search with `last.ckpt`. For holdout finetunes, pick the empirically best checkpoint (validation macro-Dice does not always track per-lesion DSC).
+`--ckpt last.ckpt` (or any basename) is tried as a path, then `-m/<name>`, `-m/checkpoints/<name>`, `-m/finetune/<name>`. Omit `--ckpt` for `last.ckpt`. Default weights are raw `net.*`. `--ema` loads the EMA shadow from that same file (`last.ckpt` = end-of-run shadow; `best-*.ckpt` = that epoch's shadow). Do not overwrite a raw `-o`. Train with `--ema-decay 0.999` or the shadow is empty.
 
 ## Inputs / outputs
 
@@ -100,6 +101,7 @@ TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the eng
 | `Baseline geometry does not match follow-up` | BL not registered into FU frame | Run `nanounet_register_longi` first |
 | `Missing baseline files for longi dataset inference` | Missing BL siblings in `--baseline-dir` | Build with `nanounet_register_longi` |
 | Missing checkpoint | Wrong `--ckpt` or incomplete train | Verify path under `checkpoints/` or `finetune/` |
+| `No EMA shadow in checkpoint` | `--ema` on a ckpt with `--ema-decay 0` or no callback block | Drop `--ema`, or train with `--ema-decay 0.999` |
 | CUDA unavailable | No GPU | Use `--device cpu` or `mps` |
 | `--metrics-out was set without --gt-dir` | `--metrics-out` without scoring GT | Pass `--gt-dir` (instance labels, same stems as `-i`) |
 | `GT at '…' looks binary` | Union/binary masks in `--gt-dir` | Use instance-labeled `targetsTrFU` (voxel value = lesion_id) |
@@ -127,6 +129,7 @@ nanounet_predict_preprocessed \
 | `-i`, `--input` | str | (required) | Preprocessed `data_identifier` folder (`nnUNetPlans_3d_fullres`) |
 | `-o`, `--output` | str | (required) | Output preds folder (`<case>.nii.gz` per case) |
 | `--ckpt` | str | auto | Checkpoint; finetune runs live under `finetune/` |
+| `--ema` | flag | off | Load `callbacks/EMACallback/shadow` from the same `.ckpt` instead of raw `net.*`. Empty/missing shadow is an error. Use a different `-o` than the raw run. |
 | `--no-border-expand` | flag | off | Disable large-lesion face-grid expand (on by default) |
 | `--max-border-extra` | int | `16` | Max extra grid tiles per cluster |
 | `--tta` / `--disable-tta` | flag | from config | Force TTA on / off |
