@@ -38,6 +38,7 @@ nanounet_longi_clicks = "nanounet.cli.longi_clicks:main"
 nanounet_repair_longi_fu = "nanounet.cli.repair_longi_fu:main"
 nanounet_build_splits = "nanounet.cli.build_splits:main"
 nanounet_build_valset = "nanounet.cli.build_valset:main"
+nanounet_segtrack = "nanounet.cli.segtrack:main"
 
 [build-system]
 requires = ["setuptools>=67.8.0"]

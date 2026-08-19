@@ -1,1 +1,1 @@
-"""CLI entry points: preprocess, train, predict, pretrain, longi registration."""
+"""CLI entry points: preprocess, train, predict, pretrain, longi, segtrack."""

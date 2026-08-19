@@ -12,6 +12,7 @@ flowchart LR
     pretrain -->|nanounet_pretrain or --mae-pretrain| train[nanounet_train]
     pretrain -->|skip| train
     train --> predict[nanounet_predict]
+    predict --> track[nanounet_segtrack]
 
     subgraph longi [Longitudinal branch]
         reg[nanounet_register_longi] --> build[nanounet_longi_build]
@@ -52,6 +53,7 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetTinyPlans --config configs/de
 | MAE pretrain | [steps/pretrain.md](steps/pretrain.md) |
 | Supervised train | [steps/train.md](steps/train.md) |
 | Inference (clustered + scores) | [steps/predict.md](steps/predict.md) |
+| Track (binary pred → matches) | [steps/track.md](steps/track.md) |
 | Longitudinal workflow | [steps/longi.md](steps/longi.md) |
 | ROI / prompt config | [reference/config.md](reference/config.md) |
 | Patch size playbook | [reference/patch_size.md](reference/patch_size.md) |
