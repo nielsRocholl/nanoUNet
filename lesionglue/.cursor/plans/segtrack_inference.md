@@ -6,6 +6,27 @@ Bible: `/lesion-tracking/.cursor/skills/nanochat-style/SKILL.md`.
 
 ---
 
+## Persistence (hard rule — container is ephemeral)
+
+Code lives on a compute-node Docker container. **Session stop = disk wipe for the repo.** The only durable volume is `/nnunet_data`. GitHub is the durable copy of source.
+
+| What | Where it must live |
+|------|-------------------|
+| Source (`/lesion-tracking`, `/nanoUNet`) | GitHub. Commit + **push** after every working slice. Unpushed work is gone if the session dies. |
+| Checkpoints, graph cache, train logs | `/nnunet_data/lesion_tracking/` (already the plan’s `--out` / `CACHE_ROOT`) |
+| `configs/split.json` | **repo** (committed). Not only on `nnunet_data`. |
+
+Rules for the implementer:
+
+1. After each item in §11 (and after any other coherent edit), `git add` the intended files, commit, **`git push`**. Do this **before** kicking a long GPU job so a killed session does not strand unpublished train/CLI code next to a ckpt nobody can rerun.
+2. Two repos. Push **both** if both changed: `/lesion-tracking` and `/nanoUNet`.
+3. Never `--force` to `main`/`master`. Never `--no-verify`. Never `git config`.
+4. Do not leave the only copy of a new file in `/tmp` or the container home.
+5. Probe scripts (§7) are deleted after the number is recorded — record the number in the commit message of the push that removes them, or in README, not in a local scrap.
+6. If push needs credentials/network and fails: **stop and say so**. Do not keep stacking unpushed commits.
+
+---
+
 ## 0. Goal / non-goals
 
 **Goal.** Tracking is easy, GPU-fast, and honest for the nanoUNet holdout (`test_patients.csv`, 60 patients). One Python API + one CLI. Seg stays in nanoUNet; tracking consumes instance masks.
@@ -430,13 +451,15 @@ Do not touch `.cursor/plans/` except this file. Do not reintroduce FeatConfig / 
 
 ## 11. Order
 
-1. Split fn + `configs/split.json` + `CACHE_TAG` + `DATASET_ROOT`. Assert 240 ∩ 60 = ∅.
+**Push after every step.** Step 2 starts GPU: push step 1 first.
+
+1. Split fn + `configs/split.json` + `CACHE_TAG` + `DATASET_ROOT`. Assert 240 ∩ 60 = ∅. **Push.**
 2. Kick preprocess (`--jobs 16`) then train (§6) on GPU. Do not wait.
-3. `common.py` rich + `infer.py` + `decode` + `cli/track.py` + pyproject scripts. Delete `predict_masks.py`.
-4. `instances.py` + `--bl-clicks`/`--fu-clicks`.
-5. Encoding table (§7). Delete the probe script.
-6. `nanounet_segtrack` + doc.
-7. Oracle eval on the 60 when ckpt exists.
+3. `common.py` rich + `infer.py` + `decode` + `cli/track.py` + pyproject scripts. Delete `predict_masks.py`. **Push.**
+4. `instances.py` + `--bl-clicks`/`--fu-clicks`. **Push.**
+5. Encoding table (§7). Delete the probe script. **Push.**
+6. `nanounet_segtrack` + doc. **Push nanoUNet.**
+7. Oracle eval on the 60 when ckpt exists. Numbers + any eval CLI fixes: **push.**
 
 ---
 
@@ -451,3 +474,4 @@ Do not touch `.cursor/plans/` except this file. Do not reintroduce FeatConfig / 
 - [ ] Default deploy path does not Hungarian-force
 - [ ] Data-path change → report `build_mask_graph` ms and `track()` ms
 - [ ] CLI/path change → README or `docs/steps/track.md` argument table in the same change
+- [ ] This slice is committed **and pushed** to GitHub (both repos if both changed). Container-only copies do not count.

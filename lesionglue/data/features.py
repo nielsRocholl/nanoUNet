@@ -1,4 +1,4 @@
-"""L0 node feature layout: pack_node, cache tag v5_l0."""
+"""L0 node feature layout: pack_node, cache tag v6_h60."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from tracking.data.appearance import MaskFeats
 DESC_DIM = 1372
 STAT_DIM = 14
 FEAT_DIM = DESC_DIM + STAT_DIM + 1
-CACHE_TAG = "v5_l0"
+CACHE_TAG = "v6_h60"
 
 
 def feat_layout() -> tuple[int, int, int, int, int]:

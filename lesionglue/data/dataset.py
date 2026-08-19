@@ -1,4 +1,4 @@
-"""Cached v5_l0 per-split PyG InMemoryDataset from dense Longitudinal_CT_v2 graphs."""
+"""Cached v6_h60 per-split PyG InMemoryDataset from dense Longitudinal_CT_v2 graphs."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from tracking.data import staging as stg
 from tracking.data.augment import drop_nodes, jitter_both
 from tracking.data.features import CACHE_TAG, DESC_DIM, FEAT_DIM, assert_graph_feat
 from tracking.data.graph import GraphConfig, build_hetero_data
-from tracking.data.meta import load_split_json
+from tracking.data.splits import load_tracking_split
 
 
 def _build_one(pid: str, root_s: str, k_intra: int) -> tuple[str, HeteroData | None]:
@@ -73,9 +73,13 @@ class LesionDataset(InMemoryDataset):
         )
 
     def process(self) -> None:
-        sp = load_split_json(self.dataset_root / "data_split.json")
+        sp = load_tracking_split()
         if self.split not in sp:
-            raise KeyError(self.split)
+            raise KeyError(
+                f"split {self.split!r} missing from tracking split.\n"
+                f"Expected keys train/val/test in {sp.keys() if isinstance(sp, dict) else 'configs/split.json'}.\n"
+                f"Fix: python3 tracking/cli/split.py --root /nnunet_data/Longitudinal-CT"
+            )
         pids = list(sp[self.split])
         root_s = str(self.dataset_root)
         k_intra = self.cfg.k_intra

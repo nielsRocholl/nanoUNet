@@ -8,11 +8,11 @@ import numpy as np
 from pytorch_lightning import LightningDataModule
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
-from tracking.common import CACHE_ROOT, DATASET_ROOT
+from tracking.common import CACHE_ROOT, DATASET_ROOT, HOLDOUT_CSV
 from tracking.data.augment import drop_nodes, jitter_both
 from tracking.data.dataset import LesionDataset
 from tracking.data.features import CACHE_TAG
-from tracking.data.splits import fold_patient_sets
+from tracking.data.splits import fold_patient_sets, load_holdout, load_tracking_split
 
 
 class MatcherDataModule(LightningDataModule):
@@ -49,11 +49,24 @@ class MatcherDataModule(LightningDataModule):
             assert n_folds >= 2
 
     def prepare_data(self) -> None:
+        sp = load_tracking_split()
+        holdout = set(load_holdout(HOLDOUT_CSV))
+        leak = (set(map(str, sp["train"])) | set(map(str, sp["val"]))) & holdout
+        if leak:
+            raise SystemExit(
+                f"{len(leak)} holdout ids in train/val: {sorted(leak)[:8]}...\n"
+                f"Expected train/val disjoint from {HOLDOUT_CSV}.\n"
+                f"Fix: python3 tracking/cli/split.py --root {self.dataset_root}"
+            )
         splits = ("train", "val") if self.fold is not None else ("train", "val", "test")
-        for sp in splits:
-            p = self.cache_root / "processed" / f"{sp}_{CACHE_TAG}.pt"
+        for spn in splits:
+            p = self.cache_root / "processed" / f"{spn}_{CACHE_TAG}.pt"
             if not p.is_file():
-                raise FileNotFoundError(f"run preprocess --split {sp}; missing {p}")
+                raise FileNotFoundError(
+                    f"No graph cache at {p}.\n"
+                    f"Expected preprocess output tagged {CACHE_TAG}.\n"
+                    f"Fix: python3 tracking/cli/preprocess.py --split {spn} --jobs 16"
+                )
 
     def setup(self, stage: str | None = None) -> None:
         if self.fold is None:

@@ -1,15 +1,26 @@
-"""Cross-cutting helpers: dataset/cache paths, constants, print0, seed, JSON I/O."""
+"""Dataset/cache paths, constants, Rich rank-0 UI, seed, JSON I/O."""
 
-from pathlib import Path
+from __future__ import annotations
+
 import json
 import multiprocessing as mp
 import random
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
-DATASET_ROOT = Path("/nnunet_data/unprocessed-universal-lesion-segmentation/")
-CACHE_ROOT = DATASET_ROOT / "tracking"
+DATASET_ROOT = Path("/nnunet_data/Longitudinal-CT")
+CACHE_ROOT = Path("/nnunet_data/lesion_tracking/cache")
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SPLIT_PATH = REPO_ROOT / "configs" / "split.json"
+HOLDOUT_CSV = DATASET_ROOT / "test_patients.csv"
+
+_CONSOLE = Console(stderr=True)
 
 LESION_TYPES = (
     "Adrenals",
@@ -30,10 +41,33 @@ PROP_SIGMA = (2.75, 5.19, 5.40)
 PROP_MAX_VOX = 34.0
 
 
-def print0(msg: str) -> None:
-    if mp.current_process().name != "MainProcess":
+def _rank0() -> bool:
+    return mp.current_process().name == "MainProcess"
+
+
+def cprint(msg: object, **kw: Any) -> None:
+    if _rank0():
+        _CONSOLE.print(msg, **kw)
+
+
+print0 = cprint
+
+
+def nano_header(title: str, color: str = "cyan") -> None:
+    if _rank0():
+        _CONSOLE.print(Panel(f"[bold {color}]{title}[/bold {color}]", border_style=color))
+
+
+def config_table(rows: list[tuple[str, object, str]], title: str = "config") -> None:
+    if not _rank0():
         return
-    print(msg)
+    t = Table(title=title, box=None, padding=(0, 2))
+    t.add_column("argument", style="cyan")
+    t.add_column("value")
+    t.add_column("source", style="dim")
+    for name, value, source in rows:
+        t.add_row(str(name), str(value), source)
+    _CONSOLE.print(t)
 
 
 def seed_all(s: int) -> None:
@@ -47,7 +81,7 @@ def load_json(path: str | Path) -> dict:
 
 
 def dump_json(path: str | Path, obj: dict) -> None:
-    Path(path).write_text(json.dumps(obj, indent=2))
+    Path(path).write_text(json.dumps(obj, indent=2) + "\n")
 
 
 def eval_device(preference: str) -> torch.device:
@@ -56,11 +90,19 @@ def eval_device(preference: str) -> torch.device:
         return torch.device("cpu")
     if p == "cuda":
         if not torch.cuda.is_available():
-            raise RuntimeError("--eval-device cuda but CUDA not available")
+            raise RuntimeError(
+                f"--device cuda but CUDA not available.\n"
+                f"Expected a visible GPU.\n"
+                f"Fix: pass --device cpu"
+            )
         return torch.device("cuda")
     if p == "mps":
         if not torch.backends.mps.is_available():
-            raise RuntimeError("--eval-device mps but MPS not available")
+            raise RuntimeError(
+                f"--device mps but MPS not available.\n"
+                f"Expected Apple Silicon MPS.\n"
+                f"Fix: pass --device cpu"
+            )
         return torch.device("mps")
     if p == "auto":
         if torch.cuda.is_available():
@@ -68,4 +110,8 @@ def eval_device(preference: str) -> torch.device:
         if torch.backends.mps.is_available():
             return torch.device("mps")
         return torch.device("cpu")
-    raise ValueError(f"unknown device preference: {preference!r}")
+    raise ValueError(
+        f"unknown device preference: {preference!r}.\n"
+        f"Expected cuda, cpu, mps, or auto.\n"
+        f"Fix: --device cuda"
+    )

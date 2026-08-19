@@ -16,7 +16,8 @@ import pytorch_lightning as pl
 
 from tracking.common import CACHE_ROOT, DATASET_ROOT, dump_json
 from tracking.config import load_config
-from tracking.data.splits import fold_patient_sets, match_score_from_counts
+from tracking.bootstrap import match_score_from_counts
+from tracking.data.splits import fold_patient_sets
 from tracking.train.datamodule import MatcherDataModule
 from tracking.train.module import MatcherModule
 

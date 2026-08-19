@@ -19,7 +19,7 @@ import pandas as pd
 
 from tracking.common import DATASET_ROOT, dump_json, load_json
 from tracking.data.provenance import CLICKFIX_REL
-from tracking.data.splits import bootstrap_match_score
+from tracking.bootstrap import bootstrap_match_score
 
 REG_TABLE_REL = "derivatives/registration_error_table.json"
 SUB_NAMES = ("uc", "dis", "new")
