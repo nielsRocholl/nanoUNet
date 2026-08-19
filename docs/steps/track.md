@@ -8,11 +8,11 @@ Requires `pip install -e /lesion-tracking`.
 
 ```bash
 nanounet_segtrack \
-  --bl-img /nnunet_data/Longitudinal-CT/inputsTrBL/CASE.nii.gz \
+  --bl-img /nnunet_data/Longitudinal-CT/inputsTrBL/CASE_00.nii.gz \
   --bl-pred /tmp/preds/CASE_bl.nii.gz --bl-clicks CASE_bl.json \
-  --fu-img /nnunet_data/Longitudinal-CT/inputsTrFU/CASE.nii.gz \
+  --fu-img /nnunet_data/Longitudinal-CT/inputsTrFU/CASE_00.nii.gz \
   --fu-pred /tmp/preds/CASE.nii.gz --fu-clicks CASE.json \
-  --propagated CASE_propagated.csv \
+  --propagated /nnunet_data/Longitudinal-CT/meta/CASE.csv \
   --track-ckpt /nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt \
   --decode dense --out /tmp/preds/CASE_matches.csv
 ```
@@ -26,7 +26,7 @@ nanounet_segtrack \
 | `--bl-img` `--fu-img` | path | required | Native CT NIfTI |
 | `--bl-pred` `--fu-pred` | path | required | Binary FG predictions from `nanounet_predict` |
 | `--bl-clicks` `--fu-clicks` | path | required | nanoUNet click JSON (`points[].name` = lesion_id, `point` = `[x,y,z]`) |
-| `--propagated` | path | required | CSV `lesion_id,z,y,x` (+ optional `lesion_type`) |
+| `--propagated` | path | required | Meta CSV (`cog_propagated`), slim `lesion_id,z,y,x`, or FU-frame click JSON. Not `inputsTrBL` native clicks. |
 | `--track-ckpt` | path | required | Lightning matcher ckpt (`h60_r9/best.ckpt`) |
 | `--out` | path | required | Match CSV next to preds |
 | `--decode` | choice | unset | `dense` / `sinkhorn` / `hungarian` (see `lesion_track --help`) |
