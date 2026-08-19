@@ -4,11 +4,20 @@ from __future__ import annotations
 
 import argparse
 import csv
+import tempfile
 from pathlib import Path
 
 from tracking.common import cprint, config_table, nano_header
+from tracking.data.instances import instances_from_nifti
 from tracking.decode import DECODE_CHOICES, DECODE_HELP, resolve_decode
 from tracking.infer import track
+
+
+def _mask(path: str, clicks: str) -> Path:
+    if not clicks:
+        return Path(path)
+    tmp = Path(tempfile.mkdtemp()) / "instances.nii.gz"
+    return instances_from_nifti(Path(path), Path(clicks), tmp)
 
 
 def main() -> None:
@@ -29,6 +38,8 @@ def main() -> None:
     ap.add_argument("--default-lesion-type", default="unclear")
     ap.add_argument("--no-ema", action="store_true")
     ap.add_argument("--pairs-out", default="")
+    ap.add_argument("--bl-clicks", default="", help="nanoUNet click JSON; treat --bl-mask as binary FG")
+    ap.add_argument("--fu-clicks", default="", help="nanoUNet click JSON; treat --fu-mask as binary FG")
     args = ap.parse_args()
 
     nano_header("lesion_track")
@@ -42,7 +53,8 @@ def main() -> None:
         ("device", args.device, "cli"),
     ])
     r = track(
-        Path(args.bl_img), Path(args.bl_mask), Path(args.fu_img), Path(args.fu_mask),
+        Path(args.bl_img), _mask(args.bl_mask, args.bl_clicks),
+        Path(args.fu_img), _mask(args.fu_mask, args.fu_clicks),
         Path(args.propagated), Path(args.ckpt),
         decode=decode, device=args.device, default_lesion_type=args.default_lesion_type,
         k_intra=args.k_intra, thresh=args.thresh,

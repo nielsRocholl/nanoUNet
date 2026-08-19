@@ -118,6 +118,7 @@ CSV-free inference from CT, instance masks, propagated BL centroids.
 | `--default-lesion-type` | str | `unclear` | |
 | `--no-ema` | flag | off | |
 | `--pairs-out` | path | `""` | optional full N×M dump |
+| `--bl-clicks` `--fu-clicks` | path | unset | nanoUNet click JSON; treat that side's mask as binary FG |
 
 Output columns: `bl_lesion_id, fu_lesion_id, pair_prob, decode`.
 
