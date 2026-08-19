@@ -20,6 +20,8 @@ Weights & Biases (optional): `wandb login` once.
 
 **Encoding (keep L0):** pid `16a5cdae36`, 90 lesions. L0+mask_stats 33341 ms CPU; `build_mask_graph` 42107 ms wall; `track()` GPU fwd 19.2 ms. Encoder GAP skipped (hook >40 LOC). GPU is not the bottleneck.
 
+**Oracle holdout (GT masks, 60-patient `test_patients.csv`):** `h60_r9/best.ckpt` → `test_match_score=0.9453` (57 graphs; 3 skipped empty BL/FU). Val on the 240's fold-0: `val_match_score_ema=0.9660`. E2E seg→track not run.
+
 **Training vs deployment:** preprocess/train need the CSV (supervision + `cog_propagated`). Deployment: `lesion_track` from CT + instance masks + propagated centroids. `predict.py` is cached-graph benchmark only.
 
 ---
