@@ -88,13 +88,28 @@ python3 tracking/cli/predict.py --ckpt /nnunet_data/lesion_tracking/runs/h60_r9/
 
 **Deploy**
 
+`--propagated` is BL lesion_id → centroid in the **FU voxel grid**. Accepts `meta/{pid}.csv` (`cog_propagated`), slim CSV `lesion_id,z,y,x`, or nanoUNet JSON in the FU frame. Not `inputsTrBL/*.json` (BL-native). `--bl-clicks` only instance-labels binary FG.
+
+Single case:
+
 ```bash
 lesion_track \
-  --bl-img bl.nii.gz --bl-mask bl_instances.nii.gz \
-  --fu-img fu.nii.gz --fu-mask fu_instances.nii.gz \
-  --propagated propagated_centroids.csv \
+  --bl-img /nnunet_data/Longitudinal-CT/inputsTrBL/0a09c8844b_00.nii.gz \
+  --bl-mask /nnunet_data/Longitudinal-CT/targetsTrBL/0a09c8844b_00.nii.gz \
+  --fu-img /nnunet_data/Longitudinal-CT/inputsTrFU/0a09c8844b_00.nii.gz \
+  --fu-mask /nnunet_data/Longitudinal-CT/targetsTrFU/0a09c8844b_00.nii.gz \
+  --propagated /nnunet_data/Longitudinal-CT/meta/0a09c8844b.csv \
   --ckpt /nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt \
   --decode dense --out matches.csv
+```
+
+Holdout folder:
+
+```bash
+lesion_track \
+  --root /nnunet_data/Longitudinal-CT --split test \
+  --ckpt /nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt \
+  --decode dense --out /tmp/track_test
 ```
 
 ---
@@ -105,24 +120,29 @@ After `pip install -e .`, commands are `lesion_track_*`. `--decode` omitted → 
 
 ### `lesion_track`
 
-CSV-free inference from CT, instance masks, propagated BL centroids.
+CSV-free inference from CT, instance masks, propagated BL centroids. Single case or `--root` dataset.
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `--bl-img` `--bl-mask` `--fu-img` `--fu-mask` | path | required | NIfTI |
-| `--propagated` | path | required | CSV `lesion_id,z,y,x` (+ optional `lesion_type`) |
+| `--bl-img` `--bl-mask` `--fu-img` `--fu-mask` | path | required in single | NIfTI |
+| `--propagated` | path | required in single | meta CSV / slim CSV / FU-frame JSON (not inputsTrBL clicks) |
+| `--root` | path | unset | Longitudinal-CT root → dataset mode |
+| `--split` | choice | unset | `train` \| `val` \| `test` from `configs/split.json` |
+| `--patients-csv` | path | unset | CSV column `patient`; xor with `--split` |
+| `--bl-mask-dir` `--fu-mask-dir` | path | `targetsTr*` | instance-mask override |
+| `--prop-dir` | path | `meta/` | `{pid}.csv` or `{pid}_{idx}.json` |
 | `--ckpt` | path | required | Lightning ckpt |
-| `--out` | path | required | matches CSV |
+| `--out` | path | required | file (single) or dir `{pid}.csv` (dataset) |
 | `--decode` | choice | unset | dense / sinkhorn / hungarian (see help) |
 | `--thresh` | float | 0.5 | dense pair cutoff |
 | `--device` | choice | `cuda` | `cuda` \| `cpu` \| `mps` |
 | `--k-intra` | int | 8 | intra-graph kNN |
 | `--sinkhorn-iters` | int | 20 | |
 | `--sinkhorn-tau` | float | 0.2 | |
-| `--default-lesion-type` | str | `unclear` | |
+| `--default-lesion-type` | str | `unclear` | used when propagated JSON has no type |
 | `--no-ema` | flag | off | |
-| `--pairs-out` | path | `""` | optional full N×M dump |
-| `--bl-clicks` `--fu-clicks` | path | unset | nanoUNet click JSON; treat that side's mask as binary FG |
+| `--pairs-out` | path | `""` | optional full N×M dump (single) |
+| `--bl-clicks` `--fu-clicks` | path | unset | instance JSON; treat that side's mask as binary FG |
 
 Output columns: `bl_lesion_id, fu_lesion_id, pair_prob, decode`.
 

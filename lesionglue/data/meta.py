@@ -56,6 +56,46 @@ class V2Paths:
 
 
 @dataclass(frozen=True)
+class TrackCase:
+    pid: str
+    bl_img: Path
+    bl_mask: Path
+    fu_img: Path
+    fu_mask: Path
+    propagated: Path
+
+
+def _img_ids(meta: Path) -> tuple[int, int]:
+    df = pd.read_csv(meta)
+    fu = int(df["img_id_fu"].value_counts().idxmax())
+    bl = int(df.loc[df["img_id_fu"] == fu, "img_id_bl"].value_counts().idxmax())
+    return bl, fu
+
+
+def resolve_track_case(
+    root: Path,
+    pid: str,
+    *,
+    prop_dir: Path | None = None,
+    bl_mask_dir: Path | None = None,
+    fu_mask_dir: Path | None = None,
+) -> TrackCase | None:
+    root = Path(root)
+    vp = V2Paths(root, pid)
+    bl_i, fu_i = _img_ids(vp.meta) if vp.meta.is_file() else (0, 0)
+    pdir = Path(prop_dir) if prop_dir is not None else root / "meta"
+    prop = pdir / f"{pid}.csv"
+    if not prop.is_file():
+        prop = pdir / f"{pid}_{fu_i:02d}.json"
+    bl_mask = Path(bl_mask_dir) / f"{pid}_{bl_i:02d}.nii.gz" if bl_mask_dir else vp.bl_mask(bl_i)
+    fu_mask = Path(fu_mask_dir) / f"{pid}_{fu_i:02d}.nii.gz" if fu_mask_dir else vp.fu_mask(fu_i)
+    case = TrackCase(pid, vp.bl_img(bl_i), bl_mask, vp.fu_img(fu_i), fu_mask, prop)
+    if not all(p.is_file() for p in (case.bl_img, case.bl_mask, case.fu_img, case.fu_mask, case.propagated)):
+        return None
+    return case
+
+
+@dataclass(frozen=True)
 class LesionRow:
     lesion_id: int
     topology: str

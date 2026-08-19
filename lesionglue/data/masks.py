@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import torch
 from torch_geometric.data import HeteroData
 
@@ -15,6 +14,7 @@ from tracking.data.descriptor import descriptor_l0
 from tracking.data.features import feat_layout, pack_node
 from tracking.data.graph import GraphConfig, intra_knn, _load_vol
 from tracking.data.pairs import cross_attr, dense_pair_index, reverse_cross_attr
+from tracking.data.propagate import load_propagated
 
 
 def _labels(mask: np.ndarray) -> list[int]:
@@ -30,22 +30,6 @@ def _centroids(mask: np.ndarray, ids: list[int]) -> dict[int, np.ndarray]:
         assert pts.size, f"empty mask label {lid}"
         out[lid] = pts.mean(axis=0).astype(np.float64) + 0.5
     return out
-
-
-def _propagated(path: Path, bl_ids: list[int]) -> tuple[dict[int, np.ndarray], dict[int, str]]:
-    df = pd.read_csv(path)
-    need = {"lesion_id", "z", "y", "x"}
-    assert need.issubset(df.columns), f"{path} needs columns {sorted(need)}"
-    prop, typ = {}, {}
-    for _, r in df.iterrows():
-        lid = int(r["lesion_id"])
-        prop[lid] = np.asarray([float(r["z"]), float(r["y"]), float(r["x"])], dtype=np.float64)
-        if "lesion_type" in df.columns and str(r["lesion_type"]).strip():
-            lt = str(r["lesion_type"]).strip()
-            assert lt in LESION_TYPES, f"unknown lesion_type {lt!r}"
-            typ[lid] = lt
-    assert set(prop) == set(bl_ids), "propagated centroid CSV must match baseline mask labels exactly"
-    return prop, typ
 
 
 def _lt(lid: int, table: dict[int, str], default: str | None) -> int:
@@ -71,7 +55,7 @@ def build_mask_graph(
     mk_fu, _, _ = _load_vol(fu_mask)
     bl_ids, fu_ids = _labels(mk_bl), _labels(mk_fu)
     c_bl, c_fu = _centroids(mk_bl, bl_ids), _centroids(mk_fu, fu_ids)
-    prop, bl_types = _propagated(propagated_csv, bl_ids)
+    prop, bl_types = load_propagated(propagated_csv, bl_ids)
     layout = feat_layout()
 
     xb, pb = [], []
