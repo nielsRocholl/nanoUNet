@@ -18,6 +18,8 @@ Weights & Biases (optional): `wandb login` once.
 
 **Cache:** `{CACHE_ROOT}/processed/{split}_v6_h60.pt` (default `/nnunet_data/lesion_tracking/cache`).
 
+**Encoding (keep L0):** pid `16a5cdae36`, 90 lesions. L0+mask_stats 33341 ms CPU; `build_mask_graph` 42107 ms wall; `track()` GPU fwd 19.2 ms. Encoder GAP skipped (hook >40 LOC). GPU is not the bottleneck.
+
 **Training vs deployment:** preprocess/train need the CSV (supervision + `cog_propagated`). Deployment: `lesion_track` from CT + instance masks + propagated centroids. `predict.py` is cached-graph benchmark only.
 
 ---
