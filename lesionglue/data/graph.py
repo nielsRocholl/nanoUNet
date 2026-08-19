@@ -12,7 +12,7 @@ import torch
 from torch_geometric.data import HeteroData
 
 from tracking.common import LESION_TYPES, print0
-from tracking.data.appearance import mask_stats
+from tracking.data.appearance import MaskFeats, mask_stats_all
 from tracking.data.descriptor import descriptor_l0
 from tracking.data.features import feat_layout, pack_node
 from tracking.data.meta import LesionRow, V2Paths, parse_meta_csv
@@ -113,22 +113,25 @@ def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> HeteroData | No
         bl_cache[k] = (cb, ab, sb, mb)
 
     layout = feat_layout()
+    mf_fu = mask_stats_all(mk_fu, fu_ids, sp_fu, ct_fu)
+    mf_bl: dict[int, MaskFeats] = {}
+    for k, (cb, ab, sb, mb) in bl_cache.items():
+        lids = [lid for lid in bl_ids if bl_rep[lid].img_id_bl == k]
+        mf_bl.update(mask_stats_all(mb, lids, sb, cb))
     xb, pb = [], []
     for lid in bl_ids:
         r = bl_rep[lid]
         assert r.cog_bl is not None
         cb, ab, sb, mb = bl_cache[r.img_id_bl]
-        mf_b = mask_stats(mb, lid, sb, cb)
         c = np.asarray(r.cog_bl, dtype=np.float64)
-        xb.append(pack_node(descriptor_l0(cb, ab, c), mf_b, LESION_TYPES.index(r.lesion_type)))
+        xb.append(pack_node(descriptor_l0(cb, ab, c), mf_bl[lid], LESION_TYPES.index(r.lesion_type)))
         pb.append(np.asarray(r.cog_propagated, dtype=np.float64) * sp_fu)
 
     xf, pf = [], []
     for lid in fu_ids:
         r = fu_rep[lid]
         cf = np.asarray(r.cog_fu, dtype=np.float64)
-        mf_f = mask_stats(mk_fu, lid, sp_fu, ct_fu)
-        xf.append(pack_node(descriptor_l0(ct_fu, aff_fu, cf), mf_f, LESION_TYPES.index(r.lesion_type)))
+        xf.append(pack_node(descriptor_l0(ct_fu, aff_fu, cf), mf_fu[lid], LESION_TYPES.index(r.lesion_type)))
         pf.append(cf * sp_fu)
 
     data = HeteroData()

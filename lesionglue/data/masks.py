@@ -9,7 +9,7 @@ import torch
 from torch_geometric.data import HeteroData
 
 from tracking.common import LESION_TYPES
-from tracking.data.appearance import mask_stats
+from tracking.data.appearance import centroids, mask_stats_all
 from tracking.data.descriptor import descriptor_l0
 from tracking.data.features import feat_layout, pack_node
 from tracking.data.graph import GraphConfig, intra_knn, _load_vol
@@ -21,15 +21,6 @@ def _labels(mask: np.ndarray) -> list[int]:
     ids = sorted(int(x) for x in np.unique(mask.astype(np.int64)) if int(x) != 0)
     assert ids
     return ids
-
-
-def _centroids(mask: np.ndarray, ids: list[int]) -> dict[int, np.ndarray]:
-    out = {}
-    for lid in ids:
-        pts = np.argwhere(mask == lid)
-        assert pts.size, f"empty mask label {lid}"
-        out[lid] = pts.mean(axis=0).astype(np.float64) + 0.5
-    return out
 
 
 def _lt(lid: int, table: dict[int, str], default: str | None) -> int:
@@ -54,23 +45,20 @@ def build_mask_graph(
     ct_fu, aff_fu, sp_fu = _load_vol(fu_img)
     mk_fu, _, _ = _load_vol(fu_mask)
     bl_ids, fu_ids = _labels(mk_bl), _labels(mk_fu)
-    c_bl, c_fu = _centroids(mk_bl, bl_ids), _centroids(mk_fu, fu_ids)
+    c_bl, c_fu = centroids(mk_bl, bl_ids), centroids(mk_fu, fu_ids)
+    mf_bl, mf_fu = mask_stats_all(mk_bl, bl_ids, sp_bl, ct_bl), mask_stats_all(mk_fu, fu_ids, sp_fu, ct_fu)
     prop, bl_types = load_propagated(propagated_csv, bl_ids)
     layout = feat_layout()
 
     xb, pb = [], []
     for lid in bl_ids:
-        mf_b = mask_stats(mk_bl, lid, sp_bl, ct_bl)
-        center = c_bl[lid]
-        xb.append(pack_node(descriptor_l0(ct_bl, aff_bl, center), mf_b, _lt(lid, bl_types, default_lesion_type)))
+        xb.append(pack_node(descriptor_l0(ct_bl, aff_bl, c_bl[lid]), mf_bl[lid], _lt(lid, bl_types, default_lesion_type)))
         pb.append(prop[lid] * sp_fu)
 
     xf, pf = [], []
     for lid in fu_ids:
-        mf_f = mask_stats(mk_fu, lid, sp_fu, ct_fu)
-        center = c_fu[lid]
-        xf.append(pack_node(descriptor_l0(ct_fu, aff_fu, center), mf_f, _lt(lid, {}, default_lesion_type)))
-        pf.append(center * sp_fu)
+        xf.append(pack_node(descriptor_l0(ct_fu, aff_fu, c_fu[lid]), mf_fu[lid], _lt(lid, {}, default_lesion_type)))
+        pf.append(c_fu[lid] * sp_fu)
 
     data = HeteroData()
     data["bl"].x, data["fu"].x = torch.tensor(np.stack(xb)), torch.tensor(np.stack(xf))
