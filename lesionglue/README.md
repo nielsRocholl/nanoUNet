@@ -9,17 +9,16 @@ Graph neural network that matches lesions between a baseline CT and a follow-up 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-export PYTHONPATH=.
+pip install -e .
 ```
 
 Weights & Biases (optional): `wandb login` once.
 
-**Dataset:** Longitudinal CT v2 layout — `meta/{patient}.csv`, `inputsTrBL/FU`, `targetsTrBL/FU`, `data_split.json`. Default root is `DATASET_ROOT` in `tracking/common.py`; override with `--root` on every CLI.
+**Dataset:** `/nnunet_data/Longitudinal-CT/` — `meta/{patient}.csv`, `inputsTrBL/FU`, `targetsTrBL/FU`, `data_split.json`. Tracking split is `configs/split.json` (240 train/val, 60 holdout). Override root with `--root`.
 
-**Cache:** preprocessed graphs under `{CACHE_ROOT}/processed/` (default `{DATASET_ROOT}/tracking/processed/`). Files: `{split}_v5_l0.pt`, `{split}_v5_l0_meta.pt`. While a split builds, per-patient staging lives in `processed/staging/{split}_v5_l0/{patient_id}.pt` and is removed after merge.
+**Cache:** `{CACHE_ROOT}/processed/{split}_v6_h60.pt` (default `/nnunet_data/lesion_tracking/cache`).
 
-**Training vs deployment:** benchmark preprocess/train needs the CSV (supervision + `cog_propagated`). At inference you need the same geometry from masks + CT + registration-warped baseline centroids — see [technical.md](technical.md). `predict_masks.py` covers the CSV-free path; `predict.py` uses cached benchmark graphs.
+**Training vs deployment:** preprocess/train need the CSV (supervision + `cog_propagated`). Deployment: `lesion_track` from CT + instance masks + propagated centroids. `predict.py` is cached-graph benchmark only.
 
 ---
 
@@ -40,7 +39,7 @@ All training knobs live in JSON, loaded by `tracking/config.py` (`Config` datacl
 
 **Config-driven CLIs** (`train`, `cv`, `report`): pass `--config configs/base.json`. Training writes a copy to `{out}/config.json`.
 
-**CLI-only overrides:** paths (`--root`, `--cache`, `--out`), W&B flags, fold index (`--fold`), early-stop disable, eval/report device and batch settings. Inference CLIs (`predict`, `predict_masks`, `eval`) keep operational decode flags (`--dust-tau`, `--sinkhorn-tau`, `--sinkhorn-iters`, etc.).
+**CLI-only overrides:** paths (`--root`, `--cache`, `--out`), W&B flags, fold index (`--fold`), early-stop disable, eval/report device and batch settings. `lesion_track` decode flags: `--decode`, `--thresh`, `--sinkhorn-tau`, `--sinkhorn-iters`.
 
 Copy and edit `configs/base.json` for experiments; unknown keys raise on load.
 
@@ -51,37 +50,16 @@ Copy and edit `configs/base.json` for experiments; unknown keys raise on load.
 **1 — Preprocess** (once per dataset; L0 only)
 
 ```bash
-PYTHONPATH=. python3 tracking/cli/preprocess.py --split all --jobs 4
-# or per split:
-PYTHONPATH=. python3 tracking/cli/preprocess.py --split train --jobs 4
-PYTHONPATH=. python3 tracking/cli/preprocess.py --split val --jobs 1
-PYTHONPATH=. python3 tracking/cli/preprocess.py --split test --jobs 1
+lesion_track_split
+lesion_track_preprocess --split all --jobs 16
+lesion_track_train --config configs/base.json --out /nnunet_data/lesion_tracking/runs/h60_r9 --wandb
+lesion_track_eval --ckpt /nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt --split test
 ```
 
-Resume after interrupt:
+**Cross-validation** (optional)
 
 ```bash
-PYTHONPATH=. python3 tracking/cli/preprocess.py --split train --jobs 4 --resume
-```
-
-Delete `{split}_v5_l0.pt` before re-preprocessing — PyG skips `process()` if the final file exists.
-
-**2 — Train**
-
-```bash
-PYTHONPATH=. python3 tracking/cli/train.py \
-  --config configs/base.json \
-  --out runs/my_run \
-  --wandb --wandb-project lesion-tracking --wandb-run-name my-run
-```
-
-**3 — Cross-validation**
-
-```bash
-PYTHONPATH=. python3 tracking/cli/cv.py \
-  --config configs/base.json \
-  --out runs/cv \
-  --wandb --wandb-run-name r9_base
+python3 tracking/cli/cv.py --config configs/base.json --out runs/cv --wandb --wandb-run-name r9_base
 ```
 
 Writes `fold_*/` subdirs + `cv_summary.json` (mean±std over folds on `val_match_score_ema`).
@@ -97,44 +75,51 @@ RUN_FINAL=1 bash scripts/round9.sh   # retrain on full train+val, sweep dust_tau
 
 Cluster: `scripts/lesion-round9-cv.sh` (SLURM; sets `RUNS` on `/nnunet_data`).
 
-**5 — Eval / predict**
+**Cached-graph eval / predict** (benchmark only)
 
 ```bash
-PYTHONPATH=. python3 tracking/cli/eval.py --ckpt runs/my_run/best.ckpt --split val
-PYTHONPATH=. python3 tracking/cli/eval.py --ckpt runs/my_run/best.ckpt --split test --dust-tau 0.20
-
-PYTHONPATH=. python3 tracking/cli/predict.py --ckpt runs/my_run/best.ckpt --split val --out preds
+lesion_track_eval --ckpt /nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt --split val
+python3 tracking/cli/predict.py --ckpt /nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt --split val --out preds
 ```
 
-**6 — Report** (train or load ckpt → GNN + distance baseline → `report.json`)
+**Deploy**
 
 ```bash
-PYTHONPATH=. python3 tracking/cli/report.py \
-  --config configs/base.json \
-  --out runs/report
-# or skip training:
-PYTHONPATH=. python3 tracking/cli/report.py \
-  --config configs/base.json \
-  --out runs/report \
-  --checkpoint runs/my_run/best.ckpt
-```
-
-**7 — Predict (masks + registration, no CSV labels)**
-
-```bash
-PYTHONPATH=. python3 tracking/cli/predict_masks.py \
+lesion_track \
   --bl-img bl.nii.gz --bl-mask bl_instances.nii.gz \
   --fu-img fu.nii.gz --fu-mask fu_instances.nii.gz \
   --propagated propagated_centroids.csv \
-  --default-lesion-type unclear \
-  --ckpt runs/my_run/best.ckpt --out best_matches.csv
+  --ckpt /nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt \
+  --decode dense --out matches.csv
 ```
 
 ---
 
 ## CLI reference
 
-Run from repo root: `PYTHONPATH=. python3 tracking/cli/<script>.py …`.
+After `pip install -e .`, commands are `lesion_track_*`. `--decode` omitted → interactive table (non-TTY must pass `--decode`).
+
+### `lesion_track`
+
+CSV-free inference from CT, instance masks, propagated BL centroids.
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--bl-img` `--bl-mask` `--fu-img` `--fu-mask` | path | required | NIfTI |
+| `--propagated` | path | required | CSV `lesion_id,z,y,x` (+ optional `lesion_type`) |
+| `--ckpt` | path | required | Lightning ckpt |
+| `--out` | path | required | matches CSV |
+| `--decode` | choice | unset | dense / sinkhorn / hungarian (see help) |
+| `--thresh` | float | 0.5 | dense pair cutoff |
+| `--device` | choice | `cuda` | `cuda` \| `cpu` \| `mps` |
+| `--k-intra` | int | 8 | intra-graph kNN |
+| `--sinkhorn-iters` | int | 20 | |
+| `--sinkhorn-tau` | float | 0.2 | |
+| `--default-lesion-type` | str | `unclear` | |
+| `--no-ema` | flag | off | |
+| `--pairs-out` | path | `""` | optional full N×M dump |
+
+Output columns: `bl_lesion_id, fu_lesion_id, pair_prob, decode`.
 
 ### `preprocess.py`
 
@@ -193,42 +178,9 @@ Same metrics as training validation, on val or test graphs.
 | `--num-workers` | `2` | DataLoader workers |
 | `--dust-tau` | ckpt value | Override decode threshold |
 
-### `predict.py`
+### `predict.py` (benchmark only)
 
-Batch inference on cached val/test graphs → one CSV per patient.
-
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--ckpt` | (required) | Lightning checkpoint |
-| `--split` | `val` | `val` \| `test` |
-| `--out` | `preds` | Output directory |
-| `--cache` | `CACHE_ROOT` | Graph cache |
-| `--root` | `DATASET_ROOT` | Dataset root |
-| `--thresh` | `0.5` | Min prob to write a row (unless `--dump-all`) |
-| `--sinkhorn-iters` | `20` | Decode Sinkhorn iterations |
-| `--sinkhorn-tau` | `0.2` | Decode temperature |
-| `--no-ema` | off | Use training weights instead of EMA |
-| `--dump-all` | off | Write every cross edge |
-| `--strict` | off | Hungarian 1:1 decode for `decoded` column |
-
-Output columns: `bl_lesion_id`, `fu_lesion_id`, `prob`, `decoded`.
-
-### `predict_masks.py`
-
-CSV-free inference from CT volumes, instance masks, and propagated baseline centroids.
-
-| Argument | Default | Description |
-|----------|---------|-------------|
-| `--bl-img`, `--bl-mask`, `--fu-img`, `--fu-mask` | (required) | NIfTI paths |
-| `--propagated` | (required) | CSV: `lesion_id,z,y,x` (+ optional `lesion_type`) |
-| `--ckpt` | (required) | Lightning checkpoint |
-| `--out` | (required) | Best-match CSV (Hungarian decode) |
-| `--pairs-out` | `""` | Optional dense pair-prob CSV |
-| `--default-lesion-type` | none | Fallback anatomy label |
-| `--k-intra` | `8` | Intra-graph kNN |
-| `--sinkhorn-iters` | `20` | Decode iterations |
-| `--sinkhorn-tau` | `0.2` | Decode temperature |
-| `--no-ema` | off | Use training weights |
+Cached val/test graphs → CSV. Deployment uses `lesion_track`.
 
 ### `report.py`
 
@@ -297,4 +249,4 @@ scripts/
   lesion-round9-cv.sh   # SLURM wrapper for round9.sh
 ```
 
-Common failures: missing NIfTI/CSV under `--root`, patient skipped (empty BL or FU side), forgot `PYTHONPATH=.`, or stale `{split}_v5_l0.pt` blocking re-preprocess.
+Common failures: missing NIfTI/CSV under `--root`, empty BL/FU side, missing `configs/split.json` (`lesion_track_split`), or looking at stale `{split}_v5_l0.pt` (ignored; cache tag is `v6_h60`).

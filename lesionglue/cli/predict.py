@@ -1,4 +1,4 @@
-"""Batch inference: cross-edge probs per patient CSV."""
+"""Cached-graph benchmark inference. Deployment: lesion_track (tracking/cli/track.py)."""
 
 import argparse
 import csv
