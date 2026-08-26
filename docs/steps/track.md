@@ -2,7 +2,7 @@
 
 One command: two CTs + click JSON → instance masks with shared tracking ids + match CSV. Predicts both timepoints (Dataset999 single-stream), instance-izes click-on-FG, then matches. `--bl-mask` / `--bl-mask-dir` skips BL predict and copies those instance ids. Requires `pip install -e /lesion-tracking`.
 
-Default `--decode hungarian`. FU click JSON is the matcher’s BL coordinates (no meta CSV). See [track_ids.md](../reference/track_ids.md).
+Default `--decode hungarian`. Pair by exact stem (`pid_00` ≠ `pid_01`). Matcher BL positions come from `{dataset}/meta/{pid}.csv` (`cog_propagated`, else `cog_fu`, rows with `img_id_fu` = this stem’s region) when that folder exists. A `drop_dp` matcher checkpoint skips that warp and uses native mask centroids. See [track_ids.md](../reference/track_ids.md).
 
 ## Command
 
@@ -11,8 +11,7 @@ Folder (sibling `{stem}.nii.gz` + `{stem}.json`, pair by exact stem):
 ```bash
 nanounet_segtrack \
   --bl-dir /nnunet_data/Longitudinal-CT/inputsTrBL \
-  --fu-dir /nnunet_data/Longitudinal-CT/inputsTrFU \
-  --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv
+  --fu-dir /nnunet_data/Longitudinal-CT/inputsTrFU
 ```
 
 Single case:
@@ -31,8 +30,7 @@ GT baseline mask (skip BL UNet; BL clicks omitted). Folder:
 nanounet_segtrack \
   --bl-dir /nnunet_data/Longitudinal-CT/inputsTrBL \
   --fu-dir /nnunet_data/Longitudinal-CT/inputsTrFU \
-  --bl-mask-dir /nnunet_data/Longitudinal-CT/targetsTrBL \
-  --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv
+  --bl-mask-dir /nnunet_data/Longitudinal-CT/targetsTrBL
 ```
 
 Single:
@@ -55,16 +53,16 @@ Writes `$NANOUNET_RESULTS/segtrack/inputsTrFU/{stem}/` (folder) or `$NANOUNET_RE
 | `--bl-img` `--bl-clicks` `--fu-img` `--fu-clicks` | path | — | Single mode |
 | `--bl-mask` | path | unset | Single: native BL instance mask (voxel = lesion_id). Skips BL predict. No `--bl-clicks` |
 | `--bl-mask-dir` | path | unset | Folder: `{stem}.nii.gz` or `{stem}.mha`. Skips BL predict |
-| `--meta` | path | unset | Single: optional types CSV (`lesion_id,lesion_type`). Not coordinates. |
-| `--meta-dir` | path | unset | Folder: optional types CSVs `{pid}.csv`. Not coordinates. |
+| `--meta` | path | unset | Single: lesion CSV (`cog_propagated` / `cog_fu` / `img_id_fu` / `lesion_type`) |
+| `--meta-dir` | path | `{dataset}/meta` if present | Folder: `{pid}.csv`. Inferred from `--bl-dir` parent. Coords + types |
 | `-o, --out` | path | `$NANOUNET_RESULTS/segtrack/...` | Parent (folder) or case dir (single) |
 | `-m, --model-dir` | path | Dataset999 `h200_instance_1200ep` | Seg run dir (`plans.json` + ckpt) |
 | `--ckpt` | str | `last.ckpt` | Seg checkpoint name |
-| `--track-ckpt` | path | `h60_r9/best.ckpt` | Matcher Lightning ckpt |
+| `--track-ckpt` | path | `h60_r9/best.ckpt` | Matcher Lightning ckpt. `drop_dp` ckpts do not use `cog_propagated` |
 | `--decode` | choice | `hungarian` | `hungarian` / `dense` / `sinkhorn` |
 | `--thresh` | float | `0.5` | Dense pair cutoff |
 | `--device` | choice | `cuda` | `cuda` \| `cpu` \| `mps` |
-| `--patients-csv` | path | unset | Folder filter |
+| `--patients-csv` | path | unset | Optional holdout filter on stem prefix. Unpaired / missing JSON are skipped. |
 | `--overwrite` | flag | off | Redo cases that already have `matches.csv` |
 | `--keep-pred` | flag | off | Binary FG `pred_bl.mha` / `pred_fu.mha`. Mask mode: `pred_fu.mha` only |
 | `--ema` | flag | off | Seg EMA weights |
@@ -77,7 +75,7 @@ Env overrides: `NANOUNET_SEGTRACK_MODEL`, `NANOUNET_SEGTRACK_TRACK`.
 
 ## Inputs / outputs
 
-**In:** BL/FU CT NIfTIs + click JSON (`points[].name` = lesion_id, `point` = `[x,y,z]` in that scan’s frame; FU JSON must be follow-up space). Optional types CSV. Optional BL instance mask: native BL grid, voxel = lesion_id; BL clicks omitted.
+**In:** BL/FU CT NIfTIs + click JSON (`points[].name` = lesion_id, `point` = `[x,y,z]` in that scan’s frame). Sibling JSON is seg clicks for that volume. Matcher BL positions: inferred `{dataset}/meta/{pid}.csv` rows with `img_id_fu` matching the stem region (`_00` → 0), unless the matcher ckpt was trained with `drop_dp` (native mask centroids; FU JSON stays the UNet click file). Optional BL instance mask: native BL grid, voxel = lesion_id; BL clicks omitted.
 
 **Out** (each case dir):
 
@@ -93,10 +91,12 @@ Env overrides: `NANOUNET_SEGTRACK_MODEL`, `NANOUNET_SEGTRACK_TRACK`.
 |---------|-------|-----|
 | `tracking is not installed` | lesion-tracking not on PYTHONPATH | `pip install -e /lesion-tracking` |
 | `No seg model at …` | Missing run dir / env | `-m $NANOUNET_RESULTS/nanounet/<run>` or `export NANOUNET_SEGTRACK_MODEL=...` |
-| `BL/FU folders do not share the same case names` | Stem mismatch (`_00` vs `_01`) | Matching `inputsTrBL` / `inputsTrFU`, or `--patients-csv` |
-| missing points JSON | No sibling `{stem}.json` | Add the click JSON next to each scan |
+| `BL/FU folders do not share any case names` | empty intersection | matching `inputsTrBL` / `inputsTrFU` |
+| `skip {stem} (no BL json)` / `no FU json` | incomplete case | skipped; rest of folder runs |
+| `skip {stem} (no FU scan)` / `no BL scan` | stem only in one folder | skipped; pair by exact stem `pid_00` ≠ `pid_01` |
+| `skip {stem} (no meta csv)` | `{pid}.csv` missing under meta-dir | skipped |
+| `drop {stem} BL ids … (not in this FU volume)` | id is other region / no coord | omitted from matcher; stays on `bl.mha` |
 | `--bl-clicks was set with --bl-mask` | both given | drop `--bl-clicks` |
-| `No BL instance mask for:` | stem missing under `--bl-mask-dir` | matching `{stem}.nii.gz` in `targetsTrBL` |
-| `BL mask grid != BL CT grid` | wrong space / registered mask | native `targetsTrBL`, not FU-warped |
-| `No FU-frame point for BL mask ids` | FU JSON lacks that BL id | Pass FU JSON in follow-up space, not baseline JSON |
+| `skip {stem} (no BL mask)` | missing mask for that stem | skipped |
+| `skip {stem} (BL mask grid != BL CT grid)` | wrong space / registered mask | native `targetsTrBL`, not FU-warped |
 | Empty instance mask | No click hit predicted FG | Check clicks; see [track_ids.md](../reference/track_ids.md) |

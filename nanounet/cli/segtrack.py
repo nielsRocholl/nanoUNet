@@ -61,7 +61,7 @@ def main() -> None:
     quiet_lightning_runtime()
     choices, load_matcher = _require_tracking()
     args = _mode(argparse.ArgumentParser(), choices)
-    cases, single = collect_cases(args)
+    cases, single, skipped, (meta_dir, meta_src) = collect_cases(args)
     model_dir, msrc = resolve_ckpt_path(args.model_dir, "NANOUNET_SEGTRACK_MODEL", DEFAULT_MODEL)
     track_ckpt, tsrc = resolve_ckpt_path(args.track_ckpt, "NANOUNET_SEGTRACK_TRACK", DEFAULT_TRACK)
     if not (model_dir / "plans.json").is_file():
@@ -82,16 +82,9 @@ def main() -> None:
         raise SystemExit(
             f"--device {d} is not available.\nExpected a working {d} device.\nFix: --device cpu  (see docs/steps/track.md)"
         )
-    pl = Plans(join(str(model_dir), "plans.json"))
-    cm, dj = pl.get_configuration("3d_fullres"), load_json(join(str(model_dir), "dataset.json"))
-    cfg = load_config(join(str(model_dir), "nano_config.json"))
-    set_resample_device(dev := torch.device(d))
-    net, lm = load_net_from_ckpt(pick_checkpoint(str(model_dir), args.ckpt), cm, dj, dev, longi=False, ema=args.ema)
-    matcher = load_matcher(track_ckpt, d)
-    use_tta = (not cfg.inference.disable_tta_default) if args.tta_flag is None else args.tta_flag
     out_cli = Path(args.out) if args.out else None
     fu_name = Path(args.fu_dir).name if args.fu_dir else None
-    parent = resolve_out(cases[0].stem, fu_dir_name=fu_name, out=out_cli, single=single).parent
+    parent = resolve_out(cases[0].stem if cases else "_", fu_dir_name=fu_name, out=out_cli, single=single).parent
     nano_banner("nanoUNet  seg × track", "scans + clicks → linked instance masks")
     rows = [
         ("model-dir", model_dir, msrc), ("ckpt", args.ckpt, "cli" if args.ckpt != "last.ckpt" else "default"),
@@ -103,46 +96,78 @@ def main() -> None:
         rows.append(("bl-mask", args.bl_mask, "cli"))
     elif args.bl_mask_dir:
         rows.append(("bl-mask-dir", args.bl_mask_dir, "cli"))
+    rows.append(("meta-dir", meta_dir if meta_dir is not None else "none", meta_src))
     config_table(rows)
+    for stem, why in skipped:
+        cprint(f"[dim]skip {stem}  ({why})[/dim]")
+    n_all, n_ok, n_empty, n_skip, n_pairs = len(cases) + len(skipped), 0, 0, len(skipped), 0
+    if not cases:
+        console().print(Panel(
+            f"{n_all} cases  ·  0 linked  ·  0 empty  ·  {n_skip} skip\n"
+            f"0 pairs  ·  0m 00s\n"
+            f"wrote  {parent}\n"
+            f"next   docs/steps/track.md",
+            border_style="green",
+        ))
+        return
+    pl = Plans(join(str(model_dir), "plans.json"))
+    cm, dj = pl.get_configuration("3d_fullres"), load_json(join(str(model_dir), "dataset.json"))
+    cfg = load_config(join(str(model_dir), "nano_config.json"))
+    set_resample_device(dev := torch.device(d))
+    net, lm = load_net_from_ckpt(pick_checkpoint(str(model_dir), args.ckpt), cm, dj, dev, longi=False, ema=args.ema)
+    matcher = load_matcher(track_ckpt, d)
+    use_tta = (not cfg.inference.disable_tta_default) if args.tta_flag is None else args.tta_flag
     seg_kw = dict(
         use_tta=use_tta, batch_size=args.batch_size, use_amp=not args.no_amp,
         inference_mode=args.inference_mode, cluster_margin_frac=0.1, border_expand=True,
     )
-    n, n_ok, n_empty, n_skip, n_pairs = len(cases), 0, 0, 0, 0
     t0 = time.perf_counter()
     with Progress(
         SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(),
         TextColumn("{task.completed}/{task.total}"), TimeElapsedColumn(),
         console=console(), transient=False,
     ) as prog:
-        tid = prog.add_task("seg × track", total=n)
+        tid = prog.add_task("seg × track", total=len(cases))
         for i, case in enumerate(cases, 1):
             cdir = resolve_out(case.stem, fu_dir_name=fu_name, out=out_cli, single=single)
 
             def on_step(s: str, i=i, stem=case.stem) -> None:
-                prog.update(tid, description=f"{i}/{n}  {stem}  ·  {s}")
+                prog.update(tid, description=f"{i}/{len(cases)}  {stem}  ·  {s}")
 
-            r = run_case(
-                case, cdir, net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dj=dj, dev=dev, matcher=matcher,
-                decode=args.decode, overwrite=args.overwrite, keep_pred=args.keep_pred,
-                track_ckpt=track_ckpt, thresh=args.thresh, device=d, seg_kw=seg_kw, on_step=on_step,
-            )
+            try:
+                r = run_case(
+                    case, cdir, net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dj=dj, dev=dev, matcher=matcher,
+                    decode=args.decode, overwrite=args.overwrite, keep_pred=args.keep_pred,
+                    track_ckpt=track_ckpt, thresh=args.thresh, device=d, seg_kw=seg_kw, on_step=on_step,
+                )
+            except SystemExit as e:
+                if single:
+                    raise
+                cprint(f"[dim]skip {case.stem}  ({str(e).splitlines()[0]})[/dim]")
+                n_skip += 1
+                prog.advance(tid)
+                continue
             n_ok += r["status"] == "ok"
             n_empty += r["status"] == "empty"
             n_skip += r["status"] == "skip"
             n_pairs += r["n_pairs"]
-            cprint(f"[dim]{case.stem}  {r['sec']:.0f}s[/dim]" if r["status"] != "skip" else f"[dim]skip {case.stem}[/dim]")
+            if r["status"] == "skip":
+                why = r.get("why")
+                cprint(f"[dim]skip {case.stem}  ({why})[/dim]" if why else f"[dim]skip {case.stem}[/dim]")
+            else:
+                cprint(f"[dim]{case.stem}  {r['sec']:.0f}s[/dim]")
             prog.advance(tid)
     elapsed = time.perf_counter() - t0
     mins, secs = divmod(int(elapsed), 60)
     console().print(Panel(
-        f"{n} cases  ·  {n_ok} linked  ·  {n_empty} empty  ·  {n_skip} skip\n"
+        f"{n_all} cases  ·  {n_ok} linked  ·  {n_empty} empty  ·  {n_skip} skip\n"
         f"{n_pairs} pairs  ·  {mins}m {secs:02d}s\n"
         f"wrote  {parent}\n"
         f"next   open fu.mha — same integer = same lesion\n"
         f"       docs/reference/track_ids.md",
         border_style="green",
     ))
+
 
 if __name__ == "__main__":
     main()
