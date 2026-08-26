@@ -12,7 +12,7 @@ from tracking.common import LESION_TYPES
 from tracking.data.appearance import centroids, mask_stats_all
 from tracking.data.descriptor import descriptor_l0
 from tracking.data.features import feat_layout, pack_node
-from tracking.data.graph import GraphConfig, intra_knn, _load_vol
+from tracking.data.graph import GraphConfig, intra_knn
 from tracking.data.pairs import cross_attr, dense_pair_index, reverse_cross_attr
 from tracking.data.propagate import load_propagated, load_types
 
@@ -32,19 +32,19 @@ def _lt(lid: int, table: dict[int, str], default: str | None) -> int:
 
 
 def build_mask_graph(
-    bl_img: Path,
-    bl_mask: Path,
-    fu_img: Path,
-    fu_mask: Path,
+    ct_bl: np.ndarray,
+    aff_bl: np.ndarray,
+    sp_bl: np.ndarray,
+    mk_bl: np.ndarray,
+    ct_fu: np.ndarray,
+    aff_fu: np.ndarray,
+    sp_fu: np.ndarray,
+    mk_fu: np.ndarray,
     propagated_csv: Path,
     cfg: GraphConfig,
     default_lesion_type: str | None = None,
     types_csv: Path | None = None,
 ) -> HeteroData:
-    ct_bl, aff_bl, sp_bl = _load_vol(bl_img)
-    mk_bl, _, _ = _load_vol(bl_mask)
-    ct_fu, aff_fu, sp_fu = _load_vol(fu_img)
-    mk_fu, _, _ = _load_vol(fu_mask)
     bl_ids, fu_ids = _labels(mk_bl), _labels(mk_fu)
     c_bl, c_fu = centroids(mk_bl, bl_ids), centroids(mk_fu, fu_ids)
     mf_bl, mf_fu = mask_stats_all(mk_bl, bl_ids, sp_bl, ct_bl), mask_stats_all(mk_fu, fu_ids, sp_fu, ct_fu)

@@ -79,19 +79,38 @@ def track(
     use_ema: bool = True,
     matcher: MatcherModule | None = None,
     types_csv: Path | None = None,
+    volumes: tuple | None = None,
 ) -> TrackResult:
     assert decode in DECODE_CHOICES
-    for label, p in (("bl-img", bl_img), ("bl-mask", bl_mask), ("fu-img", fu_img), ("fu-mask", fu_mask), ("propagated", propagated)):
-        if not Path(p).is_file():
+    if volumes is None:
+        for label, p in (
+            ("bl-img", bl_img), ("bl-mask", bl_mask),
+            ("fu-img", fu_img), ("fu-mask", fu_mask), ("propagated", propagated),
+        ):
+            if not Path(p).is_file():
+                raise FileNotFoundError(
+                    f"No {label} at {p}.\n"
+                    f"Expected NIfTI, meta CSV, slim CSV, or FU-frame JSON on disk.\n"
+                    f"Fix: pass an existing --{label} path"
+                )
+        ct_bl, aff_bl, sp_bl = _load_vol(Path(bl_img))
+        mk_bl = _load_vol(Path(bl_mask))[0]
+        ct_fu, aff_fu, sp_fu = _load_vol(Path(fu_img))
+        mk_fu = _load_vol(Path(fu_mask))[0]
+    else:
+        if not Path(propagated).is_file():
             raise FileNotFoundError(
-                f"No {label} at {p}.\n"
+                f"No propagated at {propagated}.\n"
                 f"Expected NIfTI, meta CSV, slim CSV, or FU-frame JSON on disk.\n"
-                f"Fix: pass an existing --{label} path"
+                f"Fix: pass an existing --propagated path"
             )
+        ct_bl, aff_bl, sp_bl, mk_bl, ct_fu, aff_fu, sp_fu, mk_fu = volumes
+        assert mk_bl.shape == ct_bl.shape, (mk_bl.shape, ct_bl.shape)
+        assert mk_fu.shape == ct_fu.shape, (mk_fu.shape, ct_fu.shape)
     mod = matcher if matcher is not None else load_matcher(ckpt, device)
     dev = next(mod.parameters()).device
     data = build_mask_graph(
-        Path(bl_img), Path(bl_mask), Path(fu_img), Path(fu_mask),
+        ct_bl, aff_bl, sp_bl, mk_bl, ct_fu, aff_fu, sp_fu, mk_fu,
         Path(propagated), GraphConfig(k_intra=k_intra), default_lesion_type,
         types_csv=Path(types_csv) if types_csv is not None else None,
     )

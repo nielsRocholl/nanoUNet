@@ -18,11 +18,11 @@ What one case writes. CSV stays. Masks are the product view: same integer on bot
 
 | File | Dtype / format | Grid | Meaning |
 |------|----------------|------|---------|
-| `{out}/bl.nii.gz` | `int32` NIfTI | baseline CT | instance mask. Voxel = tracking id. Background `0`. |
-| `{out}/fu.nii.gz` | `int32` NIfTI | follow-up CT | instance mask. Voxel = tracking id. Background `0`. |
+| `{out}/bl.mha` | `uint8`/`int16` MetaImage (sitk zyx) | baseline CT | instance mask. Voxel = tracking id. Background `0`. |
+| `{out}/fu.mha` | `uint8`/`int16` MetaImage (sitk zyx) | follow-up CT | instance mask. Voxel = tracking id. Background `0`. |
 | `{out}/matches.csv` | UTF-8 CSV | — | pair table (see §1.4) |
 
-Affine + header of each mask = the instance NIfTI they were painted from (same as today’s `instances_from_nifti`: xyz on disk, copy `img.affine` / `img.header`). Do not resample. Do not change BL voxel values.
+Geometry = `props["sitk_stuff"]` (spacing/origin/direction) from that scan’s preprocess. Do not resample. Do not change BL voxel values.
 
 Empty graph (no lesions on a side): that mask is all zeros; CSV still gets a header.
 
@@ -82,7 +82,7 @@ def paint_fu(fu_mask: np.ndarray, m: dict[int, int]) -> np.ndarray:
     return out
 ```
 
-`bl.nii.gz` = BL instance mask copied (`int32`). Never relabel BL.
+`bl.mha` = BL instance mask copied (sitk zyx, uint8/int16). Never relabel BL.
 
 #### What each decode does on the masks (consequence, not extra code)
 
@@ -131,7 +131,7 @@ bl_lesion_id,fu_lesion_id,pair_prob,decode,track_id
 | `fu_lesion_id` | FU **click** label **before** paint (matcher node) |
 | `pair_prob` | `sigmoid` of that pair, unchanged |
 | `decode` | `hungarian` / `dense` / `sinkhorn` |
-| `track_id` | `min(BL ids matched to this fu_lesion_id)` = voxel value on `fu.nii.gz` for that blob; also the voxel value on `bl.nii.gz` for `bl_lesion_id` when it is the min |
+| `track_id` | `min(BL ids matched to this fu_lesion_id)` = voxel value on `fu.mha` for that blob; also the voxel value on `bl.mha` for `bl_lesion_id` when it is the min |
 
 One row per decoded pair. Header only if `pairs` is empty. Unmatched lesions are **not** extra CSV rows (same as today). They only appear as ids present on one mask.
 
@@ -146,14 +146,14 @@ Touch these files when Part 2 lands. Do not write them before Part 2 is locked.
 | File | What to change |
 |------|----------------|
 | `/nanoUNet/docs/steps/track.md` | 3-line summary, copy-paste command, **argument table (D3)**, inputs/outputs, errors. Must describe mask files + CSV + the table in §1.3. `<200` lines. |
-| `/nanoUNet/docs/index.md` | Keep `predict → track` in the mermaid. Quickstart: one extra line that `nanounet_segtrack` writes `{bl,fu}.nii.gz` + `matches.csv`. |
+| `/nanoUNet/docs/index.md` | Keep `predict → track` in the mermaid. Quickstart: one extra line that `nanounet_segtrack` writes `{bl,fu}.mha` + `matches.csv`. |
 | `/nanoUNet/docs/reference/track_ids.md` | **New.** One concept: tracking ids on masks. The hungarian vs dense table from §1.3, the three worked numbers, “dense split = one id, several FU blobs”. No CLI flag dump (that lives in `steps/track.md`). `<200` lines. |
 | `/nanoUNet/README.md` | If it lists CLIs, add `nanounet_segtrack` (today it omits it). |
 
 `steps/track.md` outputs section must say, in this order:
 
-1. `{out}/bl.nii.gz` — BL instance mask, ids unchanged.
-2. `{out}/fu.nii.gz` — FU instance mask, ids remapped.
+1. `{out}/bl.mha` — BL instance mask, ids unchanged.
+2. `{out}/fu.mha` — FU instance mask, ids remapped.
 3. `{out}/matches.csv` — columns listed exactly as §1.4.
 
 Errors table (E1) must include: missing `lesion-tracking`, missing ckpt / model-dir, BL/FU stem mismatch, missing sibling JSON, BL instance id with no FU-JSON point, empty instance mask (point at `docs/reference/track_ids.md` for “why FU ids ≠ click names”). This CLI defaults `--decode hungarian` — no TTY prompt.
@@ -180,7 +180,7 @@ Flow per case, always:
 ```
 BL CT+clicks → binary pred → instance
 FU CT+clicks → binary pred → instance
-track() → paint §1.3 → {bl,fu}.nii.gz + matches.csv
+track() → paint §1.3 → {bl,fu}.mha + matches.csv
 ```
 
 Seg model: Dataset999 **single-stream**, two predict passes. Do **not** add `--longi`. Longi ckpts are FU-only and are a different product.
@@ -233,13 +233,13 @@ Startup (R15), before any GPU work:
 | Folder | `{results}/segtrack/{fu_dir.name}/{stem}/` | `{P}/{stem}/` |
 | Single | `{results}/segtrack/single/{stem}/` | `{P}/` (this **is** the case dir) |
 
-`stem` = `01161aaa0b_00` (filename without `.nii.gz`). Each case dir is exactly §1.1 (`bl.nii.gz`, `fu.nii.gz`, `matches.csv`).
+`stem` = `01161aaa0b_00` (filename without `.nii.gz`). Each case dir is exactly §1.1 (`bl.mha`, `fu.mha`, `matches.csv`).
 
-Example: `--fu-dir .../inputsTrFU` → `$NANOUNET_RESULTS/segtrack/inputsTrFU/01161aaa0b_00/fu.nii.gz`. The extra `segtrack/` folder keeps these files out of `$NANOUNET_RESULTS/nanounet/` (training). The next folder is named after the input.
+Example: `--fu-dir .../inputsTrFU` → `$NANOUNET_RESULTS/segtrack/inputsTrFU/01161aaa0b_00/fu.mha`. The extra `segtrack/` folder keeps these files out of `$NANOUNET_RESULTS/nanounet/` (training). The next folder is named after the input.
 
 Resume: if `{case}/matches.csv` exists and `--overwrite` is off, skip the whole case (no re-predict). `cprint` dim skip line with stem.
 
-`--keep-pred`: also write `{case}/pred_bl.nii.gz` and `{case}/pred_fu.nii.gz` (binary FG). Default **off** — binary lives in `tempfile.mkdtemp()` and is deleted after instance-ize.
+`--keep-pred`: also write `{case}/pred_bl.mha` and `{case}/pred_fu.mha` (binary FG). Default **off**.
 
 ---
 
@@ -430,7 +430,7 @@ On skip/empty, set description to `skip` / `empty` and advance.
 60 cases  ·  53 linked  ·  4 empty  ·  3 skip
 412 pairs  ·  14m 02s
 wrote  /nnunet_data/NanoUNet_results/segtrack/inputsTrFU
-next   open fu.nii.gz — same integer = same lesion
+next   open fu.mha — same integer = same lesion
        docs/reference/track_ids.md
 ```
 
@@ -492,7 +492,7 @@ New `docs/reference/track_ids.md` = §1.5.
 3. `nanounet/infer/segtrack.py` + `common.py` banner/console.
 4. Replace `nanounet/cli/segtrack.py`.
 5. Docs.
-6. One real case: `01161aaa0b_00` from Longitudinal-CT, `--decode hungarian`, **no meta**, confirm `bl.nii.gz`/`fu.nii.gz`/`matches.csv` exist and shared ids ⊂ BL labels.
+6. One real case: `01161aaa0b_00` from Longitudinal-CT, `--decode hungarian`, **no meta**, confirm `bl.mha`/`fu.mha`/`matches.csv` exist and shared ids ⊂ BL labels.
 
 Do not run the 59-patient holdout in this change.
 

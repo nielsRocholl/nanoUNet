@@ -45,8 +45,8 @@ def load_clicks(path: Path) -> dict[int, tuple[int, int, int]]:
 
 def binary_to_instances(pred: np.ndarray, clicks_zyx: dict[int, tuple[int, int, int]]) -> np.ndarray:
     """pred is bool/0-1, same grid as clicks. Return int32 mask, voxel = lesion_id."""
-    out = np.zeros(pred.shape, dtype=np.int32)
     lab = cc3d.connected_components((pred > 0).astype(np.uint8), connectivity=18)
+    lut = np.zeros(int(lab.max()) + 1, dtype=np.int32)
     claimed: dict[int, int] = {}
     conflicts: list[tuple[int, int, int]] = []
     for lid, (z, y, x) in clicks_zyx.items():
@@ -60,10 +60,10 @@ def binary_to_instances(pred: np.ndarray, clicks_zyx: dict[int, tuple[int, int, 
             conflicts.append((lid, claimed[cc], cc))
             continue
         claimed[cc] = lid
-        out[lab == cc] = lid
+        lut[cc] = lid
     if conflicts:
         cprint(f"[yellow]click CC conflicts (later click skipped): {conflicts}[/yellow]")
-    return out
+    return lut[lab]
 
 
 def instances_from_nifti(pred_path: Path, clicks_json_path: Path, out_path: Path) -> Path:
