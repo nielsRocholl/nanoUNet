@@ -14,6 +14,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any
 
+from rich.align import Align
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
@@ -32,35 +33,21 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 def quiet_lightning_runtime() -> None:
     import warnings
 
-    warnings.filterwarnings(
-        "ignore",
-        message=r".*pin_memory.*not supported on MPS.*",
-        category=UserWarning,
-        module=r"torch.utils.data.dataloader",
-    )
-    warnings.filterwarnings(
-        "ignore",
-        message=r".*Precision 16-mixed is not supported by the model summary.*",
-        category=UserWarning,
-    )
-    warnings.filterwarnings("ignore", message=r".*LeafSpec.*")
-    warnings.filterwarnings("ignore", message=r".*anonymous setting has no effect.*", category=UserWarning)
-    warnings.filterwarnings(
-        "ignore",
-        message=r".*IterableDataset.*__len__.*multi-process data loading.*",
-        category=UserWarning,
-    )
-    warnings.filterwarnings(
-        "ignore",
-        message=r".*DataLoader will create.*worker processes in total.*",
-        category=UserWarning,
-        module=r"torch.utils.data.dataloader",
-    )
-    warnings.filterwarnings(
-        "ignore",
-        message=r".*set_float32_matmul_precision.*",
-        category=UserWarning,
-    )
+    for msg, cat, mod in (
+        (r".*pin_memory.*not supported on MPS.*", UserWarning, r"torch.utils.data.dataloader"),
+        (r".*Precision 16-mixed is not supported by the model summary.*", UserWarning, None),
+        (r".*LeafSpec.*", None, None),
+        (r".*anonymous setting has no effect.*", UserWarning, None),
+        (r".*IterableDataset.*__len__.*multi-process data loading.*", UserWarning, None),
+        (r".*DataLoader will create.*worker processes in total.*", UserWarning, r"torch.utils.data.dataloader"),
+        (r".*set_float32_matmul_precision.*", UserWarning, None),
+    ):
+        kw = {}
+        if cat is not None:
+            kw["category"] = cat
+        if mod is not None:
+            kw["module"] = mod
+        warnings.filterwarnings("ignore", message=msg, **kw)
     global _LIGHTNING_QUIET
     if _LIGHTNING_QUIET:
         return
@@ -75,9 +62,7 @@ def quiet_lightning_runtime() -> None:
 
     _rz.rank_zero_info = _no_litlogger_tip
     _LIGHTNING_QUIET = True
-
     import torch
-
     if torch.cuda.is_available():
         torch.set_float32_matmul_precision("high")
 
@@ -146,6 +131,17 @@ def nano_rule() -> None:
 def nano_header(title: str, color: str = "cyan") -> None:
     if _rank0():
         _CONSOLE.print(Panel(f"[bold {color}]{title}[/bold {color}]", border_style=color))
+
+
+def nano_banner(title: str, subtitle: str, color: str = "cyan") -> None:
+    if not _rank0():
+        return
+    body = Align.center(f"[bold {color}]{title}[/bold {color}]\n[dim]{subtitle}[/dim]")
+    _CONSOLE.print(Panel(body, border_style=color, padding=(1, 4)))
+
+
+def console() -> Console:
+    return _CONSOLE
 
 
 def config_table(rows: list[tuple[str, Any, str]], title: str = "config") -> None:

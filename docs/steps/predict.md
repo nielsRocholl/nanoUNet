@@ -26,7 +26,7 @@ nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
   -m /path/to/run --ckpt last.ckpt
 ```
 
-Then track (binary FG + clicks): [track.md](track.md) / `nanounet_segtrack`.
+Then track both timepoints (writes `{bl,fu}.nii.gz` + `matches.csv`): [track.md](track.md) / `nanounet_segtrack`.
 
 Centered mode (one patch per click):
 

@@ -40,6 +40,8 @@ python -c "import sys; import nanounet.cli.preprocess, nanounet.cli.train, nanou
 | MAE pretrain                   | [docs/steps/pretrain.md](docs/steps/pretrain.md)                   |
 | Supervised train               | [docs/steps/train.md](docs/steps/train.md)                         |
 | Inference                      | [docs/steps/predict.md](docs/steps/predict.md)                     |
+| Track (seg × track)            | [docs/steps/track.md](docs/steps/track.md)                         |
+| Tracking ids                   | [docs/reference/track_ids.md](docs/reference/track_ids.md)         |
 | Longitudinal workflow          | [docs/steps/longi.md](docs/steps/longi.md)                         |
 | ROI / prompt config            | [docs/reference/config.md](docs/reference/config.md)               |
 | Patch size playbook            | [docs/reference/patch_size.md](docs/reference/patch_size.md)       |
@@ -47,4 +49,4 @@ python -c "import sys; import nanounet.cli.preprocess, nanounet.cli.train, nanou
 | Host RAM / cgroup OOM          | [docs/dev-notes/cgroup_memory.md](docs/dev-notes/cgroup_memory.md) |
 
 
-Entry points: `nanounet_preprocess`, `nanounet_train`, `nanounet_pretrain`, `nanounet_predict` (see [pyproject.toml](pyproject.toml)).
+Entry points: `nanounet_preprocess`, `nanounet_train`, `nanounet_pretrain`, `nanounet_predict`, `nanounet_segtrack` (see [pyproject.toml](pyproject.toml)).

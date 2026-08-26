@@ -1,50 +1,77 @@
-# Track (after predict)
+# Track (seg × track)
 
-Turn binary nanoUNet predictions + click JSON into instance masks, then call `tracking.infer.track`. Seg stays in nanoUNet; this CLI does not re-run predict.
+One command: two CTs + click JSON → instance masks with shared tracking ids + match CSV. Predicts both timepoints (Dataset999 single-stream), instance-izes click-on-FG, then matches. Requires `pip install -e /lesion-tracking`.
 
-Requires `pip install -e /lesion-tracking`.
+Default `--decode hungarian`. FU click JSON is the matcher’s BL coordinates (no meta CSV). See [track_ids.md](../reference/track_ids.md).
 
 ## Command
 
+Folder (sibling `{stem}.nii.gz` + `{stem}.json`, pair by exact stem):
+
 ```bash
 nanounet_segtrack \
-  --bl-img /nnunet_data/Longitudinal-CT/inputsTrBL/CASE_00.nii.gz \
-  --bl-pred /tmp/preds/CASE_bl.nii.gz --bl-clicks CASE_bl.json \
-  --fu-img /nnunet_data/Longitudinal-CT/inputsTrFU/CASE_00.nii.gz \
-  --fu-pred /tmp/preds/CASE.nii.gz --fu-clicks CASE.json \
-  --propagated /nnunet_data/Longitudinal-CT/meta/CASE.csv \
-  --track-ckpt /nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt \
-  --decode dense --out /tmp/preds/CASE_matches.csv
+  --bl-dir /nnunet_data/Longitudinal-CT/inputsTrBL \
+  --fu-dir /nnunet_data/Longitudinal-CT/inputsTrFU \
+  --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv
 ```
 
-`--decode` omitted on a TTY → interactive table. Non-TTY must pass `--decode`.
+Single case:
+
+```bash
+nanounet_segtrack \
+  --bl-img /nnunet_data/Longitudinal-CT/inputsTrBL/01161aaa0b_00.nii.gz \
+  --bl-clicks /nnunet_data/Longitudinal-CT/inputsTrBL/01161aaa0b_00.json \
+  --fu-img /nnunet_data/Longitudinal-CT/inputsTrFU/01161aaa0b_00.nii.gz \
+  --fu-clicks /nnunet_data/Longitudinal-CT/inputsTrFU/01161aaa0b_00.json
+```
+
+Writes `$NANOUNET_RESULTS/segtrack/inputsTrFU/{stem}/` (folder) or `$NANOUNET_RESULTS/segtrack/single/{stem}/` (one case). Override with `-o`.
 
 ## Arguments
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `--bl-img` `--fu-img` | path | required | Native CT NIfTI |
-| `--bl-pred` `--fu-pred` | path | required | Binary FG predictions from `nanounet_predict` |
-| `--bl-clicks` `--fu-clicks` | path | required | nanoUNet click JSON (`points[].name` = lesion_id, `point` = `[x,y,z]`) |
-| `--propagated` | path | required | Meta CSV (`cog_propagated`), slim `lesion_id,z,y,x`, or FU-frame click JSON. Not `inputsTrBL` native clicks. |
-| `--track-ckpt` | path | required | Lightning matcher ckpt (`h60_r9/best.ckpt`) |
-| `--out` | path | required | Match CSV next to preds |
-| `--decode` | choice | unset | `dense` / `sinkhorn` / `hungarian` (see `lesion_track --help`) |
-| `--thresh` | float | 0.5 | Dense pair cutoff |
+| `--bl-dir` `--fu-dir` | path | — | Folder mode. Sibling `.nii.gz` + `.json` |
+| `--bl-img` `--bl-clicks` `--fu-img` `--fu-clicks` | path | — | Single mode |
+| `--meta` | path | unset | Single: optional types CSV (`lesion_id,lesion_type`). Not coordinates. |
+| `--meta-dir` | path | unset | Folder: optional types CSVs `{pid}.csv`. Not coordinates. |
+| `-o, --out` | path | `$NANOUNET_RESULTS/segtrack/...` | Parent (folder) or case dir (single) |
+| `-m, --model-dir` | path | Dataset999 `h200_instance_1200ep` | Seg run dir (`plans.json` + ckpt) |
+| `--ckpt` | str | `last.ckpt` | Seg checkpoint name |
+| `--track-ckpt` | path | `h60_r9/best.ckpt` | Matcher Lightning ckpt |
+| `--decode` | choice | `hungarian` | `hungarian` / `dense` / `sinkhorn` |
+| `--thresh` | float | `0.5` | Dense pair cutoff |
 | `--device` | choice | `cuda` | `cuda` \| `cpu` \| `mps` |
+| `--patients-csv` | path | unset | Folder filter |
+| `--overwrite` | flag | off | Redo cases that already have `matches.csv` |
+| `--keep-pred` | flag | off | Keep binary FG next to masks |
+| `--ema` | flag | off | Seg EMA weights |
+| `--batch-size` | int | `8` | Predict batch |
+| `--inference-mode` | choice | `clustered` | `clustered` \| `centered` |
+| `--disable-tta` | flag | config default | Same as predict |
+| `--no-amp` | flag | off | |
 
-Output columns: `bl_lesion_id, fu_lesion_id, pair_prob, decode`.
+Env overrides: `NANOUNET_SEGTRACK_MODEL`, `NANOUNET_SEGTRACK_TRACK`.
 
 ## Inputs / outputs
 
-**In:** binary pred NIfTIs, click JSON, CTs, propagated centroids, matcher ckpt.
+**In:** BL/FU CT NIfTIs + click JSON (`points[].name` = lesion_id, `point` = `[x,y,z]` in that scan’s frame; FU JSON must be follow-up space). Optional types CSV.
 
-**Out:** match CSV. Instance conversion is in-memory (temp NIfTI); click-on-FG owns the cc3d-18 component.
+**Out** (each case dir):
+
+1. `{out}/bl.nii.gz` — BL instance mask, ids unchanged (`int32`).
+2. `{out}/fu.nii.gz` — FU instance mask, ids remapped so the same integer = same lesion.
+3. `{out}/matches.csv` — `bl_lesion_id,fu_lesion_id,pair_prob,decode,track_id`.
+
+`track_id` is the voxel value on `fu.nii.gz` for that pair. Unmatched lesions are not extra CSV rows; they only appear as ids on one mask.
 
 ## Errors
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `tracking is not installed` | lesion-tracking not on the env | `pip install -e /lesion-tracking` |
-| `No --decode given and stdin is not a TTY` | Batch job omitted decode | `--decode dense` |
-| `No checkpoint at …` | Train not finished / wrong path | `--track-ckpt /nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt` |
+| `tracking is not installed` | lesion-tracking not on PYTHONPATH | `pip install -e /lesion-tracking` |
+| `No seg model at …` | Missing run dir / env | `-m $NANOUNET_RESULTS/nanounet/<run>` or `export NANOUNET_SEGTRACK_MODEL=...` |
+| `BL/FU folders do not share the same case names` | Stem mismatch (`_00` vs `_01`) | Matching `inputsTrBL` / `inputsTrFU`, or `--patients-csv` |
+| missing points JSON | No sibling `{stem}.json` | Add the click JSON next to each scan |
+| `No FU-frame point for BL mask ids` | FU JSON lacks that BL id | Pass FU JSON in follow-up space, not baseline JSON |
+| Empty instance mask | No click hit predicted FG | Check clicks; see [track_ids.md](../reference/track_ids.md) |

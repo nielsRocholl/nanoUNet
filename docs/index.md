@@ -35,7 +35,12 @@ Set environment variables (see [README](../README.md#environment)) then run:
 nanounet_preprocess -d 001 --planner nnUNetPlannerResEncL -np 8
 nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/default.json
 nanounet_predict -i /path/to/scans -o /path/to/out -m /path/to/run --ckpt last.ckpt
+nanounet_segtrack \
+  --bl-dir /nnunet_data/Longitudinal-CT/inputsTrBL \
+  --fu-dir /nnunet_data/Longitudinal-CT/inputsTrFU
 ```
+
+`nanounet_segtrack` writes `{bl,fu}.nii.gz` (shared tracking ids) + `matches.csv` under `$NANOUNET_RESULTS/segtrack/`.
 
 Tiny laptop smoke train:
 
@@ -53,7 +58,8 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetTinyPlans --config configs/de
 | MAE pretrain | [steps/pretrain.md](steps/pretrain.md) |
 | Supervised train | [steps/train.md](steps/train.md) |
 | Inference (clustered + scores) | [steps/predict.md](steps/predict.md) |
-| Track (binary pred → matches) | [steps/track.md](steps/track.md) |
+| Track (scans + clicks → linked masks) | [steps/track.md](steps/track.md) |
+| Tracking ids on masks | [reference/track_ids.md](reference/track_ids.md) |
 | Longitudinal workflow | [steps/longi.md](steps/longi.md) |
 | ROI / prompt config | [reference/config.md](reference/config.md) |
 | Patch size playbook | [reference/patch_size.md](reference/patch_size.md) |
