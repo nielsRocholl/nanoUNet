@@ -38,14 +38,13 @@ def load_propagated(path: Path, bl_ids: list[int]) -> tuple[dict[int, np.ndarray
                 f"or nanoUNet JSON points in the FU frame.\n"
                 f"Fix: --propagated /nnunet_data/Longitudinal-CT/meta/<pid>.csv"
             )
-    want, got = set(bl_ids), set(prop)
-    if want != got:
-        miss, extra = sorted(want - got), sorted(got - want)
+    want, got = set(int(x) for x in bl_ids), set(prop)
+    missing = sorted(want - got)
+    if missing:
         raise SystemExit(
-            f"Propagated ids != BL mask labels at {path}.\n"
-            f"Expected exact match with mask ids {sorted(want)}; missing={miss} extra={extra}.\n"
-            f"Fix: pass FU-frame centroids for every BL instance (meta cog_propagated or JSON); "
-            f"not inputsTrBL native clicks"
+            f"No FU-frame point for BL mask ids {missing} at {path}.\n"
+            f"Expected a JSON/CSV point for every BL instance {sorted(want)} (extra JSON names are ignored).\n"
+            f"Fix: pass the FU click JSON in follow-up space, not the baseline JSON  (see docs/steps/track.md)"
         )
     return prop, typ
 
@@ -92,6 +91,37 @@ def _from_meta(df: pd.DataFrame) -> tuple[dict[int, np.ndarray], dict[int, str]]
                 )
             typ[lid] = lt
     return prop, typ
+
+
+def load_types(path: Path) -> dict[int, str]:
+    """lesion_id, lesion_type only. Not used for coordinates."""
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"No types CSV at {path}.\n"
+            f"Expected columns lesion_id, lesion_type.\n"
+            f"Fix: --meta /nnunet_data/Longitudinal-CT/meta/<pid>.csv  (see docs/steps/track.md)"
+        )
+    df = pd.read_csv(path)
+    if "lesion_id" not in df.columns or "lesion_type" not in df.columns:
+        raise SystemExit(
+            f"Types CSV at {path} is missing lesion_id or lesion_type.\n"
+            f"Expected columns lesion_id, lesion_type (other columns ignored).\n"
+            f"Fix: pass a meta CSV or omit --meta  (see docs/steps/track.md)"
+        )
+    out: dict[int, str] = {}
+    for _, r in df.iterrows():
+        lt = str(r["lesion_type"]).strip()
+        if not lt or lt == "nan":
+            continue
+        if lt not in LESION_TYPES:
+            raise SystemExit(
+                f"unknown lesion_type {lt!r} in {path}.\n"
+                f"Expected one of {list(LESION_TYPES)}.\n"
+                f"Fix: edit the meta row or omit --meta  (see docs/steps/track.md)"
+            )
+        out[int(r["lesion_id"])] = lt
+    return out
 
 
 def _from_slim(df: pd.DataFrame) -> tuple[dict[int, np.ndarray], dict[int, str]]:

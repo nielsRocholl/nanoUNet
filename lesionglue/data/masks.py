@@ -14,7 +14,7 @@ from tracking.data.descriptor import descriptor_l0
 from tracking.data.features import feat_layout, pack_node
 from tracking.data.graph import GraphConfig, intra_knn, _load_vol
 from tracking.data.pairs import cross_attr, dense_pair_index, reverse_cross_attr
-from tracking.data.propagate import load_propagated
+from tracking.data.propagate import load_propagated, load_types
 
 
 def _labels(mask: np.ndarray) -> list[int]:
@@ -39,6 +39,7 @@ def build_mask_graph(
     propagated_csv: Path,
     cfg: GraphConfig,
     default_lesion_type: str | None = None,
+    types_csv: Path | None = None,
 ) -> HeteroData:
     ct_bl, aff_bl, sp_bl = _load_vol(bl_img)
     mk_bl, _, _ = _load_vol(bl_mask)
@@ -48,6 +49,8 @@ def build_mask_graph(
     c_bl, c_fu = centroids(mk_bl, bl_ids), centroids(mk_fu, fu_ids)
     mf_bl, mf_fu = mask_stats_all(mk_bl, bl_ids, sp_bl, ct_bl), mask_stats_all(mk_fu, fu_ids, sp_fu, ct_fu)
     prop, bl_types = load_propagated(propagated_csv, bl_ids)
+    if types_csv is not None:
+        bl_types.update(load_types(types_csv))
     layout = feat_layout()
 
     xb, pb = [], []

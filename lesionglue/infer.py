@@ -13,6 +13,7 @@ from torch_geometric.data import Batch
 from tracking.common import eval_device
 from tracking.data.graph import GraphConfig, _load_vol
 from tracking.data.masks import build_mask_graph
+from tracking.data.paint import fu_track_map
 from tracking.decode import DECODE_CHOICES, decode_pairs
 from tracking.train.module import MatcherModule
 
@@ -50,11 +51,14 @@ def mask_has_lesions(path: Path) -> bool:
 def write_match_csv(path: Path, r: TrackResult) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    pair_ids = [(int(r.bl_ids[i]), int(r.fu_ids[j])) for i, j in r.pairs]
+    m = fu_track_map(list(map(int, r.bl_ids)), list(map(int, r.fu_ids)), pair_ids)
     with path.open("w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["bl_lesion_id", "fu_lesion_id", "pair_prob", "decode"])
+        w.writerow(["bl_lesion_id", "fu_lesion_id", "pair_prob", "decode", "track_id"])
         for i, j in r.pairs:
-            w.writerow([int(r.bl_ids[i]), int(r.fu_ids[j]), float(r.pair_prob[i, j]), r.decode])
+            fid = int(r.fu_ids[j])
+            w.writerow([int(r.bl_ids[i]), fid, float(r.pair_prob[i, j]), r.decode, m[fid]])
 
 
 def track(
@@ -74,6 +78,7 @@ def track(
     sinkhorn_tau: float = 0.2,
     use_ema: bool = True,
     matcher: MatcherModule | None = None,
+    types_csv: Path | None = None,
 ) -> TrackResult:
     assert decode in DECODE_CHOICES
     for label, p in (("bl-img", bl_img), ("bl-mask", bl_mask), ("fu-img", fu_img), ("fu-mask", fu_mask), ("propagated", propagated)):
@@ -88,6 +93,7 @@ def track(
     data = build_mask_graph(
         Path(bl_img), Path(bl_mask), Path(fu_img), Path(fu_mask),
         Path(propagated), GraphConfig(k_intra=k_intra), default_lesion_type,
+        types_csv=Path(types_csv) if types_csv is not None else None,
     )
     n_bl, n_fu = int(data["bl"].num_nodes), int(data["fu"].num_nodes)
     bat = Batch.from_data_list([data.to(dev)])
