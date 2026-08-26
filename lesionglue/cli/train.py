@@ -10,7 +10,7 @@ import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
-from tracking.common import CACHE_ROOT, DATASET_ROOT, cprint, dump_json, nano_header, seed_all
+from tracking.common import CACHE_ROOT, DATASET_ROOT, HOLDOUT_CSV, cprint, dump_json, nano_header, seed_all
 from tracking.config import CKPT_MONITOR, dump_config, load_config
 from tracking.data.graph import graph_config
 from tracking.train.datamodule import MatcherDataModule
@@ -52,6 +52,8 @@ def main() -> None:
     )
     dm.prepare_data()
     dm.setup()
+    n_val = 0 if getattr(dm, "val_ds", None) is None else len(dm.val_ds)
+    cprint(f"fit={len(dm.train_ds)} val={n_val} (holdout {HOLDOUT_CSV.name} is not used for selection)")
     mod = module_from_config(cfg)
 
     keep_ckpts = ("best.ckpt", "last.ckpt", "best_raw.ckpt", "swa_plateau.ckpt")
@@ -66,9 +68,17 @@ def main() -> None:
         dirpath=str(out), monitor="val_match_score", mode="max", save_top_k=1, save_last=False,
         filename="best_raw", auto_insert_metric_name=False, enable_version_counter=False,
     )
-    callbacks = [ckpt, ckpt_raw]
-    if not args.no_early_stop:
-        callbacks.insert(1, EarlyStopping(monitor=CKPT_MONITOR, mode="max", patience=cfg.early_stop_patience))
+    no_val = args.fold is None
+    if no_val:
+        ckpt = ModelCheckpoint(
+            dirpath=str(out), save_top_k=0, save_last=True,
+            filename="last", auto_insert_metric_name=False, enable_version_counter=False,
+        )
+        callbacks = [ckpt]
+    else:
+        callbacks = [ckpt, ckpt_raw]
+        if not args.no_early_stop:
+            callbacks.insert(1, EarlyStopping(monitor=CKPT_MONITOR, mode="max", patience=cfg.early_stop_patience))
 
     logger = False
     if args.wandb or bool(args.wandb_run_name.strip()):
@@ -82,28 +92,33 @@ def main() -> None:
 
         logger = WandbLogger(project=args.wandb_project, name=(args.wandb_run_name.strip() or None))
 
-    pl.Trainer(
+    trainer_kw = dict(
         default_root_dir=args.out, accelerator=_accelerator(), devices=1, log_every_n_steps=10,
         callbacks=callbacks, logger=logger, max_steps=cfg.max_steps, max_epochs=-1,
         val_check_interval=cfg.val_check_steps, check_val_every_n_epoch=None,
         enable_progress_bar=False,
-    ).fit(mod, dm)
+    )
+    if no_val:
+        trainer_kw.update(limit_val_batches=0, num_sanity_val_steps=0, val_check_interval=None)
+    pl.Trainer(**trainer_kw).fit(mod, dm)
 
+    last = out / "last.ckpt"
     fold_metrics = {
         "fold": args.fold,
-        "best_ckpt": str(ckpt.best_model_path),
+        "best_ckpt": str(ckpt.best_model_path or last),
         "val_match_score_ema": mod._best_ema_score,
         "val_match_score_raw": mod._best_raw_score,
         "val_match_score_peak": mod._val_score_peak,
         **{f"val_acc_{k}": v for k, v in mod._best_sub.items()},
         "selector_ckpts": {
-            "best_ema": str(ckpt.best_model_path),
-            "best_raw": str(ckpt_raw.best_model_path),
+            "best_ema": str(ckpt.best_model_path or last),
+            "best_raw": str(ckpt_raw.best_model_path) if not no_val else "",
+            "last": str(last),
             "swa_plateau": str(out / "swa_plateau.ckpt"),
         },
     }
     dump_json(out / "fold_metrics.json", fold_metrics)
-    cprint(f"best {ckpt.best_model_path} val_match_score_ema={mod._best_ema_score:.4f}")
+    cprint(f"wrote {last if no_val else ckpt.best_model_path}")
 
 
 if __name__ == "__main__":

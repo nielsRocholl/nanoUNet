@@ -186,6 +186,8 @@ class MatcherModule(pl.LightningModule):
         self.ap_sinkhorn.reset()
 
     def on_train_end(self) -> None:
+        if not self._swa:
+            return
         if self._swa_updates < SWA_MIN_UPDATES:
             raise RuntimeError(
                 f"swa_matcher only saw {self._swa_updates} plateau updates (need >= {SWA_MIN_UPDATES}); "

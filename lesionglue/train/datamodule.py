@@ -1,4 +1,8 @@
-"""LightningDataModule: cached v7_native LesionDataset + PyG DataLoader."""
+"""LightningDataModule: cached v7_native LesionDataset + PyG DataLoader.
+
+No-fold fit set is train∪val caches (everyone except test_patients.csv).
+No Lightning val: holdout is scored once after training. CV folds still have a val pool.
+"""
 
 from __future__ import annotations
 
@@ -53,14 +57,21 @@ class MatcherDataModule(LightningDataModule):
     def prepare_data(self) -> None:
         sp = load_tracking_split()
         holdout = set(load_holdout(HOLDOUT_CSV))
-        leak = (set(map(str, sp["train"])) | set(map(str, sp["val"]))) & holdout
+        fit = set(map(str, sp["train"])) | set(map(str, sp["val"]))
+        leak = fit & holdout
         if leak:
             raise SystemExit(
                 f"{len(leak)} holdout ids in train/val: {sorted(leak)[:8]}...\n"
                 f"Expected train/val disjoint from {HOLDOUT_CSV}.\n"
                 f"Fix: python3 tracking/cli/split.py --root {self.dataset_root}"
             )
-        splits = ("train", "val") if self.fold is not None else ("train", "val", "test")
+        if self.fold is None and set(map(str, sp["test"])) != holdout:
+            raise SystemExit(
+                f"split.json test ({len(sp['test'])}) != {HOLDOUT_CSV} ({len(holdout)}).\n"
+                f"Expected the holdout CSV to be the only eval split.\n"
+                f"Fix: python3 tracking/cli/split.py --root {self.dataset_root}"
+            )
+        splits = ("train", "val")
         for spn in splits:
             p = self.cache_root / "processed" / f"{spn}_{CACHE_TAG}.pt"
             if not p.is_file():
@@ -73,19 +84,16 @@ class MatcherDataModule(LightningDataModule):
     def setup(self, stage: str | None = None) -> None:
         g = self.graph
         if self.fold is None:
-            self.train_ds = LesionDataset(
-                root=str(self.cache_root),
-                split="train",
-                dataset_root=self.dataset_root,
-                cfg=g,
-                augment=True,
-                fu_jitter_scale=self.fu_jitter_scale,
-                p_drop_fu=self.p_drop_fu,
-                p_drop_bl=self.p_drop_bl,
+            parts = [
+                LesionDataset(root=str(self.cache_root), split=sp, dataset_root=self.dataset_root, cfg=g)
+                for sp in ("train", "val")
+            ]
+            n = sum(len(p) for p in parts)
+            self.train_ds = _CvPool(
+                parts, list(range(n)), augment=True, fu_jitter_scale=self.fu_jitter_scale,
+                p_drop_fu=self.p_drop_fu, p_drop_bl=self.p_drop_bl, graph=g,
             )
-            self.val_ds = LesionDataset(
-                root=str(self.cache_root), split="val", dataset_root=self.dataset_root, cfg=g
-            )
+            self.val_ds = None
             return
         train_pids, val_pids = fold_patient_sets(self.dataset_root, self.fold, self.n_folds, self.cv_seed)
         pool = []
@@ -114,6 +122,8 @@ class MatcherDataModule(LightningDataModule):
         return PyGDataLoader(self.train_ds, batch_size=self.batch_size, shuffle=True, num_workers=nw, persistent_workers=nw > 0)
 
     def val_dataloader(self):
+        if getattr(self, "val_ds", None) is None:
+            return None
         nw = self.num_workers
         return PyGDataLoader(self.val_ds, batch_size=self.val_batch_size, shuffle=False, num_workers=nw, persistent_workers=nw > 0)
 
