@@ -13,9 +13,10 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeEl
 from nanounet.common import config_table, console, cprint, nano_banner, quiet_lightning_runtime
 from nanounet.config import load_config
 from nanounet.data.resampling import set_resample_device
+from nanounet.cli.segtrack_cases import collect_cases
 from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
-from nanounet.infer.predict_io import patient_ids_from_csv
-from nanounet.infer.segtrack import DEFAULT_MODEL, DEFAULT_TRACK, SegTrackCase, pair_folder, resolve_ckpt_path, resolve_out, run_case
+from nanounet.infer.segtrack import DEFAULT_MODEL, DEFAULT_TRACK, run_case
+from nanounet.infer.segtrack_case import resolve_ckpt_path, resolve_out
 from nanounet.plan.plans import Plans
 
 
@@ -36,6 +37,7 @@ def _mode(ap: argparse.ArgumentParser, choices: tuple[str, ...]) -> argparse.Nam
     ap.add_argument("--bl-dir"), ap.add_argument("--fu-dir")
     ap.add_argument("--bl-img"), ap.add_argument("--bl-clicks")
     ap.add_argument("--fu-img"), ap.add_argument("--fu-clicks")
+    ap.add_argument("--bl-mask"), ap.add_argument("--bl-mask-dir")
     ap.add_argument("--meta"), ap.add_argument("--meta-dir")
     ap.add_argument("-o", "--out")
     ap.add_argument("-m", "--model-dir")
@@ -55,68 +57,11 @@ def _mode(ap: argparse.ArgumentParser, choices: tuple[str, ...]) -> argparse.Nam
     return ap.parse_args()
 
 
-def _cases(args) -> tuple[list[SegTrackCase], bool]:
-    folder = bool(args.bl_dir) or bool(args.fu_dir)
-    single = any((args.bl_img, args.bl_clicks, args.fu_img, args.fu_clicks))
-    if folder == single:
-        raise SystemExit(
-            "Need either folder mode (--bl-dir --fu-dir) or single case (--bl-img --bl-clicks --fu-img --fu-clicks).\n"
-            "Expected one mode, not both or neither.\n"
-            "Fix: see docs/steps/track.md"
-        )
-    if folder:
-        if not (args.bl_dir and args.fu_dir):
-            raise SystemExit("--bl-dir requires --fu-dir.\nExpected both folders.\nFix: see docs/steps/track.md")
-        if args.meta:
-            raise SystemExit("--meta is for single mode.\nExpected --meta-dir in folder mode.\nFix: --meta-dir /path/to/meta")
-        cases = pair_folder(Path(args.bl_dir), Path(args.fu_dir))
-        if args.patients_csv:
-            pids = patient_ids_from_csv(args.patients_csv)
-            cases = [c for c in cases if c.stem.split("_", 1)[0] in pids]
-            if not cases:
-                raise SystemExit(
-                    f"no cases match --patients-csv '{args.patients_csv}'.\n"
-                    f"Expected CSV column 'patient' matching stem prefixes.\n"
-                    f"Fix: --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv  (see docs/steps/track.md)"
-                )
-        if args.meta_dir:
-            md, miss = Path(args.meta_dir), []
-            for c in cases:
-                p = md / f"{c.stem.split('_', 1)[0]}.csv"
-                if not p.is_file():
-                    miss.append(str(p))
-                else:
-                    c.types_csv = p
-            if miss:
-                raise SystemExit(
-                    f"No types CSV at {miss[0]} ({len(miss)} missing).\n"
-                    f"Expected {{pid}}.csv under --meta-dir.\n"
-                    f"Fix: --meta-dir /nnunet_data/Longitudinal-CT/meta  (see docs/steps/track.md)"
-                )
-        return cases, False
-    if not all((args.bl_img, args.bl_clicks, args.fu_img, args.fu_clicks)):
-        raise SystemExit(
-            "Single mode needs --bl-img --bl-clicks --fu-img --fu-clicks.\n"
-            "Expected four paths.\nFix: see docs/steps/track.md"
-        )
-    if args.meta_dir or args.patients_csv:
-        raise SystemExit("--meta-dir / --patients-csv are folder mode.\nExpected --meta for one case.\nFix: see docs/steps/track.md")
-    types = Path(args.meta) if args.meta else None
-    if types is not None and not types.is_file():
-        raise SystemExit(
-            f"No types CSV at {types}.\nExpected lesion_id, lesion_type.\nFix: --meta <pid>.csv or omit it  (see docs/steps/track.md)"
-        )
-    stem = Path(args.fu_img).name
-    if stem.endswith(".nii.gz"):
-        stem = stem[:-7]
-    return [SegTrackCase(stem, Path(args.bl_img), Path(args.bl_clicks), Path(args.fu_img), Path(args.fu_clicks), types)], True
-
-
 def main() -> None:
     quiet_lightning_runtime()
     choices, load_matcher = _require_tracking()
     args = _mode(argparse.ArgumentParser(), choices)
-    cases, single = _cases(args)
+    cases, single = collect_cases(args)
     model_dir, msrc = resolve_ckpt_path(args.model_dir, "NANOUNET_SEGTRACK_MODEL", DEFAULT_MODEL)
     track_ckpt, tsrc = resolve_ckpt_path(args.track_ckpt, "NANOUNET_SEGTRACK_TRACK", DEFAULT_TRACK)
     if not (model_dir / "plans.json").is_file():
@@ -148,12 +93,17 @@ def main() -> None:
     fu_name = Path(args.fu_dir).name if args.fu_dir else None
     parent = resolve_out(cases[0].stem, fu_dir_name=fu_name, out=out_cli, single=single).parent
     nano_banner("nanoUNet  seg × track", "scans + clicks → linked instance masks")
-    config_table([
+    rows = [
         ("model-dir", model_dir, msrc), ("ckpt", args.ckpt, "cli" if args.ckpt != "last.ckpt" else "default"),
         ("track-ckpt", track_ckpt, tsrc), ("decode", args.decode, "cli" if args.decode != "hungarian" else "default"),
         ("device", d, "cli"), ("n_cases", len(cases), "folder" if not single else "single"),
         ("out", parent, "cli" if args.out else "default"),
-    ])
+    ]
+    if args.bl_mask:
+        rows.append(("bl-mask", args.bl_mask, "cli"))
+    elif args.bl_mask_dir:
+        rows.append(("bl-mask-dir", args.bl_mask_dir, "cli"))
+    config_table(rows)
     seg_kw = dict(
         use_tta=use_tta, batch_size=args.batch_size, use_amp=not args.no_amp,
         inference_mode=args.inference_mode, cluster_margin_frac=0.1, border_expand=True,

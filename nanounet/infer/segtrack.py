@@ -1,96 +1,24 @@
-"""Native CT+clicks → predict both timepoints → instance masks with shared tracking ids."""
+"""Predict FU (and BL unless a GT instance mask is given) → linked tracking ids."""
 
 from __future__ import annotations
 
-import os
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
-from nanounet.common import results_dir
 from nanounet.data.io import SimpleITKIO
 from nanounet.infer.export import native_seg_from_logits
 from nanounet.infer.predict_case import MAX_BORDER_EXTRA, predict_case_logits
 from nanounet.infer.predict_io import preprocess_case
+from nanounet.infer.segtrack_case import SegTrackCase, load_instance_zyx
 
 DEFAULT_MODEL = Path(
     "/nnunet_data/NanoUNet_results/nanounet/"
     "Dataset999_Merged_nnUNetResEncUNetLPlans_h200_smallpv_f0_h200_instance_1200ep"
 )
 DEFAULT_TRACK = Path("/nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt")
-END = ".nii.gz"
-
-
-@dataclass
-class SegTrackCase:
-    stem: str
-    bl_img: Path
-    bl_clicks: Path
-    fu_img: Path
-    fu_clicks: Path
-    types_csv: Path | None = None
-
-
-def resolve_ckpt_path(cli: str | None, env_key: str, default: Path) -> tuple[Path, str]:
-    if cli:
-        return Path(cli), "cli"
-    v = os.environ.get(env_key)
-    if v:
-        return Path(v), "env"
-    return default, "default"
-
-
-def resolve_out(stem: str, *, fu_dir_name: str | None, out: Path | None, single: bool) -> Path:
-    if out is not None:
-        return Path(out) if single else Path(out) / stem
-    root = Path(results_dir()) / "segtrack"
-    return root / "single" / stem if single else root / str(fu_dir_name) / stem
-
-
-def _stems(folder: Path) -> dict[str, tuple[Path, Path]]:
-    if not folder.is_dir():
-        raise FileNotFoundError(
-            f"No input folder at {folder}.\n"
-            f"Expected a folder of {{stem}}{END} + sibling {{stem}}.json.\n"
-            f"Fix: --bl-dir / --fu-dir like inputsTrBL / inputsTrFU  (see docs/steps/track.md)"
-        )
-    out, missing = {}, []
-    for p in sorted(folder.glob(f"*{END}")):
-        stem = p.name[: -len(END)]
-        js = folder / f"{stem}.json"
-        out[stem] = (p, js)
-        if not js.is_file():
-            missing.append(stem)
-    if missing:
-        raise SystemExit(
-            f"missing points JSON for: {', '.join(missing[:12])}.\n"
-            f"Expected sibling <case>.json next to each scan in {folder}.\n"
-            f"Fix: add the JSON  (see docs/steps/track.md)"
-        )
-    if not out:
-        raise SystemExit(
-            f"No {END} scans in {folder}.\n"
-            f"Expected sibling .nii.gz + .json like inputsTrFU.\n"
-            f"Fix: pass --bl-dir / --fu-dir  (see docs/steps/track.md)"
-        )
-    return out
-
-
-def pair_folder(bl_dir: Path, fu_dir: Path) -> list[SegTrackCase]:
-    bl, fu = _stems(Path(bl_dir)), _stems(Path(fu_dir))
-    only_bl, only_fu = sorted(set(bl) - set(fu)), sorted(set(fu) - set(bl))
-    if only_bl or only_fu:
-        raise SystemExit(
-            "BL/FU folders do not share the same case names.\n"
-            f"--bl-dir has {len(only_bl)} stems not in --fu-dir (e.g. {', '.join(only_bl[:12]) or 'none'}).\n"
-            f"--fu-dir has {len(only_fu)} stems not in --bl-dir (e.g. {', '.join(only_fu[:12]) or 'none'}).\n"
-            "Fix: pass matching inputsTrBL and inputsTrFU, or --patients-csv to select a subset\n"
-            "(see docs/steps/track.md)"
-        )
-    return [SegTrackCase(s, *bl[s], *fu[s]) for s in sorted(bl)]
 
 
 def _write_mha(vol_zyx: np.ndarray, props: dict, path: Path) -> None:
@@ -135,27 +63,38 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
     csv_path = case_dir / "matches.csv"
     if csv_path.is_file() and not overwrite:
         return {"status": "skip", "n_pairs": 0, "sec": 0.0}
+    assert (case.bl_mask is None) != (case.bl_clicks is None)
 
-    step("segment BL")
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        fut = pool.submit(preprocess_case, str(case.fu_img), str(case.fu_clicks), pl, cm, dj, None, None)
-        pred_bl, props_bl = segment_native(net, lm, cfg, pl, cm, dj, dev, case.bl_img, case.bl_clicks, **seg_kw)
-        pack_fu = fut.result()
-    step("segment FU")
-    pred_fu, props_fu = segment_native(
-        net, lm, cfg, pl, cm, dj, dev, case.fu_img, case.fu_clicks, pack=pack_fu, **seg_kw,
-    )
-    bl_zyx = binary_to_instances(pred_bl, load_clicks(case.bl_clicks))
-    fu_zyx = binary_to_instances(pred_fu, load_clicks(case.fu_clicks))
+    if case.bl_mask is not None:
+        step("load BL mask")
+        bl_zyx, props_bl = load_instance_zyx(case.bl_mask)
+        pred_bl = None
+        step("segment FU")
+        pred_fu, props_fu = segment_native(net, lm, cfg, pl, cm, dj, dev, case.fu_img, case.fu_clicks, **seg_kw)
+        fu_zyx = binary_to_instances(pred_fu, load_clicks(case.fu_clicks))
+    else:
+        step("segment BL")
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            fut = pool.submit(preprocess_case, str(case.fu_img), str(case.fu_clicks), pl, cm, dj, None, None)
+            pred_bl, props_bl = segment_native(net, lm, cfg, pl, cm, dj, dev, case.bl_img, case.bl_clicks, **seg_kw)
+            pack_fu = fut.result()
+        step("segment FU")
+        pred_fu, props_fu = segment_native(
+            net, lm, cfg, pl, cm, dj, dev, case.fu_img, case.fu_clicks, pack=pack_fu, **seg_kw,
+        )
+        bl_zyx = binary_to_instances(pred_bl, load_clicks(case.bl_clicks))
+        fu_zyx = binary_to_instances(pred_fu, load_clicks(case.fu_clicks))
     has_bl, has_fu = bool(np.any(bl_zyx)), bool(np.any(fu_zyx))
 
     def emit_preds() -> None:
-        if keep_pred:
+        if not keep_pred:
+            return
+        if pred_bl is not None:
             _write_mha(pred_bl, props_bl, case_dir / "pred_bl.mha")
-            _write_mha(pred_fu, props_fu, case_dir / "pred_fu.mha")
+        _write_mha(pred_fu, props_fu, case_dir / "pred_fu.mha")
 
     if not has_bl or not has_fu:
-        bl_out = bl_zyx if has_bl else np.zeros(pred_bl.shape, dtype=np.int32)
+        bl_out = bl_zyx if has_bl else np.zeros(bl_zyx.shape, dtype=np.int32)
         fu_out = fu_zyx if has_fu else np.zeros(pred_fu.shape, dtype=np.int32)
         _write_mha(bl_out, props_bl, case_dir / "bl.mha")
         _write_mha(fu_out, props_fu, case_dir / "fu.mha")
@@ -168,6 +107,12 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
     ct_fu, aff_fu, sp_fu = _load_vol(case.fu_img)
     mk_bl = np.ascontiguousarray(bl_zyx.transpose(2, 1, 0))
     mk_fu = np.ascontiguousarray(fu_zyx.transpose(2, 1, 0))
+    if case.bl_mask is not None and mk_bl.shape != ct_bl.shape:
+        raise SystemExit(
+            f"BL mask grid {tuple(mk_bl.shape)} != BL CT grid {tuple(ct_bl.shape)} for {case.stem}.\n"
+            f"Expected a native baseline instance mask on the same grid as {case.bl_img}.\n"
+            f"Fix: --bl-mask /nnunet_data/Longitudinal-CT/targetsTrBL/{case.stem}.nii.gz  (see docs/steps/track.md)"
+        )
     r = track(
         case.bl_img, case.bl_img, case.fu_img, case.fu_img,
         case.fu_clicks, track_ckpt,

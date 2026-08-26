@@ -37,10 +37,11 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/defau
 nanounet_predict -i /path/to/scans -o /path/to/out -m /path/to/run --ckpt last.ckpt
 nanounet_segtrack \
   --bl-dir /nnunet_data/Longitudinal-CT/inputsTrBL \
-  --fu-dir /nnunet_data/Longitudinal-CT/inputsTrFU
+  --fu-dir /nnunet_data/Longitudinal-CT/inputsTrFU \
+  --bl-mask-dir /nnunet_data/Longitudinal-CT/targetsTrBL
 ```
 
-`nanounet_segtrack` writes `{bl,fu}.mha` (shared tracking ids) + `matches.csv` under `$NANOUNET_RESULTS/segtrack/`.
+`nanounet_segtrack` writes `{bl,fu}.mha` (shared tracking ids) + `matches.csv` under `$NANOUNET_RESULTS/segtrack/`. `--bl-mask-dir` skips BL predict and copies those instance ids.
 
 Tiny laptop smoke train:
 

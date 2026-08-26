@@ -1,6 +1,6 @@
 # Tracking ids on masks
 
-Same integer on both scans = same lesion. Background is `0`. BL click names are canonical; the FU mask is remapped after matching. Decode only changes which pairs exist; painting is one function.
+Same integer on both scans = same lesion. Background is `0`. BL click names are canonical; the FU mask is remapped after matching. With `--bl-mask` / `--bl-mask-dir`, BL ids **are the mask labels** (not click-CC of a BL prediction). FU paint rule is unchanged. Decode only changes which pairs exist; painting is one function.
 
 | Decode | Pairs | Masks |
 |--------|-------|-------|
