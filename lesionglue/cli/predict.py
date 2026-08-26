@@ -10,6 +10,7 @@ from torch_geometric.loader import DataLoader as PyGDataLoader
 from tracking.common import CACHE_ROOT, DATASET_ROOT
 from tracking.data.dataset import LesionDataset
 from tracking.decode import decode_sinkhorn_hungarian
+from tracking.infer import graph_cfg_from_ckpt
 from tracking.train.module import MatcherModule
 
 if __name__ == "__main__":
@@ -32,7 +33,8 @@ if __name__ == "__main__":
     mod = MatcherModule.load_from_checkpoint(args.ckpt, map_location="cpu")
     mod.eval()
     dev = mod.device
-    ds = LesionDataset(root=args.cache, split=args.split, dataset_root=Path(args.root))
+    gcfg = graph_cfg_from_ckpt(mod, int(getattr(mod.hparams, "k_intra", 8)))
+    ds = LesionDataset(root=args.cache, split=args.split, dataset_root=Path(args.root), cfg=gcfg)
     loader = PyGDataLoader(ds, batch_size=1, shuffle=False)
     with torch.no_grad():
         for batch in loader:

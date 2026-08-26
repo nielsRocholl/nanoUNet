@@ -1,7 +1,8 @@
-"""Deploy CLI: CT + instance masks + propagated centroids → match CSV.
+"""Deploy CLI: CT + instance masks → match CSV. drop_dp ckpts omit --propagated.
 
 Single case or Longitudinal-CT folder (--root + --split / --patients-csv).
 --propagated: meta CSV, slim CSV, or FU-frame JSON (not inputsTrBL native clicks).
+Required unless the checkpoint was trained with drop_dp.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from tracking.data.instances import instances_from_nifti
 from tracking.data.meta import resolve_track_case
 from tracking.data.splits import load_holdout, load_tracking_split
 from tracking.decode import DECODE_CHOICES, DECODE_HELP, resolve_decode
-from tracking.infer import load_matcher, mask_has_lesions, track, write_match_csv
+from tracking.infer import graph_cfg_from_ckpt, load_matcher, mask_has_lesions, track, write_match_csv
 
 _PROP_HELP = (
     "BL lesion_id → FU-frame centroid: meta CSV (cog_propagated), slim CSV (lesion_id,z,y,x), "
@@ -52,7 +53,10 @@ def main() -> None:
     ap.add_argument("--bl-mask", default="")
     ap.add_argument("--fu-img", default="")
     ap.add_argument("--fu-mask", default="")
-    ap.add_argument("--propagated", default="", help=_PROP_HELP)
+    ap.add_argument(
+        "--propagated", default="",
+        help=_PROP_HELP + ". Required unless the checkpoint was trained with drop_dp.",
+    )
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--decode", choices=DECODE_CHOICES, default=None, help=DECODE_HELP)
@@ -62,6 +66,7 @@ def main() -> None:
     ap.add_argument("--sinkhorn-iters", type=int, default=20)
     ap.add_argument("--sinkhorn-tau", type=float, default=0.2)
     ap.add_argument("--default-lesion-type", default="unclear")
+    ap.add_argument("--types-csv", default="", help="lesion_id,lesion_type CSV; required for type_mask unless --default-lesion-type is not unclear")
     ap.add_argument("--no-ema", action="store_true")
     ap.add_argument("--pairs-out", default="")
     ap.add_argument("--bl-clicks", default="", help="instance JSON; treat --bl-mask as binary FG")
@@ -76,11 +81,17 @@ def main() -> None:
 
     nano_header("lesion_track")
     decode = resolve_decode(args.decode)
+    matcher = load_matcher(Path(args.ckpt), args.device)
+    gcfg = graph_cfg_from_ckpt(matcher, args.k_intra)
     root = args.root.strip()
-    single = all(getattr(args, k).strip() for k in ("bl_img", "bl_mask", "fu_img", "fu_mask", "propagated"))
+    need = ("bl_img", "bl_mask", "fu_img", "fu_mask")
+    if not gcfg.drop_dp:
+        need = (*need, "propagated")
+    single = all(getattr(args, k).strip() for k in need)
     if bool(root) == single:
+        geo = "--bl-img --bl-mask --fu-img --fu-mask" + ("" if gcfg.drop_dp else " --propagated")
         raise SystemExit(
-            "Need either a single case (--bl-img --bl-mask --fu-img --fu-mask --propagated) or a dataset (--root).\n"
+            f"Need either a single case ({geo}) or a dataset (--root).\n"
             "Expected one mode, not both or neither.\n"
             "Fix: lesion_track --root /nnunet_data/Longitudinal-CT --split test --ckpt ... --decode dense --out /tmp/track_test"
         )
@@ -96,10 +107,12 @@ def main() -> None:
         k_intra=args.k_intra, thresh=args.thresh, sinkhorn_iters=args.sinkhorn_iters,
         sinkhorn_tau=args.sinkhorn_tau, use_ema=not args.no_ema,
     )
-    matcher = load_matcher(Path(args.ckpt), args.device)
     config_table([
         ("ckpt", args.ckpt, "cli"),
         ("decode", decode, "cli" if args.decode else "prompt"),
+        ("drop_dp", str(gcfg.drop_dp), "ckpt"),
+        ("intra", gcfg.intra, "ckpt"),
+        ("type_mask", str(gcfg.type_mask), "ckpt"),
         ("mode", "dataset" if root else "single", "cli"),
         ("out", args.out, "cli"),
     ])
@@ -107,7 +120,8 @@ def main() -> None:
         r = track(
             Path(args.bl_img), _mask(args.bl_mask, args.bl_clicks),
             Path(args.fu_img), _mask(args.fu_mask, args.fu_clicks),
-            Path(args.propagated), Path(args.ckpt), matcher=matcher, **kw,
+            None if gcfg.drop_dp else Path(args.propagated), Path(args.ckpt), matcher=matcher,
+            types_csv=Path(args.types_csv) if args.types_csv.strip() else None, **kw,
         )
         out = Path(args.out)
         write_match_csv(out, r)
@@ -144,8 +158,10 @@ def main() -> None:
                 prog.advance(task)
                 continue
             r = track(
-                case.bl_img, case.bl_mask, case.fu_img, case.fu_mask, case.propagated,
-                Path(args.ckpt), matcher=matcher, **kw,
+                case.bl_img, case.bl_mask, case.fu_img, case.fu_mask,
+                None if gcfg.drop_dp else case.propagated,
+                Path(args.ckpt), matcher=matcher,
+                types_csv=case.propagated if gcfg.type_mask else None, **kw,
             )
             write_match_csv(out_dir / f"{pid}.csv", r)
             n_ok += 1

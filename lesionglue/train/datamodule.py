@@ -1,4 +1,4 @@
-"""LightningDataModule: cached v5_l0 LesionDataset + PyG DataLoader."""
+"""LightningDataModule: cached v7_native LesionDataset + PyG DataLoader."""
 
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ from tracking.common import CACHE_ROOT, DATASET_ROOT, HOLDOUT_CSV
 from tracking.data.augment import drop_nodes, jitter_both
 from tracking.data.dataset import LesionDataset
 from tracking.data.features import CACHE_TAG
+from tracking.data.graph import GraphConfig
+from tracking.data.intra import refresh_edges
 from tracking.data.splits import fold_patient_sets, load_holdout, load_tracking_split
 
 
@@ -26,7 +28,7 @@ class MatcherDataModule(LightningDataModule):
         fu_jitter_scale: float = 0.3,
         p_drop_fu: float = 0.1,
         p_drop_bl: float = 0.1,
-        k_intra: int = 8,
+        graph: GraphConfig | None = None,
         fold: int | None = None,
         n_folds: int = 5,
         cv_seed: int = 0,
@@ -40,7 +42,7 @@ class MatcherDataModule(LightningDataModule):
         self.fu_jitter_scale = fu_jitter_scale
         self.p_drop_fu = p_drop_fu
         self.p_drop_bl = p_drop_bl
-        self.k_intra = k_intra
+        self.graph = graph or GraphConfig()
         self.fold = fold
         self.n_folds = n_folds
         self.cv_seed = cv_seed
@@ -69,22 +71,26 @@ class MatcherDataModule(LightningDataModule):
                 )
 
     def setup(self, stage: str | None = None) -> None:
+        g = self.graph
         if self.fold is None:
             self.train_ds = LesionDataset(
                 root=str(self.cache_root),
                 split="train",
                 dataset_root=self.dataset_root,
+                cfg=g,
                 augment=True,
                 fu_jitter_scale=self.fu_jitter_scale,
                 p_drop_fu=self.p_drop_fu,
                 p_drop_bl=self.p_drop_bl,
             )
-            self.val_ds = LesionDataset(root=str(self.cache_root), split="val", dataset_root=self.dataset_root)
+            self.val_ds = LesionDataset(
+                root=str(self.cache_root), split="val", dataset_root=self.dataset_root, cfg=g
+            )
             return
         train_pids, val_pids = fold_patient_sets(self.dataset_root, self.fold, self.n_folds, self.cv_seed)
         pool = []
         for sp in ("train", "val"):
-            pool.append(LesionDataset(root=str(self.cache_root), split=sp, dataset_root=self.dataset_root))
+            pool.append(LesionDataset(root=str(self.cache_root), split=sp, dataset_root=self.dataset_root, cfg=g))
         train_idx, val_idx = [], []
         off = 0
         for ds in pool:
@@ -97,8 +103,11 @@ class MatcherDataModule(LightningDataModule):
             off += len(ds)
         if not train_idx or not val_idx:
             raise ValueError(f"fold {self.fold}: empty train or val after patient split")
-        self.train_ds = _CvPool(pool, train_idx, augment=True, fu_jitter_scale=self.fu_jitter_scale, p_drop_fu=self.p_drop_fu, p_drop_bl=self.p_drop_bl, k_intra=self.k_intra)
-        self.val_ds = _CvPool(pool, val_idx)
+        self.train_ds = _CvPool(
+            pool, train_idx, augment=True, fu_jitter_scale=self.fu_jitter_scale,
+            p_drop_fu=self.p_drop_fu, p_drop_bl=self.p_drop_bl, graph=g,
+        )
+        self.val_ds = _CvPool(pool, val_idx, graph=g)
 
     def train_dataloader(self):
         nw = self.num_workers
@@ -118,7 +127,7 @@ class _CvPool:
         fu_jitter_scale: float = 0.3,
         p_drop_fu: float = 0.1,
         p_drop_bl: float = 0.1,
-        k_intra: int = 8,
+        graph: GraphConfig | None = None,
     ):
         self.parts = parts
         self.indices = indices
@@ -131,7 +140,7 @@ class _CvPool:
         self.fu_jitter_scale = fu_jitter_scale
         self.p_drop_fu = p_drop_fu
         self.p_drop_bl = p_drop_bl
-        self.k_intra = k_intra
+        self.graph = graph or GraphConfig()
 
     def __len__(self) -> int:
         return len(self.indices)
@@ -142,10 +151,11 @@ class _CvPool:
             if gidx < off + len(ds):
                 g = ds[gidx - off]
                 if not self.augment:
-                    return g
+                    return refresh_edges(g.clone(), self.graph)
                 d = g.clone()
                 if self.p_drop_fu > 0.0 or self.p_drop_bl > 0.0:
-                    drop_nodes(d, self.p_drop_fu, self.p_drop_bl, self.k_intra, rng=np.random.default_rng())
-                jitter_both(d, k_intra=self.k_intra, sigma_fu_scale=self.fu_jitter_scale, rng=np.random.default_rng())
-                return d
+                    drop_nodes(d, self.p_drop_fu, self.p_drop_bl, self.graph, rng=np.random.default_rng())
+                if not self.graph.drop_dp:
+                    jitter_both(d, self.graph, sigma_fu_scale=self.fu_jitter_scale, rng=np.random.default_rng())
+                return refresh_edges(d, self.graph)
         raise IndexError(gidx)

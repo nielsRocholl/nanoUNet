@@ -16,6 +16,7 @@ from tracking.common import eval_device
 from tracking.data.dataset import LesionDataset
 from tracking.data.meta import V2Paths, parse_meta_csv
 from tracking.decode import decode_sinkhorn_hungarian
+from tracking.infer import graph_cfg_from_ckpt
 from tracking.train.match_utils import split_per_graph
 from tracking.data.splits import aggregate_cv_folds, load_cv_summary
 from tracking.train.module import MatcherModule
@@ -123,9 +124,10 @@ def eval_gnn(
     cuda_gc_each_batch: bool = True,
 ) -> dict[str, object]:
     dev = eval_device(eval_device_pref)
-    ds = LesionDataset(root=cache, split=split, dataset_root=root)
-    dl = PyGDataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=False, persistent_workers=False)
     mod = MatcherModule.load_from_checkpoint(str(ckpt), map_location=dev).to(dev).eval()
+    gcfg = graph_cfg_from_ckpt(mod, int(getattr(mod.hparams, "k_intra", 8)))
+    ds = LesionDataset(root=cache, split=split, dataset_root=root, cfg=gcfg)
+    dl = PyGDataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=False, persistent_workers=False)
     c = _zero()
     it = track(dl, description=f"GNN {split}", total=len(dl)) if show_progress else dl
     with torch.no_grad():

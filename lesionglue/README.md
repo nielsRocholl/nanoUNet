@@ -16,13 +16,13 @@ Weights & Biases (optional): `wandb login` once.
 
 **Dataset:** `/nnunet_data/Longitudinal-CT/` — `meta/{patient}.csv`, `inputsTrBL/FU`, `targetsTrBL/FU`, `data_split.json`. Tracking split is `configs/split.json` (240 train/val, 60 holdout). Override root with `--root`.
 
-**Cache:** `{CACHE_ROOT}/processed/{split}_v6_h60.pt` (default `/nnunet_data/lesion_tracking/cache`).
+**Cache:** `{CACHE_ROOT}/processed/{split}_v7_native.pt` (default `/nnunet_data/lesion_tracking/cache`).
 
 **Encoding (keep L0):** pid `16a5cdae36`, 90 lesions. L0+mask_stats 33341 ms CPU; `build_mask_graph` 42107 ms wall; `track()` GPU fwd 19.2 ms. Encoder GAP skipped (hook >40 LOC). GPU is not the bottleneck.
 
 **Oracle holdout (GT masks, 60-patient `test_patients.csv`):** `h60_r9/best.ckpt` → `test_match_score=0.9453` (57 graphs; 3 skipped empty BL/FU). Val on the 240's fold-0: `val_match_score_ema=0.9660`. E2E seg→track not run.
 
-**Training vs deployment:** preprocess/train need the CSV (supervision + `cog_propagated`). Deployment: `lesion_track` from CT + instance masks + propagated centroids. `predict.py` is cached-graph benchmark only.
+**Training vs deployment:** preprocess/train need the CSV (supervision + `cog_propagated`). Deployment: `lesion_track` from CT + instance masks + propagated centroids, except `drop_dp` checkpoints which need CT + instance masks only. `predict.py` is cached-graph benchmark only.
 
 ---
 
@@ -36,7 +36,10 @@ All training knobs live in JSON, loaded by `tracking/config.py` (`Config` datacl
 | `lr`, `weight_decay`, `batch_size`, `val_batch_size`, `num_workers`, `seed` | Optimizer / data loading |
 | `d`, `layers`, `heads`, `dropout` | GNN architecture |
 | `sinkhorn_w`, `pair_w`, `nce_w`, `dust_w`, `dust_pos_w`, `nce_tau`, `sinkhorn_iters` | Loss weights |
-| `fu_jitter`, `p_drop_fu`, `p_drop_bl`, `k_intra` | Augmentation + graph kNN (also used by preprocess default) |
+| `fu_jitter`, `p_drop_fu`, `p_drop_bl`, `k_intra` | Augmentation + graph kNN (ignored when `intra=complete`) |
+| `drop_dp` | Zero the 5 registered `dp/dist` channels in `cross_attr`. Retrain required. |
+| `intra` | `"knn"` (default) or `"complete"` (all intra-scan pairs) |
+| `type_mask` | Restrict intra edges to the same `lesion_type` |
 | `ema_decay`, `ema_start_step`, `val_score_ema_beta` | Weight EMA + smoothed val score for early stop |
 | `dust_tau` | Default decode threshold (sweep at eval time) |
 | `n_folds`, `cv_seed` | Patient-level k-fold CV |
@@ -88,7 +91,7 @@ python3 tracking/cli/predict.py --ckpt /nnunet_data/lesion_tracking/runs/h60_r9/
 
 **Deploy**
 
-`--propagated` is BL lesion_id → centroid in the **FU voxel grid**. Accepts `meta/{pid}.csv` (`cog_propagated`), slim CSV `lesion_id,z,y,x`, or nanoUNet JSON in the FU frame. Not `inputsTrBL/*.json` (BL-native). `--bl-clicks` only instance-labels binary FG.
+`--propagated` is BL lesion_id → centroid in the **FU voxel grid**. Accepts `meta/{pid}.csv` (`cog_propagated`), slim CSV `lesion_id,z,y,x`, or nanoUNet JSON in the FU frame. Not `inputsTrBL/*.json` (BL-native). Omit it when the checkpoint has `drop_dp`. `--bl-clicks` only instance-labels binary FG.
 
 Single case:
 
@@ -120,12 +123,13 @@ After `pip install -e .`, commands are `lesion_track_*`. `--decode` omitted → 
 
 ### `lesion_track`
 
-CSV-free inference from CT, instance masks, propagated BL centroids. Single case or `--root` dataset.
+CSV-free inference from CT and instance masks. Geo checkpoints also need propagated BL centroids. Single case or `--root` dataset.
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `--bl-img` `--bl-mask` `--fu-img` `--fu-mask` | path | required in single | NIfTI |
-| `--propagated` | path | required in single | meta CSV / slim CSV / FU-frame JSON (not inputsTrBL clicks) |
+| `--propagated` | path | required in single unless `drop_dp` ckpt | meta CSV / slim CSV / FU-frame JSON (not inputsTrBL clicks) |
+| `--types-csv` | path | unset | `lesion_id,lesion_type`; needed for `type_mask` unless `--default-lesion-type` is set |
 | `--root` | path | unset | Longitudinal-CT root → dataset mode |
 | `--split` | choice | unset | `train` \| `val` \| `test` from `configs/split.json` |
 | `--patients-csv` | path | unset | CSV column `patient`; xor with `--split` |
@@ -274,4 +278,4 @@ scripts/
   lesion-round9-cv.sh   # SLURM wrapper for round9.sh
 ```
 
-Common failures: missing NIfTI/CSV under `--root`, empty BL/FU side, missing `configs/split.json` (`lesion_track_split`), or looking at stale `{split}_v5_l0.pt` (ignored; cache tag is `v6_h60`).
+Common failures: missing NIfTI/CSV under `--root`, empty BL/FU side, missing `configs/split.json` (`lesion_track_split`), or looking at stale `{split}_v6_h60.pt` (ignored; cache tag is `v7_native`).

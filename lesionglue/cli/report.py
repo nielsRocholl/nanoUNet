@@ -14,6 +14,7 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, TQDMProg
 from tracking.common import CACHE_ROOT, DATASET_ROOT, print0, seed_all
 from tracking.config import CKPT_MONITOR, load_config
 from tracking.data.features import CACHE_TAG
+from tracking.data.graph import graph_config
 from tracking.report import eval_baseline, eval_gnn
 from tracking.train.datamodule import MatcherDataModule
 from tracking.train.module import module_from_config
@@ -62,7 +63,8 @@ if __name__ == "__main__":
         dm = MatcherDataModule(
             cache_root=cache, dataset_root=root, batch_size=cfg.batch_size,
             val_batch_size=cfg.val_batch_size, num_workers=cfg.num_workers,
-            fu_jitter_scale=cfg.fu_jitter, p_drop_fu=cfg.p_drop_fu, p_drop_bl=cfg.p_drop_bl, k_intra=cfg.k_intra,
+            fu_jitter_scale=cfg.fu_jitter, p_drop_fu=cfg.p_drop_fu, p_drop_bl=cfg.p_drop_bl,
+            graph=graph_config(cfg),
         )
         dm.prepare_data()
         dm.setup()

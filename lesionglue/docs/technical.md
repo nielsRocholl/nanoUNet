@@ -48,9 +48,9 @@ Cross-edge distances are only meaningful when baseline propagated COG and follow
 
 ### Intra-timepoint edges
 
-- Built with **k nearest neighbors in mm-space**: `torch.cdist` + `topk` on pairwise distances (pure Torch — avoids optional `torch-cluster` wheels from PyG’s `knn_graph`).
-- **`edge_attr`:** each intra directed edge carries **one scalar**, Euclidean distance / 100 in mm-space. Consumed by intra `TransformerConv` layers (`edge_dim=1`).
-- **Edge case:** if there is only one node on a side, we add a **self-loop** so `TransformerConv` always sees a non-empty relation (PyG otherwise struggles with completely empty `edge_index`); distance on that loop is **0**.
+- Default: **k nearest neighbors in mm-space** (`torch.cdist` + `topk`). `intra=complete` replaces kNN with a directed complete graph (`i≠j`) into the same intra `TransformerConv` (`edge_dim=1`).
+- **`edge_attr`:** Euclidean distance / 100 in mm. `drop_dp` zeros the first 5 `cross_attr` channels (`dp`/`dist`); `CROSS_DIM` stays 27.
+- Isolated node → **self-loop** with distance 0 so `TransformerConv` always sees a relation. `type_mask` keeps only same-`lesion_type` intra edges (not cross).
 
 ### Cross edges and labels
 

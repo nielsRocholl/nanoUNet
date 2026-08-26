@@ -12,6 +12,7 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
 from tracking.common import CACHE_ROOT, DATASET_ROOT, cprint, dump_json, nano_header, seed_all
 from tracking.config import CKPT_MONITOR, dump_config, load_config
+from tracking.data.graph import graph_config
 from tracking.train.datamodule import MatcherDataModule
 from tracking.train.module import module_from_config
 
@@ -47,7 +48,7 @@ def main() -> None:
         cache_root=Path(args.cache), dataset_root=Path(args.root),
         batch_size=cfg.batch_size, val_batch_size=cfg.val_batch_size, num_workers=cfg.num_workers,
         fu_jitter_scale=cfg.fu_jitter, p_drop_fu=cfg.p_drop_fu, p_drop_bl=cfg.p_drop_bl,
-        k_intra=cfg.k_intra, fold=args.fold, n_folds=cfg.n_folds, cv_seed=cfg.cv_seed,
+        graph=graph_config(cfg), fold=args.fold, n_folds=cfg.n_folds, cv_seed=cfg.cv_seed,
     )
     dm.prepare_data()
     dm.setup()

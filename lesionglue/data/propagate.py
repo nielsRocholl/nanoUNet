@@ -1,4 +1,7 @@
-"""BL lesion_id → FU-frame centroid: meta CSV, slim CSV, or nanoUNet JSON."""
+"""BL lesion_id → FU-frame centroid: meta CSV, slim CSV, or nanoUNet JSON.
+
+Meta CSV: optional img_id_fu filter; cog_propagated else cog_fu. Missing BL ids omitted.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +17,9 @@ from tracking.data.meta import parse_zyx
 _SLIM = {"lesion_id", "z", "y", "x"}
 
 
-def load_propagated(path: Path, bl_ids: list[int]) -> tuple[dict[int, np.ndarray], dict[int, str]]:
+def load_propagated(
+    path: Path, bl_ids: list[int], img_id: int | None = None,
+) -> tuple[dict[int, np.ndarray], dict[int, str]]:
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(
@@ -28,7 +33,7 @@ def load_propagated(path: Path, bl_ids: list[int]) -> tuple[dict[int, np.ndarray
         df = pd.read_csv(path)
         cols = set(df.columns)
         if "cog_propagated" in cols:
-            prop, typ = _from_meta(df)
+            prop, typ = _from_meta(df, img_id)
         elif _SLIM <= cols:
             prop, typ = _from_slim(df)
         else:
@@ -38,14 +43,6 @@ def load_propagated(path: Path, bl_ids: list[int]) -> tuple[dict[int, np.ndarray
                 f"or nanoUNet JSON points in the FU frame.\n"
                 f"Fix: --propagated /nnunet_data/Longitudinal-CT/meta/<pid>.csv"
             )
-    want, got = set(int(x) for x in bl_ids), set(prop)
-    missing = sorted(want - got)
-    if missing:
-        raise SystemExit(
-            f"No FU-frame point for BL mask ids {missing} at {path}.\n"
-            f"Expected a JSON/CSV point for every BL instance {sorted(want)} (extra JSON names are ignored).\n"
-            f"Fix: pass the FU click JSON in follow-up space, not the baseline JSON  (see docs/steps/track.md)"
-        )
     return prop, typ
 
 
@@ -73,10 +70,12 @@ def _from_json(path: Path) -> tuple[dict[int, np.ndarray], dict[int, str]]:
     return prop, {}
 
 
-def _from_meta(df: pd.DataFrame) -> tuple[dict[int, np.ndarray], dict[int, str]]:
+def _from_meta(df: pd.DataFrame, img_id: int | None = None) -> tuple[dict[int, np.ndarray], dict[int, str]]:
     prop, typ = {}, {}
     for _, r in df.iterrows():
-        c = parse_zyx(r["cog_propagated"])
+        if img_id is not None and int(r["img_id_fu"]) != img_id:
+            continue
+        c = parse_zyx(r["cog_propagated"]) or parse_zyx(r.get("cog_fu"))
         if c is None:
             continue
         lid = int(r["lesion_id"])

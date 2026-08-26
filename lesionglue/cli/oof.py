@@ -17,6 +17,7 @@ import pytorch_lightning as pl
 from tracking.common import CACHE_ROOT, DATASET_ROOT, dump_json
 from tracking.config import load_config
 from tracking.bootstrap import match_score_from_counts
+from tracking.data.graph import graph_config
 from tracking.data.splits import fold_patient_sets
 from tracking.train.datamodule import MatcherDataModule
 from tracking.train.module import MatcherModule
@@ -38,7 +39,7 @@ if __name__ == "__main__":
     dm = MatcherDataModule(
         cache_root=Path(args.cache), dataset_root=Path(args.root),
         val_batch_size=cfg.val_batch_size, num_workers=cfg.num_workers,
-        fold=args.fold, n_folds=cfg.n_folds, cv_seed=cfg.cv_seed,
+        graph=graph_config(cfg), fold=args.fold, n_folds=cfg.n_folds, cv_seed=cfg.cv_seed,
     )
     dm.prepare_data()
     dm.setup()

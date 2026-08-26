@@ -1,4 +1,4 @@
-"""Cached v6_h60 per-split PyG InMemoryDataset from dense Longitudinal_CT_v2 graphs."""
+"""Cached v7_native per-split PyG InMemoryDataset from dense Longitudinal_CT_v2 graphs."""
 
 from __future__ import annotations
 
@@ -16,11 +16,12 @@ from tracking.data import staging as stg
 from tracking.data.augment import drop_nodes, jitter_both
 from tracking.data.features import CACHE_TAG, DESC_DIM, FEAT_DIM, assert_graph_feat
 from tracking.data.graph import GraphConfig, build_hetero_data
+from tracking.data.intra import refresh_edges
 from tracking.data.splits import load_tracking_split
 
 
-def _build_one(pid: str, root_s: str, k_intra: int) -> tuple[str, HeteroData | None]:
-    g = build_hetero_data(pid, Path(root_s), GraphConfig(k_intra=k_intra))
+def _build_one(pid: str, root_s: str, cfg: GraphConfig) -> tuple[str, HeteroData | None]:
+    g = build_hetero_data(pid, Path(root_s), cfg)
     return pid, g
 
 
@@ -61,9 +62,10 @@ class LesionDataset(InMemoryDataset):
         d = super().get(idx).clone()
         if self.augment:
             if self.p_drop_fu > 0.0 or self.p_drop_bl > 0.0:
-                drop_nodes(d, self.p_drop_fu, self.p_drop_bl, self.cfg.k_intra, rng=np.random.default_rng())
-            jitter_both(d, k_intra=self.cfg.k_intra, sigma_fu_scale=self.fu_jitter_scale, rng=np.random.default_rng())
-        return d
+                drop_nodes(d, self.p_drop_fu, self.p_drop_bl, self.cfg, rng=np.random.default_rng())
+            if not self.cfg.drop_dp:
+                jitter_both(d, self.cfg, sigma_fu_scale=self.fu_jitter_scale, rng=np.random.default_rng())
+        return refresh_edges(d, self.cfg)
 
     def _log_graph(self, pid: str, g: HeteroData, console: Console) -> None:
         el = g["bl", "cross", "fu"].edge_label
@@ -82,7 +84,7 @@ class LesionDataset(InMemoryDataset):
             )
         pids = list(sp[self.split])
         root_s = str(self.dataset_root)
-        k_intra = self.cfg.k_intra
+        cfg = self.cfg
         staging = stg.dir(Path(self.processed_dir), self.split)
         staging.mkdir(parents=True, exist_ok=True)
         if not self.resume:
@@ -105,7 +107,7 @@ class LesionDataset(InMemoryDataset):
                 task = prog.add_task(self.split, total=len(todo), patient="")
                 for pid in todo:
                     prog.update(task, patient=str(pid))
-                    g = build_hetero_data(pid, self.dataset_root, self.cfg)
+                    g = build_hetero_data(pid, self.dataset_root, cfg)
                     if g is None:
                         prog.advance(task)
                         continue
@@ -116,7 +118,7 @@ class LesionDataset(InMemoryDataset):
             with Progress(*cols) as prog:
                 task = prog.add_task(self.split, total=len(todo), patient="")
                 with ProcessPoolExecutor(max_workers=self.num_workers) as ex:
-                    futs = [ex.submit(_build_one, pid, root_s, k_intra) for pid in todo]
+                    futs = [ex.submit(_build_one, pid, root_s, cfg) for pid in todo]
                     for fut in as_completed(futs):
                         pid, g = fut.result()
                         prog.update(task, patient=str(pid))

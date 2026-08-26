@@ -1,4 +1,4 @@
-"""Materialize cached dense v6_h60 PyG graphs for one tracking split."""
+"""Materialize cached dense v7_native PyG graphs for one tracking split."""
 
 from __future__ import annotations
 

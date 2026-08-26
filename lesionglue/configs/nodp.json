@@ -24,7 +24,7 @@
   "p_drop_fu": 0.1,
   "p_drop_bl": 0.1,
   "k_intra": 8,
-  "drop_dp": false,
+  "drop_dp": true,
   "intra": "knn",
   "type_mask": false,
   "ema_decay": 0.999,

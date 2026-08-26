@@ -37,6 +37,9 @@ class Config:
     p_drop_fu: float = 0.10
     p_drop_bl: float = 0.10
     k_intra: int = 8
+    drop_dp: bool = False
+    intra: str = "knn"
+    type_mask: bool = False
     ema_decay: float = 0.999
     ema_start_step: int = 1000
     dust_tau: float = 0.2
@@ -51,7 +54,14 @@ def load_config(path: str | Path) -> Config:
     extra = set(raw) - known
     if extra:
         raise ValueError(f"unknown config keys: {sorted(extra)}")
-    return Config(**{k: raw[k] for k in known if k in raw})
+    cfg = Config(**{k: raw[k] for k in known if k in raw})
+    if cfg.intra not in ("knn", "complete"):
+        raise ValueError(
+            f"intra must be 'knn' or 'complete', got {cfg.intra!r}.\n"
+            f"Expected a key in configs/*.json.\n"
+            f'Fix: set "intra": "knn" or "intra": "complete"'
+        )
+    return cfg
 
 
 def dump_config(cfg: Config, path: str | Path) -> None:

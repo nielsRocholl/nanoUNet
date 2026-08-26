@@ -11,6 +11,7 @@ from torch_geometric.loader import DataLoader as PyGDataLoader
 
 from tracking.common import CACHE_ROOT, DATASET_ROOT, cprint, nano_header
 from tracking.data.dataset import LesionDataset
+from tracking.infer import graph_cfg_from_ckpt
 from tracking.train.module import MatcherModule
 
 
@@ -42,9 +43,10 @@ def main() -> None:
         )
 
     nw = max(0, args.num_workers)
-    ds = LesionDataset(root=args.cache, split=args.split, dataset_root=Path(args.root))
-    loader = PyGDataLoader(ds, batch_size=args.batch_size, shuffle=False, num_workers=nw, persistent_workers=nw > 0)
     mod = MatcherModule.load_from_checkpoint(args.ckpt, map_location="cpu")
+    gcfg = graph_cfg_from_ckpt(mod, int(getattr(mod.hparams, "k_intra", 8)))
+    ds = LesionDataset(root=args.cache, split=args.split, dataset_root=Path(args.root), cfg=gcfg)
+    loader = PyGDataLoader(ds, batch_size=args.batch_size, shuffle=False, num_workers=nw, persistent_workers=nw > 0)
     mod._dust_ramp_step_override = 1_000_000_000
     if args.dust_tau is not None:
         mod.hparams.dust_tau = args.dust_tau

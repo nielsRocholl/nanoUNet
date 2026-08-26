@@ -1,4 +1,7 @@
-"""Dense BL-FU pair tensors: full edge index, relational features + descriptor sim."""
+"""Dense BL-FU pair tensors: full edge index, relational features + descriptor sim.
+
+drop_dp zeros the first 5 channels (dp, dist, log dist) so CROSS_DIM stays 27.
+"""
 
 from __future__ import annotations
 
@@ -21,6 +24,7 @@ def cross_attr(
     fu_x: torch.Tensor,
     edge_index: torch.Tensor,
     layout: tuple[int, int, int, int, int],
+    drop_dp: bool = False,
 ) -> torch.Tensor:
     desc_off, desc_end, stat_off, stat_end, lt_idx = layout
     desc_dim = desc_end - desc_off
@@ -28,6 +32,9 @@ def cross_attr(
     i, j = edge_index
     dp = fu_pos[j] - bl_pos[i]
     dist = torch.linalg.norm(dp, dim=1, keepdim=True)
+    geo = torch.cat([dp / 100.0, dist / 100.0, torch.log1p(dist) / 5.0], dim=1)
+    if drop_dp:
+        geo = torch.zeros_like(geo)
     bl_st, fu_st = bl_x[i, stat_off : stat_off + 3], fu_x[j, stat_off : stat_off + 3]
     dst = fu_st - bl_st
     rad = fu_x[j, stat_off:stat_end] - bl_x[i, stat_off:stat_end]
@@ -37,9 +44,7 @@ def cross_attr(
     same_type = (bl_x[i, lt_idx].long() == fu_x[j, lt_idx].long()).float().unsqueeze(1)
     return torch.cat(
         [
-            dp / 100.0,
-            dist / 100.0,
-            torch.log1p(dist) / 5.0,
+            geo,
             dst[:, 0:1],
             dst[:, 0:1].abs(),
             dst[:, 1:2],

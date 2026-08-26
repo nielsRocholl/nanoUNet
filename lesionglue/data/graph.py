@@ -1,4 +1,8 @@
-"""One-patient dense HeteroData: L0 nodes, mm-kNN intra, full BL-FU pairs."""
+"""One-patient dense HeteroData: L0 nodes, native BL mm, full BL-FU pairs.
+
+pos is cog_propagated in FU mm; pos_native is cog_bl in BL mm. Intra/cross
+edges are written by refresh_edges from GraphConfig flags.
+"""
 
 from __future__ import annotations
 
@@ -12,29 +16,22 @@ import torch
 from torch_geometric.data import HeteroData
 
 from tracking.common import LESION_TYPES, print0
-from tracking.data.appearance import MaskFeats, mask_stats_all
+from tracking.data.appearance import mask_stats_all
 from tracking.data.descriptor import descriptor_l0
-from tracking.data.features import feat_layout, pack_node
+from tracking.data.features import pack_node
 from tracking.data.meta import LesionRow, V2Paths, parse_meta_csv
-from tracking.data.pairs import cross_attr, dense_pair_index, reverse_cross_attr
 
 
 @dataclass
 class GraphConfig:
     k_intra: int = 8
+    drop_dp: bool = False
+    intra: str = "knn"
+    type_mask: bool = False
 
 
-def intra_knn(pos: torch.Tensor, k: int) -> tuple[torch.Tensor, torch.Tensor]:
-    n = pos.shape[0]
-    dev = pos.device
-    if n == 1:
-        return torch.tensor([[0], [0]], dtype=torch.long, device=dev), torch.zeros((1, 1), device=dev)
-    d_mat = torch.cdist(pos, pos)
-    d_mat.fill_diagonal_(torch.inf)
-    ke = min(k, n - 1)
-    dists, nei = d_mat.topk(ke, largest=False, dim=1)
-    row = torch.arange(n, device=dev).unsqueeze(1).expand(n, ke).reshape(-1)
-    return torch.stack([row, nei.reshape(-1)], dim=0), (dists.reshape(-1, 1) / 100.0).to(torch.float32)
+def graph_config(cfg) -> GraphConfig:
+    return GraphConfig(k_intra=cfg.k_intra, drop_dp=cfg.drop_dp, intra=cfg.intra, type_mask=cfg.type_mask)
 
 
 _NII_CACHE: dict[Path, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
@@ -112,13 +109,14 @@ def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> HeteroData | No
         mb, _, _ = _load_vol(vp.bl_mask(k))
         bl_cache[k] = (cb, ab, sb, mb)
 
-    layout = feat_layout()
+    from tracking.data.intra import refresh_edges
+
     mf_fu = mask_stats_all(mk_fu, fu_ids, sp_fu, ct_fu)
-    mf_bl: dict[int, MaskFeats] = {}
+    mf_bl = {}
     for k, (cb, ab, sb, mb) in bl_cache.items():
         lids = [lid for lid in bl_ids if bl_rep[lid].img_id_bl == k]
         mf_bl.update(mask_stats_all(mb, lids, sb, cb))
-    xb, pb = [], []
+    xb, pb, pbl, ibl, sbl = [], [], [], [], []
     for lid in bl_ids:
         r = bl_rep[lid]
         assert r.cog_bl is not None
@@ -126,6 +124,9 @@ def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> HeteroData | No
         c = np.asarray(r.cog_bl, dtype=np.float64)
         xb.append(pack_node(descriptor_l0(cb, ab, c), mf_bl[lid], LESION_TYPES.index(r.lesion_type)))
         pb.append(np.asarray(r.cog_propagated, dtype=np.float64) * sp_fu)
+        pbl.append(c * sb)
+        ibl.append(int(r.img_id_bl))
+        sbl.append(sb)
 
     xf, pf = [], []
     for lid in fu_ids:
@@ -138,22 +139,17 @@ def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> HeteroData | No
     data["bl"].x, data["fu"].x = torch.tensor(np.stack(xb)), torch.tensor(np.stack(xf))
     data["bl"].pos = torch.tensor(np.stack(pb), dtype=torch.float32)
     data["fu"].pos = torch.tensor(np.stack(pf), dtype=torch.float32)
+    data["bl"].pos_native = torch.tensor(np.stack(pbl), dtype=torch.float32)
+    data["bl"].img_bl = torch.tensor(ibl, dtype=torch.long)
+    data["bl"].sp_bl = torch.tensor(np.stack(sbl), dtype=torch.float32)
     data["bl"].lesion_id, data["fu"].lesion_id = torch.tensor(bl_ids), torch.tensor(fu_ids)
     bi, fj = {lid: i for i, lid in enumerate(bl_ids)}, {lid: j for j, lid in enumerate(fu_ids)}
     lab = _positive_matrix(rows, bi, fj)
     data["bl"].no_match_label = (~lab.bool().any(dim=1)).float()
     data["fu"].no_match_label = (~lab.bool().any(dim=0)).float()
-    data["bl", "intra", "bl"].edge_index, data["bl", "intra", "bl"].edge_attr = intra_knn(data["bl"].pos, cfg.k_intra)
-    data["fu", "intra", "fu"].edge_index, data["fu", "intra", "fu"].edge_attr = intra_knn(data["fu"].pos, cfg.k_intra)
-    ei = dense_pair_index(len(bl_ids), len(fu_ids))
-    ea = cross_attr(data["bl"].pos, data["fu"].pos, data["bl"].x, data["fu"].x, ei, layout)
-    data["bl", "cross", "fu"].edge_index = ei
-    data["bl", "cross", "fu"].edge_attr = ea
     data["bl", "cross", "fu"].edge_label = lab.reshape(-1)
-    data["fu", "cross", "bl"].edge_index = ei.flip(0)
-    data["fu", "cross", "bl"].edge_attr = reverse_cross_attr(ea)
     data.pid = pid
     data.img_id_fu_used = int(dom)
     data.sp_fu = torch.tensor(sp_fu.astype(np.float32))
     data.feat_mode = "l0"
-    return data
+    return refresh_edges(data, cfg)
