@@ -507,3 +507,20 @@ Do not run the 59-patient holdout in this change.
 - Interactive decode menu
 - New dependencies
 
+---
+
+## Part 3 — BL instance mask input
+
+Optional. Omit both flags → Part 2 two-UNet path.
+
+| Flag | Mode | Meaning |
+|------|------|---------|
+| `--bl-mask` | single | Native BL instance NIfTI/`.mha`. Voxel = tracking id. |
+| `--bl-mask-dir` | folder | `{stem}.nii.gz` (fallback `.mha`) for every paired stem. |
+
+XOR. `--bl-clicks` forbidden with `--bl-mask`. Folder mask mode: BL dir is CT-only (no sibling JSON required). FU JSON still required (matcher BL coordinates). BL CT still required (L0).
+
+Per case: load BL mask sitk zyx → skip BL UNet → predict FU → click-CC FU → `track()` → `paint_fu`. `bl.mha` copies given labels (no relabel). `--keep-pred` writes `pred_fu.mha` only.
+
+No `lesion-tracking` changes. No `--gt-dir` scoring.
+
