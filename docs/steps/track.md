@@ -44,7 +44,7 @@ Writes `$NANOUNET_RESULTS/segtrack/inputsTrFU/{stem}/` (folder) or `$NANOUNET_RE
 | `--device` | choice | `cuda` | `cuda` \| `cpu` \| `mps` |
 | `--patients-csv` | path | unset | Folder filter |
 | `--overwrite` | flag | off | Redo cases that already have `matches.csv` |
-| `--keep-pred` | flag | off | Keep binary FG next to masks |
+| `--keep-pred` | flag | off | Keep binary FG as `pred_bl.mha` / `pred_fu.mha` |
 | `--ema` | flag | off | Seg EMA weights |
 | `--batch-size` | int | `8` | Predict batch |
 | `--inference-mode` | choice | `clustered` | `clustered` \| `centered` |
@@ -59,11 +59,11 @@ Env overrides: `NANOUNET_SEGTRACK_MODEL`, `NANOUNET_SEGTRACK_TRACK`.
 
 **Out** (each case dir):
 
-1. `{out}/bl.nii.gz` — BL instance mask, ids unchanged (`int32`).
-2. `{out}/fu.nii.gz` — FU instance mask, ids remapped so the same integer = same lesion.
+1. `{out}/bl.mha` — BL instance mask, ids unchanged (`uint8` or `int16`).
+2. `{out}/fu.mha` — FU instance mask, ids remapped so the same integer = same lesion.
 3. `{out}/matches.csv` — `bl_lesion_id,fu_lesion_id,pair_prob,decode,track_id`.
 
-`track_id` is the voxel value on `fu.nii.gz` for that pair. Unmatched lesions are not extra CSV rows; they only appear as ids on one mask.
+`track_id` is the voxel value on `fu.mha` for that pair. Unmatched lesions are not extra CSV rows; they only appear as ids on one mask.
 
 ## Errors
 

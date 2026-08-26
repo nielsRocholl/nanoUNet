@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import os
-import shutil
-import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
+
 from nanounet.common import results_dir
-from nanounet.infer.export import export_prediction_from_logits
+from nanounet.data.io import SimpleITKIO
+from nanounet.infer.export import native_seg_from_logits
 from nanounet.infer.predict_case import MAX_BORDER_EXTRA, predict_case_logits
 from nanounet.infer.predict_io import preprocess_case
 
@@ -92,10 +93,14 @@ def pair_folder(bl_dir: Path, fu_dir: Path) -> list[SegTrackCase]:
     return [SegTrackCase(s, *bl[s], *fu[s]) for s in sorted(bl)]
 
 
-def segment_native(net, lm, cfg, pl, cm, dj, dev, scan: Path, clicks: Path, out_nii: Path, *,
+def _write_mha(vol_zyx: np.ndarray, props: dict, path: Path) -> None:
+    SimpleITKIO().write_seg(vol_zyx, str(path), props)
+
+
+def segment_native(net, lm, cfg, pl, cm, dj, dev, scan: Path, clicks: Path, *,
                    use_tta, border_expand=True, max_border_extra=MAX_BORDER_EXTRA, batch_size=8,
                    use_amp=True, cluster_margin_frac=0.1, inference_mode="clustered",
-                   no_prompt_encode=False, pack=None) -> None:
+                   no_prompt_encode=False, pack=None) -> tuple[np.ndarray, dict]:
     if pack is None:
         pack = preprocess_case(str(scan), str(clicks), pl, cm, dj, None, None)
     pad_cpu, slicer_revert, props, points_xyz, bl_points = pack
@@ -109,19 +114,16 @@ def segment_native(net, lm, cfg, pl, cm, dj, dev, scan: Path, clicks: Path, out_
         cluster_margin_frac=cluster_margin_frac, mode=inference_mode,
         is_longi=False, bl_present=False, bl_points_xyz=bl_points,
     )
-    out_trunc = str(out_nii)
-    end = dj["file_ending"]
-    if out_trunc.endswith(end):
-        out_trunc = out_trunc[: -len(end)]
-    export_prediction_from_logits(logits, props, cm, pl, dj, out_trunc, tiles)
+    return native_seg_from_logits(logits, props, cm, pl, dj, tiles), props
 
 
 def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, dev, matcher,
              decode: str, overwrite: bool, keep_pred: bool, track_ckpt: Path, thresh: float,
              device: str, seg_kw: dict, on_step=None) -> dict:
-    from tracking.data.instances import instances_from_nifti
-    from tracking.data.paint import copy_mask, fu_track_map, write_case_masks, write_empty_csv
-    from tracking.infer import mask_has_lesions, track, write_match_csv
+    from tracking.data.graph import _load_vol
+    from tracking.data.instances import binary_to_instances, load_clicks
+    from tracking.data.paint import fu_track_map, paint_fu, write_empty_csv
+    from tracking.infer import track, write_match_csv
 
     def step(s: str) -> None:
         if on_step:
@@ -133,41 +135,52 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
     csv_path = case_dir / "matches.csv"
     if csv_path.is_file() and not overwrite:
         return {"status": "skip", "n_pairs": 0, "sec": 0.0}
-    tmp = Path(tempfile.mkdtemp())
-    pred_bl, pred_fu = tmp / "pred_bl.nii.gz", tmp / "pred_fu.nii.gz"
-    try:
-        step("segment BL")
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            fut = pool.submit(preprocess_case, str(case.fu_img), str(case.fu_clicks), pl, cm, dj, None, None)
-            segment_native(net, lm, cfg, pl, cm, dj, dev, case.bl_img, case.bl_clicks, pred_bl, **seg_kw)
-            pack_fu = fut.result()
-        step("segment FU")
-        segment_native(net, lm, cfg, pl, cm, dj, dev, case.fu_img, case.fu_clicks, pred_fu, pack=pack_fu, **seg_kw)
-        bl_inst = instances_from_nifti(pred_bl, case.bl_clicks, tmp / "bl_inst.nii.gz")
-        fu_inst = instances_from_nifti(pred_fu, case.fu_clicks, tmp / "fu_inst.nii.gz")
-        has_bl, has_fu = mask_has_lesions(bl_inst), mask_has_lesions(fu_inst)
-        if not has_bl or not has_fu:
-            copy_mask(bl_inst, case_dir / "bl.nii.gz", zero=not has_bl)
-            copy_mask(fu_inst, case_dir / "fu.nii.gz", zero=not has_fu)
-            write_empty_csv(csv_path)
-            if keep_pred:
-                shutil.copy2(pred_bl, case_dir / "pred_bl.nii.gz")
-                shutil.copy2(pred_fu, case_dir / "pred_fu.nii.gz")
-            return {"status": "empty", "n_pairs": 0, "sec": time.perf_counter() - t0}
-        step("track")
-        r = track(
-            case.bl_img, bl_inst, case.fu_img, fu_inst, case.fu_clicks, track_ckpt,
-            decode=decode, device=device, matcher=matcher, thresh=thresh, types_csv=case.types_csv,
-        )
-        m = fu_track_map(
-            list(map(int, r.bl_ids)), list(map(int, r.fu_ids)),
-            [(int(r.bl_ids[i]), int(r.fu_ids[j])) for i, j in r.pairs],
-        )
-        write_case_masks(bl_inst, fu_inst, case_dir, m)
-        write_match_csv(csv_path, r)
+
+    step("segment BL")
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        fut = pool.submit(preprocess_case, str(case.fu_img), str(case.fu_clicks), pl, cm, dj, None, None)
+        pred_bl, props_bl = segment_native(net, lm, cfg, pl, cm, dj, dev, case.bl_img, case.bl_clicks, **seg_kw)
+        pack_fu = fut.result()
+    step("segment FU")
+    pred_fu, props_fu = segment_native(
+        net, lm, cfg, pl, cm, dj, dev, case.fu_img, case.fu_clicks, pack=pack_fu, **seg_kw,
+    )
+    bl_zyx = binary_to_instances(pred_bl, load_clicks(case.bl_clicks))
+    fu_zyx = binary_to_instances(pred_fu, load_clicks(case.fu_clicks))
+    has_bl, has_fu = bool(np.any(bl_zyx)), bool(np.any(fu_zyx))
+
+    def emit_preds() -> None:
         if keep_pred:
-            shutil.copy2(pred_bl, case_dir / "pred_bl.nii.gz")
-            shutil.copy2(pred_fu, case_dir / "pred_fu.nii.gz")
-        return {"status": "ok", "n_pairs": len(r.pairs), "sec": time.perf_counter() - t0}
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+            _write_mha(pred_bl, props_bl, case_dir / "pred_bl.mha")
+            _write_mha(pred_fu, props_fu, case_dir / "pred_fu.mha")
+
+    if not has_bl or not has_fu:
+        bl_out = bl_zyx if has_bl else np.zeros(pred_bl.shape, dtype=np.int32)
+        fu_out = fu_zyx if has_fu else np.zeros(pred_fu.shape, dtype=np.int32)
+        _write_mha(bl_out, props_bl, case_dir / "bl.mha")
+        _write_mha(fu_out, props_fu, case_dir / "fu.mha")
+        write_empty_csv(csv_path)
+        emit_preds()
+        return {"status": "empty", "n_pairs": 0, "sec": time.perf_counter() - t0}
+
+    step("track")
+    ct_bl, aff_bl, sp_bl = _load_vol(case.bl_img)
+    ct_fu, aff_fu, sp_fu = _load_vol(case.fu_img)
+    mk_bl = np.ascontiguousarray(bl_zyx.transpose(2, 1, 0))
+    mk_fu = np.ascontiguousarray(fu_zyx.transpose(2, 1, 0))
+    r = track(
+        case.bl_img, case.bl_img, case.fu_img, case.fu_img,
+        case.fu_clicks, track_ckpt,
+        decode=decode, device=device, matcher=matcher, thresh=thresh,
+        types_csv=case.types_csv,
+        volumes=(ct_bl, aff_bl, sp_bl, mk_bl, ct_fu, aff_fu, sp_fu, mk_fu),
+    )
+    m = fu_track_map(
+        list(map(int, r.bl_ids)), list(map(int, r.fu_ids)),
+        [(int(r.bl_ids[i]), int(r.fu_ids[j])) for i, j in r.pairs],
+    )
+    _write_mha(bl_zyx, props_bl, case_dir / "bl.mha")
+    _write_mha(paint_fu(fu_zyx, m), props_fu, case_dir / "fu.mha")
+    write_match_csv(csv_path, r)
+    emit_preds()
+    return {"status": "ok", "n_pairs": len(r.pairs), "sec": time.perf_counter() - t0}

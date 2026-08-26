@@ -181,8 +181,7 @@ def main() -> None:
             n_empty += r["status"] == "empty"
             n_skip += r["status"] == "skip"
             n_pairs += r["n_pairs"]
-            if r["status"] == "skip":
-                cprint(f"[dim]skip {case.stem}[/dim]")
+            cprint(f"[dim]{case.stem}  {r['sec']:.0f}s[/dim]" if r["status"] != "skip" else f"[dim]skip {case.stem}[/dim]")
             prog.advance(tid)
     elapsed = time.perf_counter() - t0
     mins, secs = divmod(int(elapsed), 60)
@@ -190,7 +189,7 @@ def main() -> None:
         f"{n} cases  ·  {n_ok} linked  ·  {n_empty} empty  ·  {n_skip} skip\n"
         f"{n_pairs} pairs  ·  {mins}m {secs:02d}s\n"
         f"wrote  {parent}\n"
-        f"next   open fu.nii.gz — same integer = same lesion\n"
+        f"next   open fu.mha — same integer = same lesion\n"
         f"       docs/reference/track_ids.md",
         border_style="green",
     ))

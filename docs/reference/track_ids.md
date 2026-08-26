@@ -10,7 +10,7 @@ Same integer on both scans = same lesion. Background is `0`. BL click names are 
 
 Dense split is allowed to break “one id = one connected component” **on FU only**. That is the point of `--decode dense`.
 
-CLI: [steps/track.md](../steps/track.md). Files: `{out}/bl.nii.gz`, `{out}/fu.nii.gz`, `{out}/matches.csv`.
+CLI: [steps/track.md](../steps/track.md). Files: `{out}/bl.mha`, `{out}/fu.mha`, `{out}/matches.csv`.
 
 ## Worked numbers
 
@@ -25,4 +25,4 @@ CLI: [steps/track.md](../steps/track.md). Files: `{out}/bl.nii.gz`, `{out}/fu.ni
 
 **New-id collision.** BL `{1,3}` (3 gone). FU new click id `3` → tracking id `4`.
 
-FU click names are **not** the ids on `fu.nii.gz` after paint. Join CSV `fu_lesion_id` (pre-paint click) to `track_id` (voxel value).
+FU click names are **not** the ids on `fu.mha` after paint. Join CSV `fu_lesion_id` (pre-paint click) to `track_id` (voxel value).

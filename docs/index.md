@@ -40,7 +40,7 @@ nanounet_segtrack \
   --fu-dir /nnunet_data/Longitudinal-CT/inputsTrFU
 ```
 
-`nanounet_segtrack` writes `{bl,fu}.nii.gz` (shared tracking ids) + `matches.csv` under `$NANOUNET_RESULTS/segtrack/`.
+`nanounet_segtrack` writes `{bl,fu}.mha` (shared tracking ids) + `matches.csv` under `$NANOUNET_RESULTS/segtrack/`.
 
 Tiny laptop smoke train:
 
