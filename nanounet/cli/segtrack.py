@@ -15,7 +15,7 @@ from nanounet.config import load_config
 from nanounet.data.resampling import set_resample_device
 from nanounet.cli.segtrack_cases import collect_cases
 from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
-from nanounet.infer.segtrack import DEFAULT_MODEL, DEFAULT_TRACK, run_case
+from nanounet.infer.segtrack import DEFAULT_MODEL, run_case
 from nanounet.infer.segtrack_case import resolve_ckpt_path, resolve_out
 from nanounet.plan.plans import Plans
 
@@ -60,10 +60,13 @@ def _mode(ap: argparse.ArgumentParser, choices: tuple[str, ...]) -> argparse.Nam
 def main() -> None:
     quiet_lightning_runtime()
     choices, load_matcher = _require_tracking()
+    from tracking.common import DEPLOYED_CKPT, DEPLOYED_DUST_TAU
+    from tracking.infer import graph_cfg_from_ckpt
+
     args = _mode(argparse.ArgumentParser(), choices)
     cases, single = collect_cases(args)
     model_dir, msrc = resolve_ckpt_path(args.model_dir, "NANOUNET_SEGTRACK_MODEL", DEFAULT_MODEL)
-    track_ckpt, tsrc = resolve_ckpt_path(args.track_ckpt, "NANOUNET_SEGTRACK_TRACK", DEFAULT_TRACK)
+    track_ckpt, tsrc = resolve_ckpt_path(args.track_ckpt, "NANOUNET_SEGTRACK_TRACK", DEPLOYED_CKPT)
     if not (model_dir / "plans.json").is_file():
         raise SystemExit(
             f"No seg model at {model_dir}.\n"
@@ -75,7 +78,7 @@ def main() -> None:
         raise SystemExit(
             f"No checkpoint at {track_ckpt}.\n"
             f"Expected a Lightning .ckpt from lesion_track_train.\n"
-            f"Fix: --track-ckpt /nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt  (see docs/steps/track.md)"
+            f"Fix: --track-ckpt {DEPLOYED_CKPT}  (see docs/steps/track.md)"
         )
     d = args.device
     if (d == "cuda" and not torch.cuda.is_available()) or (d == "mps" and not torch.backends.mps.is_available()):
@@ -88,6 +91,7 @@ def main() -> None:
     set_resample_device(dev := torch.device(d))
     net, lm = load_net_from_ckpt(pick_checkpoint(str(model_dir), args.ckpt), cm, dj, dev, longi=False, ema=args.ema)
     matcher = load_matcher(track_ckpt, d)
+    gcfg = graph_cfg_from_ckpt(matcher, int(getattr(matcher.hparams, "k_intra", 8)))
     use_tta = (not cfg.inference.disable_tta_default) if args.tta_flag is None else args.tta_flag
     out_cli = Path(args.out) if args.out else None
     fu_name = Path(args.fu_dir).name if args.fu_dir else None
@@ -95,7 +99,12 @@ def main() -> None:
     nano_banner("nanoUNet  seg × track", "scans + clicks → linked instance masks")
     rows = [
         ("model-dir", model_dir, msrc), ("ckpt", args.ckpt, "cli" if args.ckpt != "last.ckpt" else "default"),
-        ("track-ckpt", track_ckpt, tsrc), ("decode", args.decode, "cli" if args.decode != "hungarian" else "default"),
+        ("track-ckpt", track_ckpt, tsrc),
+        ("decode", args.decode, "cli" if args.decode != "hungarian" else "default"),
+        ("sinkhorn-tau", DEPLOYED_DUST_TAU, "default"),
+        ("track-ema", "on", "default"),
+        ("intra", gcfg.intra, "ckpt"),
+        ("drop_dp", gcfg.drop_dp, "ckpt"),
         ("device", d, "cli"), ("n_cases", len(cases), "folder" if not single else "single"),
         ("out", parent, "cli" if args.out else "default"),
     ]

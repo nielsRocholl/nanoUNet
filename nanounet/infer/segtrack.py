@@ -1,4 +1,7 @@
-"""Predict FU (and BL unless a GT instance mask is given) → linked tracking ids."""
+"""Predict FU (and BL unless a GT instance mask is given) → linked tracking ids.
+
+Matcher defaults come from tracking.common (v7_complete, EMA, dust_tau=0.125).
+"""
 
 from __future__ import annotations
 
@@ -18,7 +21,6 @@ DEFAULT_MODEL = Path(
     "/nnunet_data/NanoUNet_results/nanounet/"
     "Dataset999_Merged_nnUNetResEncUNetLPlans_h200_smallpv_f0_h200_instance_1200ep"
 )
-DEFAULT_TRACK = Path("/nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt")
 
 
 def _write_mha(vol_zyx: np.ndarray, props: dict, path: Path) -> None:
@@ -48,6 +50,7 @@ def segment_native(net, lm, cfg, pl, cm, dj, dev, scan: Path, clicks: Path, *,
 def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, dev, matcher,
              decode: str, overwrite: bool, keep_pred: bool, track_ckpt: Path, thresh: float,
              device: str, seg_kw: dict, on_step=None) -> dict:
+    from tracking.common import DEPLOYED_DUST_TAU
     from tracking.data.graph import _load_vol
     from tracking.data.instances import binary_to_instances, load_clicks
     from tracking.data.paint import fu_track_map, paint_fu, write_empty_csv
@@ -117,6 +120,7 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
         case.bl_img, case.bl_img, case.fu_img, case.fu_img,
         case.fu_clicks, track_ckpt,
         decode=decode, device=device, matcher=matcher, thresh=thresh,
+        sinkhorn_tau=DEPLOYED_DUST_TAU, use_ema=True,
         types_csv=case.types_csv,
         volumes=(ct_bl, aff_bl, sp_bl, mk_bl, ct_fu, aff_fu, sp_fu, mk_fu),
     )

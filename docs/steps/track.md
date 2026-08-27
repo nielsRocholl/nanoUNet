@@ -2,7 +2,7 @@
 
 One command: two CTs + click JSON → instance masks with shared tracking ids + match CSV. Predicts both timepoints (Dataset999 single-stream), instance-izes click-on-FG, then matches. `--bl-mask` / `--bl-mask-dir` skips BL predict and copies those instance ids. Requires `pip install -e /lesion-tracking`.
 
-Default `--decode hungarian`. FU click JSON is the matcher’s BL coordinates (no meta CSV). See [track_ids.md](../reference/track_ids.md).
+Default matcher: `v7_complete/last.ckpt`, matcher EMA on, `--decode hungarian`, `dust_tau=0.125`. `--ema` is the **seg** UNet only. FU click JSON is the matcher’s BL coordinates (no meta CSV). See [track_ids.md](../reference/track_ids.md).
 
 ## Command
 
@@ -60,14 +60,14 @@ Writes `$NANOUNET_RESULTS/segtrack/inputsTrFU/{stem}/` (folder) or `$NANOUNET_RE
 | `-o, --out` | path | `$NANOUNET_RESULTS/segtrack/...` | Parent (folder) or case dir (single) |
 | `-m, --model-dir` | path | Dataset999 `h200_instance_1200ep` | Seg run dir (`plans.json` + ckpt) |
 | `--ckpt` | str | `last.ckpt` | Seg checkpoint name |
-| `--track-ckpt` | path | `h60_r9/best.ckpt` | Matcher Lightning ckpt |
+| `--track-ckpt` | path | `v7_complete/last.ckpt` | Matcher (EMA, hungarian, `dust_tau=0.125`) |
 | `--decode` | choice | `hungarian` | `hungarian` / `dense` / `sinkhorn` |
-| `--thresh` | float | `0.5` | Dense pair cutoff |
+| `--thresh` | float | `0.5` | Dense pair cutoff only |
 | `--device` | choice | `cuda` | `cuda` \| `cpu` \| `mps` |
 | `--patients-csv` | path | unset | Folder filter |
 | `--overwrite` | flag | off | Redo cases that already have `matches.csv` |
 | `--keep-pred` | flag | off | Binary FG `pred_bl.mha` / `pred_fu.mha`. Mask mode: `pred_fu.mha` only |
-| `--ema` | flag | off | Seg EMA weights |
+| `--ema` | flag | off | Seg UNet EMA. Matcher EMA is always on |
 | `--batch-size` | int | `8` | Predict batch |
 | `--inference-mode` | choice | `clustered` | `clustered` \| `centered` |
 | `--disable-tta` | flag | config default | Same as predict |
