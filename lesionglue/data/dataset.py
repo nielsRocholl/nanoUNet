@@ -1,7 +1,11 @@
-"""Cached v7_native per-split PyG InMemoryDataset from dense Longitudinal_CT_v2 graphs."""
+"""Cached v7_native per-split PyG InMemoryDataset from dense Longitudinal_CT_v2 graphs.
+
+Workers pin BLAS/OpenMP to 1 thread: 16 jobs × default torch threads starves a
+cgroup and turns CIFS NIfTI reads into ~1 patient/min."""
 
 from __future__ import annotations
 
+import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -20,7 +24,14 @@ from tracking.data.intra import refresh_edges
 from tracking.data.splits import load_tracking_split
 
 
+def _limit_threads() -> None:
+    for k in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+        os.environ[k] = "1"
+    torch.set_num_threads(1)
+
+
 def _build_one(pid: str, root_s: str, cfg: GraphConfig) -> tuple[str, list]:
+    _limit_threads()
     return pid, build_hetero_data(pid, Path(root_s), cfg)
 
 
@@ -101,6 +112,7 @@ class LesionDataset(InMemoryDataset):
             TextColumn("[cyan]{task.fields[patient]}[/cyan]"),
         )
 
+        _limit_threads()
         if self.num_workers == 1:
             with Progress(*cols) as prog:
                 task = prog.add_task(self.split, total=len(todo), patient="")
@@ -114,7 +126,7 @@ class LesionDataset(InMemoryDataset):
         else:
             with Progress(*cols) as prog:
                 task = prog.add_task(self.split, total=len(todo), patient="")
-                with ProcessPoolExecutor(max_workers=self.num_workers) as ex:
+                with ProcessPoolExecutor(max_workers=self.num_workers, initializer=_limit_threads) as ex:
                     futs = [ex.submit(_build_one, pid, root_s, cfg) for pid in todo]
                     for fut in as_completed(futs):
                         pid, graphs = fut.result()

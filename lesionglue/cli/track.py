@@ -1,6 +1,7 @@
 """Deploy CLI: CT + instance masks → match CSV. drop_dp ckpts omit --propagated.
 
 Single case or Longitudinal-CT folder (--root + --split / --patients-csv).
+Defaults: v7_complete last.ckpt, EMA, hungarian, dust_tau=0.125.
 --propagated: meta CSV, slim CSV, or FU-frame JSON (not inputsTrBL native clicks).
 Required unless the checkpoint was trained with drop_dp.
 """
@@ -15,11 +16,11 @@ from pathlib import Path
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from tracking.common import DATASET_ROOT, cprint, config_table, nano_header
+from tracking.common import DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, cprint, config_table, nano_header, require_ckpt
 from tracking.data.instances import instances_from_nifti
 from tracking.data.meta import resolve_track_case
 from tracking.data.splits import load_holdout, load_tracking_split
-from tracking.decode import DECODE_CHOICES, DECODE_HELP, resolve_decode
+from tracking.decode import DECODE_CHOICES, DECODE_HELP
 from tracking.infer import graph_cfg_from_ckpt, load_matcher, mask_has_lesions, track, write_match_csv
 
 _PROP_HELP = (
@@ -57,14 +58,14 @@ def main() -> None:
         "--propagated", default="",
         help=_PROP_HELP + ". Required unless the checkpoint was trained with drop_dp.",
     )
-    ap.add_argument("--ckpt", required=True)
+    ap.add_argument("--ckpt", default=str(DEPLOYED_CKPT))
     ap.add_argument("--out", required=True)
-    ap.add_argument("--decode", choices=DECODE_CHOICES, default=None, help=DECODE_HELP)
+    ap.add_argument("--decode", choices=DECODE_CHOICES, default="hungarian", help=DECODE_HELP)
     ap.add_argument("--thresh", type=float, default=0.5)
     ap.add_argument("--device", choices=("cuda", "cpu", "mps"), default="cuda")
     ap.add_argument("--k-intra", type=int, default=8)
     ap.add_argument("--sinkhorn-iters", type=int, default=20)
-    ap.add_argument("--sinkhorn-tau", type=float, default=0.2)
+    ap.add_argument("--sinkhorn-tau", type=float, default=DEPLOYED_DUST_TAU)
     ap.add_argument("--default-lesion-type", default="unclear")
     ap.add_argument("--types-csv", default="", help="lesion_id,lesion_type CSV; required for type_mask unless --default-lesion-type is not unclear")
     ap.add_argument("--no-ema", action="store_true")
@@ -80,8 +81,9 @@ def main() -> None:
     args = ap.parse_args()
 
     nano_header("lesion_track")
-    decode = resolve_decode(args.decode)
-    matcher = load_matcher(Path(args.ckpt), args.device)
+    ckpt = require_ckpt(args.ckpt)
+    decode = args.decode
+    matcher = load_matcher(ckpt, args.device)
     gcfg = graph_cfg_from_ckpt(matcher, args.k_intra)
     root = args.root.strip()
     need = ("bl_img", "bl_mask", "fu_img", "fu_mask")
@@ -93,7 +95,7 @@ def main() -> None:
         raise SystemExit(
             f"Need either a single case ({geo}) or a dataset (--root).\n"
             "Expected one mode, not both or neither.\n"
-            "Fix: lesion_track --root /nnunet_data/Longitudinal-CT --split test --ckpt ... --decode dense --out /tmp/track_test"
+            "Fix: lesion_track --root /nnunet_data/Longitudinal-CT --split test --out /tmp/track_test"
         )
     if not root and (args.split is not None or args.patients_csv.strip()):
         raise SystemExit(
@@ -108,8 +110,10 @@ def main() -> None:
         sinkhorn_tau=args.sinkhorn_tau, use_ema=not args.no_ema,
     )
     config_table([
-        ("ckpt", args.ckpt, "cli"),
-        ("decode", decode, "cli" if args.decode else "prompt"),
+        ("ckpt", str(ckpt), "default" if ckpt == DEPLOYED_CKPT else "cli"),
+        ("decode", decode, "default" if decode == "hungarian" else "cli"),
+        ("sinkhorn-tau", args.sinkhorn_tau, "default" if args.sinkhorn_tau == DEPLOYED_DUST_TAU else "cli"),
+        ("ema", "off" if args.no_ema else "on", "cli" if args.no_ema else "default"),
         ("drop_dp", str(gcfg.drop_dp), "ckpt"),
         ("intra", gcfg.intra, "ckpt"),
         ("type_mask", str(gcfg.type_mask), "ckpt"),
@@ -120,7 +124,7 @@ def main() -> None:
         r = track(
             Path(args.bl_img), _mask(args.bl_mask, args.bl_clicks),
             Path(args.fu_img), _mask(args.fu_mask, args.fu_clicks),
-            None if gcfg.drop_dp else Path(args.propagated), Path(args.ckpt), matcher=matcher,
+            None if gcfg.drop_dp else Path(args.propagated), ckpt, matcher=matcher,
             types_csv=Path(args.types_csv) if args.types_csv.strip() else None, **kw,
         )
         out = Path(args.out)
@@ -160,7 +164,7 @@ def main() -> None:
             r = track(
                 case.bl_img, case.bl_mask, case.fu_img, case.fu_mask,
                 None if gcfg.drop_dp else case.propagated,
-                Path(args.ckpt), matcher=matcher,
+                ckpt, matcher=matcher,
                 types_csv=case.propagated if gcfg.type_mask else None, **kw,
             )
             write_match_csv(out_dir / f"{pid}.csv", r)

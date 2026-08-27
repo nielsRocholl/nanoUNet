@@ -1,4 +1,7 @@
-"""Dataset/cache paths, constants, Rich rank-0 UI, seed, JSON I/O."""
+"""Dataset/cache paths, Rich rank-0 UI, seed, JSON I/O.
+
+Deployed matcher: v7_complete last.ckpt, EMA, hungarian, dust_tau=0.125.
+"""
 
 from __future__ import annotations
 
@@ -19,6 +22,8 @@ CACHE_ROOT = Path("/nnunet_data/lesion_tracking/cache")
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SPLIT_PATH = REPO_ROOT / "configs" / "split.json"
 HOLDOUT_CSV = DATASET_ROOT / "test_patients.csv"
+DEPLOYED_CKPT = Path("/nnunet_data/lesion_tracking/runs/v7_complete/last.ckpt")
+DEPLOYED_DUST_TAU = 0.125
 
 _CONSOLE = Console(stderr=True)
 
@@ -78,6 +83,18 @@ def seed_all(s: int) -> None:
 
 def load_json(path: str | Path) -> dict:
     return json.loads(Path(path).read_text())
+
+
+def require_ckpt(path: str | Path) -> Path:
+    p = Path(path)
+    if not p.is_file():
+        raise SystemExit(
+            f"No checkpoint at {p}.\n"
+            f"Expected the deployed matcher at {DEPLOYED_CKPT} "
+            f"(EMA, hungarian, dust_tau={DEPLOYED_DUST_TAU}).\n"
+            f"Fix: --ckpt {DEPLOYED_CKPT}"
+        )
+    return p
 
 
 def dump_json(path: str | Path, obj: dict) -> None:

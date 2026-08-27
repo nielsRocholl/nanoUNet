@@ -1,49 +1,33 @@
-# Handoff — Round 13 one-retrain (paused)
+# Handoff — Round 13 complete
 
-**Last updated:** 2026-08-27 12:27 CEST. Continue from `.cursor/plans/round13_maximize_matcher_performance.md`.
+**Last updated:** 2026-08-27 13:52 CEST. Plan: `.cursor/plans/round13_maximize_matcher_performance.md`.
 
-## State
+## Decision
 
-Code for Phase A is on `main` (this commit). **Training has not started.** Preprocess of `cache_v8_regions` was started on a slow node (~14/240 train patients in 11 min) and should be **restarted on a faster node**, not waited out.
+**Keep `v7_complete`.** One retrain on `cache_v8_regions` (247 fit graphs, 7400 steps, seed 0) did not pass the precommitted common-set gate.
 
-Do **not** overwrite:
+| | tau | match | persist | disappeared | new |
+|---|---:|---:|---:|---:|---:|
+| old `v7_complete` EMA | 0.125 | **0.970133** | 443/460 | 185/189 | 80/82 |
+| new `final_seed0` EMA | 0.075 | 0.968810 | 443/460 | 184/189 | 80/82 |
 
-- `/nnunet_data/lesion_tracking/cache_v7`
-- `/nnunet_data/lesion_tracking/cache` (v5/v6)
-- `/nnunet_data/lesion_tracking/runs/h60_r9`
-- `/nnunet_data/lesion_tracking/runs/v7_complete`
-- `/nnunet_data/lesion_tracking/runs/v7_nodp_complete`
+Match score dropped 0.0013. Persist tied; disappeared −1 (allowed); newly-appearing 0. Gate requires match **and** persist ≥ old → reject.
 
-New artifacts only:
+Deployed: `/nnunet_data/lesion_tracking/runs/v7_complete/last.ckpt` (SHA256 `94f16e6f…f2a98f`), EMA, `dust_tau=0.125`.
+Manifest: `/nnunet_data/lesion_tracking/runs/r13_one_retrain/final_manifest.json`.
 
-- cache: `/nnunet_data/lesion_tracking/cache_v8_regions`
-- run: `/nnunet_data/lesion_tracking/runs/r13_one_retrain/`
+v8-only coverage of the same deployed ckpt (59 graphs, not comparable to 57-graph score): match 0.970241, persist 445/462.
 
-## Done
+## Artifacts (do not overwrite v7 / h60)
 
-- Explicit EMA: `MatcherModule.set_eval_weights`; `eval.py` / `oof.py` / `audit.py` default to EMA (`--no-ema` to disable).
-- `eval.py --dust-tau` is repeatable; `--out` writes JSON with selected tau.
-- No-fold train: `--seed`, `--max-steps`; refuse existing `*.ckpt` in `--out`; always write `last.ckpt`.
-- `build_hetero_data` returns one graph per `img_id_fu` (body region, not extra timepoint). Staging stores a list per pid.
-- `configs/complete.json`: `drop_dp=false`, `intra=complete`, `max_steps=7400`, `dust_tau=0.10`.
+- cache: `/nnunet_data/lesion_tracking/cache_v8_regions` — 199+48+59=306 graphs
+- candidate (not deployed): `runs/r13_one_retrain/final_seed0/last.ckpt`
+- wandb: https://wandb.ai/hyper-alignment/lesion-tracking/runs/t9sj9zt4
 
-## Blocked / next
+## What was slow about `--jobs 16`
 
-1. Kill any leftover preprocess PID on the slow node if it is still writing `cache_v8_regions`.
-2. Diagnose why `--jobs 16` was ~1.3 patients/min (expected minutes total). Measure dataloader throughput before/after.
-3. Rebuild `cache_v8_regions` from scratch on the fast node. Gates: 306 graphs total, 247 train∪val, 59 test; holdout IDs absent from fit; finite features; one forward through `v7_complete/last.ckpt`.
-4. **One** train only:
+CIFS (`/nnunet_data`) + OpenMP oversubscription: 16 workers × default `torch` thread count (24 on this cgroup) thrashed gzip NIfTI decompress. Tornadus: ~1.3 patients/min. Arceus with `OMP/MKL/OPENBLAS_NUM_THREADS=1` in each worker: ~10 patients/min (30 min for all splits). One test case (`f2fc990265`, 922 MB nii.gz) took ~7 min alone. Dataloader: v7 33.8 ms/batch vs v8 36.3 ms/batch (ratio 1.075). Pin lives in `dataset.py` `_limit_threads`.
 
-```bash
-cd /lesion-tracking && export PYTHONPATH=.
-python3 tracking/cli/train.py \
-  --config configs/complete.json \
-  --root /nnunet_data/Longitudinal-CT \
-  --cache /nnunet_data/lesion_tracking/cache_v8_regions \
-  --out /nnunet_data/lesion_tracking/runs/r13_one_retrain/final_seed0 \
-  --seed 0 --max-steps 7400 --no-early-stop \
-  --wandb --wandb-run-name r13-one-retrain-v8-s0
-```
+## Code on `main`
 
-5. Tau sweep old vs new on **cache_v7 test** (identical event set). Deploy new only if match score and persistent counts are ≥ old; disappeared/new may drop by at most 1 each. Else keep `v7_complete`.
-6. Write `runs/r13_one_retrain/final_manifest.json`. Style: `/nanochat-style`. Budget: **one** optimizer run.
+HEAD after this commit: `_limit_threads` in `dataset.py`; inference defaults (`DEPLOYED_CKPT`, `DEPLOYED_DUST_TAU=0.125`, hungarian, EMA) in `common.py` / `lesion_track` / `eval`.

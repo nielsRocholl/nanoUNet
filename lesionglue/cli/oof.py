@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytorch_lightning as pl
 
-from tracking.common import CACHE_ROOT, DATASET_ROOT, dump_json
+from tracking.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_DUST_TAU, dump_json
 from tracking.config import load_config
 from tracking.bootstrap import match_score_from_counts
 from tracking.data.graph import graph_config
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     ap.add_argument("--root", default=str(DATASET_ROOT))
     ap.add_argument("--cache", default=str(CACHE_ROOT))
     ap.add_argument("--out", required=True)
-    ap.add_argument("--dust-tau", type=float, default=None, help="override checkpoint decode threshold")
+    ap.add_argument("--dust-tau", type=float, default=DEPLOYED_DUST_TAU, help="override checkpoint decode threshold")
     ap.add_argument("--no-ema", action="store_true")
     args = ap.parse_args()
 
@@ -48,8 +48,7 @@ if __name__ == "__main__":
     mod = MatcherModule.load_from_checkpoint(args.ckpt, map_location="cpu")
     mod.set_eval_weights(not args.no_ema)
     mod._dust_ramp_step_override = 1_000_000_000  # full dust weight, not mid-ramp
-    if args.dust_tau is not None:
-        mod.hparams.dust_tau = args.dust_tau
+    mod.hparams.dust_tau = args.dust_tau
 
     # CPU-only: 5 training jobs already saturate the single GPU (Round 12 constraint), and one
     # validation pass over a fold is cheap enough that GPU contention isn't worth the risk.

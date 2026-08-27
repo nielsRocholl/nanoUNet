@@ -14,7 +14,7 @@ import torch
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
 from tracking.bootstrap import match_score_from_counts
-from tracking.common import CACHE_ROOT, DATASET_ROOT, cprint, dump_json, nano_header
+from tracking.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, cprint, dump_json, nano_header, require_ckpt
 from tracking.data.dataset import LesionDataset
 from tracking.infer import graph_cfg_from_ckpt
 from tracking.train.module import MatcherModule
@@ -46,7 +46,7 @@ def _pick_tau(rows: list[dict]) -> dict:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ckpt", required=True)
+    ap.add_argument("--ckpt", default=str(DEPLOYED_CKPT))
     ap.add_argument("--split", choices=("val", "test"), default="test")
     ap.add_argument("--cache", default=str(CACHE_ROOT))
     ap.add_argument("--root", default=str(DATASET_ROOT))
@@ -57,17 +57,11 @@ def main() -> None:
     ap.add_argument("--out", default="", help="optional JSON path for counts + selected tau")
     args = ap.parse_args()
     nano_header("lesion_track_eval")
-    ckpt = Path(args.ckpt)
-    if not ckpt.is_file():
-        raise SystemExit(
-            f"No checkpoint at {ckpt}.\n"
-            f"Expected a Lightning .ckpt from lesion_track_train.\n"
-            f"Fix: --ckpt /nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt"
-        )
+    ckpt = require_ckpt(args.ckpt)
 
     nw = max(0, args.num_workers)
     use_ema = not args.no_ema
-    taus = args.dust_tau if args.dust_tau else [None]
+    taus = args.dust_tau if args.dust_tau else [DEPLOYED_DUST_TAU]
     acc = "gpu" if torch.cuda.is_available() else "cpu"
     trainer = pl.Trainer(accelerator=acc, devices=1, logger=False, enable_checkpointing=False, enable_progress_bar=False)
 
@@ -80,7 +74,7 @@ def main() -> None:
         ds = LesionDataset(root=args.cache, split=args.split, dataset_root=Path(args.root), cfg=gcfg)
         loader = PyGDataLoader(ds, batch_size=args.batch_size, shuffle=False, num_workers=nw, persistent_workers=nw > 0)
         mod._dust_ramp_step_override = 1_000_000_000
-        used_tau = float(mod.hparams.dust_tau if tau is None else tau)
+        used_tau = float(tau)
         mod.hparams.dust_tau = used_tau
         out = trainer.validate(mod, datamodule=SplitAsVal(loader), verbose=False)
         counts = _counts(mod)

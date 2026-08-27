@@ -1,6 +1,7 @@
 """CSV-free tracking: CT + instance masks + optional propagated centroids → pair logits.
 
 drop_dp checkpoints omit --propagated and use native mask centroids.
+Defaults: EMA, hungarian dust_tau=DEPLOYED_DUST_TAU.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ import numpy as np
 import torch
 from torch_geometric.data import Batch
 
-from tracking.common import eval_device
+from tracking.common import DEPLOYED_DUST_TAU, eval_device, require_ckpt
 from tracking.data.graph import GraphConfig, _load_vol
 from tracking.data.masks import build_mask_graph
 from tracking.data.paint import fu_track_map
@@ -34,13 +35,7 @@ class TrackResult:
 
 
 def load_matcher(ckpt: Path, device: str) -> MatcherModule:
-    ckpt = Path(ckpt)
-    if not ckpt.is_file():
-        raise FileNotFoundError(
-            f"No checkpoint at {ckpt}.\n"
-            f"Expected a Lightning .ckpt from lesion_track_train.\n"
-            f"Fix: --ckpt /nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt"
-        )
+    ckpt = require_ckpt(ckpt)
     dev = eval_device(device)
     mod = MatcherModule.load_from_checkpoint(str(ckpt), map_location=dev)
     return mod.to(dev).eval()
@@ -109,7 +104,7 @@ def track(
     k_intra: int = 8,
     thresh: float = 0.5,
     sinkhorn_iters: int = 20,
-    sinkhorn_tau: float = 0.2,
+    sinkhorn_tau: float = DEPLOYED_DUST_TAU,
     use_ema: bool = True,
     matcher: MatcherModule | None = None,
     types_csv: Path | None = None,

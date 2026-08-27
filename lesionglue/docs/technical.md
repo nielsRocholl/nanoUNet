@@ -2,6 +2,20 @@
 
 This document describes what the **implemented** code does: graph construction, features, model, training objectives, and inference. It’s written for someone who’s comfortable with PyTorch / GNNs and longitudinal medical imaging, without re-deriving basic ML notation.
 
+## Deployed matcher
+
+Local checkpoint — do not download. Constants: `DEPLOYED_CKPT`, `DEPLOYED_DUST_TAU` in `tracking/common.py`.
+
+| Knob | Value |
+|------|-------|
+| checkpoint | `/nnunet_data/lesion_tracking/runs/v7_complete/last.ckpt` |
+| weights | EMA |
+| decode | hungarian, `dust_tau=0.125` |
+| graph | `drop_dp=false`, `intra=complete`, `type_mask=false` |
+| holdout | cache_v7 test match **0.9701** (57 graphs) |
+
+`lesion_track` and `lesion_track_eval` use this unless `--ckpt` / `--decode` / `--sinkhorn-tau` / `--dust-tau` override. R13 extra-region retrain did not beat it (`0.9688`). `h60_r9/best.ckpt` was `0.9453`.
+
 ---
 
 ## Problem framing
@@ -117,24 +131,13 @@ The encoder (`matcher.NodeEncoder`) splits this tensor, applies `nn.Embedding` o
 
 ---
 
-## Deployment inference (no CSV)
+## Deployment inference (`lesion_track`)
 
-The **trained weights** only need a `HeteroData` that matches what `build_hetero_data` produces: same node feature layout (1379-D), same dense cross edge contract, same intra/cross `edge_attr`, and node no-match tensors. **Supervision (`edge_label`) is unnecessary** at inference.
+CSV-free path: CT + instance masks + (unless `drop_dp`) propagated BL centroids in the **FU voxel grid**. Graph layout matches training: L0 1387-D nodes, dense cross edges (`CROSS_DIM=27`), complete or kNN intra from ckpt hparams. EMA + hungarian + `dust_tau=0.125` unless overridden.
 
-**Inputs you described** (predicted components + CTs + optional site):
+**Inputs:** baseline/follow-up CT and integer instance masks; `--propagated` as meta CSV / slim CSV / FU-frame JSON. Anatomy → `LESION_TYPES`, else `'unclear'`.
 
-1. **Volumes:** baseline CT + follow-up CT (aligned whatever way your registration pipeline assumes when you compute propagated points).
-2. **Masks:** integer instance labels per lesion on each scan (your segmenter’s connected components).
-3. **Per baseline lesion:** centroid (or COG) in **baseline voxel indices** → drives `descriptor_l0` on the baseline volume and `mask_stats` on the baseline mask.
-4. **Per follow-up lesion:** centroid in **follow-up voxel indices** → same on the follow-up side.
-5. **Propagated baseline centroid:** same baseline centroid expressed in **follow-up voxel coordinates**, using the **same deformation / registration** family you used (or will use) clinically. This replaces `cog_propagated` from the CSV. It feeds:
-   - normalized position channels (last 3 floats of the baseline node feature vector),
-   - mm-space position used for dense pair features and intra-BL kNN context (baseline branch stores mm coords derived from propagated × follow-up spacing in the current code path).
-6. **Anatomy:** map your coarse label (liver, lung, …) to an index in `LESION_TYPES`; use `'unclear'` if unknown.
-
-**Cross-edges:** build every baseline-follow-up pair and the 11-D relational feature vector. No labels are known in deployment.
-
-**Gap in repo:** there is **no** standalone `predict_from_masks.py` yet; `cli/predict.py` reads **cached splits whose graphs were built with CSV during preprocess**. Adding a thin builder that duplicates `build_hetero_data` logic without CSV rows is straightforward engineering once propagation is available in your inference stack.
+`cli/predict.py` is cached-graph benchmark only.
 
 ---
 
@@ -146,8 +149,8 @@ Loads `MatcherModule` from checkpoint and runs forward on **`LesionDataset`** gr
 
 ## Known limitations / sharp edges
 
-1. **`predict.py` is not the production path** without CSV-backed preprocess; see **Deployment inference** above.
-2. **Dominant `img_id_fu`:** rare multi-region patients may discard minority regions entirely.
+1. **`predict.py` is not the production path** — use `lesion_track`.
+2. **Empty BL or FU side** skips that body-region graph (complete responders, missing `cog_propagated`).
 3. **Dropped baseline rows** without `cog_propagated`: label noise if annotations omit propagation but the lesion still exists — acceptable only if rare.
 4. **Class imbalance metrics:** AUROC can be unstable when a mini-batch has only negatives or only positives.
 5. **`DATASET_ROOT`** default is machine-specific in `common.py`; override with `--root` for portability.
@@ -167,7 +170,7 @@ Loads `MatcherModule` from checkpoint and runs forward on **`LesionDataset`** gr
 
 | Module | Responsibility |
 |--------|----------------|
-| `common.py` | Paths, constants, JSON helpers, `print0`, seed |
+| `common.py` | Paths, `DEPLOYED_CKPT` / `DEPLOYED_DUST_TAU`, JSON helpers, `print0`, seed |
 | `data/meta.py` | `V2Paths`, strict CSV → `LesionRow` |
 | `data/appearance.py` | Descriptor offsets + `mask_stats` |
 | `data/graph.py` | `GraphConfig`, `build_hetero_data` |

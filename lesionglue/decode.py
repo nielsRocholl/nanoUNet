@@ -10,7 +10,7 @@ from rich.prompt import Prompt
 from rich.table import Table
 from scipy.optimize import linear_sum_assignment
 
-from tracking.common import cprint
+from tracking.common import DEPLOYED_DUST_TAU, cprint
 from tracking.train.sinkhorn import log_sinkhorn, superglue_marginals
 
 DECODE_CHOICES = ("dense", "sinkhorn", "hungarian")
@@ -28,7 +28,7 @@ def decode_sinkhorn(
     n_bl: int,
     n_fu: int,
     iters: int = 20,
-    tau: float = 0.2,
+    tau: float = DEPLOYED_DUST_TAU,
 ) -> np.ndarray:
     device, dtype = pair_log.device, pair_log.dtype
     S = torch.zeros((n_bl + 1, n_fu + 1), device=device, dtype=dtype)
@@ -54,7 +54,7 @@ def decode_sinkhorn_hungarian(
     n_bl: int,
     n_fu: int,
     iters: int = 20,
-    tau: float = 0.2,
+    tau: float = DEPLOYED_DUST_TAU,
 ) -> np.ndarray:
     device, dtype = pair_log.device, pair_log.dtype
     S = torch.zeros((n_bl + 1, n_fu + 1), device=device, dtype=dtype)

@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
-from tracking.common import CACHE_ROOT, DATASET_ROOT
+from tracking.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, require_ckpt
 from tracking.data.dataset import LesionDataset
 from tracking.decode import decode_sinkhorn_hungarian
 from tracking.infer import graph_cfg_from_ckpt
@@ -15,14 +15,14 @@ from tracking.train.module import MatcherModule
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ckpt", required=True)
+    ap.add_argument("--ckpt", default=str(DEPLOYED_CKPT))
     ap.add_argument("--cache", default=str(CACHE_ROOT))
     ap.add_argument("--root", default=str(DATASET_ROOT))
     ap.add_argument("--split", choices=["val", "test"], default="val")
     ap.add_argument("--out", default="preds")
     ap.add_argument("--thresh", type=float, default=0.5)
     ap.add_argument("--sinkhorn-iters", type=int, default=20)
-    ap.add_argument("--sinkhorn-tau", type=float, default=0.2)
+    ap.add_argument("--sinkhorn-tau", type=float, default=DEPLOYED_DUST_TAU)
     ap.add_argument("--no-ema", action="store_true", help="use training weights instead of EMA shadow")
     ap.add_argument("--dump-all", action="store_true")
     ap.add_argument("--strict", action="store_true")
@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    mod = MatcherModule.load_from_checkpoint(args.ckpt, map_location="cpu")
+    mod = MatcherModule.load_from_checkpoint(str(require_ckpt(args.ckpt)), map_location="cpu")
     mod.eval()
     dev = mod.device
     gcfg = graph_cfg_from_ckpt(mod, int(getattr(mod.hparams, "k_intra", 8)))
