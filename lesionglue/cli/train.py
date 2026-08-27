@@ -28,6 +28,8 @@ def main() -> None:
     ap.add_argument("--cache", default=str(CACHE_ROOT))
     ap.add_argument("--out", default="lightning_logs")
     ap.add_argument("--fold", type=int, default=None)
+    ap.add_argument("--seed", type=int, default=None)
+    ap.add_argument("--max-steps", type=int, default=None)
     ap.add_argument("--no-early-stop", action="store_true")
     ap.add_argument("--wandb", action="store_true")
     ap.add_argument("--wandb-project", default="lesion-tracking")
@@ -36,11 +38,22 @@ def main() -> None:
     nano_header("lesion_track_train")
 
     cfg = load_config(args.config)
+    if args.seed is not None:
+        cfg.seed = int(args.seed)
+    if args.max_steps is not None:
+        cfg.max_steps = int(args.max_steps)
     if args.fold is not None:
         assert args.fold in range(cfg.n_folds)
     seed_all(cfg.seed)
 
     out = Path(args.out)
+    existing = sorted(out.glob("*.ckpt")) if out.is_dir() else []
+    if existing:
+        raise SystemExit(
+            f"Refusing to overwrite checkpoints in {out}: {[p.name for p in existing]}.\n"
+            f"Expected an empty run directory.\n"
+            f"Fix: --out /nnunet_data/lesion_tracking/runs/r13_one_retrain/final_seed0"
+        )
     out.mkdir(parents=True, exist_ok=True)
     dump_config(cfg, out / "config.json")
 
@@ -100,9 +113,26 @@ def main() -> None:
     )
     if no_val:
         trainer_kw.update(limit_val_batches=0, num_sanity_val_steps=0, val_check_interval=None)
-    pl.Trainer(**trainer_kw).fit(mod, dm)
+    trainer = pl.Trainer(**trainer_kw)
+    trainer.fit(mod, dm)
 
     last = out / "last.ckpt"
+    if no_val:
+        trainer.save_checkpoint(str(last))
+        if not last.is_file():
+            raise SystemExit(
+                f"No last.ckpt at {last} after no-val fit.\n"
+                f"Expected trainer.save_checkpoint to write the final weights.\n"
+                f"Fix: lesion_track_train --config configs/complete.json --out {out}"
+            )
+        fold_metrics = {
+            "fold": None, "val_disabled": True, "selector": "last", "best_ckpt": str(last),
+            "n_fit": len(dm.train_ds), "max_steps": cfg.max_steps, "seed": cfg.seed,
+            "selector_ckpts": {"last": str(last)},
+        }
+        dump_json(out / "fold_metrics.json", fold_metrics)
+        cprint(f"wrote {last}")
+        return
     fold_metrics = {
         "fold": args.fold,
         "best_ckpt": str(ckpt.best_model_path or last),
@@ -112,13 +142,13 @@ def main() -> None:
         **{f"val_acc_{k}": v for k, v in mod._best_sub.items()},
         "selector_ckpts": {
             "best_ema": str(ckpt.best_model_path or last),
-            "best_raw": str(ckpt_raw.best_model_path) if not no_val else "",
+            "best_raw": str(ckpt_raw.best_model_path),
             "last": str(last),
             "swa_plateau": str(out / "swa_plateau.ckpt"),
         },
     }
     dump_json(out / "fold_metrics.json", fold_metrics)
-    cprint(f"wrote {last if no_val else ckpt.best_model_path}")
+    cprint(f"wrote {ckpt.best_model_path}")
 
 
 if __name__ == "__main__":

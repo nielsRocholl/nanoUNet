@@ -1,4 +1,7 @@
-"""Per-patient preprocess staging until collated {split}_v5_l0.pt is written."""
+"""Per-patient preprocess staging until collated {split}_v7_native.pt is written.
+
+Each {pid}.pt is a list of region graphs (possibly empty) so --resume is exact.
+"""
 
 from __future__ import annotations
 
@@ -29,8 +32,8 @@ def has(staging: Path, pid: str) -> bool:
     return path(staging, pid).is_file()
 
 
-def save(staging: Path, pid: str, g: HeteroData) -> None:
-    torch.save(g, path(staging, pid))
+def save(staging: Path, pid: str, graphs: list[HeteroData]) -> None:
+    torch.save(graphs, path(staging, pid))
 
 
 def load_all(staging: Path, pids: list[str]) -> list[HeteroData]:
@@ -38,7 +41,8 @@ def load_all(staging: Path, pids: list[str]) -> list[HeteroData]:
     for pid in pids:
         p = path(staging, pid)
         if p.is_file():
-            out.append(torch.load(p, weights_only=False))
+            item = torch.load(p, weights_only=False)
+            out.extend(item if isinstance(item, list) else [item])
     return out
 
 

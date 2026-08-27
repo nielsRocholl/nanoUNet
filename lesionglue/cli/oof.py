@@ -31,6 +31,7 @@ if __name__ == "__main__":
     ap.add_argument("--cache", default=str(CACHE_ROOT))
     ap.add_argument("--out", required=True)
     ap.add_argument("--dust-tau", type=float, default=None, help="override checkpoint decode threshold")
+    ap.add_argument("--no-ema", action="store_true")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -45,6 +46,7 @@ if __name__ == "__main__":
     dm.setup()
 
     mod = MatcherModule.load_from_checkpoint(args.ckpt, map_location="cpu")
+    mod.set_eval_weights(not args.no_ema)
     mod._dust_ramp_step_override = 1_000_000_000  # full dust weight, not mid-ramp
     if args.dust_tau is not None:
         mod.hparams.dust_tau = args.dust_tau
@@ -74,6 +76,7 @@ if __name__ == "__main__":
     dump_json(out / "val_per_patient.json", {
         "fold": args.fold,
         "ckpt": Path(args.ckpt).name,
+        "weights": "raw" if args.no_ema else "ema",
         "n_patients": len(per_patient),
         "match_score": match_score_from_counts(totals),
         "acc_unchanged_split": totals["uc_ok"] / totals["uc_tot"] if totals["uc_tot"] else None,

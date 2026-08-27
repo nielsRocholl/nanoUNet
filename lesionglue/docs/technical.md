@@ -44,7 +44,7 @@ This is **not** a strict one-to-one assignment matrix. Many-to-one (merge) and o
 
 ### Multi–body-region handling (`img_id_fu`)
 
-Cross-edge distances are only meaningful when baseline propagated COG and follow-up COG live in the **same follow-up volume**. The code picks the **dominant** `img_id_fu` by row count, filters all rows to that region, and logs when multiple regions were present. This is a pragmatic v1 trade-off; a fuller treatment would build disjoint subgraphs per `(img_id_bl, img_id_fu)` or batch edges only within matching FU grids.
+Cross-edge distances are only meaningful when baseline propagated COG and follow-up COG live in the **same follow-up volume**. `build_hetero_data` returns one graph per follow-up body-region volume (`img_id_fu`). Rebuild into a new cache root (`cache_v8_regions`); do not overwrite `cache_v7`.
 
 ### Intra-timepoint edges
 

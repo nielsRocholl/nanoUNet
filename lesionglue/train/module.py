@@ -74,11 +74,23 @@ class MatcherModule(pl.LightningModule):
         self.proj = nn.Linear(d, PROJ_DIM)
         self.auroc = BinaryAUROC()
         self.ap_sinkhorn = BinaryAveragePrecision()
+        self._eval_use_ema: bool | None = None  # not in Lightning state; standalone eval sets it
 
     def _ema_ready(self) -> bool:
         return self.ema_matcher is not None and int(self.global_step) >= int(self.hparams.ema_start_step)
 
+    def set_eval_weights(self, use_ema: bool) -> None:
+        if use_ema and self.ema_matcher is None:
+            raise RuntimeError(
+                "EMA evaluation requested but this checkpoint has no ema_matcher.\n"
+                "Expected a Lightning ckpt trained with ema_decay>0.\n"
+                "Fix: lesion_track_eval --ckpt … --no-ema"
+            )
+        self._eval_use_ema = bool(use_ema)
+
     def _val_net(self) -> nn.Module | AveragedModel:
+        if self._eval_use_ema is not None:
+            return self.ema_matcher if self._eval_use_ema else self.matcher
         return self.ema_matcher if self._ema_ready() else self.matcher
 
     def forward(self, batch: Batch) -> MatcherOutput:

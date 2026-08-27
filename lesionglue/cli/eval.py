@@ -1,4 +1,8 @@
-"""Run the same validation metrics as training on val or test graphs."""
+"""Run the same validation metrics as training on val or test graphs.
+
+Standalone Trainer.validate resets global_step, so EMA must be forced via
+set_eval_weights. --dust-tau may be repeated; one validate pass per tau.
+"""
 
 from __future__ import annotations
 
@@ -9,10 +13,13 @@ import pytorch_lightning as pl
 import torch
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
-from tracking.common import CACHE_ROOT, DATASET_ROOT, cprint, nano_header
+from tracking.bootstrap import match_score_from_counts
+from tracking.common import CACHE_ROOT, DATASET_ROOT, cprint, dump_json, nano_header
 from tracking.data.dataset import LesionDataset
 from tracking.infer import graph_cfg_from_ckpt
 from tracking.train.module import MatcherModule
+
+DUST_GRID = (0.05, 0.075, 0.10, 0.125, 0.15, 0.18, 0.20, 0.22, 0.25)
 
 
 class SplitAsVal(pl.LightningDataModule):
@@ -24,6 +31,19 @@ class SplitAsVal(pl.LightningDataModule):
         return self._loader
 
 
+def _counts(mod: MatcherModule) -> dict[str, int]:
+    return {
+        "uc_ok": int(mod._uc_ok), "uc_tot": int(mod._uc_tot),
+        "dis_ok": int(mod._dis_ok), "dis_tot": int(mod._dis_tot),
+        "new_ok": int(mod._new_ok), "new_tot": int(mod._new_tot),
+    }
+
+
+def _pick_tau(rows: list[dict]) -> dict:
+    best = max(rows, key=lambda r: (r["match_score"], -abs(r["dust_tau"] - 0.10), -r["dust_tau"]))
+    return best
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
@@ -32,32 +52,58 @@ def main() -> None:
     ap.add_argument("--root", default=str(DATASET_ROOT))
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--num-workers", type=int, default=2)
-    ap.add_argument("--dust-tau", type=float, default=None, help="override checkpoint decode threshold")
+    ap.add_argument("--dust-tau", type=float, action="append", default=None, help="repeatable decode threshold")
+    ap.add_argument("--no-ema", action="store_true")
+    ap.add_argument("--out", default="", help="optional JSON path for counts + selected tau")
     args = ap.parse_args()
     nano_header("lesion_track_eval")
-    if not Path(args.ckpt).is_file():
+    ckpt = Path(args.ckpt)
+    if not ckpt.is_file():
         raise SystemExit(
-            f"No checkpoint at {args.ckpt}.\n"
+            f"No checkpoint at {ckpt}.\n"
             f"Expected a Lightning .ckpt from lesion_track_train.\n"
             f"Fix: --ckpt /nnunet_data/lesion_tracking/runs/h60_r9/best.ckpt"
         )
 
     nw = max(0, args.num_workers)
-    mod = MatcherModule.load_from_checkpoint(args.ckpt, map_location="cpu")
-    gcfg = graph_cfg_from_ckpt(mod, int(getattr(mod.hparams, "k_intra", 8)))
-    ds = LesionDataset(root=args.cache, split=args.split, dataset_root=Path(args.root), cfg=gcfg)
-    loader = PyGDataLoader(ds, batch_size=args.batch_size, shuffle=False, num_workers=nw, persistent_workers=nw > 0)
-    mod._dust_ramp_step_override = 1_000_000_000
-    if args.dust_tau is not None:
-        mod.hparams.dust_tau = args.dust_tau
+    use_ema = not args.no_ema
+    taus = args.dust_tau if args.dust_tau else [None]
     acc = "gpu" if torch.cuda.is_available() else "cpu"
     trainer = pl.Trainer(accelerator=acc, devices=1, logger=False, enable_checkpointing=False, enable_progress_bar=False)
-    out = trainer.validate(mod, datamodule=SplitAsVal(loader), verbose=False)
-    if out:
+
+    rows = []
+    gcfg = None
+    for tau in taus:
+        mod = MatcherModule.load_from_checkpoint(str(ckpt), map_location="cpu")
+        mod.set_eval_weights(use_ema)
+        gcfg = graph_cfg_from_ckpt(mod, int(getattr(mod.hparams, "k_intra", 8)))
+        ds = LesionDataset(root=args.cache, split=args.split, dataset_root=Path(args.root), cfg=gcfg)
+        loader = PyGDataLoader(ds, batch_size=args.batch_size, shuffle=False, num_workers=nw, persistent_workers=nw > 0)
+        mod._dust_ramp_step_override = 1_000_000_000
+        used_tau = float(mod.hparams.dust_tau if tau is None else tau)
+        mod.hparams.dust_tau = used_tau
+        out = trainer.validate(mod, datamodule=SplitAsVal(loader), verbose=False)
+        counts = _counts(mod)
+        row = {
+            "dust_tau": used_tau, "weights": "ema" if use_ema else "raw",
+            "n_graphs": len(ds), **counts, "match_score": match_score_from_counts(counts),
+            "metrics": {k: float(v) for k, v in (out[0].items() if out else {})},
+        }
+        rows.append(row)
         pfx = "test" if args.split == "test" else "val"
-        for k, v in sorted(out[0].items()):
-            disp = k.replace("val_", f"{pfx}_", 1) if k.startswith("val_") else k
-            cprint(f"{disp}: {float(v):.6f}")
+        cprint(f"{pfx} tau={used_tau:.3f} weights={row['weights']} match={row['match_score']:.6f} persist={counts['uc_ok']}/{counts['uc_tot']}")
+
+    chosen = _pick_tau(rows)
+    payload = {
+        "ckpt": str(ckpt), "split": args.split, "cache": args.cache, "root": args.root,
+        "weights": "ema" if use_ema else "raw", "intra": None if gcfg is None else gcfg.intra,
+        "drop_dp": None if gcfg is None else gcfg.drop_dp, "rows": rows, "selected": chosen,
+    }
+    if args.out.strip():
+        dump_json(args.out.strip(), payload)
+        cprint(f"wrote {args.out.strip()} selected_tau={chosen['dust_tau']:.3f}")
+    else:
+        cprint(f"selected_tau={chosen['dust_tau']:.3f} match={chosen['match_score']:.6f}")
 
 
 if __name__ == "__main__":

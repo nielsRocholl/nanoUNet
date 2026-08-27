@@ -16,7 +16,7 @@ Weights & Biases (optional): `wandb login` once.
 
 **Dataset:** `/nnunet_data/Longitudinal-CT/` — `meta/{patient}.csv`, `inputsTrBL/FU`, `targetsTrBL/FU`, `data_split.json`. Tracking split is `configs/split.json` (240 train/val, 60 holdout). Override root with `--root`.
 
-**Cache:** `{CACHE_ROOT}/processed/{split}_v7_native.pt` (default `/nnunet_data/lesion_tracking/cache`).
+**Cache:** `{CACHE_ROOT}/processed/{split}_v7_native.pt` (default `/nnunet_data/lesion_tracking/cache`). Multi-region graphs live in `/nnunet_data/lesion_tracking/cache_v8_regions` (does not overwrite v7).
 
 **Encoding (keep L0):** pid `16a5cdae36`, 90 lesions. L0+mask_stats 33341 ms CPU; `build_mask_graph` 42107 ms wall; `track()` GPU fwd 19.2 ms. Encoder GAP skipped (hook >40 LOC). GPU is not the bottleneck.
 
@@ -174,6 +174,8 @@ Train matcher on cached train/val graphs (step clock from config).
 | `--cache` | `CACHE_ROOT` | Graph cache root |
 | `--out` | `lightning_logs` | Checkpoint dir (`best.ckpt`, `last.ckpt`) |
 | `--fold` | none | CV fold index `0 … n_folds-1` |
+| `--seed` | config | Override `Config.seed` before `seed_all` |
+| `--max-steps` | config | Override `Config.max_steps` |
 | `--no-early-stop` | off | Run full `max_steps` |
 | `--wandb` | off | Log to W&B |
 | `--wandb-project` | `lesion-tracking` | W&B project |
@@ -205,7 +207,9 @@ Same metrics as training validation, on val or test graphs.
 | `--root` | `DATASET_ROOT` | Dataset root |
 | `--batch-size` | `8` | Batch size |
 | `--num-workers` | `2` | DataLoader workers |
-| `--dust-tau` | ckpt value | Override decode threshold |
+| `--dust-tau` | ckpt value | Repeatable decode threshold; JSON records every value plus the selected tau |
+| `--no-ema` | off | Use raw `matcher` weights (default is EMA) |
+| `--out` | unset | Optional JSON path for counts + selected tau |
 
 ### `predict.py` (benchmark only)
 
@@ -266,6 +270,7 @@ Dash cytoscape viewer for one cached patient graph. Prints URL via `print0`.
 ```
 configs/
   base.json             # canonical r9_base training config
+  complete.json         # geo + complete intra, 7400 steps (r13)
 tracking/
   config.py             # Config dataclass + JSON load/save
   common.py             # paths, constants, print0, seed

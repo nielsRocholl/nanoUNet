@@ -20,9 +20,8 @@ from tracking.data.intra import refresh_edges
 from tracking.data.splits import load_tracking_split
 
 
-def _build_one(pid: str, root_s: str, cfg: GraphConfig) -> tuple[str, HeteroData | None]:
-    g = build_hetero_data(pid, Path(root_s), cfg)
-    return pid, g
+def _build_one(pid: str, root_s: str, cfg: GraphConfig) -> tuple[str, list]:
+    return pid, build_hetero_data(pid, Path(root_s), cfg)
 
 
 class LesionDataset(InMemoryDataset):
@@ -107,12 +106,10 @@ class LesionDataset(InMemoryDataset):
                 task = prog.add_task(self.split, total=len(todo), patient="")
                 for pid in todo:
                     prog.update(task, patient=str(pid))
-                    g = build_hetero_data(pid, self.dataset_root, cfg)
-                    if g is None:
-                        prog.advance(task)
-                        continue
-                    stg.save(staging, pid, g)
-                    self._log_graph(pid, g, prog.console)
+                    graphs = build_hetero_data(pid, self.dataset_root, cfg)
+                    stg.save(staging, pid, graphs)
+                    for g in graphs:
+                        self._log_graph(pid, g, prog.console)
                     prog.advance(task)
         else:
             with Progress(*cols) as prog:
@@ -120,13 +117,12 @@ class LesionDataset(InMemoryDataset):
                 with ProcessPoolExecutor(max_workers=self.num_workers) as ex:
                     futs = [ex.submit(_build_one, pid, root_s, cfg) for pid in todo]
                     for fut in as_completed(futs):
-                        pid, g = fut.result()
+                        pid, graphs = fut.result()
                         prog.update(task, patient=str(pid))
                         prog.advance(task)
-                        if g is None:
-                            continue
-                        stg.save(staging, pid, g)
-                        self._log_graph(pid, g, prog.console)
+                        stg.save(staging, pid, graphs)
+                        for g in graphs:
+                            self._log_graph(pid, g, prog.console)
 
         graphs = stg.load_all(staging, pids)
         if not graphs:

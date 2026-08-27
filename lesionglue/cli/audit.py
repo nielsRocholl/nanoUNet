@@ -31,6 +31,7 @@ ap.add_argument("--cache", default="/nnunet_data/lesion_tracking/cache")
 ap.add_argument("--split", choices=("train", "val", "test"), default="val")
 ap.add_argument("--out", default="runs/audit")
 ap.add_argument("--ckpt", default=None, help="if given, run section 4 (error stratification)")
+ap.add_argument("--no-ema", action="store_true")
 args = ap.parse_args()
 
 root = Path(args.root)
@@ -103,6 +104,7 @@ if args.ckpt is not None:
     ds = LesionDataset(root=args.cache, split=args.split, dataset_root=root)
     loader = PyGDataLoader(ds, batch_size=1, shuffle=False, num_workers=0)
     mod = MatcherModule.load_from_checkpoint(args.ckpt, map_location="cpu")
+    mod.set_eval_weights(not args.no_ema)
     mod.eval()
     strata = {
         "imputed": {"unchanged_split": [0, 0], "disappeared": [0, 0], "newly_appearing": [0, 0]},
@@ -110,7 +112,7 @@ if args.ckpt is not None:
     }
     with torch.no_grad():
         for batch in loader:
-            out = mod.matcher(batch)
+            out = mod.predict_batch(batch, use_ema=not args.no_ema)
             graphs, pp, db, dfu = split_per_graph(batch, out)
             for g, p, b, f in zip(graphs, pp, db, dfu):
                 pid = g.pid

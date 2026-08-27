@@ -1,12 +1,11 @@
 """One-patient dense HeteroData: L0 nodes, native BL mm, full BL-FU pairs.
 
-pos is cog_propagated in FU mm; pos_native is cog_bl in BL mm. Intra/cross
-edges are written by refresh_edges from GraphConfig flags.
+pos is cog_propagated in FU mm; pos_native is cog_bl in BL mm. One graph per
+follow-up body-region volume (img_id_fu); intra/cross edges from GraphConfig.
 """
 
 from __future__ import annotations
 
-from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -51,14 +50,6 @@ def _load_vol(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return hit
 
 
-def _dom_fu(rows: list[LesionRow]) -> int:
-    c = Counter(r.img_id_fu for r in rows)
-    dom = c.most_common(1)[0][0]
-    if len(c) > 1:
-        print0(f"multi img_id_fu {dict(c)} -> dominant {dom}")
-    return dom
-
-
 def _positive_matrix(rows: list[LesionRow], bi: dict[int, int], fj: dict[int, int]) -> torch.Tensor:
     y = torch.zeros((len(bi), len(fj)), dtype=torch.float32)
     for r in rows:
@@ -87,29 +78,22 @@ def _node_rows(rows: list[LesionRow], pid: str) -> tuple[dict[int, LesionRow], d
     return bl, fu
 
 
-def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> HeteroData | None:
-    _NII_CACHE.clear()
-    vp = V2Paths(Path(root), pid)
-    rows = parse_meta_csv(vp.meta)
-    if not rows:
-        return None
-    dom = _dom_fu(rows)
-    rows = [r for r in rows if r.img_id_fu == dom]
+def _one_region(pid: str, vp: V2Paths, rows: list[LesionRow], fu_id: int, cfg: GraphConfig) -> HeteroData | None:
+    from tracking.data.intra import refresh_edges
+
     bl_rep, fu_rep = _node_rows(rows, pid)
     bl_ids, fu_ids = sorted(bl_rep), sorted(fu_rep)
     if not bl_ids or not fu_ids:
-        print0(f"skip pid={pid}: empty bl={len(bl_ids)} fu={len(fu_ids)}")
+        print0(f"skip pid={pid} fu={fu_id}: empty bl={len(bl_ids)} fu={len(fu_ids)}")
         return None
 
-    ct_fu, aff_fu, sp_fu = _load_vol(vp.fu_img(dom))
-    mk_fu, _, _ = _load_vol(vp.fu_mask(dom))
+    ct_fu, aff_fu, sp_fu = _load_vol(vp.fu_img(fu_id))
+    mk_fu, _, _ = _load_vol(vp.fu_mask(fu_id))
     bl_cache: dict[int, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = {}
     for k in sorted({bl_rep[lid].img_id_bl for lid in bl_ids}):
         cb, ab, sb = _load_vol(vp.bl_img(k))
         mb, _, _ = _load_vol(vp.bl_mask(k))
         bl_cache[k] = (cb, ab, sb, mb)
-
-    from tracking.data.intra import refresh_edges
 
     mf_fu = mask_stats_all(mk_fu, fu_ids, sp_fu, ct_fu)
     mf_bl = {}
@@ -149,7 +133,22 @@ def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> HeteroData | No
     data["fu"].no_match_label = (~lab.bool().any(dim=0)).float()
     data["bl", "cross", "fu"].edge_label = lab.reshape(-1)
     data.pid = pid
-    data.img_id_fu_used = int(dom)
+    data.img_id_fu_used = int(fu_id)
+    data.graph_id = f"{pid}_{fu_id:02d}"
     data.sp_fu = torch.tensor(sp_fu.astype(np.float32))
     data.feat_mode = "l0"
     return refresh_edges(data, cfg)
+
+
+def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> list[HeteroData]:
+    _NII_CACHE.clear()
+    vp = V2Paths(Path(root), pid)
+    rows = parse_meta_csv(vp.meta)
+    if not rows:
+        return []
+    out: list[HeteroData] = []
+    for fu_id in sorted({r.img_id_fu for r in rows}):
+        g = _one_region(pid, vp, [r for r in rows if r.img_id_fu == fu_id], fu_id, cfg)
+        if g is not None:
+            out.append(g)
+    return out
