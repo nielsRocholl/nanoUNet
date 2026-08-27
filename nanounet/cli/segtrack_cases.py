@@ -4,10 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from nanounet.infer.predict_io import patient_ids_from_csv
-from nanounet.infer.segtrack_case import SegTrackCase, pair_folder
+from nanounet.infer.segtrack_case import SegTrackCase, pair_folder, stem_pid_region
 
 
-def collect_cases(args) -> tuple[list[SegTrackCase], bool]:
+def collect_cases(args) -> tuple[list[SegTrackCase], bool, list[tuple[str, str]], tuple[Path | None, str]]:
     folder = bool(args.bl_dir) or bool(args.fu_dir)
     single = any((args.bl_img, args.bl_clicks, args.bl_mask, args.fu_img, args.fu_clicks))
     if folder == single:
@@ -35,43 +35,45 @@ def collect_cases(args) -> tuple[list[SegTrackCase], bool]:
             "Fix: --bl-mask /nnunet_data/Longitudinal-CT/targetsTrBL/<stem>.nii.gz  (see docs/steps/track.md)"
         )
     if folder:
-        return _folder(args), False
-    return _single(args), True
+        cases, skipped, meta = _folder(args)
+        return cases, False, skipped, meta
+    cases, meta = _single(args)
+    return cases, True, [], meta
 
 
-def _folder(args) -> list[SegTrackCase]:
+def _folder(args) -> tuple[list[SegTrackCase], list[tuple[str, str]], tuple[Path | None, str]]:
     if not (args.bl_dir and args.fu_dir):
         raise SystemExit("--bl-dir requires --fu-dir.\nExpected both folders.\nFix: see docs/steps/track.md")
     if args.meta:
         raise SystemExit("--meta is for single mode.\nExpected --meta-dir in folder mode.\nFix: --meta-dir /path/to/meta")
-    cases = pair_folder(Path(args.bl_dir), Path(args.fu_dir), bl_mask_dir=Path(args.bl_mask_dir) if args.bl_mask_dir else None)
-    if args.patients_csv:
-        pids = patient_ids_from_csv(args.patients_csv)
-        cases = [c for c in cases if c.stem.split("_", 1)[0] in pids]
-        if not cases:
-            raise SystemExit(
-                f"no cases match --patients-csv '{args.patients_csv}'.\n"
-                f"Expected CSV column 'patient' matching stem prefixes.\n"
-                f"Fix: --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv  (see docs/steps/track.md)"
-            )
+    pids = patient_ids_from_csv(args.patients_csv) if args.patients_csv else None
+    cases, skipped = pair_folder(
+        Path(args.bl_dir), Path(args.fu_dir),
+        bl_mask_dir=Path(args.bl_mask_dir) if args.bl_mask_dir else None, pids=pids,
+    )
+    inferred = Path(args.bl_dir).resolve().parent / "meta"
     if args.meta_dir:
-        md, miss = Path(args.meta_dir), []
+        md, src = Path(args.meta_dir), "cli"
+    elif inferred.is_dir():
+        md, src = inferred, "inferred"
+    else:
+        md, src = None, "none"
+    if md is not None:
+        keep = []
         for c in cases:
-            p = md / f"{c.stem.split('_', 1)[0]}.csv"
+            pid, _ = stem_pid_region(c.stem)
+            p = md / f"{pid}.csv"
             if not p.is_file():
-                miss.append(str(p))
-            else:
-                c.types_csv = p
-        if miss:
-            raise SystemExit(
-                f"No types CSV at {miss[0]} ({len(miss)} missing).\n"
-                f"Expected {{pid}}.csv under --meta-dir.\n"
-                f"Fix: --meta-dir /nnunet_data/Longitudinal-CT/meta  (see docs/steps/track.md)"
-            )
-    return cases
+                skipped.append((c.stem, "no meta csv"))
+                continue
+            c.meta_csv = p
+            c.types_csv = p
+            keep.append(c)
+        cases = keep
+    return cases, skipped, (md, src)
 
 
-def _single(args) -> list[SegTrackCase]:
+def _single(args) -> tuple[list[SegTrackCase], tuple[Path | None, str]]:
     if args.meta_dir or args.patients_csv:
         raise SystemExit("--meta-dir / --patients-csv are folder mode.\nExpected --meta for one case.\nFix: see docs/steps/track.md")
     types = Path(args.meta) if args.meta else None
@@ -98,11 +100,25 @@ def _single(args) -> list[SegTrackCase]:
                 "Fix: --bl-mask /nnunet_data/Longitudinal-CT/targetsTrBL/<stem>.nii.gz  (see docs/steps/track.md)"
             )
         stem = Path(args.fu_img).name[:-7] if Path(args.fu_img).name.endswith(".nii.gz") else Path(args.fu_img).name
-        return [SegTrackCase(stem, Path(args.bl_img), None, Path(args.fu_img), Path(args.fu_clicks), types, Path(args.bl_mask))]
-    if not all((args.bl_img, args.bl_clicks, args.fu_img, args.fu_clicks)):
+        cases = [SegTrackCase(stem, Path(args.bl_img), None, Path(args.fu_img), Path(args.fu_clicks), types, Path(args.bl_mask))]
+    elif not all((args.bl_img, args.bl_clicks, args.fu_img, args.fu_clicks)):
         raise SystemExit(
             "Single mode needs --bl-img --bl-clicks --fu-img --fu-clicks.\n"
             "Expected four paths.\nFix: see docs/steps/track.md"
         )
-    stem = Path(args.fu_img).name[:-7] if Path(args.fu_img).name.endswith(".nii.gz") else Path(args.fu_img).name
-    return [SegTrackCase(stem, Path(args.bl_img), Path(args.bl_clicks), Path(args.fu_img), Path(args.fu_clicks), types)]
+    else:
+        stem = Path(args.fu_img).name[:-7] if Path(args.fu_img).name.endswith(".nii.gz") else Path(args.fu_img).name
+        cases = [SegTrackCase(stem, Path(args.bl_img), Path(args.bl_clicks), Path(args.fu_img), Path(args.fu_clicks), types)]
+    c = cases[0]
+    if types is not None:
+        c.meta_csv = types
+        c.types_csv = types
+        return cases, (types.parent, "cli")
+    inferred = Path(args.bl_img).resolve().parent.parent / "meta"
+    pid, _ = stem_pid_region(c.stem)
+    p = inferred / f"{pid}.csv"
+    if inferred.is_dir() and p.is_file():
+        c.meta_csv = p
+        c.types_csv = p
+        return cases, (inferred, "inferred")
+    return cases, (None, "none")

@@ -11,11 +11,12 @@ from pathlib import Path
 
 import numpy as np
 
+from nanounet.common import cprint
 from nanounet.data.io import SimpleITKIO
 from nanounet.infer.export import native_seg_from_logits
 from nanounet.infer.predict_case import MAX_BORDER_EXTRA, predict_case_logits
 from nanounet.infer.predict_io import preprocess_case
-from nanounet.infer.segtrack_case import SegTrackCase, load_instance_zyx
+from nanounet.infer.segtrack_case import SegTrackCase, load_instance_zyx, stem_pid_region
 
 DEFAULT_MODEL = Path(
     "/nnunet_data/NanoUNet_results/nanounet/"
@@ -54,6 +55,7 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
     from tracking.data.graph import _load_vol
     from tracking.data.instances import binary_to_instances, load_clicks
     from tracking.data.paint import fu_track_map, paint_fu, write_empty_csv
+    from tracking.data.propagate import load_propagated
     from tracking.infer import track, write_match_csv
 
     def step(s: str) -> None:
@@ -111,17 +113,23 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
     mk_bl = np.ascontiguousarray(bl_zyx.transpose(2, 1, 0))
     mk_fu = np.ascontiguousarray(fu_zyx.transpose(2, 1, 0))
     if case.bl_mask is not None and mk_bl.shape != ct_bl.shape:
-        raise SystemExit(
-            f"BL mask grid {tuple(mk_bl.shape)} != BL CT grid {tuple(ct_bl.shape)} for {case.stem}.\n"
-            f"Expected a native baseline instance mask on the same grid as {case.bl_img}.\n"
-            f"Fix: --bl-mask /nnunet_data/Longitudinal-CT/targetsTrBL/{case.stem}.nii.gz  (see docs/steps/track.md)"
-        )
+        return {"status": "skip", "n_pairs": 0, "sec": time.perf_counter() - t0, "why": "BL mask grid != BL CT grid"}
+    drop_dp = bool(getattr(matcher.hparams, "drop_dp", False))
+    prop = case.meta_csv if case.meta_csv is not None else case.fu_clicks
+    _, region = stem_pid_region(case.stem)
+    img_id = region if case.meta_csv is not None else None
+    if not drop_dp:
+        bl_ids = [int(x) for x in np.unique(bl_zyx) if int(x) != 0]
+        got, _ = load_propagated(prop, bl_ids, img_id=img_id)
+        drop = sorted(set(bl_ids) - set(got))
+        if drop:
+            cprint(f"[dim]drop {case.stem}  BL ids {drop} (not in this FU volume)[/dim]")
     r = track(
         case.bl_img, case.bl_img, case.fu_img, case.fu_img,
-        case.fu_clicks, track_ckpt,
+        None if drop_dp else prop, track_ckpt,
         decode=decode, device=device, matcher=matcher, thresh=thresh,
         sinkhorn_tau=DEPLOYED_DUST_TAU, use_ema=True,
-        types_csv=case.types_csv,
+        types_csv=case.types_csv, img_id=img_id,
         volumes=(ct_bl, aff_bl, sp_bl, mk_bl, ct_fu, aff_fu, sp_fu, mk_fu),
     )
     m = fu_track_map(

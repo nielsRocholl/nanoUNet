@@ -10,7 +10,7 @@ Same integer on both scans = same lesion. Background is `0`. BL click names are 
 
 Dense split is allowed to break “one id = one connected component” **on FU only**. That is the point of `--decode dense`.
 
-CLI: [steps/track.md](../steps/track.md). Files: `{out}/bl.mha`, `{out}/fu.mha`, `{out}/matches.csv`.
+CLI: [steps/track.md](../steps/track.md). Files: `{out}/bl.mha`, `{out}/fu.mha`, `{out}/matches.csv`. A `drop_dp` matcher checkpoint does not use `cog_propagated` / FU JSON as matcher BL positions — native mask centroids only. FU JSON remains the UNet click file.
 
 ## Worked numbers
 

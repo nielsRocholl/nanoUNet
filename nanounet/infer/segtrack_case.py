@@ -1,4 +1,4 @@
-"""SegTrackCase, folder pairing, output paths, load BL instance mask (sitk zyx)."""
+"""SegTrackCase, folder pairing by stem intersection (skip list), output paths, load BL instance mask (sitk zyx)."""
 from __future__ import annotations
 
 import os
@@ -22,6 +22,12 @@ class SegTrackCase:
     fu_clicks: Path
     types_csv: Path | None = None
     bl_mask: Path | None = None
+    meta_csv: Path | None = None
+
+
+def stem_pid_region(stem: str) -> tuple[str, int]:
+    pid, rr = stem.rsplit("_", 1)
+    return pid, int(rr)
 
 
 def resolve_ckpt_path(cli: str | None, env_key: str, default: Path) -> tuple[Path, str]:
@@ -48,73 +54,74 @@ def _mask_file(folder: Path, stem: str) -> Path | None:
     return None
 
 
-def _stems(folder: Path, *, clicks: bool) -> dict[str, tuple[Path, Path | None]]:
+def _stems(folder: Path) -> dict[str, Path]:
     if not folder.is_dir():
         raise FileNotFoundError(
             f"No input folder at {folder}.\n"
             f"Expected a folder of {{stem}}{END} + sibling {{stem}}.json.\n"
             f"Fix: --bl-dir / --fu-dir like inputsTrBL / inputsTrFU  (see docs/steps/track.md)"
         )
-    out, missing = {}, []
-    for p in sorted(folder.glob(f"*{END}")):
-        stem = p.name[: -len(END)]
-        js = folder / f"{stem}.json"
-        if clicks:
-            out[stem] = (p, js)
-            if not js.is_file():
-                missing.append(stem)
-        else:
-            out[stem] = (p, None)
-    if missing:
-        raise SystemExit(
-            f"missing points JSON for: {', '.join(missing[:12])}.\n"
-            f"Expected sibling <case>.json next to each scan in {folder}.\n"
-            f"Fix: add the JSON  (see docs/steps/track.md)"
-        )
+    out = {p.name[: -len(END)]: p for p in sorted(folder.glob(f"*{END}"))}
     if not out:
-        extra = (
-            "Expected .nii.gz CTs (BL clicks not required with --bl-mask-dir)."
-            if not clicks else
-            "Expected sibling .nii.gz + .json like inputsTrFU."
-        )
         raise SystemExit(
-            f"No {END} scans in {folder}.\n{extra}\n"
+            f"No {END} scans in {folder}.\n"
+            f"Expected .nii.gz CTs (sibling .json per case).\n"
             f"Fix: pass --bl-dir / --fu-dir  (see docs/steps/track.md)"
         )
     return out
 
 
-def pair_folder(bl_dir: Path, fu_dir: Path, *, bl_mask_dir: Path | None = None) -> list[SegTrackCase]:
-    bl, fu = _stems(Path(bl_dir), clicks=bl_mask_dir is None), _stems(Path(fu_dir), clicks=True)
-    only_bl, only_fu = sorted(set(bl) - set(fu)), sorted(set(fu) - set(bl))
-    if only_bl or only_fu:
+def pair_folder(
+    bl_dir: Path, fu_dir: Path, *, bl_mask_dir: Path | None = None, pids: set[str] | None = None,
+) -> tuple[list[SegTrackCase], list[tuple[str, str]]]:
+    bl_dir, fu_dir = Path(bl_dir), Path(fu_dir)
+    bl, fu = _stems(bl_dir), _stems(fu_dir)
+    if pids is not None:
+        bl = {s: p for s, p in bl.items() if s.split("_", 1)[0] in pids}
+        fu = {s: p for s, p in fu.items() if s.split("_", 1)[0] in pids}
+        if not bl and not fu:
+            raise SystemExit(
+                "no cases match --patients-csv.\n"
+                "Expected CSV column 'patient' matching stem prefixes.\n"
+                "Fix: --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv  (see docs/steps/track.md)"
+            )
+    skipped: list[tuple[str, str]] = [(s, "no FU scan") for s in sorted(set(bl) - set(fu))]
+    skipped += [(s, "no BL scan") for s in sorted(set(fu) - set(bl))]
+    both = sorted(set(bl) & set(fu))
+    if not both:
         raise SystemExit(
-            "BL/FU folders do not share the same case names.\n"
-            f"--bl-dir has {len(only_bl)} stems not in --fu-dir (e.g. {', '.join(only_bl[:12]) or 'none'}).\n"
-            f"--fu-dir has {len(only_fu)} stems not in --bl-dir (e.g. {', '.join(only_fu[:12]) or 'none'}).\n"
-            "Fix: pass matching inputsTrBL and inputsTrFU, or --patients-csv to select a subset\n"
-            "(see docs/steps/track.md)"
+            "BL/FU folders do not share any case names.\n"
+            f"--bl-dir has {len(bl)} stems, --fu-dir has {len(fu)} "
+            f"(e.g. {', '.join(sorted(bl)[:6]) or 'none'}).\n"
+            "Expected matching {stem}.nii.gz in both folders.\n"
+            "Fix: pass matching inputsTrBL and inputsTrFU  (see docs/steps/track.md)"
         )
-    if bl_mask_dir is None:
-        return [SegTrackCase(s, bl[s][0], bl[s][1], fu[s][0], fu[s][1]) for s in sorted(bl)]
-    md = Path(bl_mask_dir)
-    if not md.is_dir():
+    md = Path(bl_mask_dir) if bl_mask_dir else None
+    if md is not None and not md.is_dir():
         raise SystemExit(
             f"No BL mask folder at {md}.\n"
             "Expected a folder of {stem}.nii.gz instance masks.\n"
             "Fix: --bl-mask-dir /nnunet_data/Longitudinal-CT/targetsTrBL  (see docs/steps/track.md)"
         )
-    miss = [s for s in sorted(bl) if _mask_file(md, s) is None]
-    if miss:
-        raise SystemExit(
-            f"No BL instance mask for: {', '.join(miss[:12])} ({len(miss)} missing).\n"
-            "Expected {stem}.nii.gz or {stem}.mha under --bl-mask-dir.\n"
-            "Fix: --bl-mask-dir /nnunet_data/Longitudinal-CT/targetsTrBL  (see docs/steps/track.md)"
-        )
-    return [
-        SegTrackCase(s, bl[s][0], None, fu[s][0], fu[s][1], None, _mask_file(md, s))
-        for s in sorted(bl)
-    ]
+    cases: list[SegTrackCase] = []
+    for s in both:
+        fu_js = fu_dir / f"{s}.json"
+        if not fu_js.is_file():
+            skipped.append((s, "no FU json"))
+            continue
+        if md is None:
+            bl_js = bl_dir / f"{s}.json"
+            if not bl_js.is_file():
+                skipped.append((s, "no BL json"))
+                continue
+            cases.append(SegTrackCase(s, bl[s], bl_js, fu[s], fu_js))
+            continue
+        m = _mask_file(md, s)
+        if m is None:
+            skipped.append((s, "no BL mask"))
+            continue
+        cases.append(SegTrackCase(s, bl[s], None, fu[s], fu_js, None, m))
+    return cases, skipped
 
 
 def load_instance_zyx(path: Path) -> tuple[np.ndarray, dict]:
