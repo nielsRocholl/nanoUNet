@@ -92,17 +92,21 @@ def _load_dj(dataset_json: dict | str) -> dict:
     return dataset_json if isinstance(dataset_json, dict) else bg_load_json(dataset_json)
 
 
-def run_case_npy(
+def crop_normalize_case(
     data: np.ndarray,
     seg: np.ndarray | None,
     properties: dict,
     plans: Plans,
     cm: Config3d,
-    dataset_json: dict,
-    verbose: bool = False,
-):
+) -> tuple[np.ndarray, np.ndarray, dict, list, list, tuple[int, int, int]]:
+    """Transpose to plan axes, crop to nonzero body bbox, per-channel normalize.
+
+    Returns (data, seg, properties, o_sp, t_sp, new_sh) where `data`/`seg` are still at native
+    (cropped) resolution -- the caller resamples. `seg` is the real segmentation when one was
+    given, otherwise crop_to_nonzero's own surrogate mask (used only for normalization
+    masking) -- never None.
+    """
     data = data.astype(np.float32)
-    has_seg = seg is not None
     if seg is not None:
         assert data.shape[1:] == seg.shape[1:]
         seg = np.copy(seg)
@@ -125,20 +129,34 @@ def run_case_npy(
         ip = fi[str(c)] if str(c) in fi else fi[int(c)]
         nrm = cls(use_mask_for_norm=cm.use_mask_for_norm[c], intensityproperties=ip)
         data[c] = nrm.run(data[c], seg[0])
+    return data, seg, properties, o_sp, t_sp, new_sh
+
+
+def run_case_npy(
+    data: np.ndarray,
+    seg: np.ndarray | None,
+    properties: dict,
+    plans: Plans,
+    cm: Config3d,
+    dataset_json: dict,
+    verbose: bool = False,
+):
+    has_seg = seg is not None
+    data, seg, properties, o_sp, t_sp, new_sh = crop_normalize_case(data, seg, properties, plans, cm)
     data = np.asarray(cm.resampling_fn_data(data, new_sh, o_sp, t_sp))
-    seg = np.asarray(cm.resampling_fn_seg(seg, new_sh, o_sp, t_sp))
+    if has_seg:
+        seg = np.asarray(cm.resampling_fn_seg(seg, new_sh, o_sp, t_sp))
     if verbose:
-        cprint(
-            f"[dim]pp {data.shape} {seg.shape if seg is not None else None} {new_sh} {o_sp} {t_sp}[/dim]"
-        )
+        cprint(f"[dim]pp {data.shape} {seg.shape if has_seg else None} {new_sh} {o_sp} {t_sp}[/dim]")
     if has_seg:
         lm = labels_from_dataset_json(dataset_json)
         coll = list(lm.foreground_labels)
         if lm.has_ignore_label:
             coll.append([-1] + lm.all_labels)
         properties["class_locations"] = sample_foreground_locations(seg, coll, verbose=verbose)
-    if seg is not None:
         seg = seg.astype(np.int16 if np.max(seg) > 127 else np.int8)
+    else:
+        seg = None
     return data, seg, properties
 
 

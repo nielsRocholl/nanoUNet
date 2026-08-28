@@ -47,9 +47,19 @@ def segment_native(net, lm, cfg, pl, cm, dev, pack, *,
     return native_seg_from_logits(seg, props, cm, pl, tiles), props
 
 
+def load_case_io(case: SegTrackCase):
+    """CPU-only: disk reads. No GPU/preprocess work here -- safe to run in a background thread
+    while the GPU is busy on a different case."""
+    if case.bl_mask is not None:
+        fu = load_ct(case.fu_img)
+        bl_zyx, props_bl = load_instance_zyx(case.bl_mask)
+        return {"fu": fu, "bl_zyx": bl_zyx, "props_bl": props_bl}
+    return {"bl": load_ct(case.bl_img), "fu": load_ct(case.fu_img)}
+
+
 def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, dev, matcher,
              decode: str, overwrite: bool, keep_pred: bool, track_ckpt: Path, thresh: float,
-             device: str, seg_kw: dict, on_step=None) -> dict:
+             device: str, seg_kw: dict, on_step=None, preloaded: dict | None = None) -> dict:
     from tracking.common import DEPLOYED_DUST_TAU
     from tracking.data.instances import binary_to_instances, load_clicks
     from tracking.data.paint import fu_track_map, paint_fu, write_empty_csv
@@ -70,11 +80,11 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
 
     if case.bl_mask is not None:
         step("load FU")
-        fu_data, fu_props, (ct_fu, aff_fu, sp_fu) = load_ct(case.fu_img)
+        fu_data, fu_props, (ct_fu, aff_fu, sp_fu) = preloaded["fu"] if preloaded else load_ct(case.fu_img)
         pred_bl = None
         with ThreadPoolExecutor(max_workers=1) as pool:
             fut = pool.submit(load_ct, case.bl_img)
-            bl_zyx, props_bl = load_instance_zyx(case.bl_mask)
+            bl_zyx, props_bl = (preloaded["bl_zyx"], preloaded["props_bl"]) if preloaded else load_instance_zyx(case.bl_mask)
             step("segment FU")
             pack = preprocess_loaded(fu_data, fu_props, str(case.fu_clicks), pl, cm, dj)
             pred_fu, props_fu = segment_native(net, lm, cfg, pl, cm, dev, pack, **seg_kw)
@@ -82,10 +92,10 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
         fu_zyx = binary_to_instances(pred_fu, load_clicks(case.fu_clicks))
     else:
         step("segment BL")
-        bl_data, bl_raw, (ct_bl, aff_bl, sp_bl) = load_ct(case.bl_img)
+        bl_data, bl_raw, (ct_bl, aff_bl, sp_bl) = preloaded["bl"] if preloaded else load_ct(case.bl_img)
 
         def _fu_pack():
-            d, p, trip = load_ct(case.fu_img)
+            d, p, trip = preloaded["fu"] if preloaded else load_ct(case.fu_img)
             return preprocess_loaded(d, p, str(case.fu_clicks), pl, cm, dj), trip
 
         with ThreadPoolExecutor(max_workers=1) as pool:

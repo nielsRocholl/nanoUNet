@@ -12,21 +12,16 @@ from nanounet.infer.longi_row import encode_inference_row
 from nanounet.infer.points_pad import resolve_pts_pad
 from nanounet.infer.roi_slices import (
     background_logits_vector,
-    centered_spatial_slices_at_point,
+    canvas_bbox_for_seeds,
     extra_click_in_tile,
     face_fg_click_global,
     fg_face_touch,
     map_points_zyx_unpadded_to_padded,
+    seed_slices_for_points,
 )
 from nanounet.infer.patch_export import patch_unpadded_overlap
 from nanounet.infer.tta import max_cat, predict_batch_with_tta
-from nanounet.prompt.cluster import (
-    cell_slices,
-    cluster_points_for_patch_size,
-    face_neighbours,
-    grid_stride,
-    spatial_slices_covering_points,
-)
+from nanounet.prompt.cluster import cell_slices, face_neighbours, grid_stride
 from nanounet.prompt.coords import points_to_centers_zyx
 
 MAX_BORDER_EXTRA = 16
@@ -97,20 +92,7 @@ def predict_case_logits(
         )
         bl_pts_pad = map_points_zyx_unpadded_to_padded(bl_pre, slicer_revert)
 
-    if mode == "clustered":
-        seeds_pts = cluster_points_for_patch_size(pts_pad, patch_size, cluster_margin_frac)
-        seed_slices = [spatial_slices_covering_points(cl, patch_size, padded_shape) for cl in seeds_pts]
-    else:
-        seen: set = set()
-        seeds_pts, seed_slices = [], []
-        for p in pts_pad:
-            sl = centered_spatial_slices_at_point(p[0], p[1], p[2], patch_size, padded_shape)
-            key = (sl[0].start, sl[1].start, sl[2].start, p)
-            if key in seen:
-                continue
-            seen.add(key)
-            seeds_pts.append([p])
-            seed_slices.append(sl)
+    seeds_pts, seed_slices = seed_slices_for_points(pts_pad, patch_size, padded_shape, cluster_margin_frac, mode)
 
     stride = grid_stride(patch_size, cfg.inference.tile_step_size)
     pending: list = []
@@ -123,9 +105,13 @@ def predict_case_logits(
         pending.append((ci, (0, 0, 0), sl, ()))
         visited.add((ci, (0, 0, 0)))
 
+    canvas_sl = canvas_bbox_for_seeds(seed_slices, stride, max_border_expand_extra, border_expand, padded_shape)
+    canvas_shape = tuple(s.stop - s.start for s in canvas_sl)
+    canvas_origin = tuple(s.start for s in canvas_sl)
+
     neg = torch.finfo(acc_dtype).min
-    margin_buf = torch.full(padded_shape, neg, dtype=acc_dtype, device=dev)
-    logits_acc = bg_vec.view(-1, 1, 1, 1).to(acc_dtype).expand(nh, *padded_shape).contiguous()
+    margin_buf = torch.full(canvas_shape, neg, dtype=acc_dtype, device=dev)
+    logits_acc = bg_vec.view(-1, 1, 1, 1).to(acc_dtype).expand(nh, *canvas_shape).contiguous()
     fwd_done = 0
     written: list = []
     enc_kw = dict(
@@ -150,13 +136,16 @@ def predict_case_logits(
         for j, (ci, ijk, sl, _extra) in enumerate(batch):
             raw = out[j].float()
             sz, sy, sx = sl
+            csz = slice(sz.start - canvas_origin[0], sz.stop - canvas_origin[0])
+            csy = slice(sy.start - canvas_origin[1], sy.stop - canvas_origin[1])
+            csx = slice(sx.start - canvas_origin[2], sx.stop - canvas_origin[2])
             m = (raw[1:].amax(0) - raw[0]).to(acc_dtype)
-            sub_m = margin_buf[sz, sy, sx]
+            sub_m = margin_buf[csz, csy, csx]
             keep = m > sub_m
-            logits_acc[:, sz, sy, sx] = torch.where(
-                keep.unsqueeze(0), raw.to(acc_dtype), logits_acc[:, sz, sy, sx]
+            logits_acc[:, csz, csy, csx] = torch.where(
+                keep.unsqueeze(0), raw.to(acc_dtype), logits_acc[:, csz, csy, csx]
             )
-            margin_buf[sz, sy, sx] = torch.where(keep, m, sub_m)
+            margin_buf[csz, csy, csx] = torch.where(keep, m, sub_m)
             written.append(sl)
             fwd_done += 1
             if on_forward is not None:
@@ -192,5 +181,12 @@ def predict_case_logits(
             continue
         seen_u.add(key)
         tiles.append(u)
-    # argmax on device (GPU ~1.5s vs ~50s CPU C-first); D2H is uint8 labels, not logits
-    return logits_acc[(slice(None), *slicer_revert[1:])].float().argmax(0).to(torch.uint8).cpu(), tiles
+    # argmax on device (GPU ~1.5s vs ~50s CPU C-first); D2H is uint8 labels, not logits.
+    # Canvas may be smaller than the unpadded crop — everywhere outside it is background by
+    # construction (bg_vec argmax == 0), so start from zeros and only fill the overlap.
+    seg = torch.zeros(unpadded_shape, dtype=torch.uint8)
+    ov = patch_unpadded_overlap(canvas_sl[0], canvas_sl[1], canvas_sl[2], slicer_revert)
+    if ov is not None:
+        (uz, uy, ux), (cz, cy, cx) = ov
+        seg[uz, uy, ux] = logits_acc[:, cz, cy, cx].float().argmax(0).to(torch.uint8).cpu()
+    return seg, tiles

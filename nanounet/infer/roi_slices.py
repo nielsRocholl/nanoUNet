@@ -7,6 +7,7 @@ from typing import List, Tuple
 import torch
 
 from nanounet.plan.labels import Labels
+from nanounet.prompt.cluster import cluster_points_for_patch_size, spatial_slices_covering_points
 
 ZYX = Tuple[int, int, int]
 
@@ -93,3 +94,49 @@ def extra_click_in_tile(gxyz: ZYX, sl: Tuple[slice, slice, slice], patch_size: T
     ly = min(max(gxyz[1] - sl[1].start, 0), patch_size[1] - 1)
     lx = min(max(gxyz[2] - sl[2].start, 0), patch_size[2] - 1)
     return (lz, ly, lx)
+
+
+def seed_slices_for_points(
+    pts_pad: List[ZYX],
+    patch_size: Tuple[int, int, int],
+    padded_shape: Tuple[int, int, int],
+    cluster_margin_frac: float,
+    mode: str,
+) -> Tuple[List[List[ZYX]], List[Tuple[slice, slice, slice]]]:
+    """Seed-tile placement for `mode`. Extracted so preprocessing can compute the same
+    tile layout as predict_case_logits before any forward pass runs (click-AABB preprocess)."""
+    assert mode in ("clustered", "centered")
+    if mode == "clustered":
+        seeds_pts = cluster_points_for_patch_size(pts_pad, patch_size, cluster_margin_frac)
+        seed_slices = [spatial_slices_covering_points(cl, patch_size, padded_shape) for cl in seeds_pts]
+        return seeds_pts, seed_slices
+    seen: set = set()
+    seeds_pts, seed_slices = [], []
+    for p in pts_pad:
+        sl = centered_spatial_slices_at_point(p[0], p[1], p[2], patch_size, padded_shape)
+        key = (sl[0].start, sl[1].start, sl[2].start, p)
+        if key in seen:
+            continue
+        seen.add(key)
+        seeds_pts.append([p])
+        seed_slices.append(sl)
+    return seeds_pts, seed_slices
+
+
+def canvas_bbox_for_seeds(
+    seed_slices: List[Tuple[slice, slice, slice]],
+    stride: Tuple[int, int, int],
+    max_border_expand_extra: int,
+    border_expand: bool,
+    padded_shape: Tuple[int, int, int],
+) -> Tuple[slice, slice, slice]:
+    """Tight bbox guaranteed to contain every tile predict_case_logits can ever write.
+
+    Border-expand walks at most max_border_expand_extra steps of `stride` per seed cluster
+    (extras_done[ci] is checked before each schedule) so seed bbox +/- that reach is a hard
+    bound, not a heuristic.
+    """
+    reach = (0, 0, 0) if not border_expand else tuple(max_border_expand_extra * s for s in stride)
+    los = [max(0, min(sl[a].start for sl in seed_slices) - reach[a]) for a in range(3)]
+    his = [min(padded_shape[a], max(sl[a].stop for sl in seed_slices) + reach[a]) for a in range(3)]
+    return tuple(slice(los[a], his[a]) for a in range(3))

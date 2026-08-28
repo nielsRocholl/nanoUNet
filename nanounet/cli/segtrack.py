@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import torch
@@ -15,7 +16,7 @@ from nanounet.config import load_config
 from nanounet.data.resampling import set_resample_device
 from nanounet.cli.segtrack_cases import collect_cases
 from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
-from nanounet.infer.segtrack import DEFAULT_MODEL, run_case
+from nanounet.infer.segtrack import DEFAULT_MODEL, load_case_io, run_case
 from nanounet.infer.segtrack_case import resolve_ckpt_path, resolve_out
 from nanounet.plan.plans import Plans
 
@@ -137,35 +138,40 @@ def main() -> None:
         console=console(), transient=False,
     ) as prog:
         tid = prog.add_task("seg × track", total=len(cases))
-        for i, case in enumerate(cases, 1):
-            cdir = resolve_out(case.stem, fu_dir_name=fu_name, out=out_cli, single=single)
+        with ThreadPoolExecutor(max_workers=1) as io_pool:
+            next_fut = io_pool.submit(load_case_io, cases[0])
+            for i, case in enumerate(cases, 1):
+                preloaded = next_fut.result()
+                next_fut = io_pool.submit(load_case_io, cases[i]) if i < len(cases) else None
+                cdir = resolve_out(case.stem, fu_dir_name=fu_name, out=out_cli, single=single)
 
-            def on_step(s: str, i=i, stem=case.stem) -> None:
-                prog.update(tid, description=f"{i}/{len(cases)}  {stem}  ·  {s}")
+                def on_step(s: str, i=i, stem=case.stem) -> None:
+                    prog.update(tid, description=f"{i}/{len(cases)}  {stem}  ·  {s}")
 
-            try:
-                r = run_case(
-                    case, cdir, net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dj=dj, dev=dev, matcher=matcher,
-                    decode=args.decode, overwrite=args.overwrite, keep_pred=args.keep_pred,
-                    track_ckpt=track_ckpt, thresh=args.thresh, device=d, seg_kw=seg_kw, on_step=on_step,
-                )
-            except SystemExit as e:
-                if single:
-                    raise
-                cprint(f"[dim]skip {case.stem}  ({str(e).splitlines()[0]})[/dim]")
-                n_skip += 1
+                try:
+                    r = run_case(
+                        case, cdir, net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dj=dj, dev=dev, matcher=matcher,
+                        decode=args.decode, overwrite=args.overwrite, keep_pred=args.keep_pred,
+                        track_ckpt=track_ckpt, thresh=args.thresh, device=d, seg_kw=seg_kw, on_step=on_step,
+                        preloaded=preloaded,
+                    )
+                except SystemExit as e:
+                    if single:
+                        raise
+                    cprint(f"[dim]skip {case.stem}  ({str(e).splitlines()[0]})[/dim]")
+                    n_skip += 1
+                    prog.advance(tid)
+                    continue
+                n_ok += r["status"] == "ok"
+                n_empty += r["status"] == "empty"
+                n_skip += r["status"] == "skip"
+                n_pairs += r["n_pairs"]
+                if r["status"] == "skip":
+                    why = r.get("why")
+                    cprint(f"[dim]skip {case.stem}  ({why})[/dim]" if why else f"[dim]skip {case.stem}[/dim]")
+                else:
+                    cprint(f"[dim]{case.stem}  {r['sec']:.0f}s[/dim]")
                 prog.advance(tid)
-                continue
-            n_ok += r["status"] == "ok"
-            n_empty += r["status"] == "empty"
-            n_skip += r["status"] == "skip"
-            n_pairs += r["n_pairs"]
-            if r["status"] == "skip":
-                why = r.get("why")
-                cprint(f"[dim]skip {case.stem}  ({why})[/dim]" if why else f"[dim]skip {case.stem}[/dim]")
-            else:
-                cprint(f"[dim]{case.stem}  {r['sec']:.0f}s[/dim]")
-            prog.advance(tid)
     elapsed = time.perf_counter() - t0
     mins, secs = divmod(int(elapsed), 60)
     console().print(Panel(
