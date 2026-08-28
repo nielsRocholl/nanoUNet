@@ -16,7 +16,7 @@ from torch_geometric.data import Batch
 
 from tracking.common import DEPLOYED_DUST_TAU, eval_device, require_ckpt
 from tracking.data.graph import GraphConfig, _load_vol
-from tracking.data.masks import build_mask_graph
+from tracking.data.masks import _labels, build_mask_graph
 from tracking.data.paint import fu_track_map
 from tracking.decode import DECODE_CHOICES, decode_pairs
 from tracking.train.module import MatcherModule
@@ -157,8 +157,7 @@ def track(
         types_csv=Path(types_csv) if types_csv is not None else None, img_id=img_id,
     )
     if data is None:
-        fu_ids = sorted(int(x) for x in np.unique(mk_fu.astype(np.int64)) if int(x) != 0)
-        return _empty_result([], fu_ids, decode)
+        return _empty_result([], _labels(mk_fu), decode)
     dev = next(mod.parameters()).device
     n_bl, n_fu = int(data["bl"].num_nodes), int(data["fu"].num_nodes)
     bat = Batch.from_data_list([data.to(dev)])

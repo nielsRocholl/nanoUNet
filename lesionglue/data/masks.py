@@ -21,7 +21,14 @@ from tracking.data.propagate import load_propagated, load_types
 
 
 def _labels(mask: np.ndarray) -> list[int]:
-    return sorted(int(x) for x in np.unique(mask.astype(np.int64)) if int(x) != 0)
+    """Nonzero ids. bincount — unique(int64) sorts ~70M voxels (~50s on this box)."""
+    m = np.asarray(mask).ravel()
+    if m.size == 0:
+        return []
+    mx = int(m.max())
+    if mx <= 0:
+        return []
+    return np.flatnonzero(np.bincount(m.astype(np.int32, copy=False), minlength=mx + 1))[1:].tolist()
 
 
 def _lt(lid: int, table: dict[int, str], default: str | None) -> int:
