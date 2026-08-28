@@ -9,8 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-import nibabel as nib
 import numpy as np
+import SimpleITK as sitk
 import torch
 from torch_geometric.data import HeteroData
 
@@ -36,16 +36,30 @@ def graph_config(cfg) -> GraphConfig:
 _NII_CACHE: dict[Path, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
 
 
+def vol_from_zyx(zyx: np.ndarray, sitk_stuff: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """XYZ float32 + RAS affine + spacing. Same layout as nibabel get_fdata."""
+    vol = np.ascontiguousarray(np.asarray(zyx, dtype=np.float32).transpose(2, 1, 0))
+    sp = np.asarray(sitk_stuff["spacing"], dtype=np.float64)
+    origin = np.asarray(sitk_stuff["origin"], dtype=np.float64)
+    direction = np.asarray(sitk_stuff["direction"], dtype=np.float64).reshape(3, 3)
+    lps = np.eye(4)
+    lps[:3, :3] = direction @ np.diag(sp)
+    lps[:3, 3] = origin
+    aff = np.diag([-1.0, -1.0, 1.0, 1.0]) @ lps
+    spacing = np.linalg.norm(aff[:3, :3], axis=0).astype(np.float64)
+    return vol, aff, spacing
+
+
 def _load_vol(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     path = Path(path)
     hit = _NII_CACHE.get(path)
     if hit is not None:
         return hit
-    img = nib.load(str(path))
-    aff = np.asarray(img.affine, dtype=np.float64)
-    vol = np.ascontiguousarray(img.get_fdata(dtype=np.float32))
-    sp = np.linalg.norm(aff[:3, :3], axis=0).astype(np.float64)
-    hit = (vol, aff, sp)
+    itk = sitk.ReadImage(str(path))
+    hit = vol_from_zyx(
+        sitk.GetArrayFromImage(itk),
+        {"spacing": itk.GetSpacing(), "origin": itk.GetOrigin(), "direction": itk.GetDirection()},
+    )
     _NII_CACHE[path] = hit
     return hit
 
