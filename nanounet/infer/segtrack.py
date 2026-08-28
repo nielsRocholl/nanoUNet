@@ -34,7 +34,9 @@ def segment_native(net, lm, cfg, pl, cm, dev, pack, *,
                    use_amp=True, cluster_margin_frac=0.1, inference_mode="clustered",
                    no_prompt_encode=False) -> tuple[np.ndarray, dict]:
     pad_cpu, slicer_revert, props, points_xyz, bl_points = pack
-    pad = pad_cpu.pin_memory().to(dev, non_blocking=True) if dev.type == "cuda" else pad_cpu.to(dev)
+    # Keep the full torso on CPU. H2D is the patch crop inside encode_inference_row.
+    # Putting pad on GPU (400MB–2GB) made max_cat collapse to 1 after canvases grew → 8× TTA serial.
+    pad = pad_cpu.pin_memory() if dev.type == "cuda" else pad_cpu
     seg, tiles = predict_case_logits(
         net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dev=dev,
         pad=pad, slicer_revert=slicer_revert, props=props, points_xyz=points_xyz,
@@ -78,6 +80,7 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
         return {"status": "skip", "n_pairs": 0, "sec": 0.0}
     assert (case.bl_mask is None) != (case.bl_clicks is None)
 
+    t_seg = 0.0
     if case.bl_mask is not None:
         step("load FU")
         fu_data, fu_props, (ct_fu, aff_fu, sp_fu) = preloaded["fu"] if preloaded else load_ct(case.fu_img)
@@ -86,13 +89,16 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
             fut = pool.submit(load_ct, case.bl_img)
             bl_zyx, props_bl = (preloaded["bl_zyx"], preloaded["props_bl"]) if preloaded else load_instance_zyx(case.bl_mask)
             step("segment FU")
+            t_seg0 = time.perf_counter()
             pack = preprocess_loaded(fu_data, fu_props, str(case.fu_clicks), pl, cm, dj)
             pred_fu, props_fu = segment_native(net, lm, cfg, pl, cm, dev, pack, **seg_kw)
+            t_seg = time.perf_counter() - t_seg0
             _, _, (ct_bl, aff_bl, sp_bl) = fut.result()
         fu_zyx = binary_to_instances(pred_fu, load_clicks(case.fu_clicks))
     else:
         step("segment BL")
         bl_data, bl_raw, (ct_bl, aff_bl, sp_bl) = preloaded["bl"] if preloaded else load_ct(case.bl_img)
+        t_seg0 = time.perf_counter()
 
         def _fu_pack():
             d, p, trip = preloaded["fu"] if preloaded else load_ct(case.fu_img)
@@ -105,6 +111,7 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
             pack_fu, (ct_fu, aff_fu, sp_fu) = fut.result()
         step("segment FU")
         pred_fu, props_fu = segment_native(net, lm, cfg, pl, cm, dev, pack_fu, **seg_kw)
+        t_seg = time.perf_counter() - t_seg0
         bl_zyx = binary_to_instances(pred_bl, load_clicks(case.bl_clicks))
         fu_zyx = binary_to_instances(pred_fu, load_clicks(case.fu_clicks))
     has_bl, has_fu = bool(np.any(bl_zyx)), bool(np.any(fu_zyx))
@@ -123,9 +130,10 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
         _write_mha(fu_out, props_fu, case_dir / "fu.mha")
         write_empty_csv(csv_path)
         emit_preds()
-        return {"status": "empty", "n_pairs": 0, "sec": time.perf_counter() - t0}
+        return {"status": "empty", "n_pairs": 0, "sec": time.perf_counter() - t0, "t_seg": t_seg, "t_track": 0.0}
 
     step("track")
+    t_tr0 = time.perf_counter()
     mk_bl = np.ascontiguousarray(bl_zyx.transpose(2, 1, 0))
     mk_fu = np.ascontiguousarray(fu_zyx.transpose(2, 1, 0))
     if case.bl_mask is not None and mk_bl.shape != ct_bl.shape:
@@ -135,7 +143,8 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
     _, region = stem_pid_region(case.stem)
     img_id = region if case.meta_csv is not None else None
     if not drop_dp:
-        bl_ids = [int(x) for x in np.unique(bl_zyx) if int(x) != 0]
+        mx = int(bl_zyx.max())
+        bl_ids = np.flatnonzero(np.bincount(bl_zyx.ravel(), minlength=mx + 1))[1:].tolist() if mx > 0 else []
         got, _ = load_propagated(prop, bl_ids, img_id=img_id)
         drop = sorted(set(bl_ids) - set(got))
         if drop:
@@ -156,4 +165,7 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
     _write_mha(paint_fu(fu_zyx, m), props_fu, case_dir / "fu.mha")
     write_match_csv(csv_path, r)
     emit_preds()
-    return {"status": "ok", "n_pairs": len(r.pairs), "sec": time.perf_counter() - t0}
+    return {
+        "status": "ok", "n_pairs": len(r.pairs), "sec": time.perf_counter() - t0,
+        "t_seg": t_seg, "t_track": time.perf_counter() - t_tr0,
+    }

@@ -123,20 +123,19 @@ def seed_slices_for_points(
     return seeds_pts, seed_slices
 
 
-def canvas_bbox_for_seeds(
-    seed_slices: List[Tuple[slice, slice, slice]],
-    stride: Tuple[int, int, int],
-    max_border_expand_extra: int,
-    border_expand: bool,
-    padded_shape: Tuple[int, int, int],
-) -> Tuple[slice, slice, slice]:
-    """Tight bbox guaranteed to contain every tile predict_case_logits can ever write.
-
-    Border-expand walks at most max_border_expand_extra steps of `stride` per seed cluster
-    (extras_done[ci] is checked before each schedule) so seed bbox +/- that reach is a hard
-    bound, not a heuristic.
-    """
-    reach = (0, 0, 0) if not border_expand else tuple(max_border_expand_extra * s for s in stride)
-    los = [max(0, min(sl[a].start for sl in seed_slices) - reach[a]) for a in range(3)]
-    his = [min(padded_shape[a], max(sl[a].stop for sl in seed_slices) + reach[a]) for a in range(3)]
-    return tuple(slice(los[a], his[a]) for a in range(3))
+def grow_canvas(logits_acc, margin_buf, origin, sl, bg_vec, neg, acc_dtype):
+    """Expand one cluster canvas so it covers tile `sl`. Copy existing logits/margin."""
+    nh = logits_acc.shape[0]
+    cur_hi = tuple(origin[a] + logits_acc.shape[a + 1] for a in range(3))
+    lo = tuple(min(origin[a], sl[a].start) for a in range(3))
+    hi = tuple(max(cur_hi[a], sl[a].stop) for a in range(3))
+    if lo == origin and hi == cur_hi:
+        return logits_acc, margin_buf, origin
+    nsh = tuple(hi[a] - lo[a] for a in range(3))
+    nacc = bg_vec.view(-1, 1, 1, 1).to(acc_dtype).expand(nh, *nsh).contiguous()
+    nm = torch.full(nsh, neg, dtype=acc_dtype, device=logits_acc.device)
+    off = tuple(origin[a] - lo[a] for a in range(3))
+    z, y, x = logits_acc.shape[1:]
+    nacc[:, off[0]:off[0] + z, off[1]:off[1] + y, off[2]:off[2] + x] = logits_acc
+    nm[off[0]:off[0] + z, off[1]:off[1] + y, off[2]:off[2] + x] = margin_buf
+    return nacc, nm, lo

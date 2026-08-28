@@ -61,15 +61,23 @@ def cat_status() -> str | None:
 
 
 @torch.inference_mode()
-def predict_batch_with_tta(net: torch.nn.Module, x: torch.Tensor, use_mirroring: bool, mirror_axes=(0, 1, 2)):
-    """x: (B, C, Z, Y, X) -> (B, n_heads, Z, Y, X), mirror-averaged."""
+def predict_batch_with_tta(
+    net: torch.nn.Module, x: torch.Tensor, use_mirroring: bool, mirror_axes=(0, 1, 2),
+    cat_limit: int | None = None,
+):
+    """x: (B, C, Z, Y, X) -> (B, n_heads, Z, Y, X), mirror-averaged.
+
+    `cat_limit` is the max patches per net() (from max_cat at the start of the case).
+    Re-querying free VRAM after canvases grow would drop this to 1 and serialize 8-fold TTA.
+    """
     if not use_mirroring:
         return net(x)
     ma = [m + 2 for m in mirror_axes]
     axes_list: list[tuple[int, ...]] = [()]
     axes_list.extend(c for i in range(len(ma)) for c in itertools.combinations(ma, i + 1))
     n, b = len(axes_list), x.shape[0]
-    chunk = max(1, min(n, max_cat(net, x, x.device) // max(b, 1)))
+    limit = cat_limit if cat_limit is not None else max_cat(net, x, x.device)
+    chunk = max(1, min(n, limit // max(b, 1)))
     acc = None
     for i in range(0, n, chunk):
         views = [x if not ax else torch.flip(x, ax) for ax in axes_list[i : i + chunk]]

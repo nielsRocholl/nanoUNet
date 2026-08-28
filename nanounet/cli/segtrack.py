@@ -170,7 +170,7 @@ def main() -> None:
                     why = r.get("why")
                     cprint(f"[dim]skip {case.stem}  ({why})[/dim]" if why else f"[dim]skip {case.stem}[/dim]")
                 else:
-                    cprint(f"[dim]{case.stem}  {r['sec']:.0f}s[/dim]")
+                    cprint(f"[dim]{case.stem}  {r['sec']:.0f}s  seg={r.get('t_seg', 0):.0f}s track={r.get('t_track', 0):.0f}s[/dim]")
                 prog.advance(tid)
     elapsed = time.perf_counter() - t0
     mins, secs = divmod(int(elapsed), 60)
