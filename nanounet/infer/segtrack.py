@@ -1,6 +1,7 @@
 """Predict FU (and BL unless a GT instance mask is given) → linked tracking ids.
 
 Matcher defaults come from tracking.common (v7_complete, EMA, dust_tau=0.125).
+Each CT is SimpleITK-read once; XYZ/RAS is reused by the matcher (no second load).
 """
 
 from __future__ import annotations
@@ -15,8 +16,8 @@ from nanounet.common import cprint
 from nanounet.data.io import SimpleITKIO
 from nanounet.infer.export import native_seg_from_logits
 from nanounet.infer.predict_case import MAX_BORDER_EXTRA, predict_case_logits
-from nanounet.infer.predict_io import preprocess_case
-from nanounet.infer.segtrack_case import SegTrackCase, load_instance_zyx, stem_pid_region
+from nanounet.infer.predict_io import preprocess_loaded
+from nanounet.infer.segtrack_case import SegTrackCase, load_ct, load_instance_zyx, stem_pid_region
 
 DEFAULT_MODEL = Path(
     "/nnunet_data/NanoUNet_results/nanounet/"
@@ -28,15 +29,13 @@ def _write_mha(vol_zyx: np.ndarray, props: dict, path: Path) -> None:
     SimpleITKIO().write_seg(vol_zyx, str(path), props)
 
 
-def segment_native(net, lm, cfg, pl, cm, dj, dev, scan: Path, clicks: Path, *,
+def segment_native(net, lm, cfg, pl, cm, dev, pack, *,
                    use_tta, border_expand=True, max_border_extra=MAX_BORDER_EXTRA, batch_size=8,
                    use_amp=True, cluster_margin_frac=0.1, inference_mode="clustered",
-                   no_prompt_encode=False, pack=None) -> tuple[np.ndarray, dict]:
-    if pack is None:
-        pack = preprocess_case(str(scan), str(clicks), pl, cm, dj, None, None)
+                   no_prompt_encode=False) -> tuple[np.ndarray, dict]:
     pad_cpu, slicer_revert, props, points_xyz, bl_points = pack
     pad = pad_cpu.pin_memory().to(dev, non_blocking=True) if dev.type == "cuda" else pad_cpu.to(dev)
-    logits, tiles = predict_case_logits(
+    seg, tiles = predict_case_logits(
         net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dev=dev,
         pad=pad, slicer_revert=slicer_revert, props=props, points_xyz=points_xyz,
         encode_prompt=not no_prompt_encode, use_tta=use_tta,
@@ -45,14 +44,13 @@ def segment_native(net, lm, cfg, pl, cm, dj, dev, scan: Path, clicks: Path, *,
         cluster_margin_frac=cluster_margin_frac, mode=inference_mode,
         is_longi=False, bl_present=False, bl_points_xyz=bl_points,
     )
-    return native_seg_from_logits(logits, props, cm, pl, dj, tiles), props
+    return native_seg_from_logits(seg, props, cm, pl, tiles), props
 
 
 def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, dev, matcher,
              decode: str, overwrite: bool, keep_pred: bool, track_ckpt: Path, thresh: float,
              device: str, seg_kw: dict, on_step=None) -> dict:
     from tracking.common import DEPLOYED_DUST_TAU
-    from tracking.data.graph import _load_vol
     from tracking.data.instances import binary_to_instances, load_clicks
     from tracking.data.paint import fu_track_map, paint_fu, write_empty_csv
     from tracking.data.propagate import load_propagated
@@ -71,22 +69,32 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
     assert (case.bl_mask is None) != (case.bl_clicks is None)
 
     if case.bl_mask is not None:
-        step("load BL mask")
-        bl_zyx, props_bl = load_instance_zyx(case.bl_mask)
+        step("load FU")
+        fu_data, fu_props, (ct_fu, aff_fu, sp_fu) = load_ct(case.fu_img)
         pred_bl = None
-        step("segment FU")
-        pred_fu, props_fu = segment_native(net, lm, cfg, pl, cm, dj, dev, case.fu_img, case.fu_clicks, **seg_kw)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            fut = pool.submit(load_ct, case.bl_img)
+            bl_zyx, props_bl = load_instance_zyx(case.bl_mask)
+            step("segment FU")
+            pack = preprocess_loaded(fu_data, fu_props, str(case.fu_clicks), pl, cm, dj)
+            pred_fu, props_fu = segment_native(net, lm, cfg, pl, cm, dev, pack, **seg_kw)
+            _, _, (ct_bl, aff_bl, sp_bl) = fut.result()
         fu_zyx = binary_to_instances(pred_fu, load_clicks(case.fu_clicks))
     else:
         step("segment BL")
+        bl_data, bl_raw, (ct_bl, aff_bl, sp_bl) = load_ct(case.bl_img)
+
+        def _fu_pack():
+            d, p, trip = load_ct(case.fu_img)
+            return preprocess_loaded(d, p, str(case.fu_clicks), pl, cm, dj), trip
+
         with ThreadPoolExecutor(max_workers=1) as pool:
-            fut = pool.submit(preprocess_case, str(case.fu_img), str(case.fu_clicks), pl, cm, dj, None, None)
-            pred_bl, props_bl = segment_native(net, lm, cfg, pl, cm, dj, dev, case.bl_img, case.bl_clicks, **seg_kw)
-            pack_fu = fut.result()
+            fut = pool.submit(_fu_pack)
+            pack_bl = preprocess_loaded(bl_data, bl_raw, str(case.bl_clicks), pl, cm, dj)
+            pred_bl, props_bl = segment_native(net, lm, cfg, pl, cm, dev, pack_bl, **seg_kw)
+            pack_fu, (ct_fu, aff_fu, sp_fu) = fut.result()
         step("segment FU")
-        pred_fu, props_fu = segment_native(
-            net, lm, cfg, pl, cm, dj, dev, case.fu_img, case.fu_clicks, pack=pack_fu, **seg_kw,
-        )
+        pred_fu, props_fu = segment_native(net, lm, cfg, pl, cm, dev, pack_fu, **seg_kw)
         bl_zyx = binary_to_instances(pred_bl, load_clicks(case.bl_clicks))
         fu_zyx = binary_to_instances(pred_fu, load_clicks(case.fu_clicks))
     has_bl, has_fu = bool(np.any(bl_zyx)), bool(np.any(fu_zyx))
@@ -108,8 +116,6 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
         return {"status": "empty", "n_pairs": 0, "sec": time.perf_counter() - t0}
 
     step("track")
-    ct_bl, aff_bl, sp_bl = _load_vol(case.bl_img)
-    ct_fu, aff_fu, sp_fu = _load_vol(case.fu_img)
     mk_bl = np.ascontiguousarray(bl_zyx.transpose(2, 1, 0))
     mk_fu = np.ascontiguousarray(fu_zyx.transpose(2, 1, 0))
     if case.bl_mask is not None and mk_bl.shape != ct_bl.shape:

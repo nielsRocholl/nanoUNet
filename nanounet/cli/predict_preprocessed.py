@@ -111,9 +111,8 @@ def main() -> None:
             prev.result()
         prev = ex.submit(fn, *a)
 
-    def _export(logits, cid, out_trunc, t0):
-        seg = lm.convert_logits_to_segmentation(logits).numpy().astype(np.uint8)
-        save_preprocessed_seg(seg, spacing, out_trunc + end)
+    def _export(seg, cid, out_trunc, t0):
+        save_preprocessed_seg(np.asarray(seg), spacing, out_trunc + end)
         timings.append((cid, time.perf_counter() - t0))
 
     def gpu_case(idx: int, cid: str, out_trunc: str, pack) -> None:

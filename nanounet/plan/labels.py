@@ -89,14 +89,20 @@ class Labels:
         # nnUNet: argmax on logits is equivalent to argmax on softmax for non-region heads
         if not self.has_regions:
             ax = 1 if logits_t.ndim >= 5 else 0
+            seg = logits_t.argmax(ax)
+            if seg.device.type != "cpu":
+                seg = seg.to(torch.uint8).cpu()
             if isinstance(predicted_logits, np.ndarray):
-                return logits_t.argmax(ax).cpu().numpy()
-            return logits_t.argmax(ax)
+                return seg.numpy()
+            return seg
         probs = self._infer_nonlin(logits_t)
         ax = 1 if probs.ndim >= 5 else 0
+        seg = probs.argmax(ax)
+        if seg.device.type != "cpu":
+            seg = seg.to(torch.uint8).cpu()
         if isinstance(predicted_logits, np.ndarray):
-            return probs.argmax(ax).cpu().numpy()
-        return probs.argmax(ax)
+            return seg.numpy()
+        return seg
 
     @torch.inference_mode()
     def convert_probabilities_to_segmentation(self, predicted_probabilities: np.ndarray | torch.Tensor):

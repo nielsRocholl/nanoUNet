@@ -13,7 +13,7 @@ from acvl_utils.cropping_and_padding.padding import pad_nd_image
 from batchgenerators.utilities.file_and_folder_operations import join
 
 from nanounet.data.blosc2_dataset import Blosc2Folder, load_case_properties
-from nanounet.plan.prep.case_pp import run_case
+from nanounet.plan.prep.case_pp import run_case, run_case_npy
 from nanounet.prompt.coords import load_points_xyz
 
 
@@ -88,17 +88,27 @@ def patient_ids_from_csv(path: str) -> set[str]:
     return out
 
 
+def _pack(data, props, json_path: str, cm, bl_json=None):
+    data_t = torch.from_numpy(data).float()
+    pad, slicer_revert = pad_nd_image(data_t, tuple(cm.patch_size), "constant", {"value": 0}, True, None)
+    points = load_points_xyz(json_path)
+    bl_points = load_points_xyz(bl_json) if bl_json else None
+    return pad, slicer_revert, props, points, bl_points
+
+
+def preprocess_loaded(data: np.ndarray, props: dict, json_path: str, pl, cm, dj, bl_json=None):
+    """Same as preprocess_case, but CT already in memory (no second read)."""
+    data, _seg, props = run_case_npy(data, None, props, pl, cm, dj, verbose=False)
+    return _pack(data, props, json_path, cm, bl_json)
+
+
 def preprocess_case(scan: str, json_path: str, pl, cm, dj, bl_scan=None, bl_json=None):
     files = [scan]
     if bl_scan is not None:
         _assert_bl_geometry(scan, bl_scan)  # joint 2-ch crop keeps FU/BL voxel-aligned (design: §2)
         files = [scan, bl_scan]
     data, _seg, props = run_case(files, None, pl, cm, dj, verbose=False)
-    data_t = torch.from_numpy(data).float()
-    pad, slicer_revert = pad_nd_image(data_t, tuple(cm.patch_size), "constant", {"value": 0}, True, None)
-    points = load_points_xyz(json_path)
-    bl_points = load_points_xyz(bl_json) if bl_json else None
-    return pad, slicer_revert, props, points, bl_points
+    return _pack(data, props, json_path, cm, bl_json)
 
 
 def _zyx_to_xyz(clicks: list) -> list[tuple[float, float, float]]:

@@ -129,3 +129,11 @@ def load_instance_zyx(path: Path) -> tuple[np.ndarray, dict]:
     vol, props = SimpleITKIO().read_seg(str(path))
     assert vol.ndim == 4 and vol.shape[0] == 1, vol.shape
     return np.ascontiguousarray(np.rint(vol[0]).astype(np.int32)), props
+
+
+def load_ct(path: Path):
+    """One SimpleITK read: (C,Z,Y,X) for preprocess + XYZ/RAS for the matcher."""
+    from tracking.data.graph import vol_from_zyx
+
+    data, props = SimpleITKIO().read_images((str(path),))
+    return data, props, vol_from_zyx(data[0], props["sitk_stuff"])

@@ -1,4 +1,4 @@
-"""Batched prompt-ROI logits: cluster seeds, then per-cluster face-grid expand."""
+"""Batched prompt-ROI logits: cluster seeds, face-grid expand, GPU argmax → CPU uint8."""
 
 from __future__ import annotations
 
@@ -87,7 +87,7 @@ def predict_case_logits(
         slicer_revert=slicer_revert,
     )
     if not pts_pad:
-        return bg_vec.view(-1, 1, 1, 1).expand(nh, *unpadded_shape).contiguous().float().cpu(), []
+        return torch.zeros(unpadded_shape, dtype=torch.uint8), []
 
     bl_pts_pad = None
     if is_longi and bl_present and bl_points_xyz:
@@ -192,4 +192,5 @@ def predict_case_logits(
             continue
         seen_u.add(key)
         tiles.append(u)
-    return logits_acc[(slice(None), *slicer_revert[1:])].float().cpu(), tiles
+    # argmax on device (GPU ~1.5s vs ~50s CPU C-first); D2H is uint8 labels, not logits
+    return logits_acc[(slice(None), *slicer_revert[1:])].float().argmax(0).to(torch.uint8).cpu(), tiles
