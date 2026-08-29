@@ -1,124 +1,185 @@
 # segtrack correctness + live registration plan
 
-Status: **plan only, nothing in this doc is implemented yet.** Written for a fresh coding
-agent with no memory of the conversation that produced it. Read this whole document before
-touching any code — later sections depend on context established earlier.
+Status: **plan only. Nothing in this doc is implemented yet.** Written for a coding agent
+with no session memory. Read the whole document before touching code.
 
-## 0. Why this plan exists (read first)
+Verified against the live trees on 2026-08-29 (not against the previous draft of this
+file). Line numbers below are from that snapshot. If a cited line has drifted, search
+the symbol, do not trust the number.
 
-`nanounet_segtrack` (nanoUNet) predicts a binary lesion mask per scan, turns it into
-per-lesion instance IDs, and calls a GNN matcher (lesion-tracking) to link baseline (BL)
-lesions to follow-up (FU) lesions. A prior investigation this session found the tool was
-silently producing near-zero ID-matched Dice on a full held-out test set (median
-per-lesion Dice **0.000** over 549 GT lesions) despite the underlying segmentation being
-fine (detected lesions scored 0.73–0.79 Dice). Root cause: **the step that turns a binary
-mask into per-lesion instance IDs was throwing away correctly-segmented lesions whenever a
-click coordinate didn't land exactly on the predicted blob.** That step, and why it's wrong,
-is explained fully in Phase 1 below.
+**Repos** — two git repos, both required:
 
-Separately, the user wants `nanounet_segtrack` to be a **one-command tool that works for
-anyone**, not just on this project's own `Longitudinal-CT` dataset. Today the matcher
-requires a CSV of pre-computed "BL lesion propagated into FU space" coordinates
-(`meta/*.csv`, column `cog_propagated`) that was built once, offline, via a registration
-pipeline this project ran previously. A user who only has two CT scans and click JSONs —
-no such CSV — cannot run the tool at all (non-`drop_dp` matcher checkpoints hard-crash
-without it). Phase 3–4 replace that hard requirement with an on-the-fly registration
-fallback using [uniGradICON](https://github.com/uncbiag/uniGradICON), a pretrained
-deep-learning registration network, so the tool degrades gracefully to "register on demand"
-instead of crashing.
+- `/nanoUNet` — `nanounet_segtrack`. Paths prefixed `[nanoUNet]`.
+- `/lesion-tracking` — GNN matcher, imported as `tracking.*` (`pip install -e /lesion-tracking`).
 
-Three independent fixes, bundled into one plan because they touch overlapping code:
+nanoUNet already depends on `unigradicon>=1.0.4` (`[nanoUNet] pyproject.toml`). lesion-tracking
+does **not** get a new optional extra.
 
-| # | Phase | Fixes |
-|---|---|---|
-| 1 | Instance labeling | Stop dropping correctly-segmented lesions; same fix serves both FU and BL |
-| 2 | EMA default | `nanounet_segtrack` silently used non-EMA seg weights by default |
-| 3+4 | Live registration | Let segtrack work with no CSV at all, and handle segmentation splitting one historical lesion into multiple pieces |
+---
 
-**Repos involved** — two separate git repos on this machine, both required:
-- `/nanoUNet` — the segmentation CLI (`nanounet_segtrack`, `nanounet_predict`).
-- `/lesion-tracking` — the GNN tracker package, imported by nanoUNet as `tracking.*` (installed editable: `pip install -e /lesion-tracking`).
+## 0. What this plan is for
 
-Every file path below is prefixed `[nanoUNet]` or `[lesion-tracking]` to say which repo it's in.
+`nanounet_segtrack` predicts a binary lesion mask per scan, turns it into per-lesion
+instance ids, and calls the GNN matcher to link baseline (BL) lesions to follow-up (FU).
 
-## 1. Conventions you must not get backwards
+A held-out run is on disk at `$NANOUNET_RESULTS/segtrack/followup/`
+(`NANOUNET_RESULTS=/nanounet_data/NanoUNet_results`). Scoring JSON:
 
-These conventions are used consistently across both repos. Getting any of them backwards
-will silently corrupt coordinates rather than crash — verify against the numeric checks in
-each phase rather than trusting derivation alone.
+`/nnunet_data/NanoUNet_results/segtrack/followup/dice_vs_targetsTrFU.json`
 
-- **Voxel-index coordinates are always `(z, y, x)`.** Every function in this codebase that
-  takes/returns a bare coordinate tuple (`load_clicks`, `centroids`, `cog_bl`/`cog_fu`/
-  `cog_propagated` in `meta/*.csv`, `parse_zyx`) uses array-index order `(z, y, x)`, i.e.
-  numpy's own indexing order for a volume loaded as `arr[z, y, x]`.
-- **ITK physical-space `Point`/`Index`/`ContinuousIndex` objects are always `(x, y, z)`.**
-  This is the opposite order from the above, and is a real ITK convention (not a bug to
-  "fix") — `itk.Image.GetSpacing()`, `.GetOrigin()`, `.TransformContinuousIndexToPhysicalPoint`,
-  etc. all use `(x, y, z)`. Any code converting between voxel-index and ITK point/index
-  types must explicitly reverse the triple. **Get this backwards and every produced
-  coordinate silently lands in the wrong place** (not a crash) — this is why Phase 3
-  mandates a numeric validation gate before wiring anything into the main pipeline.
-- **`click JSON` `"point"` field is `[x, y, z]`** (see `[lesion-tracking] tracking/data/instances.py:load_clicks`, which does `p[2], p[1], p[0]` to build the `(z,y,x)` tuple it returns) — already consistent with the physical-space-order convention above, since these values ultimately came from a physical-space pipeline even though downstream code treats them as voxel indices in the resampled native grid (that native grid was built with 1 array unit = 1 voxel, so this works out, but don't assume `"point"` fields elsewhere follow the same order without checking).
-- **BL ids are canonical, FU ids are provisional until tracked.** `docs/reference/track_ids.md`: "BL click names are canonical... the FU mask is remapped after matching." The final published `fu.mha` never uses whatever id `label_instances` (Phase 1) assigned FU pre-tracking — `paint_fu`/`fu_track_map` (`[lesion-tracking] tracking/data/paint.py`, unchanged by this plan) always overwrite it. This is *why* Phase 1 can safely stop trying to make FU's provisional id "correct" — it is never the final answer.
+| agg field | value |
+|-----------|-------|
+| `n_cases` | 63 |
+| `n_gt_lesions` | 549 |
+| `n_pred_lesions` | 284 |
+| `n_detected` | 266 |
+| `median_comp_lesion` | **0.0** |
+| `mean_detected` | 0.731 |
 
-## 2. Phase 1 — stop dropping correctly-segmented lesions
+The UNet is fine on lesions that survive onto `fu.mha` (`mean_detected` 0.73; case-level
+detected medians in the 0.79 range). The published ID-matched median is zero because
+**correctly segmented FU blobs are deleted before the matcher runs**.
 
-### 2.1 What's wrong today
+Separately, the matcher (deployed `v7_complete/last.ckpt`: `drop_dp=false`, `intra=complete`,
+`type_mask=false`) needs a BL lesion centroid in the **FU voxel grid**. Today that comes from
+`meta/{pid}.csv` column `cog_propagated`, or, when `meta_csv is None`, from `case.fu_clicks`.
+Folder mode **skips** a case with no `{pid}.csv` if a meta dir is inferred. A user who only
+has two CTs and click JSONs cannot run the tool.
 
-`[lesion-tracking] tracking/data/instances.py::binary_to_instances(pred, clicks_zyx)`:
-runs connected-components on the binary mask, then for each click looks up the label at
-the click's *exact* voxel. If that voxel is background, **the entire connected component
-is dropped** (never written to the output — `lut` stays `0` for that component, even though
-it may be a large, correctly-segmented lesion).
+Three fixes, one plan, overlapping code:
 
-This is called for **FU always**, and for **BL only when `--bl-mask-dir` is not given**
-(`[nanoUNet] nanounet/infer/segtrack.py::run_case`, lines ~97 and ~115-116). When
-`--bl-mask-dir` *is* given, BL instead uses `load_instance_zyx` and reads GT mask labels
-directly — Phase 1 does not touch that branch at all.
+| Phase | Fix |
+|-------|------|
+| 1 | Stop dropping predicted connected components that a click missed |
+| 2 | Default the **seg** UNet to EMA (`--no-ema` to opt out) |
+| 3+4 | Compute missing BL→FU centroids with the **existing** uniGradICON wrapper; stop pretending FU click JSON is a registration product |
 
-Two things make "click lands exactly on FG" a bad test, confirmed against real data this
-session:
-1. **FU's click coordinate is a registration estimate, not ground truth.** Verified
-   directly: `inputsTrFU/{stem}.json`'s point for a given lesion id is numerically identical
-   to `cog_propagated` in `meta/{pid}.csv` (BL centroid warped into FU space by
-   registration), not `cog_fu` (the true annotated FU location). This is intentional — using
-   the true location would leak ground truth into what's meant to be a realistic
-   "where might this be now" prompt — but it means the click can be several mm to over a
-   centimeter off the segmented lesion's actual location, and no fixed tolerance fully
-   fixes that (small lesions have less margin than the registration error).
-2. **The matcher (the GNN) doesn't need the click's identity for FU at all.** Verified by
-   reading `[lesion-tracking] tracking/data/masks.py::build_mask_graph`: FU node positions
-   come from `centroids(mk_fu, fu_ids)` — the **predicted mask's own connected-component
-   centroid** — never from the click file. `fu_ids = _labels(mk_fu)` just takes whatever
-   integer labels exist in the mask; their numeric value is irrelevant to the matcher. So
-   filtering FU CCs by click identity before the matcher even runs discards real detections
-   for no benefit — the matcher was never going to use that identity anyway.
+Phase 1 is the metric bug (the `--bl-mask-dir` eval path). Phases 3–4 are the product path
+(no CSV, or a BL id Phase 1 invented). Do not skip Phase 1 to start registration.
 
-For BL (non-`--bl-mask-dir` path), identity *does* matter — BL ids are canonical/final — but
-the same "one CC per lesion, or it's dropped" limitation applies if the model over-segments
-a historical lesion into multiple disconnected pieces: only the piece the click happens to
-land on survives today; the rest are silently lost.
+---
+
+## 1. Two coordinate frames — get this wrong and nothing crashes
+
+The previous draft of this plan claimed every bare triple is `(z, y, x)`. That is false.
+There are two frames. Mixing them is a silent, millimetre-scale bug.
+
+### Frame A — SimpleITK / instance masks: `(z, y, x)`
+
+`SimpleITKIO().read_images` / `read_seg` and `sitk.GetArrayFromImage` yield `(z, y, x)`.
+
+- `[lesion-tracking] tracking/data/instances.py::load_clicks` — JSON `"point"` is `[x, y, z]`;
+  returns `(int(round(p[2])), int(round(p[1])), int(round(p[0])))` for indexing a SITK array.
+- `[nanoUNet] nanounet/infer/segtrack.py` `bl_zyx` / `fu_zyx` / `pred_*` are this frame.
+- `binary_to_instances` / `label_instances` index `lab[z, y, x]`.
+
+### Frame B — matcher / CSV / JSON-as-propagated / ITK Index: `(x, y, z)`
+
+`[nanoUNet] nanounet/infer/segtrack.py` transposes before `track()`:
+
+```137:138:[nanoUNet] nanounet/infer/segtrack.py
+    mk_bl = np.ascontiguousarray(bl_zyx.transpose(2, 1, 0))
+    mk_fu = np.ascontiguousarray(fu_zyx.transpose(2, 1, 0))
+```
+
+`[lesion-tracking] tracking/data/graph.py::vol_from_zyx` documents this as
+"XYZ float32 + RAS affine + spacing. Same layout as nibabel get_fdata."
+
+ITK `TransformIndexToPhysicalPoint` / `TransformContinuousIndexToPhysicalPoint` take `(x, y, z)`.
+
+On-disk `meta/*.csv` `cog_*` strings are **the same numbers, same order** as click JSON
+`[x, y, z]`. Empirically, case `307fd7f231_00` lesion 1:
+
+| source | triple |
+|--------|--------|
+| BL JSON `"point"` | `[199.60, 235.50, 122.07]` |
+| `cog_bl` | `199.60 235.50 122.07` |
+| SITK mask centroid `(z, y, x)` | `[121.57, 235.00, 199.10]` |
+| that centroid reversed to `(x, y, z)` | `[199.10, 235.00, 121.57]` (+0.5 = CSV) |
+| `sitk_array[z=122, y=236, x=200]` (CSV as xyz) | **label 1** |
+| `sitk_array[z=200, y=236, x=122]` (CSV as zyx) | **0** |
+| nibabel `data[199, 235, 122]` | **1** |
+
+`parse_zyx` (`[lesion-tracking] tracking/data/meta.py:24-33`) splits `"a b c"` and returns
+`(a, b, c)` with an error message that says "expected z y x". The **values** are Frame B
+`(x, y, z)`. The GNN was trained on that. **Do not swap CSV triples to "fix" the name.**
+Do not swap live-registration output either.
+
+`load_propagated` JSON branch (`_from_json`) stores `[p[0], p[1], p[2]]` with **no**
+`load_clicks` swap. That is correct for Frame B. `load_clicks` swap is correct for Frame A.
+Both are intentional.
+
+### ITK physical `(x, y, z)`
+
+`itk.Image.GetSpacing/GetOrigin/GetDirection` and point/index APIs are `(x, y, z)`.
+SimpleITK on this case reports identity direction; nibabel RAS affine is the LPS↔RAS flip
+of the same geometry. Registration code in this repo uses the `itk` package
+(`itk.imread(..., itk.F)`), not SimpleITK, matching `[nanoUNet] nanounet/register/`.
+
+### BL ids vs FU ids
+
+`[nanoUNet] docs/reference/track_ids.md`: BL click names (or `--bl-mask` voxel values) are
+canonical. `paint_fu` / `fu_track_map` always rewrite the FU mask after matching. Phase 1
+FU provisional ids are never the published `fu.mha` values.
+
+### What `extra_propagated` must be
+
+`build_mask_graph` does `prop[lid] * sp_fu` with `centroids(mk_*, ids)` on **Frame B**
+arrays. Live-registration output must be Frame B `(x, y, z)`, the same convention as
+`parse_zyx(cog_propagated)` and `_from_json`.
+
+---
+
+## 2. Phase 1 — stop dropping predicted lesions
+
+### 2.1 What is wrong
+
+`[lesion-tracking] tracking/data/instances.py:46-66` `binary_to_instances`:
+
+1. `cc3d.connected_components(..., connectivity=18)`
+2. For each click, read `lab[z, y, x]` (Frame A, click already swapped by `load_clicks`)
+3. If that voxel is 0, `continue` — the CC is never written into `lut`
+4. Unclaimed CCs stay `lut[cc]==0` → output background
+
+Call sites in `[nanoUNet] nanounet/infer/segtrack.py`:
+
+- line 97: **FU always** (including `--bl-mask` / `--bl-mask-dir`)
+- lines 115-116: BL and FU when BL is predicted (no `--bl-mask-dir`)
+
+`--bl-mask-dir` BL path uses `load_instance_zyx` (line 90). Phase 1 does not touch that
+branch. The 63-case followup run used `--bl-mask-dir targetsTrBL`, so the zero Dice is
+**FU instance labeling**, not BL.
+
+Why "click on FG" is the wrong test:
+
+1. **FU JSON is `cog_propagated`, not `cog_fu`.** Verified: `inputsTrFU/307fd7f231_00.json`
+   lesion 1 equals `cog_propagated` exactly, not `cog_fu`. The click can miss the segmented
+   blob by several millimetres. On EMA pred
+   `/nnunet_data/Longitudinal-CT/results/preds_ema_finetune/307fd7f231_00.nii.gz`:
+   **2 CCs, 2 clicks, 0 exact hits, 13433 FG voxels, followup `n_pred=0`.**
+2. **The matcher does not use FU click identity.** `build_mask_graph` sets
+   `fu_ids = _labels(mk_fu)` and `centroids(mk_fu, fu_ids)`. Dropping a CC because the
+   click missed it deletes a detection the GNN would have used.
+
+For predicted BL (no `--bl-mask-dir`), identity **does** matter. Same function still drops
+pieces of a split lesion the click did not land on.
 
 ### 2.2 The fix
 
-Replace `binary_to_instances` with a function that **never drops a connected component**.
-A CC a click lands on exactly keeps that click's id (unchanged behavior — still correct,
-still needed for BL identity). Any CC with no click on it keeps its own fresh id instead of
-being deleted.
+Replace `binary_to_instances` with `label_instances`. Never drop a CC. A CC a click hits
+keeps that click's id. Any other CC gets a fresh id. No `SNAP_RADIUS`.
 
-**`[lesion-tracking] tracking/data/instances.py`** — replace the `binary_to_instances`
-function (lines 46-66) with:
+**`[lesion-tracking] tracking/data/instances.py`** — replace `binary_to_instances`
+(lines 46-66). Keep `load_clicks` unchanged. Point `instances_from_nifti` (line 73) at
+`label_instances`. Delete `binary_to_instances` (one function, not two paths).
 
 ```python
 def label_instances(pred: np.ndarray, clicks_zyx: dict[int, tuple[int, int, int]]) -> np.ndarray:
-    """pred is bool/0-1, same grid as clicks. Return int32 mask, voxel = lesion_id.
+    """pred is bool/0-1, Frame A (z,y,x), same grid as load_clicks. Voxel = lesion_id.
 
-    Every predicted connected component becomes an instance. A CC a click lands on exactly
-    keeps that click's id. A CC with no click on it (click missed by a few voxels of
-    registration error, or the model split one historical lesion into pieces) keeps a fresh
-    id instead of being silently dropped -- unlike the old binary_to_instances, which threw
-    away any predicted lesion a click didn't land on exactly. See
-    docs/dev-notes/segtrack_correctness_and_registration_plan.md Phase 1.
+    Every predicted 18-connected component becomes an instance. A CC a click lands on
+    keeps that click's id. A CC with no click keeps a fresh id instead of being deleted.
+    Fresh ids start after max(click ids) so they cannot steal a canonical BL id.
     """
     lab = cc3d.connected_components((pred > 0).astype(np.uint8), connectivity=18)
     n = int(lab.max())
@@ -150,406 +211,335 @@ def label_instances(pred: np.ndarray, clicks_zyx: dict[int, tuple[int, int, int]
     return lut[lab]
 ```
 
-Keep `load_clicks` and `instances_from_nifti` unchanged, except `instances_from_nifti`
-(line 73) must call `label_instances` instead of `binary_to_instances`. Do not add a
-`SNAP_RADIUS`/nearest-voxel-search mechanism — that was an earlier, inferior approach
-(a fixed voxel tolerance) superseded by this "never drop" design; do not reintroduce it.
+`cprint` is already imported from `tracking.common`. Clamp is the same as today's function.
 
-**`[nanoUNet] nanounet/infer/segtrack.py::run_case`** — both call sites of
-`binary_to_instances` (lines 97 and 115-116) become `label_instances` (update the import at
-line 66: `from tracking.data.instances import label_instances, load_clicks`). No other
-change in this phase — do not touch the `--bl-mask-dir` branch (`bl_zyx` from
-`load_instance_zyx`) at all.
+**`[nanoUNet] nanounet/infer/segtrack.py`**
 
-### 2.3 Verification (do this before moving on)
+- line 66: `from tracking.data.instances import label_instances, load_clicks`
+- line 97 and lines 115-116: `label_instances(...)` instead of `binary_to_instances(...)`
 
-Reuse the existing on-disk EMA predictions and click JSONs — no model inference needed:
+Do not touch the `--bl-mask-dir` BL load.
+
+### 2.3 Verification (before Phase 2)
+
+On-disk EMA preds + FU clicks; no UNet:
 
 ```python
 import json
 import numpy as np
+import cc3d
 import SimpleITK as sitk
 from tracking.data.instances import label_instances, load_clicks
 
-for stem in ["307fd7f231_00", "38b18881fc_00", "bf97f24695_00", "0f49c89d1e_00"]:
-    ema = sitk.GetArrayFromImage(sitk.ReadImage(f"/nnunet_data/Longitudinal-CT/results/preds_ema_finetune/{stem}.nii.gz"))
+# expected: (n_cc, n_clicks, n_exact_hits) measured 2026-08-29 on preds_ema_finetune
+# 307fd7f231_00: (2, 2, 0)
+# 38b18881fc_00: (13, 13, 10)
+# bf97f24695_00: (25, 23, 19)
+# 0f49c89d1e_00: (8, 9, 2)
+for stem, n_cc_expect in [("307fd7f231_00", 2), ("38b18881fc_00", 13),
+                          ("bf97f24695_00", 25), ("0f49c89d1e_00", 8)]:
+    ema = sitk.GetArrayFromImage(sitk.ReadImage(
+        f"/nnunet_data/Longitudinal-CT/results/preds_ema_finetune/{stem}.nii.gz"))
     clicks = load_clicks(f"/nnunet_data/Longitudinal-CT/inputsTrFU/{stem}.json")
     inst = label_instances(ema > 0, clicks)
-    n_cc_total = int(np.unique(inst).size) - 1  # exclude background
-    print(stem, "clicks:", len(clicks), "instances kept:", n_cc_total)
+    n_cc = int(cc3d.connected_components((ema > 0).astype(np.uint8), connectivity=18).max())
+    n_kept = int(np.unique(inst).size) - 1
+    assert n_kept == n_cc == n_cc_expect, (stem, n_kept, n_cc)
+    print(stem, "ok", n_kept)
 ```
 
-Expected: **every one of these 4 cases keeps at least as many instances as there are
-foreground connected components in the EMA prediction** (i.e. `n_cc_total` should equal the
-number of CCs `cc3d.connected_components(ema>0, connectivity=18)` finds, not the number of
-clicks that happen to land exactly on one). Confirm this — under the old
-`binary_to_instances`, `307fd7f231_00` produced **0** surviving instances from 2 clicks;
-under `label_instances` it must produce instances for every real CC in the prediction
-(2 CCs in this case, both kept, regardless of click accuracy).
+Pass: `n_kept == n_cc` for all four. `307fd7f231_00` must keep 2, not 0.
 
-Then run the full pipeline end to end on these 4 cases and confirm `fu.mha` is no longer
-empty where `pred_fu.mha` (pass `--keep-pred`) has real foreground.
+Then one real `nanounet_segtrack` on `307fd7f231_00` with `--bl-mask` + `--keep-pred --overwrite`
+(and `--ema` until Phase 2 lands). `pred_fu.mha` has FG; `fu.mha` must also have FG.
+
+Current followup: `307fd7f231_00` `n_pred=0`, `dices=[0.0, 0.0]`.
+
+---
 
 ## 3. Phase 2 — EMA default
 
-`[nanoUNet] nanounet/cli/segtrack.py` line 53: `ap.add_argument("--ema", action="store_true")`
-— defaults to `False`. This is documented (`docs/steps/track.md` line 68: "`--ema` | flag |
-off"), not a bug in isolation, but the project's own reference predictions
-(`/nnunet_data/Longitudinal-CT/results/preds_ema_finetune`) were generated *with* `--ema`,
-and EMA weights are the intended production checkpoint throughout this project (see
-`DEPLOYED_CKPT` naming convention for the tracker). Default it on for consistency:
+`[nanoUNet] nanounet/cli/segtrack.py:53`
 
-**`[nanoUNet] nanounet/cli/segtrack.py`** line 53, change:
 ```python
 ap.add_argument("--ema", action="store_true")
 ```
-to:
+
+Default off. Docs (`docs/steps/track.md:68`) agree. Matcher EMA is a different thing
+(`use_ema=True` hardcoded in `run_case` line 156; config table `"track-ema", "on"`). Seg EMA
+is **not** in the config table today.
+
+The project's reference preds are `preds_ema_finetune`. Default the seg checkpoint to EMA.
+
+Replace line 53 with:
+
 ```python
 ap.add_argument("--no-ema", dest="ema", action="store_false", default=True)
 ```
-This flips the default to `True` while keeping an escape hatch (`--no-ema`) for anyone who
-explicitly wants the raw checkpoint. Update the config-table row that echoes this value —
-`[nanoUNet] nanounet/cli/segtrack.py` line ~100, the `("track-ema", "on", "default")` row is
-for the *matcher's* EMA (always on, unrelated) — check there is a separate row surfacing the
-**segmentation** UNet's `--ema`/`args.ema` value; if there isn't one today, add one so the
-resolved config table doesn't silently hide this default.
 
-**`[nanoUNet] docs/steps/track.md`** line 68 argument table row: change
-`| \`--ema\` | flag | off | Seg UNet EMA. Matcher EMA is always on |` to
-`| \`--ema\` | flag | **on** | Seg UNet EMA. \`--no-ema\` for the raw checkpoint. Matcher EMA is always on |`.
+Do **not** also keep `--ema` (argparse conflict). `load_net_from_ckpt(..., ema=args.ema)` at
+line 128 stays.
 
-Do **not** change `nanounet_predict`'s own `--ema` default (`[nanoUNet] nanounet/cli/predict.py`
-line 34) — out of scope for this plan; only `nanounet_segtrack`'s default was established
-this session as causing a real discrepancy against the project's reference predictions.
+Config table (after the `track-ema` row, ~line 100):
+
+```python
+("seg-ema", "on" if args.ema else "off", "default" if args.ema else "cli"),
+```
+
+**`[nanoUNet] docs/steps/track.md`** argument table: replace the `--ema` row with
+
+```markdown
+| `--no-ema` | flag | off | Load the raw seg checkpoint. Default is EMA. Matcher EMA is always on |
+```
+
+Do **not** change `nanounet_predict` (`[nanoUNet] nanounet/cli/predict.py:34`).
 
 ### Verification
-`nanounet_segtrack --help` (or the printed config table on a real run) must show `--ema`
-defaulting to on; `--no-ema` must still work and load the raw checkpoint (confirm via the
-existing `load_net_from_ckpt(..., ema=args.ema)` call unchanged at
-`[nanoUNet] nanounet/cli/segtrack.py` line 128).
 
-## 4. Phase 3 — uniGradICON live registration module
+`nanounet_segtrack --help` shows `--no-ema`. Printed config table: `seg-ema on default`.
+`--no-ema` prints `seg-ema off cli` and still loads.
+
+---
+
+## 4. Phase 3 — live BL→FU points, reuse existing uniGradICON
 
 ### 4.1 What this replaces
 
-Today, `[nanoUNet] nanounet/infer/segtrack.py::run_case` (lines 142-151) does this:
+`run_case` lines 141-151:
 
 ```python
 prop = case.meta_csv if case.meta_csv is not None else case.fu_clicks
 ...
-if not drop_dp:
-    mx = int(bl_zyx.max())
-    bl_ids = np.flatnonzero(np.bincount(bl_zyx.ravel(), minlength=mx + 1))[1:].tolist() if mx > 0 else []
-    got, _ = load_propagated(prop, bl_ids, img_id=img_id)
-    drop = sorted(set(bl_ids) - set(got))
-    if drop:
-        cprint(f"[dim]drop {case.stem}  BL ids {drop} (not in this FU volume)[/dim]")
+got, _ = load_propagated(prop, bl_ids, img_id=img_id)
+drop = sorted(set(bl_ids) - set(got))
 ```
 
-Two problems: (1) when `case.meta_csv is None`, it silently reuses `case.fu_clicks` — the
-plain nanoUNet interactive-segmentation click file — *as if* it were a real "BL centroid
-warped into FU space" file. This only happens to work on this project's own dataset because
-(per Phase 1's investigation) `inputsTrFU/*.json` *was itself* built from `cog_propagated`.
-For any other dataset, a genuine FU click file has no such relationship to BL and this
-silently produces nonsense BL positions. (2) any BL id not covered (`drop`) is just logged
-and discarded — that lesion is never tracked, period, even though real registration could
-recover a usable position for it.
+Two bugs:
 
-This phase adds a live-registration fallback so a BL id with no CSV coverage — whether
-because there's no CSV at all, or because it's a fresh id Phase 1 invented for an extra
-connected component with no historical record — gets a real, computed FU-space position
-instead of being dropped or guessed at.
+1. `fu_clicks` as propagated is only valid on *this* dataset, where `inputsTrFU/*.json`
+   was built from `cog_propagated`. On any other dataset a FU click JSON is "where the user
+   clicked now", not "BL centroid in FU space". Axis order of `_from_json` is fine (Frame B);
+   the **semantics** are wrong.
+2. BL ids not in the CSV are logged and omitted from the matcher (`bl_ids = [i for i in all_bl if i in prop]`).
 
-### 4.2 New module: `[lesion-tracking] tracking/data/unigradicon.py` (new file)
+Folder mode (`[nanoUNet] nanounet/cli/segtrack_cases.py:61-72`) **skips** `no meta csv` when
+a meta dir exists (inferred `{bl-dir}/../meta` or `--meta-dir`). Single mode infers
+`{bl-img}/../../meta/{pid}.csv` (`segtrack_cases.py:117-124`). On Longitudinal-CT you
+cannot "just omit `--meta`" — the CSV is auto-attached.
 
-This must be a **self-contained, lazily-imported module** — importing `tracking.infer` or
-`tracking.data.masks` must not require `unigradicon`/`itk` to be installed. Only import
-`itk`, `icon_registration`, `unigradicon` inside function bodies (never at module top),
-so a segtrack run that's fully covered by a CSV never touches this dependency at all.
+### 4.2 Do not create `tracking/data/unigradicon.py`
 
-**Dependency**: add to `[lesion-tracking] pyproject.toml`:
-```toml
-[project.optional-dependencies]
-unigradicon = ["unigradicon"]
-```
-(`unigradicon`'s own `pyproject.toml`/`requirements.txt` pulls in `itk`, `icon_registration`,
-`torch`, `footsteps` transitively — do not list those separately.) Install with
-`pip install -e /lesion-tracking[unigradicon]`.
+That file does not exist, and it must not. `[nanoUNet] nanounet/register/unigradicon.py`
+already loads weights, calls `register_pair`, and warps BL onto FU. nanoUNet already
+depends on `unigradicon`. lesion-tracking stays a GNN package: it accepts an
+`extra_propagated` dict and never imports `itk` / `unigradicon`.
 
-**uniGradICON API, as actually shipped** (verified by reading the real source at
-`github.com/uncbiag/uniGradICON` `src/unigradicon/__init__.py` and
-`github.com/uncbiag/ICON` `src/icon_registration/itk_wrapper.py` — do not guess at this API
-from memory, it does not match the CLI's `--fixed`/`--moving` naming directly):
-
-- `unigradicon.get_unigradicon(weights_location=None)` loads the pretrained network. If
-  `weights_location` doesn't exist, it **auto-downloads** the weights — but its own
-  `os.makedirs(...)` call targets a hardcoded relative path (`"network_weights/unigradicon1.0/"`),
-  **not** whatever `weights_location` you pass. If you pass a custom absolute path whose
-  parent directory doesn't exist, the download will fail. **You must `mkdir -p` the parent
-  of your chosen `weights_location` yourself before calling this.**
-- `unigradicon.preprocess(itk_image, modality="ct")` casts to float, clamps to `[-1000, 1000]`
-  HU, then shift/scales to `[0, 1]`. Use this exactly, don't reimplement it.
-- `icon_registration.itk_wrapper.register_pair(model, image_A, image_B, finetune_steps=None)`
-  returns `(phi_AB, phi_BA)`, both `itk.CompositeTransform[itk.D, 3]`. Per
-  `create_itk_transform`'s own comment (`# warp(image_A, phi_AB_itk) is close to image_B`)
-  and confirmed against the CLI's own `--warped_moving_out` resample call:
-  **`phi_AB.TransformPoint(point in image_B's physical space)` returns the corresponding
-  point in `image_A`'s physical space.** (`phi_BA` is the reverse: image_A space →
-  image_B space.)
-  **To get BL→FU: call `register_pair(model, image_A=fu_img, image_B=bl_img, ...)`, then
-  use `phi_AB.TransformPoint(bl_physical_point)` → FU physical point.** Do not swap this —
-  it is the single most likely place to introduce a silent, hard-to-detect bug (wrong
-  points, not a crash). The Phase 3.4 validation step exists specifically to catch this if
-  the derivation above is somehow wrong.
-- `finetune_steps=None` disables "instance optimization" (IO), an iterative per-pair
-  refinement (the CLI's `--io_iterations`, default `50` there). IO materially slows
-  registration (tens of gradient steps per pair). **Default to `finetune_steps=None`** (base
-  network only, one forward pass, a few seconds on GPU) to keep this fast — this is a
-  correctness/speed tradeoff, not free; document it, don't hide it.
-
-**Coarse pre-alignment — required, not optional.** uniGradICON resamples each image to a
-fixed 175×175×175 grid **independently**, based only on that image's own header (spacing/
-origin/direction) — verified in `register_pair`'s source (`F.interpolate(A_trch, size=shape[2:], ...)`
-on the raw pixel array; the physical geometry only re-enters via
-`resampling_transform(image_A, shape)`/`resampling_transform(image_B, shape)`, each built
-independently per image). If BL and FU cover very different physical extents (different
-scan range, different couch position — normal for real longitudinal CT), the network sees
-unrelated anatomy in the two 175³ grids and registration degrades badly. Confirmed as a
-correctness risk by the user before this plan was written. Fix: a **cheap, metadata-only
-translation** that re-origins FU so its body centroid coincides with BL's, before handing
-both to uniGradICON. This does not correct rotation, only gross translation offset — the
-dominant failure mode for two full-body/torso CT scans acquired at different times. If this
-proves insufficient in practice (see 4.4), the next escalation is a real affine
-pre-registration; do not build that preemptively, it is out of scope for this plan.
-
-Write the full file exactly as follows:
+Production A/B convention (`warp_pair` lines 63-68), verified in source:
 
 ```python
-"""Live BL->FU point propagation via uniGradICON, for BL lesions with no CSV coverage.
+phi_AB, _ = itk_wrapper.register_pair(get_model(), bl_pp, fu_pp, finetune_steps=steps)
+warped_img = resample_to(bl, phi_AB, fu, default=-1000.0)
+```
 
-Only imported when a BL lesion has no --meta/--meta-dir coverage (no CSV at all, or an id
-Phase 1's label_instances invented for an extra connected component). A case fully covered
-by a propagated CSV never touches this module or its heavy dependencies (itk, torch,
-icon_registration). See docs/dev-notes/segtrack_correctness_and_registration_plan.md Phase 3
-in nanoUNet for the full derivation and required validation before this is trusted.
-"""
+`image_A=BL`, `image_B=FU`. ICON comment: `warp(image_A, phi_AB_itk) is close to image_B`.
+ITK resample pulls: `phi_AB.TransformPoint(point in FU physical) → BL physical`.
 
-from __future__ import annotations
+The reverse map `phi_BA` is `create_itk_transform(phi_BA, ident, image_B, image_A)` =
+`(FU, BL)` → `warp(FU, phi_BA) ≈ BL` → `phi_BA.TransformPoint(BL physical) → FU physical`.
 
-from pathlib import Path
+**Point propagation uses `phi_BA` from the same `register_pair(model, bl, fu)` as `warp_pair`.
+Do not swap A/B relative to `warp_pair`.** If Phase 3.4 fails, the ordered retries are
+(1) `phi_AB.GetInverseTransform()` with the same A/B, (2) swapped A/B using `phi_AB` as
+the previous draft claimed. Re-derive from `warp_pair`, do not guess.
 
-import cc3d
-import numpy as np
+### 4.3 Coarse origin shift is out
 
-BODY_HU_THRESHOLD = -500.0  # separates patient body from air/couch; matches unigradicon's own [-1000,1000] CT clamp range
+The previous draft added `_coarse_align` (metadata `SetOrigin`). `register_pair` does
+`F.interpolate` on the **raw pixel array** to 175³ (`icon_registration/itk_wrapper.py`).
+Origin is not in that tensor. Origin-only translation does not change what the network
+sees. `resampling_transform` uses origin when composing the ITK composite; that already
+handles header differences.
 
-_MODEL_CACHE: dict[tuple[str, str], object] = {}
+`warp_pair` has no origin shift and is the production backend. `warp_case` already
+resamples pixels (`landmark_align`) when `frame_z_overlap_mm <= 0`. Do not invent a third
+pre-align. If Phase 3.4 fails with a huge miss, escalate to that existing pixel resample —
+not an origin hack. Out of scope until 3.4 fails.
 
+`BODY_HU = -300` already lives in `elastix.py`. Do not add `-500`.
 
-def _get_model(weights_path: Path, device: str):
-    key = (str(weights_path), device)
-    if key not in _MODEL_CACHE:
-        import torch
-        from unigradicon import get_unigradicon
+### 4.4 Weights
 
-        weights_path.parent.mkdir(parents=True, exist_ok=True)
-        model = get_unigradicon(weights_location=str(weights_path))
-        model.to(torch.device(device)).eval()
-        _MODEL_CACHE[key] = model
-    return _MODEL_CACHE[key]
+Already in `unigradicon.py`:
 
+```python
+WEIGHTS_PATH = os.environ.get(
+    "NANOUNET_UNIGRADICON_WEIGHTS",
+    os.path.expanduser("~/.cache/nanounet/unigradicon/Step_2_final.trch"),
+)
+WEIGHTS_URL = "https://github.com/uncbiag/uniGradICON/releases/download/unigradicon_weights/Step_2_final.trch"
+```
 
-def _body_centroid_phys(img) -> np.ndarray:
-    """Physical-space (x, y, z) centroid of the image's largest body/torso component."""
-    import itk
+`get_model()` already `os.makedirs` the parent, then `get_unigradicon(weights_location=...)`.
+(uniGradICON's own `makedirs("network_weights/unigradicon1.0/")` is a relative CWD path and
+is **not** the download target when `weights_location` is set. Parent mkdir is required;
+`get_model` already does it.)
 
-    arr = itk.array_from_image(img)  # (z, y, x) numpy view -- standard ITK<->numpy convention
-    body = (arr > BODY_HU_THRESHOLD).astype(np.uint8)
-    lab = cc3d.connected_components(body, connectivity=18)
-    sizes = np.bincount(lab.ravel())
-    sizes[0] = 0
-    largest = int(sizes.argmax())
-    assert largest > 0, "no foreground above BODY_HU_THRESHOLD -- unexpected for a real CT"
-    idx_zyx = np.argwhere(lab == largest).mean(axis=0)
-    idx_xyz = itk.ContinuousIndex[itk.D, 3]([float(idx_zyx[2]), float(idx_zyx[1]), float(idx_zyx[0])])
-    return np.array(img.TransformContinuousIndexToPhysicalPoint(idx_xyz))
+As of 2026-08-29 the cache file is **missing** on this machine. `unigradicon` **is**
+installed (`/usr/local/lib/python3.11/site-packages/unigradicon`). First `get_model()` will
+download. If download is blocked:
 
+```bash
+mkdir -p ~/.cache/nanounet/unigradicon
+curl -L -o ~/.cache/nanounet/unigradicon/Step_2_final.trch \
+  https://github.com/uncbiag/uniGradICON/releases/download/unigradicon_weights/Step_2_final.trch
+```
 
-def _coarse_align(bl_img, fu_img):
-    """Shift fu_img's origin so its body centroid matches bl_img's, in physical space.
-    Metadata-only: no resampling, no pixel data touched. Mutates and returns fu_img."""
-    bl_dir = np.array(bl_img.GetDirection())
-    fu_dir = np.array(fu_img.GetDirection())
-    assert np.allclose(bl_dir, fu_dir, atol=1e-3), (
-        f"BL/FU direction cosines differ (BL={bl_dir.tolist()}, FU={fu_dir.tolist()}); "
-        f"coarse pre-alignment assumes matched patient orientation between the two scans."
-    )
-    delta = _body_centroid_phys(bl_img) - _body_centroid_phys(fu_img)
-    fu_img.SetOrigin(tuple(np.array(fu_img.GetOrigin()) + delta))
-    return fu_img
+Do **not** invent `$NANOUNET_RESULTS/unigradicon/unigradicon1.0/Step_2_final.trch`.
+Do **not** add `DEFAULT_UNIGRADICON_*` to `tracking/common.py`.
+Do **not** add `--unigradicon-weights` (env already exists; `cli/segtrack.py` is at 188 LOC).
 
+### 4.5 `icon_registration.config.device`
 
+`icon_registration/config.py`: `device = torch.device("cuda")` if CUDA else CPU.
+`register_pair` does `model.to(config.device)` and can override a placement in `get_model`.
+`get_unigradicon` also `net.to(config.device)`.
+
+Before `register_pair`, set:
+
+```python
+import icon_registration.config as icon_config
+import torch
+icon_config.device = torch.device(device)
+```
+
+`device` comes from `nanounet_segtrack --device` (default `cuda`). `_MODEL` in `get_model`
+is a single global — first call wins. Acceptable; segtrack is one process, one device.
+
+### 4.6 New function in `[nanoUNet] nanounet/register/unigradicon.py`
+
+Append. File is 73 LOC; this stays under 200. Lazy-import `itk` / `itk_wrapper` /
+`preprocess` / `icon_registration.config` inside the function (the module already imports
+`resample_to` from elastix at top — that is existing). `numpy` is a new module-level or
+function-body import; inside the function is fine.
+
+`register_pair` **always** `print(loss)` (ICON source). Quiet it: this is a user-facing
+segtrack path (nanochat U5 / U7). `register_longi` already has `_quiet_stderr`; this print
+is stdout.
+
+```python
 def propagate_points(
-    bl_ct_path: Path,
-    fu_ct_path: Path,
-    points_bl_zyx: dict[int, np.ndarray],
+    bl_ct_path: "os.PathLike | str",
+    fu_ct_path: "os.PathLike | str",
+    points_xyz: dict[int, np.ndarray],
     *,
-    weights_path: Path,
-    device: str,
-    io_iterations: int | None = None,
+    io_iterations: int = 0,
+    device: str = "cuda",
 ) -> dict[int, np.ndarray]:
-    """BL voxel-index (z, y, x) points -> FU voxel-index (z, y, x) points via uniGradICON.
+    """BL Frame-B (x,y,z) voxel coords → FU Frame-B (x,y,z) via uniGradICON.
 
-    io_iterations=None runs the base network only (a few seconds on GPU, no per-pair
-    refinement). Pass an int (uniGradICON's own CLI default is 50) for slower, more accurate
-    per-case instance optimization if base-network accuracy proves insufficient.
+    Same register_pair(model, bl, fu) as warp_pair. Uses phi_BA to map BL physical → FU
+    physical. io_iterations<=0: one forward pass. io_iterations>0: ICON instance optimization
+    (register_longi defaults to 50; live segtrack default is 0).
     """
+    import contextlib
+    import numpy as np
+    import torch
+    import icon_registration.config as icon_config
+    import icon_registration.itk_wrapper as itk_wrapper
     import itk
-    from icon_registration.itk_wrapper import register_pair
     from unigradicon import preprocess
 
-    if not points_bl_zyx:
+    if not points_xyz:
         return {}
 
-    model = _get_model(Path(weights_path), device)
-    bl_img = itk.imread(str(bl_ct_path))
-    fu_img = _coarse_align(bl_img, itk.imread(str(fu_ct_path)))
-
-    # image_A=FU, image_B=BL => phi_AB.TransformPoint(point in BL space) = point in FU space.
-    # See plan Phase 3.2 for the full derivation. Do not swap image_A/image_B.
-    phi_AB, _phi_BA = register_pair(
-        model,
-        preprocess(fu_img, modality="ct"),
-        preprocess(bl_img, modality="ct"),
-        finetune_steps=io_iterations,
-    )
-
+    icon_config.device = torch.device(device)
+    model = get_model()
+    bl = itk.imread(str(bl_ct_path), itk.F)
+    fu = itk.imread(str(fu_ct_path), itk.F)
+    steps = io_iterations if io_iterations and io_iterations > 0 else None
+    with open(os.devnull, "w") as devnull, contextlib.redirect_stdout(devnull):
+        _phi_AB, phi_BA = itk_wrapper.register_pair(
+            model, preprocess(bl, "ct"), preprocess(fu, "ct"), finetune_steps=steps,
+        )
     out: dict[int, np.ndarray] = {}
-    for lid, zyx in points_bl_zyx.items():
-        idx_xyz = itk.ContinuousIndex[itk.D, 3]([float(zyx[2]), float(zyx[1]), float(zyx[0])])
-        p_bl_phys = bl_img.TransformContinuousIndexToPhysicalPoint(idx_xyz)
-        p_fu_phys = phi_AB.TransformPoint(p_bl_phys)
-        idx_fu = fu_img.TransformPhysicalPointToContinuousIndex(p_fu_phys)
-        out[lid] = np.array([idx_fu[2], idx_fu[1], idx_fu[0]], dtype=np.float64)
+    for lid, xyz in points_xyz.items():
+        xyz = np.asarray(xyz, dtype=np.float64)
+        p_bl = bl.TransformContinuousIndexToPhysicalPoint(
+            [float(xyz[0]), float(xyz[1]), float(xyz[2])]
+        )
+        p_fu = phi_BA.TransformPoint(p_bl)
+        idx = fu.TransformPhysicalPointToContinuousIndex(p_fu)
+        out[int(lid)] = np.array([idx[0], idx[1], idx[2]], dtype=np.float64)
     return out
 ```
 
-Known API-risk to check while implementing (not certainties — verify against the installed
-`itk` package version, this is exactly what Phase 3.4's validation step is for):
-- `itk.array_from_image`, `itk.imread`, `.GetDirection()`, `.GetOrigin()`, `.SetOrigin()`,
-  `.TransformContinuousIndexToPhysicalPoint()`, `.TransformPhysicalPointToContinuousIndex()`,
-  `itk.ContinuousIndex[itk.D, 3]([x, y, z])` are all standard, long-stable ITK Python API —
-  high confidence these work as written.
-- `icon_registration.config.device` may auto-select CUDA/CPU independently of the `device`
-  argument passed here (`register_pair` internally calls `model.to(config.device)`, which
-  could override the placement done in `_get_model`). If Phase 3.4 validation shows
-  computation running on the wrong device, set `icon_registration.config.device` explicitly
-  before calling `register_pair` — check `icon_registration/config.py`'s actual contents
-  first, don't guess at the fix.
+If `TransformContinuousIndexToPhysicalPoint` rejects a Python list on this ITK 5.4.7
+build, use the same pattern as `landmarks.py:40-41` (`TransformIndexToPhysicalPoint` with
+rounded ints) only as a last resort — centroids are subvoxel (`+0.5` in `centroids()`).
+Prefer:
 
-### 4.3 Weight location default
-
-**`[lesion-tracking] tracking/common.py`** — add near `DEPLOYED_CKPT` (line 25):
 ```python
-DEFAULT_UNIGRADICON_WEIGHTS_NAME = "unigradicon1.0/Step_2_final.trch"
+cidx = itk.ContinuousIndex[itk.D, 3]()
+cidx[0], cidx[1], cidx[2] = float(xyz[0]), float(xyz[1]), float(xyz[2])
+p_bl = bl.TransformContinuousIndexToPhysicalPoint(cidx)
 ```
-**`[nanoUNet] nanounet/infer/segtrack.py`** — add near `DEFAULT_MODEL` (line 22-25), reusing
-the exact existing `resolve_ckpt_path` pattern from
-`[nanoUNet] nanounet/infer/segtrack_case.py`:
-```python
-from nanounet.common import results_dir
-DEFAULT_UNIGRADICON_WEIGHTS = Path(results_dir()) / "unigradicon" / "unigradicon1.0" / "Step_2_final.trch"
-```
-Resolve it in `[nanoUNet] nanounet/cli/segtrack.py::main()` the same way `model_dir`/
-`track_ckpt` already are (`resolve_ckpt_path(args.unigradicon_weights, "NANOUNET_UNIGRADICON_WEIGHTS", DEFAULT_UNIGRADICON_WEIGHTS)`),
-and add a config-table row for it, matching the existing `model-dir`/`track-ckpt` rows
-exactly in style.
 
-### 4.4 Validation gate — required before Phase 4 wiring
+Add `import numpy as np` at function body (already in the snippet). Type hints that
+reference `np.ndarray` need numpy imported at type-check time — use
+`from __future__ import annotations` (already in the file) so hints are strings.
 
-Nobody has run this exact code path yet (`unigradicon` is not installed in this
-environment). Do not wire this into `run_case` until this validation passes. Write a
-throwaway script (delete it after, per this project's testing convention — no permanent
-`tests/` folder), run it, and confirm the numbers before proceeding:
+### 4.7 Validation gate — required before Phase 4
+
+Throwaway script, delete after (R16). Do **not** wire `run_case` until this prints a
+sensible point.
 
 ```python
-# scratch validation -- not part of either package, delete after running
 from pathlib import Path
 import numpy as np
-from tracking.data.unigradicon import propagate_points
+from nanounet.register.unigradicon import propagate_points
 
-# use a real case with a known, already-computed answer: 307fd7f231_00, lesion_id=1
-# meta/307fd7f231.csv, img_id_fu=0: cog_bl="199.601855155191 235.505440599358 122.067160185516"
-#                                    cog_fu="210.814898057473 304.457296516295 126.892438593675"
-#                                    cog_propagated="207.95331503893644 286.0173397756782 119.03847670485004"
-bl_zyx = np.array([199.601855155191, 235.505440599358, 122.067160185516])
+# Frame B (x,y,z) — CSV / JSON order. NOT reversed.
+bl_xyz = np.array([199.601855155191, 235.505440599358, 122.067160185516])
+cog_prop = np.array([207.95331503893644, 286.0173397756782, 119.03847670485004])
+cog_fu = np.array([210.814898057473, 304.457296516295, 126.892438593675])
+fu_sp = np.array([0.841796875, 0.841796875, 3.0])  # ITK spacing (x,y,z)
+shape = np.array([512, 512, 267])  # FU nibabel / Frame B size
 
 out = propagate_points(
-    Path("/nnunet_data/Longitudinal-CT/inputsTrBL/307fd7f231_00.nii.gz"),
-    Path("/nnunet_data/Longitudinal-CT/inputsTrFU/307fd7f231_00.nii.gz"),
-    {1: bl_zyx},
-    weights_path=Path("/nnunet_data/NanoUNet_results/unigradicon/unigradicon1.0/Step_2_final.trch"),
+    "/nnunet_data/Longitudinal-CT/inputsTrBL/307fd7f231_00.nii.gz",
+    "/nnunet_data/Longitudinal-CT/inputsTrFU/307fd7f231_00.nii.gz",
+    {1: bl_xyz},
+    io_iterations=0,
     device="cuda",
-)
-print("computed:", out[1])
-print("existing cog_propagated (z,y,x):", [119.03847670485004, 286.0173397756782, 207.95331503893644])
-print("true cog_fu             (z,y,x):", [126.892438593675, 304.457296516295, 210.814898057473])
+)[1]
+print("computed xyz", out)
+print("cog_propagated   ", cog_prop, "err_mm", np.linalg.norm((out - cog_prop) * fu_sp))
+print("cog_fu           ", cog_fu, "err_mm", np.linalg.norm((out - cog_fu) * fu_sp))
+print("in volume", np.all((out >= -1) & (out <= shape)))
 ```
 
-**Pass criterion**: `out[1]` should land closer to the true `cog_fu` than a wrong-direction
-bug would (a swapped `image_A`/`image_B` typically produces a point wildly outside the body,
-or very close to `cog_bl` unchanged — either is an obvious, large-magnitude failure, not a
-subtle few-mm difference). It does not need to exactly match the existing `cog_propagated`
-(that came from a different, offline registration run, possibly a different backend) or
-`cog_fu` (that's ground truth, registration is never exact) — but it must be in the same
-general neighborhood (tens of mm, not hundreds), and the coarse pre-alignment assert must
-not fire. If the result is nonsensical, the most likely bugs, in order of likelihood: (1)
-`image_A`/`image_B` swapped in `register_pair` (try swapping and re-check against `cog_fu`),
-(2) the `(z,y,x)`↔`(x,y,z)` reversal missing or doubled somewhere, (3) the coarse-alignment
-delta sign flipped (`c_bl - c_fu` vs `c_fu - c_bl`). Re-derive from Section 1's conventions,
-don't guess-and-check blindly.
+**Pass (all of):**
 
-Also time this call — confirm it completes in single-digit seconds on this GPU with
-`io_iterations=None`. If it's much slower, that's a signal `icon_registration.config.device`
-is not actually using the GPU (see the note in 4.2).
+1. `out` is inside the FU grid (allow a few voxels of margin). A swapped A/B typically
+   lands hundreds of mm away or outside `[0,512)×[0,512)×[0,267)`.
+2. `||(out - cog_fu) * fu_sp||` is tens of mm, not hundreds. Need not match `cog_propagated`
+   (different offline backend) or `cog_fu` (GT; registration is not identity).
+3. Wall time with `io_iterations=0` is single-digit seconds on GPU. Much slower →
+   `icon_registration.config.device` is CPU (see 4.5).
 
-## 5. Phase 4 — wire the fallback into `run_case` / `track()` / `build_mask_graph`
+If fail, retry in the order in 4.2. Time the call.
 
-Only start this after Phase 3.4 passes.
+---
+
+## 5. Phase 4 — wire fallback into matcher + `run_case` + case collection
+
+Only after 4.7 passes.
 
 ### 5.1 `[lesion-tracking] tracking/data/masks.py::build_mask_graph`
 
-Add a parameter and relax the hard-fail-on-missing-CSV behavior. Current (lines 56-70):
-```python
-def build_mask_graph(
-    ct_bl: np.ndarray, aff_bl: np.ndarray, sp_bl: np.ndarray, mk_bl: np.ndarray,
-    ct_fu: np.ndarray, aff_fu: np.ndarray, sp_fu: np.ndarray, mk_fu: np.ndarray,
-    propagated_csv: Path | None, cfg: GraphConfig, default_lesion_type: str | None = None,
-    types_csv: Path | None = None, img_id: int | None = None,
-) -> HeteroData | None:
-    all_bl, fu_ids = _labels(mk_bl), _labels(mk_fu)
-    types: dict[int, str] = {}
-    if cfg.drop_dp:
-        bl_ids = all_bl
-        prop: dict = {}
-    else:
-        if propagated_csv is None:
-            raise FileNotFoundError(
-                "No propagated file for a geo matcher.\n"
-                "Expected meta CSV, slim CSV, or FU-frame JSON.\n"
-                "Fix: pass --propagated /nnunet_data/Longitudinal-CT/meta/<pid>.csv"
-            )
-        prop, types = load_propagated(propagated_csv, all_bl, img_id=img_id)
-        bl_ids = [i for i in all_bl if i in prop]
-```
+Current geo branch (lines 63-70) raises if `propagated_csv is None`. Change to:
 
-Change to:
 ```python
-def build_mask_graph(
-    ct_bl: np.ndarray, aff_bl: np.ndarray, sp_bl: np.ndarray, mk_bl: np.ndarray,
-    ct_fu: np.ndarray, aff_fu: np.ndarray, sp_fu: np.ndarray, mk_fu: np.ndarray,
-    propagated_csv: Path | None, cfg: GraphConfig, default_lesion_type: str | None = None,
-    types_csv: Path | None = None, img_id: int | None = None,
     extra_propagated: dict[int, np.ndarray] | None = None,
 ) -> HeteroData | None:
     all_bl, fu_ids = _labels(mk_bl), _labels(mk_fu)
@@ -565,77 +555,64 @@ def build_mask_graph(
             prop.update(extra_propagated)
         bl_ids = [i for i in all_bl if i in prop]
 ```
-The existing `if not bl_ids or not fu_ids: return None` two lines below (unchanged) already
-handles "still nothing trackable" gracefully — do not add a new error path there.
+
+Add `extra_propagated` to the signature after `img_id`. Keep
+`if not bl_ids or not fu_ids: return None` (lines 73-74). File is 101 LOC; stays under 200.
+
+Deployed ckpt has `type_mask=false`, so empty `types` + `default_lesion_type="unclear"` is OK.
 
 ### 5.2 `[lesion-tracking] tracking/infer.py::track`
 
-Add the same parameter and thread it through (current signature at line 93-113, current
-`build_mask_graph` call at line 154-158):
+Signature (lines 93-113): add
+
 ```python
-def track(
-    bl_img: Path, bl_mask: Path, fu_img: Path, fu_mask: Path,
-    propagated: Path | None, ckpt: Path, *,
-    decode: str, device: str = "cuda", default_lesion_type: str | None = "unclear",
-    k_intra: int = 8, thresh: float = 0.5, sinkhorn_iters: int = 20,
-    sinkhorn_tau: float = DEPLOYED_DUST_TAU, use_ema: bool = True,
-    matcher: MatcherModule | None = None, types_csv: Path | None = None,
-    volumes: tuple | None = None, img_id: int | None = None,
     extra_propagated: dict[int, np.ndarray] | None = None,
 ) -> TrackResult:
 ```
-and pass `extra_propagated=extra_propagated` into the `build_mask_graph(...)` call.
 
-Also relax the existing hard guard in the `else` branch (used when `volumes is not None`,
-which is always true for the `nanounet_segtrack` in-process path) at lines 144-150:
+Volumes branch guard today (lines 145-150):
+
 ```python
         if not gcfg.drop_dp and (propagated is None or not Path(propagated).is_file()):
-            raise FileNotFoundError(...)
 ```
-change to:
+
+Change to (use `is None`, not truthiness — `{}` must not trip the "missing extra" path):
+
 ```python
-        if not gcfg.drop_dp and propagated is None and extra_propagated is None:
+        if not gcfg.drop_dp and extra_propagated is None and (
+            propagated is None or not Path(propagated).is_file()
+        ):
             raise FileNotFoundError(
-                "No propagated coordinates for a geo matcher.\n"
-                "Expected --meta/--meta-dir, or the uniGradICON fallback enabled.\n"
-                "Fix: pass --meta, or drop --drop-uncovered so live registration can run\n"
-                "(see docs/dev-notes/segtrack_correctness_and_registration_plan.md)"
+                f"No propagated at {propagated}.\n"
+                f"Expected meta CSV, slim CSV, FU-frame JSON, or extra_propagated from live registration.\n"
+                f"Fix: pass --meta / --meta-dir, or omit --drop-uncovered so nanounet_segtrack can register\n"
+                f"(see docs/steps/track.md)"
             )
 ```
-Note this still requires `Path(propagated).is_file()` checking to be preserved for the case
-where `propagated is not None` but points at a missing file — keep that part of the original
-condition, only change the "is `None` OK now" logic. Leave the `if volumes is None:` branch
-(lines 131-140, the plain-CLI `lesion_track` path with no in-memory volumes) untouched —
-out of scope for this plan (see Section 7, non-goals).
+
+`build_mask_graph` call (lines 154-158): pass `extra_propagated=extra_propagated`.
+When `propagated is None`, pass `None` into `build_mask_graph`, **not** `Path(propagated)`.
+
+```python
+        None if gcfg.drop_dp else (None if propagated is None else Path(propagated)),
+```
+
+and `extra_propagated=extra_propagated`.
+
+Leave the `volumes is None` branch (lines 131-143, `lesion_track` CLI) unchanged.
+
+File is 181 LOC; stays under 200.
 
 ### 5.3 `[nanoUNet] nanounet/infer/segtrack.py::run_case`
 
-This is the main wiring point. Current code (lines 141-159):
+Signature (lines 62-64): add `no_live_registration: bool = False, io_iterations: int = 0`.
+
+Replace lines 141-159. `mk_bl` is already Frame B (lines 137-138). Use `centroids(mk_bl, missing)`,
+**not** `centroids(bl_zyx, missing)` (that would be Frame A).
+
 ```python
     drop_dp = bool(getattr(matcher.hparams, "drop_dp", False))
-    prop = case.meta_csv if case.meta_csv is not None else case.fu_clicks
-    _, region = stem_pid_region(case.stem)
-    img_id = region if case.meta_csv is not None else None
-    if not drop_dp:
-        mx = int(bl_zyx.max())
-        bl_ids = np.flatnonzero(np.bincount(bl_zyx.ravel(), minlength=mx + 1))[1:].tolist() if mx > 0 else []
-        got, _ = load_propagated(prop, bl_ids, img_id=img_id)
-        drop = sorted(set(bl_ids) - set(got))
-        if drop:
-            cprint(f"[dim]drop {case.stem}  BL ids {drop} (not in this FU volume)[/dim]")
-    r = track(
-        case.bl_img, case.bl_img, case.fu_img, case.fu_img,
-        None if drop_dp else prop, track_ckpt,
-        decode=decode, device=device, matcher=matcher, thresh=thresh,
-        sinkhorn_tau=DEPLOYED_DUST_TAU, use_ema=True,
-        types_csv=case.types_csv, img_id=img_id,
-        volumes=(ct_bl, aff_bl, sp_bl, mk_bl, ct_fu, aff_fu, sp_fu, mk_fu),
-    )
-```
-Replace with:
-```python
-    drop_dp = bool(getattr(matcher.hparams, "drop_dp", False))
-    prop = case.meta_csv  # may be None now -- means "no CSV, rely on live registration"
+    prop = case.meta_csv  # None ⇒ no CSV; do not substitute fu_clicks
     _, region = stem_pid_region(case.stem)
     img_id = region if case.meta_csv is not None else None
     extra_propagated = None
@@ -648,14 +625,14 @@ Replace with:
         missing = sorted(set(bl_ids) - set(got))
         if missing and not no_live_registration:
             from tracking.data.appearance import centroids
-            from tracking.data.unigradicon import propagate_points
+            from nanounet.register.unigradicon import propagate_points
             extra_propagated = propagate_points(
-                case.bl_img, case.fu_img, centroids(bl_zyx, missing),
-                weights_path=unigradicon_weights, device=device,
+                case.bl_img, case.fu_img, centroids(mk_bl, missing),
+                io_iterations=io_iterations, device=device,
             )
-            cprint(f"[dim]{case.stem}  live-registered {len(missing)} BL id(s) via uniGradICON (no CSV coverage)[/dim]")
+            cprint(f"[dim]{case.stem}  live-registered {len(missing)} BL id(s) via uniGradICON[/dim]")
         elif missing:
-            cprint(f"[dim]drop {case.stem}  BL ids {missing} (no propagated coverage, --drop-uncovered set)[/dim]")
+            cprint(f"[dim]drop {case.stem}  BL ids {missing} (no propagated coverage, --drop-uncovered)[/dim]")
     r = track(
         case.bl_img, case.bl_img, case.fu_img, case.fu_img,
         None if drop_dp else prop, track_ckpt,
@@ -666,86 +643,267 @@ Replace with:
         extra_propagated=extra_propagated,
     )
 ```
-`run_case`'s own signature needs two new keyword parameters, `no_live_registration: bool`
-and `unigradicon_weights: Path`, added alongside the existing `seg_kw`/`on_step` parameters
-(around line 64); thread them in from the caller (5.4 below). `bl_zyx` here is the same
-array already computed earlier in `run_case` (either from `label_instances` or, in the
-`--bl-mask-dir` branch, from `load_instance_zyx`) — this fallback applies uniformly to both,
-by design (Section 2.1 already established BL identity needs this in either case).
 
-### 5.4 `[nanoUNet] nanounet/cli/segtrack.py` — new CLI flags
+This applies to both `--bl-mask-dir` BL and predicted BL.
 
-Add to `_mode()` (near the existing `--ema`/`--batch-size` flags, line ~52-57):
+File is 171 LOC. If `wc -l` ≥ 200 after the edit, extract nothing new — tighten the block
+above (it replaces a similar-sized block).
+
+### 5.4 `[nanoUNet] nanounet/cli/segtrack.py`
+
+`_mode()` after `--no-ema` / `--batch-size`:
+
 ```python
-ap.add_argument("--unigradicon-weights")
-ap.add_argument("--drop-uncovered", action="store_true",
-                 help="Skip BL lesions with no propagated-coordinate coverage instead of live-registering them")
+    ap.add_argument("--drop-uncovered", action="store_true",
+                    help="Omit BL ids with no CSV coverage instead of live-registering them")
+    ap.add_argument("--io-iterations", type=int, default=0,
+                    help="uniGradICON instance-optimization steps; 0 = one forward pass")
 ```
-In `main()`, resolve the weights path the same way `model_dir`/`track_ckpt` already are
-(near line 69-70):
+
+No weights flag. Config table:
+
 ```python
-unigradicon_weights, uw_src = resolve_ckpt_path(
-    args.unigradicon_weights, "NANOUNET_UNIGRADICON_WEIGHTS", DEFAULT_UNIGRADICON_WEIGHTS,
-)
+    ("drop-uncovered", "on" if args.drop_uncovered else "off", "cli" if args.drop_uncovered else "default"),
+    ("io-iterations", args.io_iterations, "cli" if args.io_iterations else "default"),
 ```
-Add a config-table row (near line 95-110) matching the existing style:
+
+`run_case(...)` call (lines 152-157): add
+`no_live_registration=args.drop_uncovered, io_iterations=args.io_iterations`.
+
+File is 188 LOC. After edit, `wc -l` must be < 200. Compact `add_argument` lines the same
+way lines 38-56 already do if needed.
+
+### 5.5 `[nanoUNet] nanounet/cli/segtrack_cases.py::_folder`
+
+Without this, folder mode on a tree with no `meta/` never had a problem (`md is None`,
+cases keep `meta_csv=None`), but a **partial** meta dir still skips. Change the skip so
+missing CSV is live-reg, not skip — unless `--drop-uncovered`:
+
 ```python
-("unigradicon-weights", unigradicon_weights, uw_src),
+    if md is not None:
+        keep = []
+        for c in cases:
+            pid, _ = stem_pid_region(c.stem)
+            p = md / f"{pid}.csv"
+            if p.is_file():
+                c.meta_csv = p
+                c.types_csv = p
+                keep.append(c)
+            elif getattr(args, "drop_uncovered", False):
+                skipped.append((c.stem, "no meta csv"))
+            else:
+                keep.append(c)
+        cases = keep
 ```
-Pass `no_live_registration=args.drop_uncovered, unigradicon_weights=unigradicon_weights`
-into the `run_case(...)` call inside the progress loop (around line 152-157).
 
-### 5.5 Docs
+Single-mode inferred meta (`_single` lines 117-124) stays: if the file exists, use it
+(Longitudinal-CT eval). To test no-CSV, copy two cases to a folder that has **no** sibling
+`meta/` (see §6.6). Do not add `--no-meta`.
 
-Update `[nanoUNet] docs/steps/track.md`'s argument table (near line 68) with rows for
-`--unigradicon-weights` and `--drop-uncovered`, and add a short paragraph explaining the
-live-registration fallback and when it triggers (no `--meta`/`--meta-dir` at all, or a BL
-lesion id the given CSV doesn't cover). Follow the existing doc format exactly (D3 in this
-project's nanochat-style skill: argument table with `Argument | Type | Default | Description`
-columns).
+### 5.6 Docs — `[nanoUNet] docs/steps/track.md`
 
-## 6. End-to-end verification protocol
+Same change as the CLI. Argument table (D3 columns). Add:
 
-Run in this order; each step gates the next.
+```markdown
+| `--drop-uncovered` | flag | off | Skip BL ids with no `cog_propagated` instead of live uniGradICON |
+| `--io-iterations` | int | `0` | uniGradICON IO steps. `0` = one forward pass (seconds). `50` matches `nanounet_register_longi` |
+```
 
-1. **Phase 1 alone**: run the Section 2.3 snippet. Confirm no lesion with real predicted
-   foreground is dropped purely for a click miss.
-2. **Phase 1 full pipeline**: rerun `nanounet_segtrack` on the same 4 flagged cases
-   (`307fd7f231_00`, `38b18881fc_00`, `bf97f24695_00`, `0f49c89d1e_00`) with `--overwrite
-   --keep-pred --ema`, confirm `fu.mha` is non-empty wherever `pred_fu.mha` has real
-   foreground.
-3. **Phase 2**: confirm the printed config table shows `--ema` on by default; rerun without
-   `--ema`/with `--no-ema` and confirm it still works.
-4. **Phase 3 validation gate**: run Section 4.4's script standalone. Do not proceed past
-   this step until it passes.
-5. **Phase 4, CSV-covered case (regression check)**: rerun a case that has full `--meta`
-   coverage today (any case already in `meta/*.csv` with no gaps). Confirm `uniGradICON` is
-   **never imported** for this case (add a temporary print/breakpoint in `_get_model` if
-   needed to confirm it's not called) and timing is unchanged from before this plan.
-6. **Phase 4, no-CSV case**: run `nanounet_segtrack` on a case **without** `--meta`/
-   `--meta-dir` at all. Confirm it completes (does not crash with the old
-   `FileNotFoundError`), confirm `matches.csv` has real pairs, and spot-check that the
-   painted `fu.mha` ids look reasonable against `bl.mha`.
-7. **Full 63-case test-set rerun**: once 1-6 all pass, rerun the full `followup` scoring
-   command from `docs/steps/track.md` with `--overwrite`, and recompute Dice using whatever
-   scoring approach is current at that time (the original `scripts/score_segtrack_fu.py`
-   used earlier this session was a standalone throwaway script not committed to the repo —
-   check whether it still exists before rewriting it). Expect ID-matched median Dice to move
-   substantially off `0.000` — Phase 1 alone should recover most of the previously-dropped
-   lesions.
+Short paragraph under Inputs (replace the sentence that says matcher BL positions only
+come from meta CSV):
 
-## 7. Explicitly out of scope for this plan (do not build these)
+Matcher BL positions: `{dataset}/meta/{pid}.csv` `cog_propagated` when that file exists
+(inferred from `--bl-dir` parent or `--meta-dir`). Any BL id the CSV does not cover is
+live-registered with uniGradICON (`nanounet/register/unigradicon.py`, same
+`register_pair(bl, fu)` as `nanounet_register_longi --backend unigradicon`). Weights:
+`$NANOUNET_UNIGRADICON_WEIGHTS` or `~/.cache/nanounet/unigradicon/Step_2_final.trch`. A
+`drop_dp` matcher does not need this. `--drop-uncovered` restores the old omit behaviour.
 
-- Full affine/rigid pre-registration beyond the single translation in `_coarse_align`. Only
-  build this if 4.4's validation (or later real-world use) shows the translation-only
-  approach is insufficient.
-- Wiring the uniGradICON fallback into the standalone `lesion_track` CLI
-  (`tracking/cli/track.py`, the `volumes is None` path in `track()`). This plan only wires
-  it into `nanounet_segtrack`'s in-process fast path.
-- Any change to `nanounet_predict`'s `--ema` default.
-- Any change to how BL identity is displayed/renumbered in the final `bl.mha`/`fu.mha` for
-  a fresh synthetic id from Phase 1 (e.g. wanting "nicer" numbers) — the only requirement
-  per `docs/reference/track_ids.md` is "same integer = same lesion," which fresh ids already
-  satisfy.
-- Multi-modality (MRI) support in the registration module — this project is CT-only
-  (`preprocess(..., modality="ct")` is hardcoded intentionally).
+Update the errors table:
+
+| old | new |
+|-----|-----|
+| `skip {stem} (no meta csv)` | only with `--drop-uncovered` |
+| `Empty instance mask \| No click hit predicted FG` | Empty only if the binary pred has no FG CC |
+
+`docs/steps/track.md` is 102 LOC; D4 < 200 still holds. Do not mention this plan file in
+user-facing docs.
+
+---
+
+## 6. End-to-end protocol
+
+Each step gates the next. Throwaway scripts are deleted after they pass (R16).
+`scripts/score_segtrack_fu.py` is **not in the repo**. Recreate it when you need it (§6.7);
+do not look for it.
+
+### 6.1 Phase 1 snippet
+
+§2.3. Four stems, `n_kept == n_cc`.
+
+### 6.2 Phase 1 one case through the CLI
+
+Until Phase 2, pass `--ema`.
+
+```bash
+nanounet_segtrack \
+  --bl-img /nnunet_data/Longitudinal-CT/inputsTrBL/307fd7f231_00.nii.gz \
+  --bl-mask /nnunet_data/Longitudinal-CT/targetsTrBL/307fd7f231_00.nii.gz \
+  --fu-img /nnunet_data/Longitudinal-CT/inputsTrFU/307fd7f231_00.nii.gz \
+  --fu-clicks /nnunet_data/Longitudinal-CT/inputsTrFU/307fd7f231_00.json \
+  -o "$NANOUNET_RESULTS/segtrack/phase1_check/307fd7f231_00" \
+  --overwrite --keep-pred --ema
+```
+
+`fu.mha` FG > 0 wherever `pred_fu.mha` FG > 0. Meta will be **inferred** from
+`Longitudinal-CT/meta/307fd7f231.csv` — that is intended for this step (CSV-covered BL ids).
+
+### 6.3 Phase 2
+
+Config table `seg-ema on default`. `--no-ema` still loads.
+
+### 6.4 Phase 3.4
+
+§4.7. Do not start §5 until it passes.
+
+### 6.5 Phase 4 regression (CSV-covered, no live reg)
+
+Rerun `307fd7f231_00` as in 6.2 **without** `--ema` (default on). uniGradICON must **not**
+run: every GT BL id is in the CSV. Confirm: no `live-registered` log line; no
+`propagate_points` import if you temporarily print in `get_model`. Timing unchanged.
+
+### 6.6 Phase 4 no-CSV
+
+Longitudinal-CT always infers `meta/`. Copy:
+
+```bash
+tmp=/tmp/segtrack_nocsv
+mkdir -p "$tmp/bl" "$tmp/fu" "$tmp/blm"
+for s in 307fd7f231_00; do
+  cp /nnunet_data/Longitudinal-CT/inputsTrBL/$s.nii.gz "$tmp/bl/"
+  cp /nnunet_data/Longitudinal-CT/inputsTrBL/$s.json "$tmp/bl/" 2>/dev/null || true
+  cp /nnunet_data/Longitudinal-CT/inputsTrFU/$s.nii.gz "$tmp/fu/"
+  cp /nnunet_data/Longitudinal-CT/inputsTrFU/$s.json "$tmp/fu/"
+  cp /nnunet_data/Longitudinal-CT/targetsTrBL/$s.nii.gz "$tmp/blm/"
+done
+nanounet_segtrack \
+  --bl-dir "$tmp/bl" --fu-dir "$tmp/fu" --bl-mask-dir "$tmp/blm" \
+  -o "$NANOUNET_RESULTS/segtrack/nocsv_check" --overwrite --keep-pred
+```
+
+`{bl-dir}/../meta` is `/tmp/segtrack_nocsv/meta` — absent ⇒ `meta_csv is None`. Must
+complete (no `FileNotFoundError`), log `live-registered`, write `matches.csv` with pairs,
+`fu.mha` ids comparable to `bl.mha`.
+
+### 6.7 Full 63-case rerun
+
+```bash
+nanounet_segtrack \
+  --bl-dir /nnunet_data/Longitudinal-CT/inputsTrBL \
+  --fu-dir /nnunet_data/Longitudinal-CT/inputsTrFU \
+  --bl-mask-dir /nnunet_data/Longitudinal-CT/targetsTrBL \
+  --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv \
+  -o "$NANOUNET_RESULTS/segtrack/followup" \
+  --overwrite --keep-pred
+```
+
+Throwaway scorer (delete after). Matches the existing JSON schema
+(`agg.median_comp_lesion` over all GT lesions, miss = 0):
+
+```python
+import json
+from pathlib import Path
+import numpy as np
+import SimpleITK as sitk
+
+gt_dir = Path("/nnunet_data/Longitudinal-CT/targetsTrFU")
+pred_dir = Path("/nanounet_data/NanoUNet_results/segtrack/followup")
+cases, all_d = [], []
+for fu in sorted(pred_dir.glob("*/fu.mha")):
+    stem = fu.parent.name
+    gtp = gt_dir / f"{stem}.nii.gz"
+    if not gtp.is_file():
+        continue
+    pred = sitk.GetArrayFromImage(sitk.ReadImage(str(fu)))
+    gt = sitk.GetArrayFromImage(sitk.ReadImage(str(gtp)))
+    gids = [int(i) for i in np.unique(gt) if i != 0]
+    pids = [int(i) for i in np.unique(pred) if i != 0]
+    dices = []
+    for lid in gids:
+        p, g = pred == lid, gt == lid
+        dices.append(float(2 * (p & g).sum() / (p.sum() + g.sum())) if (p.any() or g.any()) else 0.0)
+    det = [d for d, lid in zip(dices, gids) if lid in pids]
+    rec = dict(stem=stem, n_gt=len(gids), n_pred=len(pids),
+                n_id_both=len(set(gids) & set(pids)),
+                vol_dice=float(2 * ((pred > 0) & (gt > 0)).sum() / ((pred > 0).sum() + (gt > 0).sum()))
+                         if (pred > 0).any() or (gt > 0).any() else 0.0,
+                mean_comp=float(np.mean(dices)) if dices else 0.0,
+                median_comp=float(np.median(dices)) if dices else 0.0,
+                mean_detected=float(np.mean(det)) if det else float("nan"),
+                n_detected=len(det), dices=dices)
+    cases.append(rec)
+    all_d.extend(dices)
+agg = dict(n_cases=len(cases), n_gt_lesions=sum(c["n_gt"] for c in cases),
+            n_pred_lesions=sum(c["n_pred"] for c in cases),
+            n_detected=sum(c["n_detected"] for c in cases),
+            median_comp_lesion=float(np.median(all_d)) if all_d else 0.0,
+            mean_detected=float(np.nanmean([c["mean_detected"] for c in cases])))
+print(json.dumps(agg, indent=2))
+Path(pred_dir / "dice_vs_targetsTrFU.json").write_text(json.dumps({"agg": agg, "cases": cases}))
+```
+
+Expect `median_comp_lesion` **off 0.0**. Phase 1 alone should recover the dropped CCs
+(`307fd7f231_00` must leave `n_pred=0`). Do not require matching `cog_propagated` quality
+on the no-CSV path in this rerun (this rerun still has inferred meta).
+
+---
+
+## 7. LOC budget (nanochat R1: <200)
+
+| file | now | note |
+|------|-----|------|
+| `[nanoUNet] nanounet/cli/segtrack.py` | 188 | tight — compact flags if needed |
+| `[nanoUNet] nanounet/infer/segtrack.py` | 171 | replace a block, don't append a second |
+| `[nanoUNet] nanounet/register/unigradicon.py` | 73 | add `propagate_points` |
+| `[nanoUNet] nanounet/cli/segtrack_cases.py` | 124 | skip-logic change |
+| `[nanoUNet] nanounet/cli/predict.py` | 198 | **do not touch** |
+| `[lesion-tracking] tracking/infer.py` | 181 | extra param + guard |
+| `[lesion-tracking] tracking/data/masks.py` | 101 | extra param |
+| `[lesion-tracking] tracking/data/instances.py` | 78 | replace function |
+| `[nanoUNet] docs/steps/track.md` | 102 | D4 |
+
+After every edit: `wc -l` the file. Split only on a concept boundary, not to dodge the cap.
+
+---
+
+## 8. Out of scope (do not build)
+
+- `tracking/data/unigradicon.py` or `[project.optional-dependencies]` on lesion-tracking.
+- Origin-only `_coarse_align`. Pixel-space pre-align (`warp_case.landmark_align` /
+  elastix rigid) only if 4.7 fails.
+- Wiring live reg into `lesion_track` (`volumes is None`).
+- `nanounet_predict --ema` default.
+- Renaming / swapping `parse_zyx` (would desync the trained matcher).
+- "Nicer" numbers for Phase 1 synthetic ids. Constraint is `track_ids.md`: same integer =
+  same lesion.
+- MRI (`preprocess(..., modality="ct")` stays).
+- Changing `warp_pair` image-warping behaviour.
+
+---
+
+## 9. What the previous draft of this file got wrong
+
+| claim | reality |
+|-------|---------|
+| All bare triples are `(z,y,x)` | Two frames; CSV/JSON/matcher are `(x,y,z)` |
+| §4.4 used CSV as `bl_zyx` and reversed `cog_propagated` | Mixed frames in one script |
+| New `tracking/data/unigradicon.py` | Duplicate of `nanounet/register/unigradicon.py` |
+| `register_pair(A=FU, B=BL)` then `phi_AB(BL)→FU` | Opposite of production `warp_pair` |
+| Origin shift as "required" pre-align | No-op on the 175³ network input |
+| Weights under `$NANOUNET_RESULTS/unigradicon/...` | Env + `~/.cache/nanounet/unigradicon/` |
+| `unigradicon` not installed | Installed; weights not cached |
+| Omit `--meta` to test no-CSV on this dataset | Meta is inferred; must copy to a tree without `meta/` |
+| Folder skip unchanged | Must stop skipping missing CSV unless `--drop-uncovered` |
+| `centroids(bl_zyx, missing)` into propagate | Frame A into a Frame-B API |
+| Scoring command in `docs/steps/track.md` | Not there; script was never committed |
+| `cli/segtrack.py` has room for weights + two flags | 188 LOC; env for weights, two flags max |
