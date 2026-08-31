@@ -142,11 +142,11 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
     prop = case.meta_csv if case.meta_csv is not None else case.fu_clicks
     _, region = stem_pid_region(case.stem)
     img_id = region if case.meta_csv is not None else None
+    mx = int(bl_zyx.max())
+    all_bl_ids = np.flatnonzero(np.bincount(bl_zyx.ravel(), minlength=mx + 1))[1:].tolist() if mx > 0 else []
     if not drop_dp:
-        mx = int(bl_zyx.max())
-        bl_ids = np.flatnonzero(np.bincount(bl_zyx.ravel(), minlength=mx + 1))[1:].tolist() if mx > 0 else []
-        got, _ = load_propagated(prop, bl_ids, img_id=img_id)
-        drop = sorted(set(bl_ids) - set(got))
+        got, _ = load_propagated(prop, all_bl_ids, img_id=img_id)
+        drop = sorted(set(all_bl_ids) - set(got))
         if drop:
             cprint(f"[dim]drop {case.stem}  BL ids {drop} (not in this FU volume)[/dim]")
     r = track(
@@ -158,7 +158,7 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
         volumes=(ct_bl, aff_bl, sp_bl, mk_bl, ct_fu, aff_fu, sp_fu, mk_fu),
     )
     m = fu_track_map(
-        list(map(int, r.bl_ids)), list(map(int, r.fu_ids)),
+        all_bl_ids, list(map(int, r.fu_ids)),
         [(int(r.bl_ids[i]), int(r.fu_ids[j])) for i, j in r.pairs],
     )
     _write_mha(bl_zyx, props_bl, case_dir / "bl.mha")

@@ -50,7 +50,7 @@ def _mode(ap: argparse.ArgumentParser, choices: tuple[str, ...]) -> argparse.Nam
     ap.add_argument("--patients-csv")
     ap.add_argument("--overwrite", action="store_true")
     ap.add_argument("--keep-pred", action="store_true")
-    ap.add_argument("--ema", action="store_true")
+    ap.add_argument("--ema", action=argparse.BooleanOptionalAction, default=True)
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--inference-mode", choices=("clustered", "centered"), default="clustered")
     ap.add_argument("--disable-tta", dest="tta_flag", action="store_false", default=None)
@@ -98,6 +98,7 @@ def main() -> None:
         ("decode", args.decode, "cli" if args.decode != "hungarian" else "default"),
         ("sinkhorn-tau", DEPLOYED_DUST_TAU, "default"),
         ("track-ema", "on", "default"),
+        ("seg-ema", "on" if args.ema else "off", "default" if args.ema else "cli"),
         ("intra", gcfg.intra, "ckpt"),
         ("drop_dp", gcfg.drop_dp, "ckpt"),
         ("device", d, "cli"), ("n_cases", len(cases), "folder" if not single else "single"),

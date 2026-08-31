@@ -65,7 +65,7 @@ Writes `$NANOUNET_RESULTS/segtrack/inputsTrFU/{stem}/` (folder) or `$NANOUNET_RE
 | `--patients-csv` | path | unset | Optional holdout filter on stem prefix. Unpaired / missing JSON are skipped. |
 | `--overwrite` | flag | off | Redo cases that already have `matches.csv` |
 | `--keep-pred` | flag | off | Binary FG `pred_bl.mha` / `pred_fu.mha`. Mask mode: `pred_fu.mha` only |
-| `--ema` | flag | off | Seg UNet EMA. Matcher EMA is always on |
+| `--ema` / `--no-ema` | flag | on | Seg UNet EMA (deployed checkpoint has EMA shadow). Matcher EMA is always on |
 | `--batch-size` | int | `8` | Predict batch |
 | `--inference-mode` | choice | `clustered` | `clustered` \| `centered` |
 | `--disable-tta` | flag | config default | Same as predict |
