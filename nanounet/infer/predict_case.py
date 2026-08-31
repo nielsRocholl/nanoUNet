@@ -98,13 +98,9 @@ def predict_case_logits(
     with autocast(dev.type, enabled=amp_on):
         cat_limit = max_cat(net, torch.empty((1, row_ch, *patch_size), device=dev), dev)
         batch_size = min(batch_size, cat_limit)
-    pending: list = []
-    visited: set = set()
-    origins: list = []
+    pending, visited, origins = [], set(), []
     extras_done = [0] * len(seeds_pts)
-    canvas_origin: list = []
-    margin_bufs: list = []
-    logits_accs: list = []
+    canvas_origin, margin_bufs, logits_accs = [], [], []
     neg = torch.finfo(acc_dtype).min
     for ci, sl in enumerate(seed_slices):
         origin = (sl[0].start, sl[1].start, sl[2].start)
@@ -114,12 +110,8 @@ def predict_case_logits(
         canvas_origin.append(origin)
         margin_bufs.append(torch.full(patch_size, neg, dtype=acc_dtype, device=dev))
         logits_accs.append(bg_vec.view(-1, 1, 1, 1).to(acc_dtype).expand(nh, *patch_size).contiguous())
-    fwd_done = 0
-    written: list = []
-    enc_kw = dict(
-        is_longi=is_longi, bl_present=bl_present, bl_pts_pad=bl_pts_pad,
-    )
-
+    fwd_done, written = 0, []
+    enc_kw = dict(is_longi=is_longi, bl_present=bl_present, bl_pts_pad=bl_pts_pad)
     while pending:
         batch = pending[:batch_size]
         pending = pending[batch_size:]
@@ -186,14 +178,20 @@ def predict_case_logits(
             continue
         seen_u.add(key)
         tiles.append(u)
-    # Per-cluster canvas is ~tiles, not the AABB of distant clicks (that AABB is the full torso).
+    # Per-cluster canvas is ~tiles, not the AABB of distant clicks (full torso -> OOM). Adjacent
+    # clusters can still overlap after border-expand growth, so replay the margin competition
+    # here with one single-channel buffer instead of a last-cluster-wins overwrite.
     seg = torch.zeros(unpadded_shape, dtype=torch.uint8)
-    for acc, origin in zip(logits_accs, canvas_origin):
+    best_margin = torch.full(unpadded_shape, neg, dtype=acc_dtype)
+    for acc, mbuf, origin in zip(logits_accs, margin_bufs, canvas_origin):
         csl = tuple(slice(origin[a], origin[a] + acc.shape[a + 1]) for a in range(3))
         ov = patch_unpadded_overlap(csl[0], csl[1], csl[2], slicer_revert)
         if ov is None:
             continue
         (uz, uy, ux), (cz, cy, cx) = ov
-        seg[uz, uy, ux] = acc[:, cz, cy, cx].argmax(0).to(torch.uint8).cpu()
+        m = mbuf[cz, cy, cx].cpu()
+        keep = m > best_margin[uz, uy, ux]
+        seg[uz, uy, ux] = torch.where(keep, acc[:, cz, cy, cx].argmax(0).to(torch.uint8).cpu(), seg[uz, uy, ux])
+        best_margin[uz, uy, ux] = torch.where(keep, m, best_margin[uz, uy, ux])
     del logits_accs, margin_bufs
     return seg, tiles
