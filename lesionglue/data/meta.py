@@ -21,7 +21,7 @@ def _norm_topo(raw: str) -> str:
     return t
 
 
-def parse_zyx(s: object) -> tuple[float, float, float] | None:
+def parse_xyz(s: object) -> tuple[float, float, float] | None:
     if s is None or (isinstance(s, float) and pd.isna(s)):
         return None
     t = str(s).strip()
@@ -29,7 +29,7 @@ def parse_zyx(s: object) -> tuple[float, float, float] | None:
         return None
     parts = t.split()
     if len(parts) != 3:
-        raise ValueError(f"expected z y x triple, got {s!r}")
+        raise ValueError(f"expected x y z triple, got {s!r}")
     return float(parts[0]), float(parts[1]), float(parts[2])
 
 
@@ -125,10 +125,10 @@ def parse_meta_csv(path: Path) -> list[LesionRow]:
             LesionRow(
                 lesion_id=int(r["lesion_id"]),
                 topology=topo,
-                cog_bl=parse_zyx(r["cog_bl"]),
-                cog_propagated=parse_zyx(r["cog_propagated"]),
-                cog_backpropagated=parse_zyx(r.get("cog_backpropagated")),
-                cog_fu=parse_zyx(r["cog_fu"]),
+                cog_bl=parse_xyz(r["cog_bl"]),
+                cog_propagated=parse_xyz(r["cog_propagated"]),
+                cog_backpropagated=parse_xyz(r.get("cog_backpropagated")),
+                cog_fu=parse_xyz(r["cog_fu"]),
                 img_id_bl=int(r["img_id_bl"]),
                 img_id_fu=int(r["img_id_fu"]),
                 lesion_type=lt,

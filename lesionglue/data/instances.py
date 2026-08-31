@@ -44,9 +44,15 @@ def load_clicks(path: Path) -> dict[int, tuple[int, int, int]]:
 
 
 def binary_to_instances(pred: np.ndarray, clicks_zyx: dict[int, tuple[int, int, int]]) -> np.ndarray:
-    """pred is bool/0-1, same grid as clicks. Return int32 mask, voxel = lesion_id."""
+    """pred is bool/0-1, same grid as clicks. Every 18-connected FG component gets an id:
+    a click's component keeps that lesion_id, an unclaimed component gets a fresh id above
+    every click id. Two clicks on one component is a real collision (not separable here);
+    the later click is skipped and reported, not silently dropped or snapped elsewhere."""
     lab = cc3d.connected_components((pred > 0).astype(np.uint8), connectivity=18)
-    lut = np.zeros(int(lab.max()) + 1, dtype=np.int32)
+    n = int(lab.max())
+    if n == 0:
+        return lab.astype(np.int32)
+    lut = np.zeros(n + 1, dtype=np.int32)
     claimed: dict[int, int] = {}
     conflicts: list[tuple[int, int, int]] = []
     for lid, (z, y, x) in clicks_zyx.items():
@@ -63,6 +69,11 @@ def binary_to_instances(pred: np.ndarray, clicks_zyx: dict[int, tuple[int, int, 
         lut[cc] = lid
     if conflicts:
         cprint(f"[yellow]click CC conflicts (later click skipped): {conflicts}[/yellow]")
+    next_id = max(clicks_zyx, default=0) + 1
+    for cc in range(1, n + 1):
+        if lut[cc] == 0:
+            lut[cc] = next_id
+            next_id += 1
     return lut[lab]
 
 

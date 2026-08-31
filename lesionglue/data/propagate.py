@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from tracking.common import LESION_TYPES
-from tracking.data.meta import parse_zyx
+from tracking.data.meta import parse_xyz
 
 _SLIM = {"lesion_id", "z", "y", "x"}
 
@@ -75,7 +75,7 @@ def _from_meta(df: pd.DataFrame, img_id: int | None = None) -> tuple[dict[int, n
     for _, r in df.iterrows():
         if img_id is not None and int(r["img_id_fu"]) != img_id:
             continue
-        c = parse_zyx(r["cog_propagated"]) or parse_zyx(r.get("cog_fu"))
+        c = parse_xyz(r["cog_propagated"]) or parse_xyz(r.get("cog_fu"))
         if c is None:
             continue
         lid = int(r["lesion_id"])
@@ -127,7 +127,7 @@ def _from_slim(df: pd.DataFrame) -> tuple[dict[int, np.ndarray], dict[int, str]]
     prop, typ = {}, {}
     for _, r in df.iterrows():
         lid = int(r["lesion_id"])
-        prop[lid] = np.asarray([float(r["z"]), float(r["y"]), float(r["x"])], dtype=np.float64)
+        prop[lid] = np.asarray([float(r["x"]), float(r["y"]), float(r["z"])], dtype=np.float64)
         if "lesion_type" in df.columns and str(r["lesion_type"]).strip():
             lt = str(r["lesion_type"]).strip()
             assert lt in LESION_TYPES, f"unknown lesion_type {lt!r}"
