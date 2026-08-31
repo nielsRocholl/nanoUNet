@@ -55,8 +55,15 @@ hit by multiple clicks still cannot represent multiple instances.
 
 FU JSON is not uniformly a registration product. Across the 63 paired cases, 683 points
 equal `cog_propagated` and 90 equal `cog_fu`. `load_propagated::_from_meta` also uses
-`cog_fu` when propagation is missing; 23 real BL-mask IDs receive this ground-truth
-location. Remove that leakage.
+`cog_fu` when propagation is missing; 23 real BL-mask IDs receive this location. Confirmed
+with the dataset owner: this is a known, permanent dataset limitation, not leakage this
+pipeline introduces — the dataset team registered most lesions but ran out of time for
+some, and used the real FU annotation as the recorded substitute for both the meta-CSV
+`cog_propagated` column and the FU-click JSON. **Keep both fallbacks. Do not remove them.**
+Coverage of the model's predictions matters more here than excluding this documented gap.
+The fallback stays silent (no per-lesion provenance tagging in output); `tracking/data/
+provenance.py` already has an `imputed` flag available if stratified reporting is wanted
+later.
 
 Across 68 held-out BL masks, 45 IDs are absent after current region-filtered loading:
 39 belong only to another `img_id_fu`; six have a same-region row but no coordinate.
@@ -86,7 +93,8 @@ back to an index; it cannot improve registration.
 
 1. Implement instance retention and reserve **all** BL IDs during FU painting.
 2. Make segmentation EMA default without removing the existing `--ema` spelling.
-3. Enforce strict propagated-coordinate sources and preserve other-region exclusions.
+3. Make propagated-coordinate loading region-aware (`img_id`-filtered) and preserve
+   other-region exclusions. Keep the documented `cog_propagated` -> `cog_fu` fallback.
 4. Run registration research gate. Do not wire live fallback before it passes.
 5. Wire `extra_propagated`, case collection, and CLI only after the gate.
 6. Re-run the exact scorer and compare both segmentation and tracking metrics.
@@ -97,7 +105,9 @@ Each numbered document is a gate. A failed gate stops later work.
 
 - Every predicted 18-connected foreground component reaches the matcher.
 - Every integer shared by `bl.mha` and `fu.mha` is backed by a match row.
-- Metadata coordinates used as BL-in-FU positions come only from `cog_propagated`.
+- Metadata coordinates used as BL-in-FU positions come from `cog_propagated`, falling
+  back to `cog_fu` only when `cog_propagated` is empty (documented dataset limitation,
+  kept intentionally, both meta CSV and FU-click JSON).
 - IDs assigned exclusively to another FU region remain excluded.
 - No bare `(z,y,x)`/`(x,y,z)` triple crosses a module boundary undocumented.
 - No origin-only alignment is introduced.
@@ -107,8 +117,8 @@ Each numbered document is a gate. A failed gate stops later work.
 
 ## Safe behavior before registration passes
 
-Removing the FU-click and `cog_fu` fallbacks may make a geo matcher reject cases without
-propagated coordinates. That explicit failure is safer than silently using a false frame.
+A geo checkpoint with no metadata CSV and no FU-click JSON at all (neither source present)
+must still fail loudly rather than silently proceeding with no propagated coordinates.
 Users needing CSV-free tracking can explicitly pass the existing
 `/nnunet_data/lesion_tracking/runs/v7_nodp_complete/last.ckpt`
 (`drop_dp=true`; measured 57-graph match score 0.8929 versus 0.9558 for geo complete).

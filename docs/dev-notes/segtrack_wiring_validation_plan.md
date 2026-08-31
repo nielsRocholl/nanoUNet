@@ -62,7 +62,11 @@ replacing its duplicate propagated guards rather than appending another guard.
 ## 2. `run_case` source merge
 
 After Frame A masks are transposed to `mk_bl`/`mk_fu`, compute `all_bl_ids` as specified
-in the instance plan. Read strict metadata points only when `case.meta_csv` exists.
+in the instance plan. Read metadata points (including the kept `cog_fu` fallback, see
+[the coordinate plan](segtrack_coordinate_sources_plan.md) section 3) only when
+`case.meta_csv` exists; this draft does not change the existing
+`case.meta_csv or case.fu_clicks` behavior for the no-metadata case, so `missing` below is
+expected to be empty or near-empty for metadata cases in practice.
 
 ```python
 prop_path = case.meta_csv
@@ -185,7 +189,10 @@ For every completed case assert:
 - every shared nonzero BL/FU mask ID appears as `track_id` in `matches.csv`;
 - live coordinates are finite Frame-B `(x,y,z)` points inside expected bounds;
 - other-region-only BL IDs never enter the graph;
-- no metadata coordinate came from `cog_fu`.
+- live-registered coordinates (case 3/5 above) never equal the stored `cog_fu` value for
+  that lesion — that would mean the research alignment peeked at ground truth, not that a
+  metadata `cog_fu` fallback occurred (metadata `cog_fu` fallback is expected and fine,
+  per [the coordinate plan](segtrack_coordinate_sources_plan.md) section 3).
 
 Finally score the full fixed cohort before/after. Report segmentation retention, ID-linked
 Dice, pair precision/recall/F1, complete-match score, runtime, and peak GPU memory with

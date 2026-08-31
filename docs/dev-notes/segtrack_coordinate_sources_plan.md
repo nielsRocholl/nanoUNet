@@ -38,35 +38,33 @@ def parse_xyz(s: object) -> tuple[float, float, float] | None:
 Update the four `parse_meta_csv` calls and the import/use in `propagate.py`. There are no
 other repository call sites.
 
-## 3. Remove ground-truth leakage
+## 3. Keep the documented `cog_fu` fallback — do not remove it
 
-`/lesion-tracking/tracking/data/propagate.py::_from_meta` currently falls back from
-`cog_propagated` to `cog_fu`. For the held-out BL masks this leaks 23 real lesion
-locations into matcher geometry. Replace:
+`/lesion-tracking/tracking/data/propagate.py::_from_meta` falls back from
+`cog_propagated` to `cog_fu` when propagation is empty (23 real BL-mask IDs on the
+held-out set). The FU-click JSON has the same character: of 683+90 checked points, 90
+equal `cog_fu` instead of a registration warp.
 
-```python
-c = parse_xyz(r["cog_propagated"]) or parse_xyz(r.get("cog_fu"))
-```
+This is **not leakage to fix**. Confirmed with the dataset owner: the dataset team
+registered most lesions but ran out of time for some, and recorded the true FU annotation
+as the substitute for both the meta-CSV `cog_propagated` column and the FU-click JSON.
+That is a permanent, documented characteristic of this dataset, not a bug this pipeline
+introduces. Dropping those lesions would reduce prediction coverage for no benefit — there
+is no better estimate available for them.
 
-with:
+**Leave `_from_meta` and the FU-click JSON path unchanged on this point.** No code change
+in this section. `nanoUNet`'s existing
+`prop = case.meta_csv if case.meta_csv is not None else case.fu_clicks` also stays as-is —
+do not restrict it to `case.meta_csv` only.
 
-```python
-c = parse_xyz(r["cog_propagated"])
-```
+The fallback stays silent: no per-lesion `imputed` tagging in output for this pass.
+`tracking/data/provenance.py` already computes an `imputed` flag (registration guess vs.
+real annotation) if stratified reporting is wanted later; it is not wired into the segtrack
+CLI or scorer here.
 
-Update the module docstring to `Meta CSV: optional img_id_fu filter; cog_propagated only.
-Missing BL ids omitted.`
-
-Keep JSON support because an explicitly supplied JSON may contain registration-warped BL
-points. Its contract is not a generic FU-click file. In `nanoUNet` specifically, stop using
-`case.fu_clicks` as a propagated source:
-
-```python
-prop = case.meta_csv
-```
-
-Before live registration exists, a geo checkpoint with `prop is None` must fail with an
-actionable error. A `drop_dp` checkpoint must continue to pass `None` and work.
+Before live registration exists, a geo checkpoint with **neither** `case.meta_csv` nor
+`case.fu_clicks` present (`prop is None`) must fail with an actionable error. A `drop_dp`
+checkpoint must continue to pass `None` and work.
 
 ## 4. Fix slim CSV order
 
@@ -87,13 +85,19 @@ Do not change the external schema in this patch.
 
 ## 5. Preserve graph-partition exclusions
 
-Missing `cog_propagated` has two meanings:
+A single patient's meta CSV can cover more than one BL/FU scan pair (different
+`img_id_bl`/`img_id_fu`, e.g. different anatomical regions or follow-up timepoints). One
+`nanounet_segtrack` run works on exactly one such pair. Without filtering lookups by
+`img_id`, "no `cog_propagated` found for this BL id" conflates two different situations:
 
-1. the lesion is assigned only to another `img_id_fu`; exclude it from this graph;
-2. a same-region row exists without a coordinate; this is a registration gap.
+1. the lesion ID belongs only to a *different* scan pair for this patient; it was never
+   part of this run's volumes, and there is nothing to propagate — exclude it, do not fill;
+2. the lesion ID *is* in this run's scan pair, but has no coordinate; this is the same
+   documented registration gap as section 3, and after the `cog_fu` fallback in section 3
+   it should already have a coordinate in nearly all cases.
 
-Across 68 held-out BL masks the split is 39 versus six IDs. Live registration must fill
-only category 2.
+Across 68 held-out BL masks the split is 39 (category 1) versus six (category 2). Any
+future live registration must only ever target category 2 IDs, never category 1.
 
 Add to `propagate.py`:
 
@@ -135,14 +139,15 @@ assert np.allclose(prop[2], [332.98329748071467, 330.1652544079212, 108.33511925
 
 Expected behavior:
 
-- metadata rows with empty `cog_propagated` are omitted even when `cog_fu` exists;
+- metadata rows with empty `cog_propagated` fall back to `cog_fu` (documented dataset
+  limitation, kept intentionally — see section 3);
 - an explicit JSON preserves `[x,y,z]`;
 - slim row `z=1,y=2,x=3` returns `[3,2,1]`;
 - malformed triples say `expected x y z triple`;
 - the 68-case classification totals 39 `other_region_only` and six
   `same_region_no_coord`;
 - `drop_dp=true` succeeds with `propagated=None`;
-- a geo checkpoint with no metadata fails before matcher inference and does not inspect
-  `fu_clicks`.
+- a geo checkpoint with neither `case.meta_csv` nor `case.fu_clicks` present fails before
+  matcher inference with an actionable error.
 
 Delete temporary scripts after validation.
