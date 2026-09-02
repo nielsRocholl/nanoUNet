@@ -18,8 +18,8 @@
 # loop (it targets a hypothetical 48 GB card for patch sizing) -- preprocessing itself never
 # touches a GPU, so this job asks for none.
 #
-# -np 16, NOT 38 (the cpus-per-task ceiling): this step is memory-bound, not cpu-bound. At 200G
-# mem and 16 workers that's ~12.5 GB/worker steady-state, but large volumes can peak at ~50 GB/
+# -np 12, NOT 38 (the cpus-per-task ceiling): this step is memory-bound, not cpu-bound. At 200G
+# mem and 12 workers that is ~16.7 GB/worker steady-state, but large volumes can peak at ~50 GB/
 # worker during resampling -- running all 38 cores as workers would blow the 200G ceiling on the
 # first big volume. 16 leaves headroom for that peak.
 #
@@ -43,7 +43,7 @@ PLANNER=nnUNetPlannerResEncL
 GPU_MEM_GB=48
 PATCH_VOL=small
 PLANS_NAME=nnUNetResEncUNetLPlans_h200_smallpv
-NP=16
+NP=12
 
 export NANOUNET_RAW="${STORAGE}/NanoUNet_raw"
 export NANOUNET_PREPROCESSED="${STORAGE}/NanoUNet_preprocessed"
@@ -111,7 +111,7 @@ fi
 echo "== nanounet_preprocess merge -> Dataset${merged_padded}_${MERGED_NAME} =="
 echo "sources: ${IDS[*]} (all present under $NANOUNET_RAW)"
 echo "free space at \$NANOUNET_PREPROCESSED: ${FREE_GB}G"
-echo "-np $NP workers (memory-bound: ~12.5G/worker steady-state at --mem=200G, ~50G/worker peak)"
+echo "-np $NP workers (memory-bound: ~16.7G/worker steady-state at --mem=200G, ~50G/worker peak)"
 
 # ---- the expensive step --------------------------------------------------------------------------
 
