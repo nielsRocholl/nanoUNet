@@ -1,5 +1,6 @@
 #!/bin/bash
 #SBATCH --qos=vram
+#SBATCH --nodelist=dlc-arceus
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=38
 #SBATCH --mem=200G
