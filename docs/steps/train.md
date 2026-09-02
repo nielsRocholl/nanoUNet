@@ -138,13 +138,20 @@ Full write-up: [dev-notes/cgroup_memory.md](../dev-notes/cgroup_memory.md).
 **Inputs**
 
 - Preprocessed blosc2 + plans JSON
+- `splits_final.json` and `cohorts.json` — **hard preconditions**, produced by
+  [`nanounet_preprocess`](preprocess.md) (or `nanounet_build_splits`). Training no longer
+  fabricates a split on first run; both files must already exist under
+  `$NANOUNET_PREPROCESSED/DatasetXXX_*/` before `nanounet_train` starts
 - ROI config (`--config`) copied to run dir as `nano_config.json`
 - Optional MAE checkpoint or `--mae-pretrain`
+- Optional `--val-manifest` from `nanounet_build_valset` (or `--valset-config` during preprocess) —
+  its header stamps the `plans` name and `config_path` it was built with; `nanounet_train` checks
+  both against `--plans` and `--config` and fails at startup on a mismatch rather than silently
+  validating against the wrong ROI/prompt settings
 
 **Outputs**
 
 - `checkpoints/last.ckpt`, `checkpoints/best-*.ckpt`
-- `splits_final.json` (created on first run, 5-fold fixed seed)
 - `plans.json`, `dataset.json`, `nano_config.json` in run dir
 
 ## Common errors
@@ -158,6 +165,8 @@ Full write-up: [dev-notes/cgroup_memory.md](../dev-notes/cgroup_memory.md).
 | Missing plans / config | Preprocess or path error | Verify `--plans` basename and `--config` path |
 | `--consistency-weight ... requires --prompts-per-patch >= 2` | Consistency enabled without 2 prompts | Add `--prompts-per-patch 2` |
 | `batch_size ... not divisible by --prompts-per-patch` | Batch size / prompt count mismatch | Pick `--batch-size` as a multiple of `--prompts-per-patch` |
+| No `splits_final.json` / `cohorts.json` | Dataset was never preprocessed with splits enabled | `nanounet_preprocess -d <id> ...` (or `nanounet_build_splits -d <id> --plans <plans>`) before training |
+| `--val-manifest` plans/config stamp mismatch | Manifest built against a different `--plans` or `--config` than this run | Rebuild with `nanounet_build_valset -d <id> --plans <plans> --config <cfg> --out <manifest>`, or pass the matching `--plans`/`--config` |
 
 ## Cohort-weighted sampling
 

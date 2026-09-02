@@ -15,6 +15,13 @@ Merge example:
 nanounet_preprocess -d 1 2 3 --merged-id 999 --merged-name Merged -np 8
 ```
 
+Merge with a custom split fraction and a fixed validation manifest built in the same step:
+
+```bash
+nanounet_preprocess -d 11 12 13 --merged-id 900 --merged-name Merged -np 16 \
+  --val-frac 0.15 --split-seed 12345 --valset-config configs/default.json --valset-n 1500
+```
+
 Tiny local model:
 
 ```bash
@@ -50,6 +57,11 @@ refuses to run if a backup already exists at
 | `--skip-fingerprint` | flag | off | Skip fingerprint; use existing `dataset_fingerprint.json` |
 | `--skip-plan` | flag | off | Skip planning; requires `--plans-name` |
 | `--sidecars-only` | flag | off | Regenerate `*_centroids.json` sidecars only; requires `--plans-name`; never touches `.b2nd`, plans, or `gt_segmentations` |
+| `--val-frac` | float | `0.15` | Held-out fraction for `splits_final.json`, balanced within each source dataset (see [`nanounet_build_splits`](../../nanounet/cli/build_splits.py)) |
+| `--split-seed` | int | `12345` | RNG seed for the balanced train/val split |
+| `--no-splits` | flag | off | Skip writing `splits_final.json` / `cohorts.json` (e.g. re-preprocessing without disturbing an existing split) |
+| `--valset-config` | str | `None` | ROI config path; when set, also builds the fixed validation manifest via `nanounet_build_valset` |
+| `--valset-n` | int | `1500` | Patch count for the fixed validation manifest, only used with `--valset-config` |
 
 See [plan.md](plan.md) for `--patch-vol`, `--planner`, and `--gpu-memory-gb` trade-offs.
 
@@ -67,6 +79,21 @@ See [plan.md](plan.md) for `--patch-vol`, `--planner`, and `--gpu-memory-gb` tra
 - `<plans>/3d_fullres/*.b2nd` — blosc2 training tensors
 - `<plans>/3d_fullres/*_centroids.json` — per-lesion centroid, bbox, EDT seed, and voxel count
 - `gt_segmentations/` — resampled labels (also under raw dataset folder)
+- `splits_final.json` — single balanced train/val split (skip with `--no-splits`)
+- `cohorts.json` — per-cohort sampling weights derived from `lesion_site` (see below); consumed by
+  `nanounet_train`'s default cohort-weighted sampler
+- `valset_<n>.json` + `valset_<n>.targets.npz` — fixed validation manifest, only with `--valset-config`
+
+### lesion_site and cohorts.json
+
+Each source `dataset.json` under `$NANOUNET_RAW` carries a `"lesion_site"` key (e.g. `liver`,
+`lung`, `pancreas`) — a lowercase controlled-vocabulary tag for the anatomical site the dataset's
+lesions come from. Datasets covering the same organ share the exact same string. Preprocess reads
+this key from every merged source and writes `cohorts.json` with one weight per site instead of
+per source dataset, so a site spread across many small datasets (or one dataset dominating a site
+by raw case count) doesn't silently dominate the training mixture. Every source `dataset.json`
+passed to a merge must carry `lesion_site` — add the key (see the 21 datasets under
+`$NANOUNET_RAW/Dataset0{11..31}_*` for examples) before preprocessing a new merge.
 
 ### seed_zyx and volume_vox
 
@@ -95,3 +122,4 @@ derivatives change.
 | Wiped preprocess mid-run | Re-run without `--resume` | Use `--resume` to keep existing `3d_fullres` output |
 | `--sidecars-only needs --plans-name` | `--sidecars-only` without plans basename | Pass `--plans-name` for the dataset's existing plans json |
 | `--sidecars-only needs an existing preprocessed folder` | Target `<data_identifier>` folder missing | Run a full preprocess first (command shown in the error) |
+| `A preprocess worker was killed with no Python exception (SIGKILL)` | OOM kill by the cgroup, not a code bug — large volumes can peak ~50 GB/worker during resampling | Lower `-np` (the error suggests half the current count) and rerun with `--resume` to skip already-finished cases |
