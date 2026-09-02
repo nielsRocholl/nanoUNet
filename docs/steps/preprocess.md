@@ -53,7 +53,6 @@ refuses to run if a backup already exists at
 | `--gpu-memory-gb` | float | none | VRAM budget (GB) for planner patch shrink loop |
 | `--patch-vol` | choice | `large` | `small` (128) \| `medium` (192) \| `large` (256) \| `xlarge` (320) isotropic edge before aniso handling |
 | `--plans-name` | str | none | Basename of plans JSON (no `.json`) when using `--skip-plan` |
-| `--config-path` | str | none | Optional path forwarded into preprocessing |
 | `--skip-fingerprint` | flag | off | Skip fingerprint; use existing `dataset_fingerprint.json` |
 | `--skip-plan` | flag | off | Skip planning; requires `--plans-name` |
 | `--sidecars-only` | flag | off | Regenerate `*_centroids.json` sidecars only; requires `--plans-name`; never touches `.b2nd`, plans, or `gt_segmentations` |

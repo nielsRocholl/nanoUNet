@@ -7,11 +7,11 @@ from typing import List
 
 import numpy as np
 import torch
-from batchgenerators.utilities.file_and_folder_operations import join, load_json
+from batchgenerators.utilities.file_and_folder_operations import join
 from batchgeneratorsv2.transforms.base.basic_transform import BasicTransform
 from torch.utils.data import DataLoader, IterableDataset
 
-from nanounet.common import preprocessed_dir, print0, raw_dir
+from nanounet.common import preprocessed_dir, print0
 from nanounet.dataloader_prefs import DataloaderBucket, build_iter_dataloader, init_dataloader_ipc
 from nanounet.data.blosc2_dataset import Blosc2Folder, case_spatial_shape
 from nanounet.diag import (
@@ -22,7 +22,7 @@ from nanounet.diag import (
     worker_diag_tick,
 )
 from nanounet.plan.plans import Plans
-from nanounet.plan.splits import fold_keys, load_or_create_splits
+from nanounet.plan.splits import fold_keys, load_splits
 from nanounet.pretrain.augment import apply_spatial_tf, train_spatial_tf
 
 
@@ -139,18 +139,14 @@ def build_pretrain_dataloaders(
     persistent_workers: bool = False,
 ) -> tuple[DataLoader, DataLoader]:
     pp = preprocessed_dir()
-    raw = raw_dir()
     pl_path = join(pp, dataset_name, plans_identifier + ".json")
     pm = Plans(pl_path)
     cm = pm.get_configuration("3d_fullres")
-    dj = load_json(join(raw, dataset_name, "dataset.json"))
     fold_dir = join(pp, dataset_name)
     case_dir = join(pp, dataset_name, cm.data_identifier)
-    all_ids = Blosc2Folder.get_identifiers(case_dir)
-    ntr = dj.get("numTraining")
-    tr_keys = all_ids[: int(ntr)] if ntr is not None else list(all_ids)
     sp = join(fold_dir, "splits_final.json")
-    spl = load_or_create_splits(sp, tr_keys, 5, 12345)
+    did = int(dataset_name.split("_")[0].replace("Dataset", ""))
+    spl = load_splits(sp, did, plans_identifier)
     tr_k, va_k = fold_keys(spl, fold)
     ps = np.array(cm.patch_size)
     tr_0, va_0 = tr_k, va_k

@@ -1,4 +1,4 @@
-"""K-fold splits; same file format as nnU-Net."""
+"""Balanced train/val splits; same on-disk file format as nnU-Net (list of {train, val})."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import json
 from typing import List
 
 import numpy as np
-from sklearn.model_selection import KFold
 
 ALL_FOLD = "all"
 
@@ -19,25 +18,17 @@ def fold_seed(fold: int | str) -> int:
     return 0 if fold == ALL_FOLD else fold
 
 
-def make_splits(identifiers: List[str], n_splits: int = 5, seed: int = 12345) -> List[dict]:
-    ids = sorted(identifiers)
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
-    out: List[dict] = []
-    for tr, va in kf.split(ids):
-        out.append({"train": [ids[i] for i in tr], "val": [ids[i] for i in va]})
-    return out
-
-
-def load_or_create_splits(path: str, tr_keys: List[str], n_splits: int, seed: int) -> List[dict]:
+def load_splits(path: str, dataset_id: int, plans_identifier: str) -> List[dict]:
     import os
 
-    if os.path.isfile(path):
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    sp = make_splits(tr_keys, n_splits, seed)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(sp, f)
-    return sp
+    if not os.path.isfile(path):
+        raise FileNotFoundError(
+            f"No splits_final.json at {path}.\n"
+            f"Expected output of the balanced-split step for dataset {dataset_id}, plans {plans_identifier}.\n"
+            f"Fix: nanounet_build_splits -d {dataset_id} --plans {plans_identifier} --val-frac 0.15"
+        )
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
 
 
 def fold_keys(splits: List[dict], fold: int | str) -> tuple[list[str], list[str]]:

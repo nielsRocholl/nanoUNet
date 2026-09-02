@@ -14,11 +14,10 @@ from torch.utils.data import DataLoader
 from nanounet.common import ANISO_THRESHOLD, preprocessed_dir, raw_dir, setup_logging
 from nanounet.config import load_config
 from nanounet.data import augment
-from nanounet.data.blosc2_dataset import Blosc2Folder
 from nanounet.data.valset import build_val_dataloader, load_manifest
 from nanounet.dataloader_prefs import DataloaderBucket, build_iter_dataloader, init_dataloader_ipc
 from nanounet.plan.plans import Plans
-from nanounet.plan.splits import fold_keys, fold_seed, load_or_create_splits
+from nanounet.plan.splits import fold_keys, fold_seed, load_splits
 from nanounet.train.patch_iterable import PatchIterable, collate_patches, worker_init
 from nanounet.train.patch_size import get_patch_size
 
@@ -112,11 +111,9 @@ class NanoDataModule(pl.LightningDataModule):
             )
         fold_dir = join(pp, self.dataset_name)
         case_dir = join(pp, self.dataset_name, self.cm.data_identifier)
-        all_ids = Blosc2Folder.get_identifiers(case_dir)
-        ntr = dj.get("numTraining")
-        tr_keys = all_ids[: int(ntr)] if ntr is not None else list(all_ids)
         sp = join(fold_dir, "splits_final.json")
-        spl = load_or_create_splits(sp, tr_keys, 5, 12345)
+        did = int(self.dataset_name.split("_")[0].replace("Dataset", ""))
+        spl = load_splits(sp, did, self.plans_identifier)
         self.tr_keys, self.val_keys = fold_keys(spl, self.fold)
         if self.only_prefix:
             self.tr_keys = [k for k in self.tr_keys if k.startswith(self.only_prefix)]
