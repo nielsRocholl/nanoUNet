@@ -146,10 +146,13 @@ def _agg(rows: list[dict]) -> dict:
         "n_cases": len(rows), "n_lesions": sum(r["n"] for r in rows),
         "n_skipped_empty_gt": sum(r["n_skip"] for r in rows),
         "volume_dice_mean": float(np.mean([r["volume_dice"] for r in rows])),
+        "volume_dice_median": float(np.median([r["volume_dice"] for r in rows])),
         "dsc_case_mean": float(np.nanmean([r["dsc"] for r in rows])),
+        "dsc_case_median": float(np.nanmedian([r["dsc"] for r in rows])),
         "nsd_case_mean": float(np.nanmean([r["nsd"] for r in rows])),
         "ldr_case_mean": float(np.nanmean([r["ldr"] for r in rows])),
         "dsc_lesion_macro": float(np.nanmean(all_d)) if all_d else float("nan"),
+        "dsc_lesion_median": float(np.nanmedian(all_d)) if all_d else float("nan"),
     }
 
 
@@ -161,13 +164,13 @@ def report_case(r: dict) -> None:
 def report(rows: list[dict]) -> None:
     a = _agg(rows)
     cprint(Panel(
-        f"Dice vol     {_f(a['volume_dice_mean'])}    case-mean whole-volume (not comparable to LongiSeg)\n"
-        f"DSC          {_f(a['dsc_case_mean'])}    case-mean per-lesion  ← vs LongiSeg verified ~0.737\n"
+        f"Dice vol     {_f(a['volume_dice_mean'])}  (median {_f(a['volume_dice_median'])})   case-mean whole-volume (not comparable to LongiSeg)\n"
+        f"DSC          {_f(a['dsc_case_mean'])}  (median {_f(a['dsc_case_median'])})   case-mean per-lesion  ← vs LongiSeg verified ~0.737\n"
         f"NSD          {_f(a['nsd_case_mean'])}    1 mm surface\n"
         f"LDR          {_f(a['ldr_case_mean'])}    IoU > {IOU_HIT}\n"
         f"lesions      {a['n_lesions']} scored, {a['n_skipped_empty_gt']} empty-GT skipped",
         title="LongiSeg lesion metrics", border_style="cyan"))
-    cprint(f"[dim]lesion-macro DSC {_f(a['dsc_lesion_macro'])} (every lesion equal; headline is case-mean)[/dim]")
+    cprint(f"[dim]lesion-macro DSC {_f(a['dsc_lesion_macro'])}  (median {_f(a['dsc_lesion_median'])})  (every lesion equal; headline is case-mean)[/dim]")
 
 
 def _jsonable(obj):

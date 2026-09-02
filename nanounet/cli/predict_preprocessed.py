@@ -111,16 +111,16 @@ def main() -> None:
             prev.result()
         prev = ex.submit(fn, *a)
 
-    def _export(logits, cid, out_trunc, t0):
-        seg = lm.convert_logits_to_segmentation(logits).numpy().astype(np.uint8)
-        save_preprocessed_seg(seg, spacing, out_trunc + end)
+    def _export(seg, cid, out_trunc, t0):
+        save_preprocessed_seg(np.asarray(seg), spacing, out_trunc + end)
         timings.append((cid, time.perf_counter() - t0))
 
     def gpu_case(idx: int, cid: str, out_trunc: str, pack) -> None:
         nonlocal logged
         t0 = time.perf_counter()
         pad_cpu, slicer_revert, props, fu_xyz, bl_xyz, has_bl = pack
-        pad = pad_cpu.pin_memory().to(dev, non_blocking=True) if dev.type == "cuda" else pad_cpu.to(dev)
+        # Full torso stays on CPU; encode_inference_row H2Ds the patch. Pad-on-GPU starved TTA cat.
+        pad = pad_cpu.pin_memory() if dev.type == "cuda" else pad_cpu
         logits, _ = predict_case_logits(
             net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dev=dev,
             pad=pad, slicer_revert=slicer_revert, props=props,

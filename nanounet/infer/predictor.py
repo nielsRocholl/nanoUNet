@@ -26,7 +26,8 @@ def _ema_shadow(ck: dict, ckpt_path: str, net_st: dict) -> dict:
             f"No EMA shadow in checkpoint '{ckpt_path}'.\n"
             f"Expected Lightning callback state at callbacks/{_EMA_CB}/shadow "
             f"(written when training with --ema-decay > 0).\n"
-            f"Fix: drop --ema to use raw net.* weights, or train with --ema-decay 0.999  (see docs/steps/predict.md)"
+            f"Fix: pass --no-ema in nanounet_segtrack, or omit --ema in nanounet_predict "
+            f"(or train with --ema-decay 0.999)  (see docs/steps/predict.md)"
         )
     missing = [k for k in net_st if k not in shadow]
     extra = [k for k in shadow if k not in net_st]
@@ -35,8 +36,8 @@ def _ema_shadow(ck: dict, ckpt_path: str, net_st: dict) -> dict:
             f"EMA shadow keys do not match net.* in '{ckpt_path}'.\n"
             f"Expected the same {len(net_st)} tensors as state_dict keys stripped of 'net.'; "
             f"got {len(shadow)} ({len(missing)} missing, {len(extra)} extra).\n"
-            f"Fix: this checkpoint's EMA is from a different architecture; use matching --ckpt or drop --ema  "
-            f"(see docs/steps/predict.md)"
+            f"Fix: this checkpoint's EMA is from a different architecture; use matching --ckpt, or "
+            f"pass --no-ema in nanounet_segtrack / omit --ema in nanounet_predict  (see docs/steps/predict.md)"
         )
     return shadow
 

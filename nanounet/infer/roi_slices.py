@@ -7,6 +7,7 @@ from typing import List, Tuple
 import torch
 
 from nanounet.plan.labels import Labels
+from nanounet.prompt.cluster import cluster_points_for_patch_size, spatial_slices_covering_points
 
 ZYX = Tuple[int, int, int]
 
@@ -93,3 +94,48 @@ def extra_click_in_tile(gxyz: ZYX, sl: Tuple[slice, slice, slice], patch_size: T
     ly = min(max(gxyz[1] - sl[1].start, 0), patch_size[1] - 1)
     lx = min(max(gxyz[2] - sl[2].start, 0), patch_size[2] - 1)
     return (lz, ly, lx)
+
+
+def seed_slices_for_points(
+    pts_pad: List[ZYX],
+    patch_size: Tuple[int, int, int],
+    padded_shape: Tuple[int, int, int],
+    cluster_margin_frac: float,
+    mode: str,
+) -> Tuple[List[List[ZYX]], List[Tuple[slice, slice, slice]]]:
+    """Seed-tile placement for `mode`. Extracted so preprocessing can compute the same
+    tile layout as predict_case_logits before any forward pass runs (click-AABB preprocess)."""
+    assert mode in ("clustered", "centered")
+    if mode == "clustered":
+        seeds_pts = cluster_points_for_patch_size(pts_pad, patch_size, cluster_margin_frac)
+        seed_slices = [spatial_slices_covering_points(cl, patch_size, padded_shape) for cl in seeds_pts]
+        return seeds_pts, seed_slices
+    seen: set = set()
+    seeds_pts, seed_slices = [], []
+    for p in pts_pad:
+        sl = centered_spatial_slices_at_point(p[0], p[1], p[2], patch_size, padded_shape)
+        key = (sl[0].start, sl[1].start, sl[2].start, p)
+        if key in seen:
+            continue
+        seen.add(key)
+        seeds_pts.append([p])
+        seed_slices.append(sl)
+    return seeds_pts, seed_slices
+
+
+def grow_canvas(logits_acc, margin_buf, origin, sl, bg_vec, neg, acc_dtype):
+    """Expand one cluster canvas so it covers tile `sl`. Copy existing logits/margin."""
+    nh = logits_acc.shape[0]
+    cur_hi = tuple(origin[a] + logits_acc.shape[a + 1] for a in range(3))
+    lo = tuple(min(origin[a], sl[a].start) for a in range(3))
+    hi = tuple(max(cur_hi[a], sl[a].stop) for a in range(3))
+    if lo == origin and hi == cur_hi:
+        return logits_acc, margin_buf, origin
+    nsh = tuple(hi[a] - lo[a] for a in range(3))
+    nacc = bg_vec.view(-1, 1, 1, 1).to(acc_dtype).expand(nh, *nsh).contiguous()
+    nm = torch.full(nsh, neg, dtype=acc_dtype, device=logits_acc.device)
+    off = tuple(origin[a] - lo[a] for a in range(3))
+    z, y, x = logits_acc.shape[1:]
+    nacc[:, off[0]:off[0] + z, off[1]:off[1] + y, off[2]:off[2] + x] = logits_acc
+    nm[off[0]:off[0] + z, off[1]:off[1] + y, off[2]:off[2] + x] = margin_buf
+    return nacc, nm, lo

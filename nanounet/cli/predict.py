@@ -139,7 +139,8 @@ def main() -> None:
         nonlocal logged
         t0 = time.perf_counter()
         pad_cpu, slicer_revert, props, points_xyz, bl_points = pack
-        pad = pad_cpu.pin_memory().to(dev, non_blocking=True) if dev.type == "cuda" else pad_cpu.to(dev)
+        # Full torso stays on CPU; encode_inference_row H2Ds the patch. Pad-on-GPU starved TTA cat.
+        pad = pad_cpu.pin_memory() if dev.type == "cuda" else pad_cpu
         logits, tiles = predict_case_logits(
             net=net, lm=lm, cfg=cfg, pl=pl, cm=cm, dev=dev,
             pad=pad, slicer_revert=slicer_revert, props=props, points_xyz=points_xyz,

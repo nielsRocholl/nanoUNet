@@ -31,7 +31,7 @@ def encode_inference_row(
     extra_clicks: tuple[tuple[int, int, int], ...] = (),
 ) -> None:
     n_stream = n_img + 2
-    row[:n_img] = pad[:n_img, sz, sy, sx]
+    row[:n_img].copy_(pad[:n_img, sz, sy, sx], non_blocking=True)
     if not encode_prompt:
         row[n_img:n_stream].zero_()
     else:
@@ -51,7 +51,7 @@ def encode_inference_row(
         row[n_stream:] = row[:n_stream]
         return
     # Real baseline: same bbox crops ch1 because the joint 2-ch crop keeps FU/BL voxel-aligned.
-    row[n_stream : n_stream + n_img] = pad[n_img : 2 * n_img, sz, sy, sx]
+    row[n_stream : n_stream + n_img].copy_(pad[n_img : 2 * n_img, sz, sy, sx], non_blocking=True)
     bl_local = cluster_prompts_patch_local(bl_pts_pad, sz, sy, sx) if bl_pts_pad else []
     bl_pr = encode_points_to_heatmap_pair(
         bl_local, [], patch_size, cfg.prompt.point_radius_vox, cfg.prompt.encoding,

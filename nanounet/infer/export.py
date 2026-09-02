@@ -1,4 +1,4 @@
-"""Logits in preprocessed space → per-tile native paste, SimpleITK seg write."""
+"""pp-space uint8 argmax → per-tile native paste, SimpleITK seg write."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from acvl_utils.cropping_and_padding.bounding_boxes import insert_crop_into_imag
 
 from nanounet.data.io import reader_writer_class_from_dataset
 from nanounet.infer.patch_export import tiles_to_native_seg
-from nanounet.plan.labels import labels_from_dataset_json
 from nanounet.plan.plans import Config3d, Plans
 
 
@@ -51,15 +50,14 @@ def export_preprocessed_seg_to_native(
 
 
 def native_seg_from_logits(
-    logits: Union[np.ndarray, torch.Tensor],
+    seg_pp: Union[np.ndarray, torch.Tensor],
     props: dict,
     cm: Config3d,
     plans: Plans,
-    dataset_json: dict,
     tiles: list[tuple[slice, slice, slice]],
 ) -> np.ndarray:
-    lm = labels_from_dataset_json(dataset_json)
-    seg_pp = np.asarray(lm.convert_logits_to_segmentation(logits))
+    if isinstance(seg_pp, torch.Tensor):
+        seg_pp = np.asarray(seg_pp.detach().cpu())
     if not tiles:
         assert not np.any(seg_pp > 0), "FG voxels but no tiles (predict_case_logits must return tiles)"
     crops = [(seg_pp[sl], sl) for sl in tiles]
@@ -78,6 +76,6 @@ def export_prediction_from_logits(
 ):
     if save_probabilities:
         raise NotImplementedError("save_probabilities")
-    native = native_seg_from_logits(logits, props, cm, plans, dataset_json, tiles)
+    native = native_seg_from_logits(logits, props, cm, plans, tiles)
     rw = reader_writer_class_from_dataset(dataset_json, None, verbose=False)()
     rw.write_seg(native, output_trunc + dataset_json["file_ending"], props)

@@ -1,4 +1,4 @@
-"""Batched prompt-ROI logits: cluster seeds, then per-cluster face-grid expand."""
+"""Batched prompt-ROI logits: cluster seeds, face-grid expand, GPU argmax → CPU uint8."""
 
 from __future__ import annotations
 
@@ -12,21 +12,16 @@ from nanounet.infer.longi_row import encode_inference_row
 from nanounet.infer.points_pad import resolve_pts_pad
 from nanounet.infer.roi_slices import (
     background_logits_vector,
-    centered_spatial_slices_at_point,
     extra_click_in_tile,
     face_fg_click_global,
     fg_face_touch,
+    grow_canvas,
     map_points_zyx_unpadded_to_padded,
+    seed_slices_for_points,
 )
 from nanounet.infer.patch_export import patch_unpadded_overlap
 from nanounet.infer.tta import max_cat, predict_batch_with_tta
-from nanounet.prompt.cluster import (
-    cell_slices,
-    cluster_points_for_patch_size,
-    face_neighbours,
-    grid_stride,
-    spatial_slices_covering_points,
-)
+from nanounet.prompt.cluster import cell_slices, face_neighbours, grid_stride
 from nanounet.prompt.coords import points_to_centers_zyx
 
 MAX_BORDER_EXTRA = 16
@@ -36,7 +31,7 @@ ACC_DTYPE_ENV = "NANOUNET_SINGLE_PATCH_ACCUM_DTYPE"
 def _accum_dtype(dev: torch.device) -> torch.dtype:
     if dev.type == "cpu":
         return torch.float32
-    r = (os.environ.get(ACC_DTYPE_ENV) or "").lower()
+    r = (os.environ.get(ACC_DTYPE_ENV) or "half").lower()
     return torch.float16 if r in ("half", "float16", "fp16") else torch.float32
 
 
@@ -87,7 +82,7 @@ def predict_case_logits(
         slicer_revert=slicer_revert,
     )
     if not pts_pad:
-        return bg_vec.view(-1, 1, 1, 1).expand(nh, *unpadded_shape).contiguous().float().cpu(), []
+        return torch.zeros(unpadded_shape, dtype=torch.uint8), []
 
     bl_pts_pad = None
     if is_longi and bl_present and bl_points_xyz:
@@ -97,43 +92,26 @@ def predict_case_logits(
         )
         bl_pts_pad = map_points_zyx_unpadded_to_padded(bl_pre, slicer_revert)
 
-    if mode == "clustered":
-        seeds_pts = cluster_points_for_patch_size(pts_pad, patch_size, cluster_margin_frac)
-        seed_slices = [spatial_slices_covering_points(cl, patch_size, padded_shape) for cl in seeds_pts]
-    else:
-        seen: set = set()
-        seeds_pts, seed_slices = [], []
-        for p in pts_pad:
-            sl = centered_spatial_slices_at_point(p[0], p[1], p[2], patch_size, padded_shape)
-            key = (sl[0].start, sl[1].start, sl[2].start, p)
-            if key in seen:
-                continue
-            seen.add(key)
-            seeds_pts.append([p])
-            seed_slices.append(sl)
+    seeds_pts, seed_slices = seed_slices_for_points(pts_pad, patch_size, padded_shape, cluster_margin_frac, mode)
 
     stride = grid_stride(patch_size, cfg.inference.tile_step_size)
-    pending: list = []
-    visited: set = set()
-    origins: list = []
+    with autocast(dev.type, enabled=amp_on):
+        cat_limit = max_cat(net, torch.empty((1, row_ch, *patch_size), device=dev), dev)
+        batch_size = min(batch_size, cat_limit)
+    pending, visited, origins = [], set(), []
     extras_done = [0] * len(seeds_pts)
+    canvas_origin, margin_bufs, logits_accs = [], [], []
+    neg = torch.finfo(acc_dtype).min
     for ci, sl in enumerate(seed_slices):
         origin = (sl[0].start, sl[1].start, sl[2].start)
         origins.append(origin)
         pending.append((ci, (0, 0, 0), sl, ()))
         visited.add((ci, (0, 0, 0)))
-
-    neg = torch.finfo(acc_dtype).min
-    margin_buf = torch.full(padded_shape, neg, dtype=acc_dtype, device=dev)
-    logits_acc = bg_vec.view(-1, 1, 1, 1).to(acc_dtype).expand(nh, *padded_shape).contiguous()
-    fwd_done = 0
-    written: list = []
-    enc_kw = dict(
-        is_longi=is_longi, bl_present=bl_present, bl_pts_pad=bl_pts_pad,
-    )
-    with autocast(dev.type, enabled=amp_on):
-        batch_size = min(batch_size, max_cat(net, torch.empty((1, row_ch, *patch_size), device=dev), dev))
-
+        canvas_origin.append(origin)
+        margin_bufs.append(torch.full(patch_size, neg, dtype=acc_dtype, device=dev))
+        logits_accs.append(bg_vec.view(-1, 1, 1, 1).to(acc_dtype).expand(nh, *patch_size).contiguous())
+    fwd_done, written = 0, []
+    enc_kw = dict(is_longi=is_longi, bl_present=bl_present, bl_pts_pad=bl_pts_pad)
     while pending:
         batch = pending[:batch_size]
         pending = pending[batch_size:]
@@ -146,17 +124,24 @@ def predict_case_logits(
             )
             rows.append(row)
         with autocast(dev.type, enabled=amp_on):
-            out = predict_batch_with_tta(net, torch.stack(rows), use_tta)
+            out = predict_batch_with_tta(net, torch.stack(rows), use_tta, cat_limit=cat_limit)
         for j, (ci, ijk, sl, _extra) in enumerate(batch):
             raw = out[j].float()
             sz, sy, sx = sl
-            m = (raw[1:].amax(0) - raw[0]).to(acc_dtype)
-            sub_m = margin_buf[sz, sy, sx]
-            keep = m > sub_m
-            logits_acc[:, sz, sy, sx] = torch.where(
-                keep.unsqueeze(0), raw.to(acc_dtype), logits_acc[:, sz, sy, sx]
+            logits_accs[ci], margin_bufs[ci], canvas_origin[ci] = grow_canvas(
+                logits_accs[ci], margin_bufs[ci], canvas_origin[ci], sl, bg_vec, neg, acc_dtype,
             )
-            margin_buf[sz, sy, sx] = torch.where(keep, m, sub_m)
+            o = canvas_origin[ci]
+            csz = slice(sz.start - o[0], sz.stop - o[0])
+            csy = slice(sy.start - o[1], sy.stop - o[1])
+            csx = slice(sx.start - o[2], sx.stop - o[2])
+            m = (raw[1:].amax(0) - raw[0]).to(acc_dtype)
+            sub_m = margin_bufs[ci][csz, csy, csx]
+            keep = m > sub_m
+            logits_accs[ci][:, csz, csy, csx] = torch.where(
+                keep.unsqueeze(0), raw.to(acc_dtype), logits_accs[ci][:, csz, csy, csx]
+            )
+            margin_bufs[ci][csz, csy, csx] = torch.where(keep, m, sub_m)
             written.append(sl)
             fwd_done += 1
             if on_forward is not None:
@@ -180,6 +165,7 @@ def predict_case_logits(
                 pending.append((ci, nijk, nsl, extra_c))
                 extras_done[ci] += 1
 
+    del out, rows
     tiles: list[tuple[slice, slice, slice]] = []
     seen_u: set = set()
     for sl in written:
@@ -192,4 +178,20 @@ def predict_case_logits(
             continue
         seen_u.add(key)
         tiles.append(u)
-    return logits_acc[(slice(None), *slicer_revert[1:])].float().cpu(), tiles
+    # Per-cluster canvas is ~tiles, not the AABB of distant clicks (full torso -> OOM). Adjacent
+    # clusters can still overlap after border-expand growth, so replay the margin competition
+    # here with one single-channel buffer instead of a last-cluster-wins overwrite.
+    seg = torch.zeros(unpadded_shape, dtype=torch.uint8)
+    best_margin = torch.full(unpadded_shape, neg, dtype=acc_dtype)
+    for acc, mbuf, origin in zip(logits_accs, margin_bufs, canvas_origin):
+        csl = tuple(slice(origin[a], origin[a] + acc.shape[a + 1]) for a in range(3))
+        ov = patch_unpadded_overlap(csl[0], csl[1], csl[2], slicer_revert)
+        if ov is None:
+            continue
+        (uz, uy, ux), (cz, cy, cx) = ov
+        m = mbuf[cz, cy, cx].cpu()
+        keep = m > best_margin[uz, uy, ux]
+        seg[uz, uy, ux] = torch.where(keep, acc[:, cz, cy, cx].argmax(0).to(torch.uint8).cpu(), seg[uz, uy, ux])
+        best_margin[uz, uy, ux] = torch.where(keep, m, best_margin[uz, uy, ux])
+    del logits_accs, margin_bufs
+    return seg, tiles
