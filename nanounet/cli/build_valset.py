@@ -18,7 +18,7 @@ from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from nanounet.common import cprint, nano_header, nano_progress, preprocessed_dir, resolve_user_config_path
 from nanounet.config import load_config
 from nanounet.data.blosc2_dataset import Blosc2Folder
-from nanounet.data.valset import SCENARIOS, SCHEMA_VERSION, SIZE_BUCKETS, SMALL_LESION_MAX_VOX, _sidecar_path
+from nanounet.data.valset import SCENARIOS, SCHEMA_VERSION, SIZE_BUCKETS, SMALL_LESION_MAX_VOX, _sidecar_path, config_stamp
 from nanounet.data.valset_alloc import allocate, load_cohorts, scenario_allocation
 from nanounet.data.valset_build import (
     LabelCache,
@@ -178,6 +178,7 @@ def main() -> None:
 
     header = {
         "schema": SCHEMA_VERSION, "dataset": ds_name, "plans": args.plans, "config_path": cfg_path,
+        "config_stamp": config_stamp(roi_cfg),
         "seed": args.seed, "patch_size": [int(x) for x in patch_size], "small_lesion_max_vox": SMALL_LESION_MAX_VOX,
         "scenario_counts": scenario_counts, "cohort_weights": cohort_weights, "entries": all_entries,
         "subset_capable_cohorts": sorted(c for c, n in multi_counts.items() if n > 0),

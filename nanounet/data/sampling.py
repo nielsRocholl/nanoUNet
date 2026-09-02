@@ -9,7 +9,6 @@ kept set is drawn once per patch, before displacement, and shared by every promp
 from __future__ import annotations
 
 from typing import List, Tuple
-
 import numpy as np
 from scipy.spatial import cKDTree
 
@@ -18,7 +17,6 @@ from nanounet.data.error_table import draw_propagated_offset
 from nanounet.data.instance_target import kept_clicks, resolve_instance_target
 from nanounet.data.patch_bbox import _sample_bbox, crop_patch
 from nanounet.prompt.centroids import filter_centroids_in_patch
-
 
 def select_prompt_points(
     seg_crop: np.ndarray,
@@ -33,21 +31,14 @@ def select_prompt_points(
     kept: list[int] | None = None,
     fallback: dict | None = None,
 ) -> Tuple[List[Tuple[int, int, int]], List[Tuple[int, int, int]], int]:
-    """Click SELECTION only -- returns (positive, negative, n_false_pos) patch-local point lists;
-    rendering to heatmaps happens later (after augmentation), see nanounet/train/patch_iterable.py.
-
-    Order matters: offset applied to the GLOBAL centroid first, THEN filtered into the patch -- a
-    displaced click that lands outside the patch is simply not rendered, no clamping to the border.
-    jitter=False for points already real (registered/propagated), not mask-derived guesses.
-
-    `false_pos` is drawn ONCE PER PATCH by the caller and shared by every variant, so a consistency
-    /agreement pair differs only in lesion-click placement -- never in where the decoy sits. The
-    decoys are always the LAST `n_false_pos` entries of `pp`; click_inside_flags relies on that to
-    exclude them from the inside/outside vote.
-
-    `kept` (indices into cts_global, drawn once per patch by build_patch when instance_targets is
-    set) fixes WHICH lesions may click -- the per-variant random dropout below must not re-run, or
-    the target (masked to the same kept set) would disagree with what got clicked."""
+    """Click SELECTION only -- (positive, negative, n_false_pos) patch-local point lists; heatmap
+    rendering happens later, after augmentation (nanounet/train/patch_iterable.py). Offset applies
+    to the GLOBAL centroid first, THEN filtered into the patch -- an out-of-patch displaced click
+    is dropped, never clamped. jitter=False is for points already real (registered/propagated).
+    `false_pos` (drawn ONCE PER PATCH by the caller) is appended as the LAST `n_false_pos` entries
+    of `pp` -- click_inside_flags relies on that order. `kept` (drawn once per patch by build_patch
+    for instance_targets) fixes WHICH lesions may click; the dropout below must not re-run it, or
+    the kept-masked target would disagree with what got clicked."""
     pp: List[Tuple[int, int, int]] = []
     pn: List[Tuple[int, int, int]] = []
     n_fp = 0
@@ -65,10 +56,9 @@ def select_prompt_points(
             cm = cfg.sampling.click_modes
             kept_ = inch if cm.drop == 0.0 else [p for p in inch if rng.random() < cm.pos]
         else:
-            # Kept set fixed per patch (instance_targets). A kept lesion ALWAYS gets a click: if
-            # displacement threw it out of the patch, fall back to a point on its own tissue
-            # instead of dropping it. Inference does the same (longi_row.py:37-39), and dropping
-            # here trained "no click => background" for patches that at inference DO get a click.
+            # Kept set fixed per patch (instance_targets): a kept lesion ALWAYS gets a click -- if
+            # displaced out of the patch, fall back to a point on its own tissue (inference does the
+            # same, longi_row.py:37-39) rather than drop it and train "no click => background".
             kept_ = kept_clicks(displaced, kept, pslc, fallback)
         pp = list(kept_)
         if false_pos:
@@ -76,19 +66,16 @@ def select_prompt_points(
             pp = pp + list(false_pos)
     return pp, pn, n_fp
 
-
 def draw_false_pos(seg_crop, cfg: RoiPromptConfig, force_zero_prompt: bool, rng) -> list:
     """One decoy draw PER PATCH (not per variant) -- see select_prompt_points."""
     if force_zero_prompt or rng.random() >= cfg.sampling.false_pos_probability:
         return []
     return _sample_false_pos(seg_crop, rng)
 
-
 # One decoy for the rare "click on empty tissue" case; not a difficulty knob (at deployment every click
 # refers to a real lesion, and the genuine negative is the disappeared lesion, already in the data).
 # The old 30-50 vox setting tuned hardness, wrongly: 42% of lesions have a neighbour closer than 30.
 _FALSE_POS_GUARD_VOX = 5
-
 
 def points_variant(
     seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox, false_pos=None,
@@ -103,7 +90,6 @@ def points_variant(
         "points_neg": np.asarray(pn, dtype=np.float32).reshape(-1, 3),
         "n_false_pos": n_fp,
     }
-
 
 def _sample_false_pos(seg_crop: np.ndarray, rng: np.random.Generator) -> list[tuple[int, int, int]]:
     """One random background voxel >= _FALSE_POS_GUARD_VOX from foreground. KD-tree rejection
@@ -124,7 +110,6 @@ def _sample_false_pos(seg_crop: np.ndarray, rng: np.random.Generator) -> list[tu
         if len(hit):
             return [tuple(int(v) for v in hit[0])]
     return []
-
 
 def build_patch(
     data,
@@ -152,14 +137,22 @@ def build_patch(
         )
     volumes_vox = [float(v) for v in raw_v]
     assert len(volumes_vox) == len(cts_global), (len(volumes_vox), len(cts_global))
+    # Per-centroid sampling weights from the <case>_weights.json sidecar; absent => uniform draw,
+    # unless require_weights refuses that fallback (nanounet/config.py SamplingConfig).
     w = properties.get("centroid_weights")
+    if w is None and cfg.sampling.require_weights:
+        raise KeyError(
+            "centroid_weights missing (no <case>_weights.json sidecar) and sampling.require_weights "
+            "is true: refusing uniform per-centroid sampling.\n"
+            "Fix: nanounet_lesion_weights -d <id> --plans <plans> --meta-dir <dir of <hash>.csv "
+            "lesion-type files>   -- or set require_weights to false"
+        )
+    weights = None
     if w is not None:
         assert len(w) == len(cts_global), (len(w), len(cts_global))
         w = np.asarray(w, dtype=np.float64)
         s = w.sum()
         weights = w / s if s > 0 else None
-    else:
-        weights = None
     need_to_pad = (patch_size - final_patch_size).astype(int)
     shape = np.array(data.shape[1:])
     bbox_lbs, bbox_ubs, _anchor = _sample_bbox(
@@ -185,10 +178,9 @@ def build_patch(
         seg_out, kept, fallback = resolve_instance_target(
             seg_crop, cts_global, bboxes_global, pslc, cfg.sampling.click_modes.pos, rng
         )
-    # N independent click draws over ONE shared crop, so a consistency pair differs only in the click.
-    # `seg_crop` (the REAL seg), not `seg_out`, feeds draw_false_pos above and click_inside_flags
-    # downstream: decoys must avoid real tissue, and the inside/outside vote must reflect the real
-    # lesion, not the click-conditional target.
+    # N independent click draws over ONE shared crop, so a consistency pair differs only in the
+    # click. `seg_crop` (not `seg_out`) feeds draw_false_pos and click_inside_flags below: decoys
+    # avoid real tissue, and the inside/outside vote reflects the real lesion, not the click-target.
     variants = [
         points_variant(seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, True, volumes_vox, fp, kept, fallback)
         for _ in range(prompts_per_patch)

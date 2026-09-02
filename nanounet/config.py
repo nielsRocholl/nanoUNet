@@ -43,6 +43,9 @@ class SamplingConfig:
     instance_targets: bool = False
     # Absent/empty => uniform case draw, exactly. See nanounet/data/cohorts.py.
     cohorts: Mapping[str, float] = field(default_factory=dict)
+    # False (default): a missing <case>_weights.json falls back to uniform per-centroid sampling.
+    # True: that same absence raises instead. See nanounet/data/sampling.py.
+    require_weights: bool = False
 
 
 @dataclass(frozen=True)
@@ -129,6 +132,7 @@ def _load_sampling(d: dict) -> SamplingConfig:
         propagated=_load_prop(d.get("propagated")),
         instance_targets=bool(d.get("instance_targets", False)),
         cohorts={str(k): float(v) for k, v in (d.get("cohorts") or {}).items()},
+        require_weights=bool(d.get("require_weights", False)),
     )
 
 

@@ -120,6 +120,8 @@ class NanoDataModule(pl.LightningDataModule):
             self.val_keys = [k for k in self.val_keys if k.startswith(self.only_prefix)]
             assert self.tr_keys and self.val_keys, self.only_prefix
         self.case_folder = case_dir
+        # dataset_dir (not case_dir) is where nanounet_preprocess writes cohorts.json.
+        self.dataset_dir = fold_dir
         ps = np.array(self.cm.patch_size)
         dss = _ds_scales(self.cm, self.enable_ds)
         rot, do_dum, init_ps, mirrors = _rotation_dummy_mirroring(list(ps))
@@ -129,13 +131,14 @@ class NanoDataModule(pl.LightningDataModule):
         ign = self.label_manager.ignore_label
         self.train_tf = augment.train_transforms(ps, rot, dss, mirrors, do_dum, umn, False, fl, reg, ign)
         self.val_tf = augment.val_transforms(dss, False, fl, reg, ign)
-        self.val_manifest = load_manifest(self.val_manifest_path) if self.val_manifest_path else None
+        self.val_manifest = load_manifest(self.val_manifest_path, self.roi_cfg) if self.val_manifest_path else None
         self.patch_size, self.final_ps, self.init_patch_size = ps, ps, np.array(init_ps)
 
     def train_dataloader(self) -> DataLoader:
         init_dataloader_ipc()
         it = PatchIterable(
             self.case_folder,
+            self.dataset_dir,
             self.tr_keys,
             self.roi_cfg,
             self.init_patch_size,
@@ -176,7 +179,7 @@ class NanoDataModule(pl.LightningDataModule):
         # emit_prompt2=True: 2nd independent-prompt draw for val_prompt_agreement, own RNG stream
         # (prompts_per_patch stays 1 -- val batch composition, and val_dice, are unaffected).
         it = PatchIterable(
-            self.case_folder, self.val_keys, self.val_cfg, self.final_ps, self.final_ps,
+            self.case_folder, self.dataset_dir, self.val_keys, self.val_cfg, self.final_ps, self.final_ps,
             self.label_manager.annotated_classes_key, self.val_tf, False, self.num_val_iterations,
             self.batch_size, fold_seed(self.fold) + 2000, self.longi, self.longi_null, emit_prompt2=True,
         )

@@ -12,13 +12,15 @@ bits in a sidecar .npz -- that is what keeps cc3d off the validation path entire
 
 Per-cohort metrics are defined over all_clicked rows only: single-lesion cohorts (e.g. d014/d016/
 d020) get zero subset_clicked patches by construction (see nanounet_build_valset), so mixing
-scenarios into one per-cohort number would compare scenario difficulty rather than model quality."""
+scenarios into one per-cohort number would compare scenario difficulty rather than model quality.
+
+Every entry is baked in at build time under a specific RoiPromptConfig; load_manifest stamps that
+config into the header and refuses a stale mismatch -- see config_stamp() for which fields and why."""
 
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
-
+from dataclasses import asdict, dataclass
 import numpy as np
 import torch
 from batchgenerators.utilities.file_and_folder_operations import load_json
@@ -36,7 +38,6 @@ SCENARIOS = ("all_clicked", "subset_clicked", "none_clicked", "lesion_free_decoy
 SIZE_BUCKETS = ("small", "large")
 SMALL_LESION_MAX_VOX = 500  # ~10mm diameter at the plans spacing; see docs/steps/valset.md
 
-
 @dataclass(frozen=True)
 class ValManifest:
     path: str
@@ -45,14 +46,22 @@ class ValManifest:
     packed: np.ndarray | None  # (n, nbytes) uint8, or None when no subset entries
     patch_size: tuple[int, int, int]
 
-
 def _sidecar_path(manifest_path: str) -> str:
     if not manifest_path.endswith(".json"):
         raise ValueError(f"manifest path must end in .json, got {manifest_path!r}")
     return manifest_path[: -len(".json")] + ".targets.npz"
 
+def config_stamp(cfg: RoiPromptConfig) -> dict:
+    """Fields nanounet_build_valset reads while choosing WHICH patch/clicks to bake into a row
+    (draw_lesion_clicks in valset_build.py). Only sampling.propagated qualifies -- it drives the
+    per-lesion displacement behind the stored click coordinates. Everything else in RoiPromptConfig
+    either never reaches the build (fg_patch_prob, click_modes, false_pos_probability,
+    instance_targets are fixed by the build's own scenario logic) or is applied fresh at load time
+    regardless of the manifest (prompt.* rendering uses the LIVE roi_cfg in ValPatchDataset), so a
+    mismatch there can't make the manifest stale."""
+    return {"propagated": asdict(cfg.sampling.propagated)}
 
-def load_manifest(path: str) -> ValManifest:
+def load_manifest(path: str, cfg: RoiPromptConfig) -> ValManifest:
     if not os.path.isfile(path):
         raise FileNotFoundError(
             f"No validation manifest at {path}.\n"
@@ -65,6 +74,22 @@ def load_manifest(path: str) -> ValManifest:
         raise ValueError(
             f"{path} has schema {header.get('schema')}, this build expects {SCHEMA_VERSION}.\n"
             f"Fix: rebuild it with nanounet_build_valset"
+        )
+    stamp = header.get("config_stamp")
+    if stamp is None:
+        raise ValueError(
+            f"{path} has no config_stamp (built by an older nanounet_build_valset).\n"
+            f"Without it a manifest built under a different sampling config loads silently, and "
+            f"the val curve becomes meaningless.\n"
+            f"Fix: nanounet_build_valset -d <id> --plans <plans> --config <cfg> --out {path}"
+        )
+    live = config_stamp(cfg)
+    if stamp != live:
+        keys = sorted(set(stamp) | set(live))
+        diff = "\n".join(f"  {k}: manifest={stamp.get(k)!r} vs live={live.get(k)!r}" for k in keys if stamp.get(k) != live.get(k))
+        raise ValueError(
+            f"{path} was built under a different sampling config than the one now in use:\n{diff}\n"
+            f"Fix: nanounet_build_valset -d <id> --plans <plans> --config <cfg> --out {path}"
         )
     entries = header["entries"]
     patch_size = tuple(int(x) for x in header["patch_size"])
@@ -79,7 +104,6 @@ def load_manifest(path: str) -> ValManifest:
             )
         packed = np.load(npz_path)["packed"]
     return ValManifest(path=path, header=header, entries=entries, packed=packed, patch_size=patch_size)
-
 
 class ValPatchDataset(Dataset):
     """Map-style val dataset over a fixed ValManifest. __getitem__ re-crops from the case, re-runs
@@ -120,16 +144,10 @@ class ValPatchDataset(Dataset):
         # Both draws ride ONE augmentation pass, exactly as PatchIterable does, so the pair differs
         # only in click placement.
         variants = [
-            {
-                "points_pos": np.asarray(e["clicks_zyx"], np.float32).reshape(-1, 3),
-                "points_neg": np.zeros((0, 3), np.float32),
-                "n_false_pos": e["n_false_pos"],
-            },
-            {
-                "points_pos": np.asarray(e["clicks2_zyx"], np.float32).reshape(-1, 3),
-                "points_neg": np.zeros((0, 3), np.float32),
-                "n_false_pos": e["n_false_pos"],
-            },
+            {"points_pos": np.asarray(e["clicks_zyx"], np.float32).reshape(-1, 3),
+             "points_neg": np.zeros((0, 3), np.float32), "n_false_pos": e["n_false_pos"]},
+            {"points_pos": np.asarray(e["clicks2_zyx"], np.float32).reshape(-1, 3),
+             "points_neg": np.zeros((0, 3), np.float32), "n_false_pos": e["n_false_pos"]},
         ]
         kp = concat_variant_keypoints(variants, self.longi)
         with torch.no_grad():
@@ -137,18 +155,13 @@ class ValPatchDataset(Dataset):
             split = split_variant_keypoints(o["keypoints"], variants, self.longi)
             v1 = render_variant(o, split[0], {"null_baseline": False}, self.longi, self.final_ps, self.pr)
             v2 = render_variant(o, split[1], {"null_baseline": False}, self.longi, self.final_ps, self.pr)
-
         item = {
-            "data_variants": [v1],
-            "data_prompt2": v2,
-            "target": o["segmentation"],
-            "click_inside": [e["click_inside"]],
-            "scenario": SCENARIOS.index(e["scenario"]),
-            "cohort": self.cohort_index[e["cohort"]],
-            "size_bucket": SIZE_BUCKETS.index(e["size_bucket"]),
-            # Displacement can push a lesion click out of the patch in one draw but not the
-            # other (67/1500 on the real manifest); those rows measure "a lesion left the
-            # prompt", not pure placement jitter -- val_metrics reports both variants.
+            "data_variants": [v1], "data_prompt2": v2, "target": o["segmentation"],
+            "click_inside": [e["click_inside"]], "scenario": SCENARIOS.index(e["scenario"]),
+            "cohort": self.cohort_index[e["cohort"]], "size_bucket": SIZE_BUCKETS.index(e["size_bucket"]),
+            # Displacement can push a lesion click out of the patch in one draw but not the other
+            # (67/1500 on the real manifest); those rows measure "a lesion left the prompt", not
+            # pure placement jitter -- val_metrics reports both variants.
             "draws_matched": int(len(e["clicks_zyx"]) == len(e["clicks2_zyx"])),
         }
         if e["subset_target_index"] >= 0:
@@ -159,7 +172,6 @@ class ValPatchDataset(Dataset):
             item["target_subset"] = torch.zeros((1, *self.patch_size), dtype=torch.int16)
         item["has_subset"] = int(e["subset_target_index"] >= 0)
         return item
-
 
 def build_val_dataloader(
     manifest: ValManifest,
@@ -180,13 +192,7 @@ def build_val_dataloader(
     nw = bucket.nw_val
     winit = worker_init if nw else None
     return build_iter_dataloader(
-        ds,
-        batch_size=batch_size,
-        bucket=bucket,
-        nw=nw,
-        prefetch=bucket.prefetch_val,
-        collate_fn=collate_patches,
-        pin_memory=pin_memory,
-        worker_init_fn=winit,
+        ds, batch_size=batch_size, bucket=bucket, nw=nw, prefetch=bucket.prefetch_val,
+        collate_fn=collate_patches, pin_memory=pin_memory, worker_init_fn=winit,
         persistent_workers=persistent_workers,
     )

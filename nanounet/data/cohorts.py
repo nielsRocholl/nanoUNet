@@ -2,9 +2,9 @@
 
 Dataset999 merges 17 source datasets of very unequal size (CECT 18%, MSD_Lung 1%), so a uniform
 draw over cases makes the training mixture an accident of how much data each site happened to
-contribute. Named prefixes take their stated probability; the remaining mass is spread over all
-other cases in proportion to their counts, so an absent or empty `sampling.cohorts` block
-reproduces the uniform draw exactly.
+contribute. Weights come from cohorts.json, written into the preprocessed dataset dir by
+nanounet_preprocess -- it is the single derived, always-correct source, so it is loaded by
+default instead of being re-specified (and silently left incomplete) in the training config.
 
 This composes with, and does not replace, the *_weights.json lesion-type weights: cohort weights
 pick WHICH case, lesion weights pick WHERE inside it (patch_bbox.py). Two independent knobs.
@@ -15,13 +15,30 @@ the dataloader hot path for every patch.
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
+from batchgenerators.utilities.file_and_folder_operations import load_json
 
 from nanounet.plan.splits import cohort_of
 
+COHORTS_FILENAME = "cohorts.json"
+
+
+def load_cohort_weights(dataset_dir: str) -> dict[str, float]:
+    """Read the {prefix: weight} map written by preprocess for `dataset_dir`."""
+    path = os.path.join(dataset_dir, COHORTS_FILENAME)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(
+            f"No {COHORTS_FILENAME} at {path}.\n"
+            f"Expected the site-balanced cohort weights written by the preprocess step.\n"
+            f"Fix: nanounet_preprocess -d <id> ...   (this now also writes {COHORTS_FILENAME})"
+        )
+    return {str(k): float(v) for k, v in load_json(path)["weights"].items()}
+
 
 class CohortSampler:
-    def __init__(self, keys: list[str], weights: dict[str, float]):
+    def __init__(self, keys: list[str], dataset_dir: str, override: dict[str, float] | None = None):
         groups: dict[str, list[int]] = {}
         for i, k in enumerate(keys):
             groups.setdefault(cohort_of(k), []).append(i)
@@ -29,32 +46,43 @@ class CohortSampler:
         self.names = sorted(groups)
         self.idx = [np.asarray(groups[n], dtype=np.int64) for n in self.names]
 
-        named = {n: float(w) for n, w in weights.items()}
-        unknown = sorted(set(named) - set(self.names))
-        if unknown:
-            raise ValueError(
-                f"sampling.cohorts names {unknown} are not present in this key list.\n"
-                f"Available cohorts: {', '.join(self.names)}\n"
-                f"Fix: use a bare dataset prefix such as \"d013\" (no trailing underscore)"
-            )
-        total = sum(named.values())
-        if total > 1.0 + 1e-9:
-            raise ValueError(
-                f"sampling.cohorts weights sum to {total:.4f}, which exceeds 1.0.\n"
-                f"The remainder is what is left for every unnamed cohort.\n"
-                f"Fix: lower the weights so they sum to at most 1.0"
-            )
-        rest = [n for n in self.names if n not in named]
-        rest_cases = sum(len(self.idx[self.names.index(n)]) for n in rest)
-        if rest and rest_cases == 0:
-            raise ValueError("every cohort is named but the weights do not sum to 1.0")
-        spare = max(0.0, 1.0 - total)
-        p = np.empty(len(self.names), dtype=np.float64)
-        for j, n in enumerate(self.names):
-            if n in named:
-                p[j] = named[n]
-            else:
-                p[j] = spare * len(self.idx[j]) / rest_cases if rest_cases else 0.0
+        if override:
+            weights = {str(k): float(v) for k, v in override.items()}
+            unknown = sorted(set(weights) - set(self.names))
+            if unknown:
+                raise ValueError(
+                    f"sampling.cohorts names {unknown} are not present in this key list.\n"
+                    f"Available cohorts: {', '.join(self.names)}\n"
+                    f"Fix: use a bare dataset prefix such as \"d013\" (no trailing underscore)"
+                )
+            missing = sorted(set(self.names) - set(weights))
+            if missing:
+                raise ValueError(
+                    f"sampling.cohorts overrides {sorted(weights)} but does not name {missing}, "
+                    f"which are present in the dataset.\n"
+                    f"An override must cover every cohort in the dataset -- there is no more "
+                    f"silent leftover-mass fill.\n"
+                    f"Fix: add {missing} to sampling.cohorts, or delete the `cohorts` block "
+                    f"entirely to use the derived weights in {COHORTS_FILENAME}"
+                )
+        else:
+            weights = load_cohort_weights(dataset_dir)
+            unknown = sorted(set(weights) - set(self.names))
+            if unknown:
+                raise ValueError(
+                    f"{COHORTS_FILENAME} names {unknown} which are not present in this key list.\n"
+                    f"Available cohorts: {', '.join(self.names)}\n"
+                    f"Fix: rebuild it with nanounet_preprocess -d <id> ..."
+                )
+            missing = sorted(set(self.names) - set(weights))
+            if missing:
+                raise ValueError(
+                    f"{COHORTS_FILENAME} at {os.path.join(dataset_dir, COHORTS_FILENAME)} does not "
+                    f"name {missing}, which are present in this key list.\n"
+                    f"Fix: rebuild it with nanounet_preprocess -d <id> ..."
+                )
+
+        p = np.array([weights[n] for n in self.names], dtype=np.float64)
         s = p.sum()
         assert s > 0, "cohort weights collapsed to zero"
         self.cdf = np.cumsum(p / s)

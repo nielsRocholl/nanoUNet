@@ -32,7 +32,11 @@ def main() -> None:
     ap.add_argument("-d", "--dataset_id", type=int, required=True)
     ap.add_argument("--plans", required=True)
     ap.add_argument("--meta-dir", required=True, help="folder of <hash>.csv lesion-type files")
-    ap.add_argument("--only-prefix", default="d013_")
+    ap.add_argument(
+        "--only-prefix", default="d013_Longitudinal_CT_",
+        help="case id prefix up to the per-patient hash, e.g. 'd013_Longitudinal_CT_' -- used "
+        "both to filter case ids and to parse hash/timepoint from each id (case_to_csv)",
+    )
     ap.add_argument("--cog-axis-order", choices=("xyz", "zyx"), default="xyz")
     ap.add_argument("--max-match-dist", type=float, default=10.0, help="voxels")
     ap.add_argument("--max-median-dist", type=float, default=8.0, help="sanity gate on overall median")
@@ -61,7 +65,7 @@ def main() -> None:
             bbox = props["bbox_used_for_cropping"]
             shape_after_crop = props["shape_after_cropping_and_before_resampling"]
 
-            hash_, tp = case_to_csv(cid)
+            hash_, tp = case_to_csv(cid, args.only_prefix)
             csv_path = join(args.meta_dir, hash_ + ".csv")
             assert isfile(csv_path), csv_path  # required input, no fallback (R12)
             lesions = load_lesions(csv_path, tp)

@@ -75,6 +75,7 @@ class PatchIterable(IterableDataset):
     def __init__(
         self,
         folder: str,
+        dataset_dir: str,
         keys: List[str],
         roi_cfg: RoiPromptConfig,
         patch_size: np.ndarray,
@@ -100,8 +101,10 @@ class PatchIterable(IterableDataset):
         # Diagnostic-only extra variant (val_prompt_agreement); never affects prompts_per_patch,
         # __len__, or batch_size math -- see module docstring.
         self.emit_prompt2 = emit_prompt2
-        # Built ONCE here, not per draw: _producer runs this for every patch.
-        self.cohorts = CohortSampler(keys, roi_cfg.sampling.cohorts) if roi_cfg.sampling.cohorts else None
+        # Built ONCE here, not per draw: _producer runs this for every patch. dataset_dir points at
+        # cohorts.json (written by nanounet_preprocess); an empty sampling.cohorts override falls
+        # back to those derived weights instead of uniform draws -- see CohortSampler.
+        self.cohorts = CohortSampler(keys, dataset_dir, roi_cfg.sampling.cohorts)
 
     def __len__(self) -> int:
         # item count == raw-patch count; NanoDataModule uses batch_size // prompts_per_patch.
@@ -120,7 +123,7 @@ class PatchIterable(IterableDataset):
         try:
             for _ in range(n_here):
                 if stop.is_set(): break
-                cid = self.cohorts.draw(rng) if self.cohorts else self.keys[int(rng.integers(0, len(self.keys)))]
+                cid = self.cohorts.draw(rng)
                 prop = meta.get(cid) or meta.put(cid, load_case_properties(ds.source_folder, cid))
                 with ds.open_case(cid, need_seg=True) as (data, seg, _, _):
                     common = (data, seg, prop, self.roi_cfg, self.patch_size, self.final_patch_size)

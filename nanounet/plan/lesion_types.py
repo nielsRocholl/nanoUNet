@@ -18,11 +18,14 @@ import numpy as np
 HARD_TYPE_BOOST = {"Lymph node": 4.0, "Soft tissue / Skin": 3.0, "Skeleton": 4.0}
 
 
-def case_to_csv(case_id: str) -> tuple[str, str]:
-    """Map a preprocessed case id to (hash, timepoint). timepoint is 'BL' or 'FU'."""
+def case_to_csv(case_id: str, prefix: str) -> tuple[str, str]:
+    """Map a preprocessed case id to (hash, timepoint). timepoint is 'BL' or 'FU'.
+
+    `prefix` is the dataset's case-id prefix up to the per-patient hash (e.g.
+    "d013_Longitudinal_CT_") -- the caller's --only-prefix plus the fixed "Longitudinal_CT_"
+    naming, threaded in rather than hardcoded so this works for any dataset, not just d013."""
     s = case_id
-    prefix = "d013_Longitudinal_CT_"
-    assert s.startswith(prefix), s
+    assert s.startswith(prefix), f"{case_id!r} does not start with prefix {prefix!r}"
     s = s[len(prefix):]
     has_bl = "_BL_img" in s
     has_fu = "_FU_img" in s
