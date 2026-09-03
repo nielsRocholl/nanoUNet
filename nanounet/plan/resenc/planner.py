@@ -132,7 +132,9 @@ def run_plan(
     plan_fr = resenc_3d_fullres_plan(
         ts_t,
         med_t,
-        "nnUNetPlans_3d_fullres",
+        # data_identifier names the on-disk folder of preprocessed cases; must be unique per
+        # plans variant or two variants overwrite each other's preprocessed data.
+        f"{ident}_3d_fullres",
         approx_nvox,
         dj,
         norm_n,

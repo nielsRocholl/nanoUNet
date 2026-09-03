@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import List
 
 import numpy as np
@@ -50,12 +51,39 @@ def cohort_of(identifier: str) -> str:
     return identifier.split("_")[0]
 
 
+_PATIENT_RE = {
+    "d013": re.compile(r"^d013_Longitudinal_CT_([0-9a-f]+)_"),
+    "d029": re.compile(r"^d029_RIDER_LungCT_Seg_(RIDER-\d+)_"),
+}
+
+
+def patient_of(identifier: str) -> str:
+    """Patient key of a case id -- two scans of one patient must never straddle train/val.
+
+    Only d013 (BL/FU pairs, 240 patients / 537 scans) and d029 (TEST/RETEST, 31/59) carry more
+    than one scan per patient; every other cohort is one scan per patient, so the case id is its
+    own key."""
+    rx = _PATIENT_RE.get(cohort_of(identifier))
+    if rx is None:
+        return identifier
+    m = rx.match(identifier)
+    if m is None:
+        raise ValueError(
+            f"{identifier!r} is in cohort {cohort_of(identifier)} but does not match its patient-id "
+            f"pattern {rx.pattern!r}, so its patient cannot be determined and it could leak across "
+            f"the split.\nFix: update _PATIENT_RE in nanounet/plan/splits.py to the new naming."
+        )
+    return f"{cohort_of(identifier)}_{m.group(1)}"
+
+
 def make_balanced_split(identifiers: List[str], val_frac: float, seed: int) -> List[dict]:
-    """One train/val split with `val_frac` applied WITHIN each source dataset.
+    """One train/val split with `val_frac` applied WITHIN each source dataset, drawn by PATIENT.
 
     The plain KFold above is dataset-blind: on the 17-cohort merged pool it drifted to 13-25% val
-    per cohort, so small cohorts got val sets too small to plot. Returns a ONE-element list so it
-    stays format-compatible with splits_final.json; fold 0 is the only valid fold."""
+    per cohort, so small cohorts got val sets too small to plot. The draw fills the val quota with
+    whole patients (see patient_of), not individual cases, so a patient's repeat scans (d013
+    BL/FU, d029 TEST/RETEST) never straddle train/val. Returns a ONE-element list so it stays
+    format-compatible with splits_final.json; fold 0 is the only valid fold."""
     assert 0.0 < val_frac < 1.0, val_frac
     rng = np.random.default_rng(seed)
     groups: dict[str, list[str]] = {}
@@ -64,9 +92,21 @@ def make_balanced_split(identifiers: List[str], val_frac: float, seed: int) -> L
     train: list[str] = []
     val: list[str] = []
     for _, ids in sorted(groups.items()):
-        perm = rng.permutation(len(ids))
+        by_pat: dict[str, list[str]] = {}
+        for cid in ids:
+            by_pat.setdefault(patient_of(cid), []).append(cid)
+        pats = sorted(by_pat)
+        perm = rng.permutation(len(pats))
         n_val = int(round(len(ids) * val_frac))
         n_val = min(max(n_val, 1), len(ids) - 1)  # every cohort appears in BOTH sides
-        val += [ids[i] for i in perm[:n_val]]
-        train += [ids[i] for i in perm[n_val:]]
+        # whole patients into val until the case quota is met, never the last one left -- a
+        # per-case draw put 71 of d013's 240 patients on both sides of the boundary.
+        k, v = 0, []
+        while k < len(perm) - 1 and len(v) < n_val:
+            v += by_pat[pats[perm[k]]]
+            k += 1
+        val += v
+        for j in perm[k:]:
+            train += by_pat[pats[j]]
+    assert not set(map(patient_of, train)) & set(map(patient_of, val)), "patient leaked across split"
     return [{"train": sorted(train), "val": sorted(val)}]
