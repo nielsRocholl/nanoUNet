@@ -8,6 +8,7 @@ from torch.amp import autocast
 from nanounet.infer.longi_row import encode_inference_row
 from nanounet.infer.roi_slices import centered_spatial_slices_at_point
 from nanounet.infer.tta import predict_batch_with_tta
+from nanounet.prompt.encoding import N_PROMPT_CHANNELS
 
 
 def predict_patch_logits(
@@ -34,7 +35,7 @@ def predict_patch_logits(
         point_zyx_padded[0], point_zyx_padded[1], point_zyx_padded[2], patch_size, padded_shape
     )
     n_img = pad.shape[0] // 2 if (is_longi and bl_present) else pad.shape[0]
-    n_stream = n_img + 2
+    n_stream = n_img + N_PROMPT_CHANNELS
     row_ch = 2 * n_stream if is_longi else n_stream
     row = torch.empty((row_ch, *patch_size), device=dev, dtype=torch.float32)
     encode_inference_row(

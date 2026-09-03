@@ -1,4 +1,4 @@
-"""Point → heatmap (binary ball or EDT); pos/neg pair for two channels."""
+"""Point → heatmap (binary ball or EDT); single positive heatmap."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ import numpy as np
 import torch
 from scipy.ndimage import distance_transform_edt
 from skimage.morphology import ball
+
+N_PROMPT_CHANNELS = 1  # positive heatmap only; the unused negative channel was removed
 
 
 @lru_cache(maxsize=16)
@@ -56,17 +58,3 @@ def encode_points_to_heatmap(
         patch = strel[strel_slc].to(heatmap.device)
         torch.maximum(heatmap[slc], patch, out=heatmap[slc])
     return heatmap * intensity_scale
-
-
-def encode_points_to_heatmap_pair(
-    points_pos: List[Tuple[int, int, int]],
-    points_neg: List[Tuple[int, int, int]],
-    shape: Tuple[int, int, int],
-    radius_vox: int,
-    encoding: str,
-    device: Union[torch.device, str, None] = None,
-    intensity_scale: float = 1.0,
-) -> torch.Tensor:
-    pos = encode_points_to_heatmap(points_pos, shape, radius_vox, encoding, device, intensity_scale)
-    neg = encode_points_to_heatmap(points_neg, shape, radius_vox, encoding, device, intensity_scale)
-    return torch.stack([pos, neg], dim=0)

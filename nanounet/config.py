@@ -11,14 +11,6 @@ from nanounet.data.error_table import parse_propagated
 
 
 @dataclass(frozen=True)
-class LargeLesionConfig:
-    K: Tuple[int, int]
-    K_min: int
-    K_max: int
-    max_extra: int
-
-
-@dataclass(frozen=True)
 class PropagatedConfig:
     mode: Literal["gaussian", "empirical"]
     error_table: str
@@ -38,7 +30,6 @@ class SamplingConfig:
     fg_patch_prob: float
     click_modes: ClickModeConfig
     false_pos_probability: float
-    large_lesion: LargeLesionConfig
     propagated: PropagatedConfig
     instance_targets: bool = False
     # Absent/empty => uniform case draw, exactly. See nanounet/data/cohorts.py.
@@ -81,26 +72,6 @@ def _require(d: dict, key: str) -> object:
     return d[key]
 
 
-def _parse_int_range(val: object, key: str) -> Tuple[int, int]:
-    if isinstance(val, int):
-        return (val, val)
-    if isinstance(val, (list, tuple)) and len(val) == 2:
-        lo, hi = int(val[0]), int(val[1])
-        if lo > hi:
-            raise ValueError(f"{key}: min>max {val}")
-        return (lo, hi)
-    raise ValueError(f"{key}: int or [min,max]")
-
-
-def _load_large(d: dict) -> LargeLesionConfig:
-    return LargeLesionConfig(
-        K=_parse_int_range(_require(d, "K"), "K"),
-        K_min=int(_require(d, "K_min")),
-        K_max=int(_require(d, "K_max")),
-        max_extra=int(_require(d, "max_extra")),
-    )
-
-
 def _load_prop(d: dict | None) -> PropagatedConfig:
     kw = parse_propagated(d)
     kw["mode"] = cast(Literal["gaussian", "empirical"], kw["mode"])
@@ -119,8 +90,6 @@ def _load_sampling(d: dict) -> SamplingConfig:
         raise ValueError("click_modes pos and drop must be in [0, 1]")
     if abs(p + dr - 1.0) > 1e-5:
         raise ValueError("click_modes.pos + click_modes.drop must sum to 1")
-    ll = _require(d, "large_lesion")
-    assert isinstance(ll, dict)
     fp_prob = float(d.get("false_pos_probability", 1.0))
     if fp_prob < 0 or fp_prob > 1:
         raise ValueError("false_pos_probability must be in [0, 1]")
@@ -128,7 +97,6 @@ def _load_sampling(d: dict) -> SamplingConfig:
         fg_patch_prob=fgp,
         click_modes=ClickModeConfig(pos=p, drop=dr),
         false_pos_probability=fp_prob,
-        large_lesion=_load_large(ll),
         propagated=_load_prop(d.get("propagated")),
         instance_targets=bool(d.get("instance_targets", False)),
         cohorts={str(k): float(v) for k, v in (d.get("cohorts") or {}).items()},

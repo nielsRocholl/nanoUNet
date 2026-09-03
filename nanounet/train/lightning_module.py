@@ -77,9 +77,8 @@ class NanoUNetLM(pl.LightningModule):
         self.consistency_weight_max = consistency_weight
         self.consistency_warmup_epochs = consistency_warmup_epochs
         self.warmup_epochs = warmup_epochs
-        # Prompt-heatmap channel indices, per the fixed layouts documented in patch_iterable.py:
-        # supervised [CT, hm+, hm-], longi [FU_CT, FU_hm+, FU_hm-, BL_CT, BL_hm+, BL_hm-].
-        self._prompt_ch = [1, 2, 4, 5] if longi else [1, 2]
+        # supervised [CT, hm]; longi [FU_CT, FU_hm, BL_CT, BL_hm]. Used to zero prompts for val_prompt_gap.
+        self._prompt_ch = [1, 3] if longi else [1]
         self._val_buf: List[Dict[str, Any]] = []
         self._val_buf_ablated: List[Dict[str, Any]] = []
         self._agreement_buf: List[torch.Tensor] = []

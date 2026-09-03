@@ -151,41 +151,18 @@ def run_supervised(
             return
 
     dm = NanoDataModule(
-        ds,
-        args.fold,
-        args.plans_identifier,
-        args.roi_cfg,
-        dl_b,
-        args.batch_size,
-        args.iters_per_epoch,
-        args.val_iters,
-        persistent_workers=args.dl_persistent_workers,
-        only_prefix=args.only_prefix,
-        longi=args.longi,
-        longi_null=args.longi_null,
-        prompts_per_patch=args.prompts_per_patch,
-        val_manifest=args.val_manifest,
+        ds, args.fold, args.plans_identifier, args.roi_cfg, dl_b, args.batch_size,
+        args.iters_per_epoch, args.val_iters, persistent_workers=args.dl_persistent_workers,
+        only_prefix=args.only_prefix, longi=args.longi, longi_null=args.longi_null,
+        prompts_per_patch=args.prompts_per_patch, val_manifest=args.val_manifest,
     )
     lm = NanoUNetLM(
-        plans_path,
-        dj_path,
-        args.roi_cfg,
-        out,
-        initial_lr=args.lr,
-        weight_decay=args.wd,
-        num_epochs=args.epochs,
-        lr_schedule=args.lr_schedule,
-        stretched_k=args.stretched_k,
-        stretched_ref=args.stretched_ref,
-        stretched_exp=args.stretched_exp,
-        loss_type=args.loss,
-        optimizer=args.optimizer,
-        mae_ckpt=mae_ckpt_arg,
-        init_weights=args.init_weights,
-        longi=args.longi,
-        consistency_weight=args.consistency_weight,
-        consistency_warmup_epochs=args.consistency_warmup_epochs,
-        warmup_epochs=args.warmup_epochs,
+        plans_path, dj_path, args.roi_cfg, out, initial_lr=args.lr, weight_decay=args.wd,
+        num_epochs=args.epochs, lr_schedule=args.lr_schedule, stretched_k=args.stretched_k,
+        stretched_ref=args.stretched_ref, stretched_exp=args.stretched_exp, loss_type=args.loss,
+        optimizer=args.optimizer, mae_ckpt=mae_ckpt_arg, init_weights=args.init_weights,
+        longi=args.longi, consistency_weight=args.consistency_weight,
+        consistency_warmup_epochs=args.consistency_warmup_epochs, warmup_epochs=args.warmup_epochs,
     )
     cb = [
         ModelCheckpoint(
@@ -196,6 +173,13 @@ def run_supervised(
             save_top_k=2,
         ),
         ModelCheckpoint(dirpath=join(out, ckpt_dir), save_last=True),
+        ModelCheckpoint(
+            dirpath=join(out, ckpt_dir),
+            filename="bestsel-{epoch}-{val_prompt_score:.4f}",
+            monitor="val_prompt_score",
+            mode="max",
+            save_top_k=1,
+        ),
         EMACallback(decay=args.ema_decay),
     ]
     tr = Trainer(

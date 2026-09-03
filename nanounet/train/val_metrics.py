@@ -96,6 +96,7 @@ def log_val_metrics(lm) -> None:
         off += b
 
     # (c) per scenario
+    dice_all_clicked = float("nan")
     for si, s in enumerate(SCENARIOS):
         sel = scenario == si
         lm.log(f"val/{s}/n", float(sel.sum()), reduce_fx="sum", sync_dist=True)
@@ -105,6 +106,8 @@ def log_val_metrics(lm) -> None:
         lm.log(f"val/{s}/val_prompt_agreement_matched", _agree_sel(agree, matched), **d)
         if s in ("all_clicked", "subset_clicked"):
             dice_s = _dice_sel(tp, fp, fn, sel)
+            if s == "all_clicked":
+                dice_all_clicked = dice_s
             lm.log(f"val/{s}/val_dice", dice_s, **d)
             lm.log(f"val/{s}/val_dice_macro", _mean_sel(dice_row, sel & has_fg), **d)
             dice_ab = _dice_sel(tp_a, fp_a, fn_a, sel)
@@ -124,6 +127,7 @@ def log_val_metrics(lm) -> None:
     lm.log("val/subset_clicked/val_dice_vs_clicked_subset", dice_clicked, **d)
     lm.log("val/subset_clicked/val_dice_vs_all_lesions", dice_all, **d)
     lm.log("val/subset_clicked/val_selectivity_margin", dice_clicked - dice_all, **d)
+    lm.log("val_prompt_score", dice_all_clicked + 0.5 * (dice_clicked - dice_all), **d)
 
     # (e) per cohort (all_clicked rows only, D15) + (g) weighted headline
     manifest = lm.trainer.datamodule.val_manifest

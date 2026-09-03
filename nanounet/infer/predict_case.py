@@ -23,6 +23,7 @@ from nanounet.infer.patch_export import patch_unpadded_overlap
 from nanounet.infer.tta import max_cat, predict_batch_with_tta
 from nanounet.prompt.cluster import cell_slices, face_neighbours, grid_stride
 from nanounet.prompt.coords import points_to_centers_zyx
+from nanounet.prompt.encoding import N_PROMPT_CHANNELS
 
 MAX_BORDER_EXTRA = 16
 ACC_DTYPE_ENV = "NANOUNET_SINGLE_PATCH_ACCUM_DTYPE"
@@ -68,7 +69,7 @@ def predict_case_logits(
     unpadded_shape = tuple(s.stop - s.start for s in slicer_revert[1:])
     nh = lm.num_segmentation_heads
     n_img = pad.shape[0] // 2 if (is_longi and bl_present) else pad.shape[0]
-    n_stream = n_img + 2
+    n_stream = n_img + N_PROMPT_CHANNELS
     row_ch = 2 * n_stream if is_longi else n_stream
     acc_dtype = _accum_dtype(dev)
     bg_vec = background_logits_vector(lm, nh, dev, acc_dtype)

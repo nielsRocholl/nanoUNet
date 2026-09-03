@@ -8,25 +8,15 @@
   "sampling": {
     "fg_patch_prob": 0.67,
     "instance_targets": true,
-    "click_modes": {
-      "pos": 0.8,
-      "drop": 0.2
-    },
+    "click_modes": { "pos": 0.8, "drop": 0.2 },
     "false_pos_probability": 0.05,
     "propagated": {
       "mode": "empirical",
       "error_table": "/nnunet_data/Longitudinal-CT/derivatives/registration_error_table.json",
       "backends": ["original", "unigradicon"],
-      "sigma_per_axis": [
-        5.95,
-        6.39,
-        5.93
-      ],
+      "sigma_per_axis": [5.95, 6.39, 5.93],
       "max_vox": 34.0
     }
   },
-  "inference": {
-    "tile_step_size": 0.75,
-    "disable_tta_default": false
-  }
+  "inference": { "tile_step_size": 0.75, "disable_tta_default": false }
 }

@@ -1,5 +1,5 @@
 """Two-stream shared-encoder UNet with Difference Weighting at every skip
-(LongiSeg). x = [FU(3ch); BL(3ch)]; null baseline = duplicated FU ⇒ identity DWB."""
+(LongiSeg). x = [FU(2ch); BL(2ch)] (1 CT + 1 prompt); null baseline = duplicated FU ⇒ identity DWB."""
 
 from __future__ import annotations
 

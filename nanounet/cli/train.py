@@ -52,6 +52,12 @@ def main() -> None:
     dj_path = join(rw, ds, "dataset.json")
     out = args.out or join(results_dir(), "nanounet", f"{ds}_{args.plans_identifier}_f{args.fold}")
     ckpt_dir = "finetune" if args.init_weights else "checkpoints"
+    if args.resume:
+        ckpt_dir = os.path.basename(os.path.dirname(os.path.abspath(args.resume)))
+        if ckpt_dir not in ("checkpoints", "finetune"):
+            raise ValueError(
+                f"--resume must sit in a checkpoints/ or finetune/ directory, got {args.resume}"
+            )
     set_safe_tmpdir(results_tmp=join(out, ".tmp"))
     maybe_mkdir_p(out)
     os.makedirs(join(out, ckpt_dir), exist_ok=True)

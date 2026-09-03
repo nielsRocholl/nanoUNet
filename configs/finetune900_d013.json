@@ -1,0 +1,31 @@
+{
+  "prompt": {
+    "point_radius_vox": 2,
+    "encoding": "edt",
+    "validation_use_prompt": true,
+    "prompt_intensity_scale": 0.5
+  },
+  "sampling": {
+    "fg_patch_prob": 0.67,
+    "instance_targets": true,
+    "click_modes": { "pos": 0.8, "drop": 0.2 },
+    "false_pos_probability": 0.05,
+    "cohorts": {
+      "d011": 0.009557, "d012": 0.010844, "d013": 0.38,    "d014": 0.062,
+      "d015": 0.003162, "d016": 0.01484,  "d017": 0.006306, "d018": 0.062,
+      "d019": 0.011255, "d020": 0.003735, "d021": 0.062,    "d022": 0.062,
+      "d023": 0.006113, "d024": 0.045032, "d025": 0.062,    "d026": 0.000687,
+      "d027": 0.025033, "d028": 0.046474, "d029": 0.002962, "d030": 0.062,
+      "d031": 0.062
+    },
+    "propagated": {
+      "mode": "empirical",
+      "error_table": "/nnunet_data/Longitudinal-CT/derivatives/registration_error_table.json",
+      "backends": ["original", "unigradicon"],
+      "sigma_per_axis": [5.95, 6.39, 5.93],
+      "max_vox": 34.0
+    }
+  },
+  "inference": { "tile_step_size": 0.75, "disable_tta_default": false },
+  "validation": { "no_lesion_frac": 0.3 }
+}

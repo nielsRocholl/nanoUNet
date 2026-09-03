@@ -147,7 +147,7 @@ def main() -> None:
                 )
                 for entry, row, seg_crop in filled:
                     pp3 = torch.tensor(np.asarray(entry["clicks_zyx"], dtype=np.float32)).reshape(-1, 3)
-                    ci_entry = {"pp": pp3, "pn": torch.zeros((0, 3)), "n_fp": entry["n_false_pos"]}
+                    ci_entry = {"pp": pp3, "n_fp": entry["n_false_pos"]}
                     seg_t = torch.from_numpy(np.maximum(seg_crop, 0).astype(np.int16))
                     entry["click_inside"] = click_inside_flags([ci_entry], seg_t)[0]
                     if row is not None:

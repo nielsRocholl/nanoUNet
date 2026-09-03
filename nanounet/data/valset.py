@@ -145,9 +145,9 @@ class ValPatchDataset(Dataset):
         # only in click placement.
         variants = [
             {"points_pos": np.asarray(e["clicks_zyx"], np.float32).reshape(-1, 3),
-             "points_neg": np.zeros((0, 3), np.float32), "n_false_pos": e["n_false_pos"]},
+             "n_false_pos": e["n_false_pos"]},
             {"points_pos": np.asarray(e["clicks2_zyx"], np.float32).reshape(-1, 3),
-             "points_neg": np.zeros((0, 3), np.float32), "n_false_pos": e["n_false_pos"]},
+             "n_false_pos": e["n_false_pos"]},
         ]
         kp = concat_variant_keypoints(variants, self.longi)
         with torch.no_grad():

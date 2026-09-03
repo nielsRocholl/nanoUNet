@@ -9,7 +9,7 @@ from __future__ import annotations
 import torch
 
 from nanounet.prompt.cluster import cluster_prompts_patch_local
-from nanounet.prompt.encoding import encode_points_to_heatmap_pair
+from nanounet.prompt.encoding import N_PROMPT_CHANNELS, encode_points_to_heatmap
 
 
 def encode_inference_row(
@@ -30,7 +30,7 @@ def encode_inference_row(
     bl_pts_pad: list[tuple[int, int, int]] | None = None,
     extra_clicks: tuple[tuple[int, int, int], ...] = (),
 ) -> None:
-    n_stream = n_img + 2
+    n_stream = n_img + N_PROMPT_CHANNELS
     row[:n_img].copy_(pad[:n_img, sz, sy, sx], non_blocking=True)
     if not encode_prompt:
         row[n_img:n_stream].zero_()
@@ -39,10 +39,10 @@ def encode_inference_row(
         if not loc:
             loc = list(extra_clicks)
         assert loc, "seed tile must contain a click"
-        pr = encode_points_to_heatmap_pair(
-            loc, [], patch_size, cfg.prompt.point_radius_vox, cfg.prompt.encoding,
+        pr = encode_points_to_heatmap(
+            loc, patch_size, cfg.prompt.point_radius_vox, cfg.prompt.encoding,
             device=dev, intensity_scale=cfg.prompt.prompt_intensity_scale,
-        )
+        ).unsqueeze(0)
         row[n_img:n_stream] = pr.float()
     if not is_longi:
         return
@@ -53,8 +53,8 @@ def encode_inference_row(
     # Real baseline: same bbox crops ch1 because the joint 2-ch crop keeps FU/BL voxel-aligned.
     row[n_stream : n_stream + n_img].copy_(pad[n_img : 2 * n_img, sz, sy, sx], non_blocking=True)
     bl_local = cluster_prompts_patch_local(bl_pts_pad, sz, sy, sx) if bl_pts_pad else []
-    bl_pr = encode_points_to_heatmap_pair(
-        bl_local, [], patch_size, cfg.prompt.point_radius_vox, cfg.prompt.encoding,
+    bl_pr = encode_points_to_heatmap(
+        bl_local, patch_size, cfg.prompt.point_radius_vox, cfg.prompt.encoding,
         device=dev, intensity_scale=cfg.prompt.prompt_intensity_scale,
-    )
+    ).unsqueeze(0)
     row[n_stream + n_img :] = bl_pr.float()

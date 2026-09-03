@@ -30,8 +30,8 @@ def select_prompt_points(
     false_pos: List[Tuple[int, int, int]] | None = None,
     kept: list[int] | None = None,
     fallback: dict | None = None,
-) -> Tuple[List[Tuple[int, int, int]], List[Tuple[int, int, int]], int]:
-    """Click SELECTION only -- (positive, negative, n_false_pos) patch-local point lists; heatmap
+) -> Tuple[List[Tuple[int, int, int]], int]:
+    """Click SELECTION only -- (positive, n_false_pos) patch-local point list; heatmap
     rendering happens later, after augmentation (nanounet/train/patch_iterable.py). Offset applies
     to the GLOBAL centroid first, THEN filtered into the patch -- an out-of-patch displaced click
     is dropped, never clamped. jitter=False is for points already real (registered/propagated).
@@ -40,7 +40,6 @@ def select_prompt_points(
     for instance_targets) fixes WHICH lesions may click; the dropout below must not re-run it, or
     the kept-masked target would disagree with what got clicked."""
     pp: List[Tuple[int, int, int]] = []
-    pn: List[Tuple[int, int, int]] = []
     n_fp = 0
     if not force_zero_prompt:
         if jitter:
@@ -64,7 +63,7 @@ def select_prompt_points(
         if false_pos:
             n_fp = len(false_pos)
             pp = pp + list(false_pos)
-    return pp, pn, n_fp
+    return pp, n_fp
 
 def draw_false_pos(seg_crop, cfg: RoiPromptConfig, force_zero_prompt: bool, rng) -> list:
     """One decoy draw PER PATCH (not per variant) -- see select_prompt_points."""
@@ -82,12 +81,11 @@ def points_variant(
     kept=None, fallback=None,
 ):
     """One prompt draw as float (N,3) arrays, ready to ride through the augmentation chain."""
-    pp, pn, n_fp = select_prompt_points(
+    pp, n_fp = select_prompt_points(
         seg_crop, cts_global, pslc, cfg, force_zero_prompt, rng, jitter, volumes_vox, false_pos, kept, fallback
     )
     return {
         "points_pos": np.asarray(pp, dtype=np.float32).reshape(-1, 3),
-        "points_neg": np.asarray(pn, dtype=np.float32).reshape(-1, 3),
         "n_false_pos": n_fp,
     }
 

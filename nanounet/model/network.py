@@ -12,6 +12,7 @@ import torch
 from nanounet.plan.labels import Labels
 from nanounet.plan.plans import Config3d, determine_num_input_channels
 from nanounet.model.dwb import LongiResEncUNet
+from nanounet.prompt.encoding import N_PROMPT_CHANNELS
 
 
 def _build_class(network_class: str, arch_kwargs: dict, req: list | tuple):
@@ -32,7 +33,7 @@ def build_net(
     lm: Labels,
     dataset_json: dict,
     enable_deep_supervision: bool,
-    n_extra_in: int = 2,
+    n_extra_in: int = N_PROMPT_CHANNELS,
     num_classes_override: int | None = None,
     n_in_override: int | None = None,
 ):
@@ -58,19 +59,19 @@ def build_net_longi(
     enable_deep_supervision: bool,
     num_classes_override: int | None = None,
 ):
-    # The longi dataset stores 2 CT channels (FU, BL). Each DWB stream sees only 1 CT + 2 prompt
-    # channels; the BL channel is consumed into the second encoder pass, not stacked onto the first.
+    # The longi dataset stores 2 CT channels (FU, BL). Each DWB stream sees only 1 CT + N_PROMPT_CHANNELS
+    # heatmap channels; the BL channel is consumed into the second encoder pass, not stacked onto the first.
     assert determine_num_input_channels(cm, dataset_json) == 2, "longi dataset must have 2 CT channels"
     base = build_net(
         cm,
         lm,
         dataset_json,
         enable_deep_supervision,
-        n_extra_in=2,
+        n_extra_in=N_PROMPT_CHANNELS,
         num_classes_override=num_classes_override,
         n_in_override=1,
     )
-    n_stream = 1 + 2  # per stream: 1 CT modality + 2 prompt channels
+    n_stream = 1 + N_PROMPT_CHANNELS  # per stream: 1 CT modality + prompt heatmap
     return LongiResEncUNet(base, n_stream)
 
 
