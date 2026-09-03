@@ -80,7 +80,7 @@ def multi_lesion_counts(case_dir: str, by_cohort: dict[str, list[str]], case_inf
 
 
 def allocate_subset(
-    cohort_totals: dict[str, int], multi_counts: dict[str, int], n_subset_total: int, cap_frac: float = 0.30
+    cohort_totals: dict[str, int], multi_counts: dict[str, int], n_subset_total: int, cap_frac: float = 0.40
 ) -> dict[str, int]:
     """Global subset_clicked allocation, weighted by multi-lesion supply rather than cohort size:
     single-lesion cohorts (multi_counts[c] == 0, e.g. single-tumor datasets) get exactly 0, and no
@@ -111,7 +111,8 @@ def allocate_subset(
             f"subset_clicked target {n_subset_total} exceeds available capacity "
             f"{n_subset_total - shortfall} (only {n_multi}/{len(cohorts)} cohorts have multi-lesion "
             f"cases, each capped at {int(cap_frac * 100)}% of its patch budget).\n"
-            f"Fix: lower the subset_clicked share in --mix, or raise --n-patches"
+            f"Fix: lower subset_clicked in --mix, raise cap_frac (now {cap_frac}), or lower --floor. "
+            f"Raising --n-patches does not help: the gap is cap_frac times the single-lesion-cohort budget."
         )
     return subset
 

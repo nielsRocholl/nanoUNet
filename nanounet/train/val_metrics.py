@@ -67,6 +67,7 @@ def log_val_metrics(lm) -> None:
     lm.log("val_prompt_agreement", agreement_mean(lm._agreement_buf), **d)  # METRIC 1 (headline)
 
     if not lm._meta_buf:  # training run without --val-manifest: legacy path stops here
+        lm.log("val_prompt_score", float("nan"), **d)  # ModelCheckpoint(bestsel) requires the key
         return
 
     scenario = torch.cat([m["scenario"] for m in lm._meta_buf])
