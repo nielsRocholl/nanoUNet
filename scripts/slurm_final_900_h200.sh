@@ -10,7 +10,8 @@
 #SBATCH --output=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_900_final.out
 #SBATCH --error=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_900_final.err
 #SBATCH --no-container-entrypoint
-#SBATCH --container-mounts=/data/oncology/experiments/universal-lesion-segmentation:/nnunet_data,/scratch:/scratch
+#SBATCH --container-mounts=/data/oncology/experiments/universal-lesion-segmentation:/nnunet_data
+#SBATCH --container-name=nanounet-900-final
 #SBATCH --container-image="dockerdex.umcn.nl:5005/nielsrocholl/nnunet-v2-pro-sol-docker:latest"
 
 # Dataset900: MAE 250ep → supervised 1200ep (instance targets, site-balanced) → mixed d013 FT 80ep.
@@ -18,7 +19,9 @@
 #
 # WALL: 578 s/ep × 1200 = 8.03 d supervised alone (wandb ekkxcgi6 runtime 8.0 d). qos=vram is 7 d,
 # so EXPECT AT LEAST ONE RESUME. Copy ~1 d + MAE ~1 d + FT ~0.5 d ⇒ 10–11 d total.
-# Dataset staging lives on dlc-slowpoke's /scratch and survives job/container restarts.
+# Staging is /root/NanoUNet_preprocessed. --container-name keeps that overlay on the node after
+# the job ends, so a resubmit on dlc-slowpoke reuses it (rclone copy then only fills gaps).
+# Do not bind-mount /scratch: it is not a host path, and the image has no /scratch dest.
 #
 # Resume is a state machine on NFS, not RESUME=last.ckpt. FRESH=1 wipes $OUT only.
 # Never deletes $OUT_FT; refuses to overwrite it.
@@ -76,7 +79,7 @@ if [ "$FRESH" = 1 ]; then
   rm -rf "$OUT"
 fi
 
-LOCAL_PREP=/scratch/nielsrocholl/NanoUNet_preprocessed
+LOCAL_PREP=/root/NanoUNet_preprocessed
 REMOTE_PREP="${STORAGE}/NanoUNet_preprocessed/${DS_FOLDER}"
 mkdir -p "$LOCAL_PREP/${DS_FOLDER}"
 
@@ -190,8 +193,8 @@ if [ "$SKIP_MAIN" = 0 ]; then
   export WANDB_RESUME=allow
   echo "wandb run $WANDB_RUN_ID"
 
-  # A crash here must NOT kill the job: retry from the latest last.ckpt. The stage on node-local
-  # /scratch also survives resubmission on dlc-slowpoke.
+  # A crash here must NOT kill the job: retry from the latest last.ckpt. Named container
+  # overlay also survives resubmission on dlc-slowpoke.
   MAIN_MAX_RETRIES="${MAIN_MAX_RETRIES:-8}"
   attempt=1
   while :; do
