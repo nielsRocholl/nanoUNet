@@ -10,7 +10,7 @@
 #SBATCH --output=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_900_final.out
 #SBATCH --error=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_900_final.err
 #SBATCH --no-container-entrypoint
-#SBATCH --container-mounts=/data/oncology/experiments/universal-lesion-segmentation:/nnunet_data
+#SBATCH --container-mounts=/data/oncology/experiments/universal-lesion-segmentation:/nnunet_data,/scratch:/scratch
 #SBATCH --container-image="dockerdex.umcn.nl:5005/nielsrocholl/nnunet-v2-pro-sol-docker:latest"
 
 # Dataset900: MAE 250ep → supervised 1200ep (instance targets, site-balanced) → mixed d013 FT 80ep.
@@ -18,7 +18,7 @@
 #
 # WALL: 578 s/ep × 1200 = 8.03 d supervised alone (wandb ekkxcgi6 runtime 8.0 d). qos=vram is 7 d,
 # so EXPECT AT LEAST ONE RESUME. Copy ~1 d + MAE ~1 d + FT ~0.5 d ⇒ 10–11 d total.
-# Resubmit re-stages /root (ephemeral); checkpoints live on NFS.
+# Dataset staging lives on dlc-slowpoke's /scratch and survives job/container restarts.
 #
 # Resume is a state machine on NFS, not RESUME=last.ckpt. FRESH=1 wipes $OUT only.
 # Never deletes $OUT_FT; refuses to overwrite it.
@@ -76,7 +76,7 @@ if [ "$FRESH" = 1 ]; then
   rm -rf "$OUT"
 fi
 
-LOCAL_PREP=/root/NanoUNet_preprocessed
+LOCAL_PREP=/scratch/nielsrocholl/NanoUNet_preprocessed
 REMOTE_PREP="${STORAGE}/NanoUNet_preprocessed/${DS_FOLDER}"
 mkdir -p "$LOCAL_PREP/${DS_FOLDER}"
 
@@ -142,36 +142,40 @@ if [ ${#local_w[@]} -eq 0 ]; then
   exit 1
 fi
 
-SKIP_MAIN=0
-MAIN_ARGS=()
-MAE_FLAGS=()
-if [ -f "$FT_LAST" ]; then
-  echo "FT checkpoint present: skip SSL+supervised, resume FT from $FT_LAST"
-  SKIP_MAIN=1
-elif [ -f "$SUP_LAST" ]; then
-  echo "supervised resume from $SUP_LAST (no --mae-pretrain)"
-  MAIN_ARGS=(--resume "$SUP_LAST")
-elif [ -f "$MAE_LAST" ]; then
-  echo "MAE resume from $MAE_LAST"
-  MAIN_ARGS=(--mae-pretrain --mae-resume "$MAE_LAST")
-  MAE_FLAGS=(--mae-epochs "$MAE_EPOCHS" --mae-lr 1e-2 --mae-lr-schedule cosine_warm_restarts --mae-cosine-t0 250 --mae-mask-ratio 0.75)
-else
-  echo "fresh MAE+supervised into $OUT"
-  MAIN_ARGS=(--mae-pretrain)
-  MAE_FLAGS=(--mae-epochs "$MAE_EPOCHS" --mae-lr 1e-2 --mae-lr-schedule cosine_warm_restarts --mae-cosine-t0 250 --mae-mask-ratio 0.75)
-fi
+# Re-derived on every retry attempt below, not just once -- a crash mid-run leaves a fresher
+# last.ckpt than we started with, and the next attempt must resume from it, not repeat from
+# scratch.
+compute_main_args() {
+  SKIP_MAIN=0
+  MAIN_ARGS=()
+  MAE_FLAGS=()
+  if [ -f "$FT_LAST" ]; then
+    echo "FT checkpoint present: skip SSL+supervised, resume FT from $FT_LAST"
+    SKIP_MAIN=1
+  elif [ -f "$SUP_LAST" ]; then
+    echo "supervised resume from $SUP_LAST (no --mae-pretrain)"
+    MAIN_ARGS=(--resume "$SUP_LAST")
+  elif [ -f "$MAE_LAST" ]; then
+    echo "MAE resume from $MAE_LAST"
+    MAIN_ARGS=(--mae-pretrain --mae-resume "$MAE_LAST")
+    MAE_FLAGS=(--mae-epochs "$MAE_EPOCHS" --mae-lr 1e-2 --mae-lr-schedule cosine_warm_restarts --mae-cosine-t0 250 --mae-mask-ratio 0.75)
+  else
+    echo "fresh MAE+supervised into $OUT"
+    MAIN_ARGS=(--mae-pretrain)
+    MAE_FLAGS=(--mae-epochs "$MAE_EPOCHS" --mae-lr 1e-2 --mae-lr-schedule cosine_warm_restarts --mae-cosine-t0 250 --mae-mask-ratio 0.75)
+  fi
 
-if [ "${MAIN_ARGS[0]:-}" = "--resume" ] && [ ! -f "$SUP_LAST" ]; then
-  echo "FATAL: claimed supervised resume missing: $SUP_LAST"
-  exit 1
-fi
-if [ "${MAIN_ARGS[1]:-}" = "--mae-resume" ] && [ ! -f "$MAE_LAST" ]; then
-  echo "FATAL: claimed MAE resume missing: $MAE_LAST"
-  exit 1
-fi
+  if [ "${MAIN_ARGS[0]:-}" = "--resume" ] && [ ! -f "$SUP_LAST" ]; then
+    echo "FATAL: claimed supervised resume missing: $SUP_LAST"
+    exit 1
+  fi
+  if [ "${MAIN_ARGS[1]:-}" = "--mae-resume" ] && [ ! -f "$MAE_LAST" ]; then
+    echo "FATAL: claimed MAE resume missing: $MAE_LAST"
+    exit 1
+  fi
+}
 
-cleanup_stage() { rm -rf "$LOCAL_PREP/${DS_FOLDER}"; }
-trap cleanup_stage EXIT
+compute_main_args
 
 if [ "$SKIP_MAIN" = 0 ]; then
   mkdir -p "$OUT"
@@ -186,37 +190,54 @@ if [ "$SKIP_MAIN" = 0 ]; then
   export WANDB_RESUME=allow
   echo "wandb run $WANDB_RUN_ID"
 
-  if ! nanounet_train \
-    -d "$DATASET_ID" \
-    -f "$FOLD" \
-    --plans "$PLANS_NAME" \
-    --config "$ROI_CONFIG" \
-    --val-manifest "$VAL_MANIFEST" \
-    --val-every-n-epochs "$VAL_EVERY_N" \
-    "${MAIN_ARGS[@]}" \
-    "${MAE_FLAGS[@]}" \
-    --out "$OUT" \
-    --batch-size "$BATCH_SIZE" \
-    --epochs "$SUP_EPOCHS" \
-    --iters-per-epoch "$ITERS_PER_EPOCH" \
-    --lr 0.01 \
-    --warmup-epochs "$WARMUP_EPOCHS" \
-    --ema-decay "$EMA_DECAY" \
-    --monitor val_dice \
-    --lr-schedule stretched_tail_poly \
-    --stretched-k "$STRETCHED_K" \
-    --stretched-ref "$STRETCHED_REF" \
-    --loss dc_ce \
-    --prompts-per-patch "$PROMPTS_PER_PATCH" \
-    --consistency-weight "$CONSISTENCY_WEIGHT" \
-    --dl-bucket xl \
-    --dl-persistent-workers \
-    --devices 1 \
-    --accelerator cuda \
-    --precision 16-mixed \
-    --wandb-name "Dataset900_f0_ssl_sup_instance_1200ep"; then
-    exit 1
-  fi
+  # A crash here must NOT kill the job: retry from the latest last.ckpt. The stage on node-local
+  # /scratch also survives resubmission on dlc-slowpoke.
+  MAIN_MAX_RETRIES="${MAIN_MAX_RETRIES:-8}"
+  attempt=1
+  while :; do
+    compute_main_args
+    if [ "$SKIP_MAIN" = 1 ]; then
+      break
+    fi
+    echo "=== nanounet_train (SSL+supervised) attempt $attempt/$MAIN_MAX_RETRIES ==="
+    if nanounet_train \
+      -d "$DATASET_ID" \
+      -f "$FOLD" \
+      --plans "$PLANS_NAME" \
+      --config "$ROI_CONFIG" \
+      --val-manifest "$VAL_MANIFEST" \
+      --val-every-n-epochs "$VAL_EVERY_N" \
+      "${MAIN_ARGS[@]}" \
+      "${MAE_FLAGS[@]}" \
+      --out "$OUT" \
+      --batch-size "$BATCH_SIZE" \
+      --epochs "$SUP_EPOCHS" \
+      --iters-per-epoch "$ITERS_PER_EPOCH" \
+      --lr 0.01 \
+      --warmup-epochs "$WARMUP_EPOCHS" \
+      --ema-decay "$EMA_DECAY" \
+      --monitor val_dice \
+      --lr-schedule stretched_tail_poly \
+      --stretched-k "$STRETCHED_K" \
+      --stretched-ref "$STRETCHED_REF" \
+      --loss dc_ce \
+      --prompts-per-patch "$PROMPTS_PER_PATCH" \
+      --consistency-weight "$CONSISTENCY_WEIGHT" \
+      --dl-bucket xl \
+      --devices 1 \
+      --accelerator cuda \
+      --precision 16-mixed \
+      --wandb-name "Dataset900_f0_ssl_sup_instance_1200ep"; then
+      break
+    fi
+    if [ "$attempt" -ge "$MAIN_MAX_RETRIES" ]; then
+      echo "FATAL: nanounet_train (SSL+supervised) failed $MAIN_MAX_RETRIES times in this allocation; giving up"
+      exit 1
+    fi
+    echo "nanounet_train (SSL+supervised) attempt $attempt failed; retrying in 30s from the latest checkpoint"
+    attempt=$((attempt + 1))
+    sleep 30
+  done
 fi
 
 sup_done() {
@@ -293,16 +314,41 @@ run_ft() {
     --ema-decay "$EMA_DECAY" \
     --monitor val_dice \
     --dl-bucket xl \
-    --dl-persistent-workers \
     --devices 1 \
     --accelerator cuda \
     --precision 16-mixed \
     --wandb-name "Dataset900_f0_mixed_d013_ft_80ep"
 }
 
+# Same in-job retry rationale as the main call above: FT re-derives --resume vs --init-weights
+# from $FT_LAST on every attempt, so a crash after FT has already checkpointed resumes instead of
+# restarting FT from the supervised init.
+run_ft_with_retry() {
+  local init_ckpt="$1"
+  local ft_max_retries="${FT_MAX_RETRIES:-8}"
+  local attempt=1
+  while :; do
+    echo "=== FT attempt $attempt/$ft_max_retries ==="
+    if [ -f "$FT_LAST" ]; then
+      echo "FT resume from $FT_LAST"
+      run_ft --resume "$FT_LAST" && return 0
+    else
+      echo "FT init from $init_ckpt"
+      run_ft --init-weights "$init_ckpt" && return 0
+    fi
+    if [ "$attempt" -ge "$ft_max_retries" ]; then
+      echo "FATAL: FT failed $ft_max_retries times in this allocation; giving up"
+      return 1
+    fi
+    echo "FT attempt $attempt failed; retrying in 30s from the latest checkpoint"
+    attempt=$((attempt + 1))
+    sleep 30
+  done
+}
+
 if [ -f "$FT_LAST" ]; then
   echo "resuming FT from $FT_LAST"
-  run_ft --resume "$FT_LAST"
+  run_ft_with_retry "" || exit 1
 elif [ -f "$SUP_LAST" ] && sup_done; then
   INIT_CKPT=$(pick_init_ckpt)
   echo "supervised done; FT init $INIT_CKPT"
@@ -310,7 +356,7 @@ elif [ -f "$SUP_LAST" ] && sup_done; then
     echo "FATAL: output already exists; refusing to overwrite: $OUT_FT"
     exit 1
   }
-  run_ft --init-weights "$INIT_CKPT"
+  run_ft_with_retry "$INIT_CKPT" || exit 1
 else
   echo "supervised not finished (no last.ckpt or epoch < 1200-1); skip FT this allocation"
 fi
