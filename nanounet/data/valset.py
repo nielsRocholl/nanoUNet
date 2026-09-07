@@ -19,6 +19,7 @@ config into the header and refuses a stale mismatch -- see config_stamp() for wh
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import asdict, dataclass
 import numpy as np
@@ -83,7 +84,10 @@ def load_manifest(path: str, cfg: RoiPromptConfig) -> ValManifest:
             f"the val curve becomes meaningless.\n"
             f"Fix: nanounet_build_valset -d <id> --plans <plans> --config <cfg> --out {path}"
         )
-    live = config_stamp(cfg)
+    # stamp came back from load_json (tuples -> lists); round-trip live the same way so e.g.
+    # PropagatedConfig.backends (a tuple) doesn't fail equality against its own manifest just
+    # because JSON has no tuple type.
+    live = json.loads(json.dumps(config_stamp(cfg)))
     if stamp != live:
         keys = sorted(set(stamp) | set(live))
         diff = "\n".join(f"  {k}: manifest={stamp.get(k)!r} vs live={live.get(k)!r}" for k in keys if stamp.get(k) != live.get(k))
