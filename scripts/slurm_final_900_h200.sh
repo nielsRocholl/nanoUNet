@@ -178,6 +178,28 @@ compute_main_args() {
   fi
 }
 
+# A hang (stuck dataloader/checkpoint write, no exception) never exits, so SLURM and the retry
+# loop above never see it -- the job just idles out the wall clock. Runs the wrapped command in
+# its own process group (setsid) so we can kill the whole tree, not just the parent; watchdog
+# kills the group if nothing under watch_dir has been modified in stale_min minutes.
+watchdog() {
+  local watch_dir="$1" pgid="$2" stale_min="${3:-45}"
+  while kill -0 "$pgid" 2>/dev/null; do
+    sleep 300
+    latest=$(find "$watch_dir" -type f -printf '%T@\n' 2>/dev/null | sort -n | tail -1)
+    [ -z "$latest" ] && continue
+    age_min=$(( ($(date +%s) - ${latest%.*}) / 60 ))
+    if [ "$age_min" -ge "$stale_min" ]; then
+      echo "WATCHDOG: nothing under $watch_dir modified in ${age_min}m (>= ${stale_min}m); killing pgid $pgid"
+      kill -TERM -- "-$pgid" 2>/dev/null || true
+      sleep 15
+      kill -KILL -- "-$pgid" 2>/dev/null || true
+      return
+    fi
+  done
+}
+WATCHDOG_STALE_MIN="${WATCHDOG_STALE_MIN:-45}"
+
 compute_main_args
 
 if [ "$SKIP_MAIN" = 0 ]; then
@@ -203,7 +225,7 @@ if [ "$SKIP_MAIN" = 0 ]; then
       break
     fi
     echo "=== nanounet_train (SSL+supervised) attempt $attempt/$MAIN_MAX_RETRIES ==="
-    if nanounet_train \
+    setsid nanounet_train \
       -d "$DATASET_ID" \
       -f "$FOLD" \
       --plans "$PLANS_NAME" \
@@ -230,7 +252,14 @@ if [ "$SKIP_MAIN" = 0 ]; then
       --devices 1 \
       --accelerator cuda \
       --precision 16-mixed \
-      --wandb-name "Dataset900_f0_ssl_sup_instance_1200ep"; then
+      --wandb-name "Dataset900_f0_ssl_sup_instance_1200ep" &
+    train_pid=$!
+    watchdog "$OUT" "$train_pid" "$WATCHDOG_STALE_MIN" &
+    watchdog_pid=$!
+    train_rc=0
+    wait "$train_pid" || train_rc=$?
+    kill "$watchdog_pid" 2>/dev/null || true; wait "$watchdog_pid" 2>/dev/null || true
+    if [ "$train_rc" -eq 0 ]; then
       break
     fi
     if [ "$attempt" -ge "$MAIN_MAX_RETRIES" ]; then
@@ -295,7 +324,7 @@ run_ft() {
   local ft_args=("$@")
   unset WANDB_RUN_ID WANDB_RUN_PATH
   export WANDB_RESUME=never
-  nanounet_train \
+  setsid nanounet_train \
     -d "$DATASET_ID" \
     -f "$FOLD" \
     --plans "$PLANS_NAME" \
@@ -320,7 +349,14 @@ run_ft() {
     --devices 1 \
     --accelerator cuda \
     --precision 16-mixed \
-    --wandb-name "Dataset900_f0_mixed_d013_ft_80ep"
+    --wandb-name "Dataset900_f0_mixed_d013_ft_80ep" &
+  local train_pid=$!
+  watchdog "$OUT_FT" "$train_pid" "$WATCHDOG_STALE_MIN" &
+  local watchdog_pid=$!
+  local train_rc=0
+  wait "$train_pid" || train_rc=$?
+  kill "$watchdog_pid" 2>/dev/null || true; wait "$watchdog_pid" 2>/dev/null || true
+  return "$train_rc"
 }
 
 # Same in-job retry rationale as the main call above: FT re-derives --resume vs --init-weights
