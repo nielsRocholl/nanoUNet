@@ -7,8 +7,8 @@
 #SBATCH --gpus-per-task=1
 #SBATCH --time=7-00:00:00
 #SBATCH --job-name=nanounet-900-final
-#SBATCH --output=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_900_final.out
-#SBATCH --error=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_900_final.err
+#SBATCH --output=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_900_final_%j.out
+#SBATCH --error=/data/oncology/experiments/universal-lesion-segmentation/logs/nanounet_900_final_%j.err
 #SBATCH --no-container-entrypoint
 #SBATCH --container-mounts=/data/oncology/experiments/universal-lesion-segmentation:/nnunet_data
 #SBATCH --container-name=nanounet-900-final
@@ -25,6 +25,7 @@
 #
 # Resume is a state machine on NFS, not RESUME=last.ckpt. FRESH=1 wipes $OUT only.
 # Never deletes $OUT_FT; refuses to overwrite it.
+# SKIP_SUP=1 stops supervised where last.ckpt is and goes straight to FT (init from pick_init_ckpt).
 
 set -euo pipefail
 
@@ -48,6 +49,7 @@ STRETCHED_REF=500
 VAL_EVERY_N=2
 STORAGE=/nnunet_data
 FRESH="${FRESH:-0}"
+SKIP_SUP="${SKIP_SUP:-0}"
 
 OUT="${STORAGE}/NanoUNet_results/nanounet/${DS_FOLDER}_${PLANS_NAME}_f${FOLD}_h200_final"
 OUT_FT="${OUT}_ft"
@@ -67,6 +69,15 @@ mkdir -p "$PIP_CACHE_DIR" "$NANOUNET_RESULTS" "$NANOUNET_TMPDIR"
 
 if ! nanounet_train --help &>/dev/null; then
   echo "FATAL: nanounet_train not found or broken."
+  exit 1
+fi
+
+if [ "$SKIP_SUP" = 1 ] && [ "$FRESH" = 1 ]; then
+  echo "FATAL: SKIP_SUP=1 and FRESH=1 are contradictory (FRESH wipes the supervised checkpoints FT needs)"
+  exit 1
+fi
+if [ "$SKIP_SUP" = 1 ] && [ ! -f "$FT_LAST" ] && [ ! -f "$SUP_LAST" ]; then
+  echo "FATAL: SKIP_SUP=1 but no supervised checkpoint to finetune from: $SUP_LAST"
   exit 1
 fi
 
@@ -154,6 +165,9 @@ compute_main_args() {
   MAE_FLAGS=()
   if [ -f "$FT_LAST" ]; then
     echo "FT checkpoint present: skip SSL+supervised, resume FT from $FT_LAST"
+    SKIP_MAIN=1
+  elif [ "$SKIP_SUP" = 1 ]; then
+    echo "SKIP_SUP=1: stop supervised at $SUP_LAST, go to FT"
     SKIP_MAIN=1
   elif [ -f "$SUP_LAST" ]; then
     echo "supervised resume from $SUP_LAST (no --mae-pretrain)"
@@ -287,7 +301,7 @@ import csv, glob, os, re, sys
 out = sys.argv[1]
 ck = os.path.join(out, 'checkpoints')
 def _metric(path, key):
-    m = re.search(re.escape(key) + r'=([0-9.]+)', os.path.basename(path))
+    m = re.search(re.escape(key) + r'=([0-9]+(?:\.[0-9]+)?)', os.path.basename(path))
     return float(m.group(1)) if m else -1.0
 bestsel = sorted(glob.glob(os.path.join(ck, 'bestsel-*.ckpt')), key=lambda p: _metric(p, 'val_prompt_score'))
 best = sorted(
@@ -388,9 +402,9 @@ run_ft_with_retry() {
 if [ -f "$FT_LAST" ]; then
   echo "resuming FT from $FT_LAST"
   run_ft_with_retry "" || exit 1
-elif [ -f "$SUP_LAST" ] && sup_done; then
+elif [ -f "$SUP_LAST" ] && { [ "$SKIP_SUP" = 1 ] || sup_done; }; then
   INIT_CKPT=$(pick_init_ckpt)
-  echo "supervised done; FT init $INIT_CKPT"
+  echo "supervised done (SKIP_SUP=$SKIP_SUP); FT init $INIT_CKPT"
   mkdir "$OUT_FT" || {
     echo "FATAL: output already exists; refusing to overwrite: $OUT_FT"
     exit 1
