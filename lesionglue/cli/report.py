@@ -15,6 +15,7 @@ from tracking.common import CACHE_ROOT, DATASET_ROOT, print0, seed_all
 from tracking.config import CKPT_MONITOR, load_config
 from tracking.data.features import CACHE_TAG
 from tracking.data.graph import graph_config
+from tracking.decode import DECODE_CHOICES, DECODE_HELP
 from tracking.report import eval_baseline, eval_gnn
 from tracking.train.datamodule import MatcherDataModule
 from tracking.train.module import module_from_config
@@ -46,6 +47,8 @@ ap.add_argument("--eval-num-workers", type=int, default=0)
 ap.add_argument("--eval-device", choices=("auto", "cuda", "cpu", "mps"), default="auto")
 ap.add_argument("--quiet", action="store_true")
 ap.add_argument("--baseline-full-mask-cache", action="store_true")
+ap.add_argument("--decode", choices=DECODE_CHOICES, default="hungarian", help=DECODE_HELP)
+ap.add_argument("--thresh", type=float, default=0.5, help="dense decode threshold")
 
 if __name__ == "__main__":
     args = ap.parse_args()
@@ -93,12 +96,12 @@ if __name__ == "__main__":
     print0(f"best checkpoint: {best}")
     prog = not args.quiet
     one_mask = not args.baseline_full_mask_cache
-    gnn_val = eval_gnn(best, root, cache, "val", args.eval_batch_size, args.eval_num_workers, not args.no_ema, eval_device_pref=args.eval_device, show_progress=prog)
+    gnn_val = eval_gnn(best, root, cache, "val", args.eval_batch_size, args.eval_num_workers, not args.no_ema, eval_device_pref=args.eval_device, show_progress=prog, decode=args.decode, thresh=args.thresh)
     _cuda_gc()
-    gnn_test = eval_gnn(best, root, cache, "test", args.eval_batch_size, args.eval_num_workers, not args.no_ema, eval_device_pref=args.eval_device, show_progress=prog)
+    gnn_test = eval_gnn(best, root, cache, "test", args.eval_batch_size, args.eval_num_workers, not args.no_ema, eval_device_pref=args.eval_device, show_progress=prog, decode=args.decode, thresh=args.thresh)
     _cuda_gc()
     bl_val = eval_baseline(root, cache, "val", show_progress=prog, one_mask_cache=one_mask)
     bl_test = eval_baseline(root, cache, "test", show_progress=prog, one_mask_cache=one_mask)
-    report = {"best_checkpoint": str(best), "config": asdict(cfg), "gnn": {"val": gnn_val, "test": gnn_test}, "baseline": {"val": bl_val, "test": bl_test}}
+    report = {"best_checkpoint": str(best), "config": asdict(cfg), "decode": args.decode, "gnn": {"val": gnn_val, "test": gnn_test}, "baseline": {"val": bl_val, "test": bl_test}}
     (out / "report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     print0(f"wrote {out / 'report.json'}")

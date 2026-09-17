@@ -15,7 +15,7 @@ from baselines.nearest_mask.io import load_fu_mask
 from tracking.common import eval_device
 from tracking.data.dataset import LesionDataset
 from tracking.data.meta import V2Paths, parse_meta_csv
-from tracking.decode import decode_sinkhorn_hungarian
+from tracking.decode import DECODE_CHOICES, decode_pairs
 from tracking.infer import graph_cfg_from_ckpt
 from tracking.train.match_utils import split_per_graph
 from tracking.data.splits import aggregate_cv_folds, load_cv_summary
@@ -67,17 +67,28 @@ def _topology(root: Path, g) -> dict[int, str]:
     return {r.lesion_id: r.topology for r in rows if r.img_id_fu == img}
 
 
-def _add_graph(root: Path, g, dec: np.ndarray, c: dict[str, object]) -> None:
+def _pred_matrix(pairs: np.ndarray, n_bl: int, n_fu: int) -> np.ndarray:
+    pred = np.zeros((n_bl, n_fu), dtype=bool)
+    pairs = np.asarray(pairs, dtype=np.int64).reshape(-1, 2)
+    pred[pairs[:, 0], pairs[:, 1]] = True
+    return pred
+
+
+def _add_graph(root: Path, g, pred: np.ndarray, c: dict[str, object], external: np.ndarray | None = None) -> None:
+    """Score one graph. `pred` is the (n_bl, n_fu) predicted link matrix, so a row may link to
+    several FU (split) and a column may be linked by several BL (merge). A row is correct when
+    its predicted FU set equals its labelled FU set; an empty set is a disappearance.
+    `external[i]` marks a BL row that claimed a FU lesion outside this graph: never correct.
+    """
     n_bl, n_fu = len(g["bl"].lesion_id), len(g["fu"].lesion_id)
     lab = g["bl", "cross", "fu"].edge_label.reshape(n_bl, n_fu).cpu().numpy() > 0.5
     bl_ids = g["bl"].lesion_id.cpu().numpy().astype(int)
     topo = _topology(root, g)
-    pred = np.zeros((n_bl, n_fu), dtype=bool)
-    for i, j in enumerate(dec):
-        if int(j) >= 0:
-            pred[i, int(j)] = True
-        elif int(j) < -1:
-            c["external_claim_total"] = int(c["external_claim_total"]) + 1
+    assert pred.shape == (n_bl, n_fu) and pred.dtype == bool, (pred.shape, pred.dtype)
+    ext = np.zeros(n_bl, dtype=bool) if external is None else np.asarray(external, dtype=bool)
+    assert ext.shape == (n_bl,), ext.shape
+    assert not (ext & pred.any(axis=1)).any(), "a row cannot both claim an external FU and link inside the graph"
+    c["external_claim_total"] = int(c["external_claim_total"]) + int(ext.sum())
     tp = int(np.logical_and(pred, lab).sum())
     fp = int(np.logical_and(pred, ~lab).sum())
     fn = int(np.logical_and(~pred, lab).sum())
@@ -86,8 +97,7 @@ def _add_graph(root: Path, g, dec: np.ndarray, c: dict[str, object]) -> None:
         c[k] = int(c[k]) + v
     row_ok = 0
     for i in range(n_bl):
-        pos = set(map(int, np.where(lab[i])[0]))
-        ok = int(int(dec[i]) in pos) if pos else int(int(dec[i]) == -1)
+        ok = int(not ext[i] and np.array_equal(pred[i], lab[i]))
         row_ok += ok
         t = topo[int(bl_ids[i])]
         if t == "MERGED":
@@ -98,12 +108,12 @@ def _add_graph(root: Path, g, dec: np.ndarray, c: dict[str, object]) -> None:
             c["split_correct"] = int(c["split_correct"]) + ok
         if float(g["bl"].no_match_label[i]) > 0.5:
             c["disappeared_total"] = int(c["disappeared_total"]) + 1
-            c["disappeared_correct"] = int(c["disappeared_correct"]) + int(int(dec[i]) == -1)
-    claimed = {int(j) for j in dec if int(j) >= 0}
+            c["disappeared_correct"] = int(c["disappeared_correct"]) + int(not ext[i] and not pred[i].any())
+    claimed = pred.any(axis=0)
     for j in range(n_fu):
         if float(g["fu"].no_match_label[j]) > 0.5:
             c["newly_appeared_total"] = int(c["newly_appeared_total"]) + 1
-            c["newly_appeared_correct"] = int(c["newly_appeared_correct"]) + int(j not in claimed)
+            c["newly_appeared_correct"] = int(c["newly_appeared_correct"]) + int(not claimed[j])
     c["row_correct"] = int(c["row_correct"]) + row_ok
     c["row_total"] = int(c["row_total"]) + n_bl
     c["patient_row_acc"].append(row_ok / max(n_bl, 1))
@@ -122,7 +132,10 @@ def eval_gnn(
     eval_device_pref: str = "auto",
     show_progress: bool = True,
     cuda_gc_each_batch: bool = True,
+    decode: str = "hungarian",
+    thresh: float = 0.5,
 ) -> dict[str, object]:
+    assert decode in DECODE_CHOICES, decode
     dev = eval_device(eval_device_pref)
     mod = MatcherModule.load_from_checkpoint(str(ckpt), map_location=dev).to(dev).eval()
     gcfg = graph_cfg_from_ckpt(mod, int(getattr(mod.hparams, "k_intra", 8)))
@@ -137,8 +150,11 @@ def eval_gnn(
             graphs, pp, db, df = split_per_graph(batch, out)
             for g, p, b, f in zip(graphs, pp, db, df):
                 n_bl, n_fu = len(g["bl"].lesion_id), len(g["fu"].lesion_id)
-                dec = decode_sinkhorn_hungarian(p.detach(), b.detach(), f.detach(), n_bl, n_fu, iters=mod.hparams.sinkhorn_iters, tau=float(mod.hparams.dust_tau))
-                _add_graph(root, g.cpu(), dec, c)
+                pairs = decode_pairs(
+                    decode, p.detach(), b.detach(), f.detach(), n_bl, n_fu,
+                    thresh=thresh, sinkhorn_iters=mod.hparams.sinkhorn_iters, sinkhorn_tau=float(mod.hparams.dust_tau),
+                )
+                _add_graph(root, g.cpu(), _pred_matrix(pairs, n_bl, n_fu), c)
             del batch, out, graphs, pp, db, df
             if cuda_gc_each_batch and dev.type == "cuda":
                 torch.cuda.empty_cache()
@@ -171,5 +187,6 @@ def eval_baseline(root: Path, cache: Path, split: str, *, show_progress: bool = 
             assert r.cog_propagated is not None
             pred = idx_cache[key].query(r.cog_propagated).pred_fu_lesion_id
             dec[i] = fu[pred] if pred in fu else (-1 if pred < 0 else -2)
-        _add_graph(root, g, dec, c)
+        live = dec >= 0
+        _add_graph(root, g, _pred_matrix(np.stack([np.nonzero(live)[0], dec[live]], axis=1), len(dec), len(fu)), c, external=dec < -1)
     return _finish(c)

@@ -124,7 +124,7 @@ lesion_track \
 
 ## CLI reference
 
-After `pip install -e .`, commands are `lesion_track_*`. Decode defaults to hungarian (the holdout gate). `--decode dense` keeps merges/splits.
+After `pip install -e .`, commands are `lesion_track_*`. Decode defaults to hungarian (the holdout gate). `--decode dense` and `--decode sinkhorn` keep merges/splits (sinkhorn up to about `1/--sinkhorn-tau` lesions per merge; see `tracking/decode.py`). `lesion_track_report --decode` scores any of the three.
 
 ### `lesion_track`
 
