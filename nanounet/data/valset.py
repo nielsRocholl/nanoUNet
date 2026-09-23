@@ -121,14 +121,12 @@ class ValPatchDataset(Dataset):
         roi_cfg: RoiPromptConfig,
         val_tf,
         final_patch_size,
-        longi: bool,
     ):
         self.manifest = manifest
         self.pr = roi_cfg.prompt
         self.tf = val_tf
         self.final_ps = final_patch_size
         self.patch_size = manifest.patch_size
-        self.longi = longi
         cases = sorted({e["case"] for e in manifest.entries})
         self.ds = Blosc2Folder(case_folder, identifiers=cases)
         # Shared with val_metrics.py, which reads the same cohort_weights keys off the manifest
@@ -153,12 +151,12 @@ class ValPatchDataset(Dataset):
             {"points_pos": np.asarray(e["clicks2_zyx"], np.float32).reshape(-1, 3),
              "n_false_pos": e["n_false_pos"]},
         ]
-        kp = concat_variant_keypoints(variants, self.longi)
+        kp = concat_variant_keypoints(variants)
         with torch.no_grad():
             o = self.tf(**{"image": im, "segmentation": se, "keypoints": kp})
-            split = split_variant_keypoints(o["keypoints"], variants, self.longi)
-            v1 = render_variant(o, split[0], {"null_baseline": False}, self.longi, self.final_ps, self.pr)
-            v2 = render_variant(o, split[1], {"null_baseline": False}, self.longi, self.final_ps, self.pr)
+            split = split_variant_keypoints(o["keypoints"], variants)
+            v1 = render_variant(o, split[0], self.final_ps, self.pr)
+            v2 = render_variant(o, split[1], self.final_ps, self.pr)
         item = {
             "data_variants": [v1], "data_prompt2": v2, "target": o["segmentation"],
             "click_inside": [e["click_inside"]], "scenario": SCENARIOS.index(e["scenario"]),
@@ -183,16 +181,14 @@ def build_val_dataloader(
     roi_cfg: RoiPromptConfig,
     val_tf,
     final_ps,
-    longi: bool,
     batch_size: int,
     bucket: DataloaderBucket,
     pin_memory: bool,
     persistent_workers: bool,
 ) -> DataLoader:
-    """Deterministic val loader over a fixed manifest. shuffle stays False and no sampler is
-    passed: Lightning injects a DistributedSampler under DDP, and order does not affect any
-    metric here because every bucket is pooled before reduction."""
-    ds = ValPatchDataset(manifest, case_folder, roi_cfg, val_tf, final_ps, longi)
+    """Deterministic val loader over a fixed manifest. Order does not affect any metric here
+    because every bucket is pooled before reduction."""
+    ds = ValPatchDataset(manifest, case_folder, roi_cfg, val_tf, final_ps)
     nw = bucket.nw_val
     winit = worker_init if nw else None
     return build_iter_dataloader(

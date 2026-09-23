@@ -80,7 +80,7 @@ class EMACallback(pl.Callback):
                     out = pl_module.net(x)
                 buf.append(val_step_row(out, y, pl_module.label_manager, pl_module.enable_deep_supervision, 0.0))
         pl_module.net.load_state_dict(raw)
-        pl_module.log("val_dice_ema", pooled_fg_dice(buf), sync_dist=True)
+        pl_module.log("val_dice_ema", pooled_fg_dice(buf))
 
     def state_dict(self) -> dict[str, Any]:
         return {"shadow": self.shadow, "n_val": self._n_val}

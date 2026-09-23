@@ -1,6 +1,6 @@
 # nanoUNet
 
-Minimal prompt-aware 3D ResEnc U-Net with PyTorch Lightning and optional MAE pretraining; optional longitudinal finetune uses a registered BL+FU dual-stream encoder with difference weighting at skips. Layout and style follow [nanochat](https://github.com/karpathy/nanochat): small modules, no framework sprawl. The U-Net preprocessing, training, and setup pipeline draws a lot of inspiration from [nnU-Net](https://github.com/MIC-DKFZ/nnUNet).
+Minimal prompt-aware 3D ResEnc U-Net with PyTorch Lightning and optional MAE pretraining. Layout and style follow [nanochat](https://github.com/karpathy/nanochat): small modules, no framework sprawl. The U-Net preprocessing, training, and setup pipeline draws a lot of inspiration from [nnU-Net](https://github.com/MIC-DKFZ/nnUNet).
 
 ## Install
 
@@ -42,7 +42,6 @@ python -c "import sys; import nanounet.cli.preprocess, nanounet.cli.train, nanou
 | Inference                      | [docs/steps/predict.md](docs/steps/predict.md)                     |
 | Track (seg × track)            | [docs/steps/track.md](docs/steps/track.md)                         |
 | Tracking ids                   | [docs/reference/track_ids.md](docs/reference/track_ids.md)         |
-| Longitudinal workflow          | [docs/steps/longi.md](docs/steps/longi.md)                         |
 | ROI / prompt config            | [docs/reference/config.md](docs/reference/config.md)               |
 | Patch size playbook            | [docs/reference/patch_size.md](docs/reference/patch_size.md)       |
 | Loss functions                 | [docs/reference/losses.md](docs/reference/losses.md)               |

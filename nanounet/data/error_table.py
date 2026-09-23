@@ -1,6 +1,6 @@
 """Registration-error offset table: load-once-per-process cache, validation, and the empirical draw.
 
-Schema (see scripts/measure_registration_error.py): {frame, spacing_zyx, size_bins_mm,
+Schema (see docs/reference/config.md): {frame, spacing_zyx, size_bins_mm,
 backends: {name: {offsets_zyx: [[dz,dy,dx], ...] per size bin]}}, excluded, provenance}. Offsets are
 in RESAMPLED voxels. Shared by nanounet/config.py (startup validation) and
 nanounet/data/sampling.py (the actual draw), so the JSON is parsed exactly once per process.
@@ -20,7 +20,6 @@ from nanounet.prompt.centroids import apply_propagation_offset
 if TYPE_CHECKING:
     from nanounet.config import PropagatedConfig
 
-_MEASURE_CMD = "python3 scripts/measure_registration_error.py"
 _CACHE: Dict[str, dict] = {}
 
 DEFAULT_ERROR_TABLE = "/nnunet_data/Longitudinal-CT/derivatives/registration_error_table.json"
@@ -59,38 +58,41 @@ def load_table(path: str) -> dict:
 
 def validate_table(path: str, backends: Tuple[str, ...]) -> None:
     p = Path(path)
+    fix = (
+        'Fix: point propagated.error_table at a table matching the schema in '
+        'docs/reference/config.md, or set propagated.mode to "gaussian" (no table needed).'
+    )
     if not p.is_file():
         raise FileNotFoundError(
-            f"propagated.error_table {path!r} does not exist (mode=empirical requires it).\n"
-            f"Fix: {_MEASURE_CMD}   (writes {path})"
+            f"propagated.error_table {path!r} does not exist (mode=empirical requires it).\n{fix}"
         )
     try:
         table = load_table(path)
     except json.JSONDecodeError as e:
         raise ValueError(
-            f"propagated.error_table {path!r} is not valid JSON ({e}).\nFix: {_MEASURE_CMD}"
+            f"propagated.error_table {path!r} is not valid JSON ({e}).\n{fix}"
         ) from e
     size_bins = table.get("size_bins_mm")
     if not size_bins:
-        raise ValueError(f"propagated.error_table {path!r} has no size_bins_mm.\nFix: {_MEASURE_CMD}")
+        raise ValueError(f"propagated.error_table {path!r} has no size_bins_mm.\n{fix}")
     table_backends = table.get("backends", {})
     for b in backends:
         if b not in table_backends:
             raise ValueError(
                 f"propagated.backends requests {b!r} but {path!r} only has "
-                f"{list(table_backends)}.\nFix: {_MEASURE_CMD}"
+                f"{list(table_backends)}.\n{fix}"
             )
         offsets = table_backends[b].get("offsets_zyx", [])
         if len(offsets) != len(size_bins):
             raise ValueError(
                 f"propagated.error_table {path!r} backend {b!r} has {len(offsets)} size-bin "
-                f"entries, expected {len(size_bins)}.\nFix: {_MEASURE_CMD}"
+                f"entries, expected {len(size_bins)}.\n{fix}"
             )
         for i, bin_offsets in enumerate(offsets):
             if len(bin_offsets) == 0:
                 raise ValueError(
                     f"propagated.error_table {path!r} backend {b!r} size bin {size_bins[i]} "
-                    f"is empty.\nFix: {_MEASURE_CMD}"
+                    f"is empty.\n{fix}"
                 )
 
 

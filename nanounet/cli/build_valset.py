@@ -13,12 +13,12 @@ from collections import Counter
 
 import numpy as np
 import torch
-from batchgenerators.utilities.file_and_folder_operations import join, load_json
+from batchgenerators.utilities.file_and_folder_operations import join
 
 from nanounet.common import cprint, nano_header, nano_progress, preprocessed_dir, resolve_user_config_path
 from nanounet.config import load_config
 from nanounet.data.blosc2_dataset import Blosc2Folder
-from nanounet.data.valset import SCENARIOS, SCHEMA_VERSION, SIZE_BUCKETS, SMALL_LESION_MAX_VOX, _sidecar_path, config_stamp
+from nanounet.data.valset import SCENARIOS, SCHEMA_VERSION, SMALL_LESION_MAX_VOX, _sidecar_path, config_stamp
 from nanounet.data.valset_alloc import allocate, load_cohorts, scenario_allocation
 from nanounet.data.valset_build import (
     LabelCache,

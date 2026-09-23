@@ -31,13 +31,12 @@ from pytorch_lightning.loggers import WandbLogger
 
 from nanounet.dataloader_prefs import dataloader_bucket
 from nanounet.lightning_ckpt import (
-    pl_ckpt_assert_epochs_match,
     pl_ckpt_epoch_and_target,
     pl_ckpt_stage_done,
 )
 from nanounet.plan.dataset_id import convert_id_to_dataset_name
 from nanounet.plan.splits import fold_seed, parse_fold
-from nanounet.diag import mem_diag_enabled, set_mem_diag
+from nanounet.diag import set_mem_diag
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
 from nanounet.pretrain.module import NanoMAELM
 from nanounet.runtime import assert_mem_diag_cgroup, runtime_banner

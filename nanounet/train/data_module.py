@@ -62,8 +62,6 @@ class NanoDataModule(pl.LightningDataModule):
         pin_memory: bool | None = None,
         persistent_workers: bool = False,
         only_prefix: str | None = None,
-        longi: bool = False,
-        longi_null: bool = False,
         prompts_per_patch: int = 1,
         val_manifest: str | None = None,
     ):
@@ -88,8 +86,6 @@ class NanoDataModule(pl.LightningDataModule):
         self.enable_ds = enable_deep_supervision
         self.persistent_workers = persistent_workers
         self.only_prefix = only_prefix
-        self.longi = longi
-        self.longi_null = longi_null
         if pin_memory is None:
             pin_memory = torch.cuda.is_available()
         self.pin_memory = pin_memory
@@ -149,8 +145,6 @@ class NanoDataModule(pl.LightningDataModule):
             self.num_iterations_per_epoch,
             self.batch_size,
             fold_seed(self.fold) + 1000 * self.num_iterations_per_epoch,
-            self.longi,
-            self.longi_null,
             self.prompts_per_patch,
         )
         b = self.dl_bucket
@@ -174,14 +168,14 @@ class NanoDataModule(pl.LightningDataModule):
         if self.val_manifest is not None:
             return build_val_dataloader(
                 self.val_manifest, self.case_folder, self.roi_cfg, self.val_tf, self.final_ps,
-                self.longi, self.batch_size, self.dl_bucket, self.pin_memory, self.persistent_workers,
+                self.batch_size, self.dl_bucket, self.pin_memory, self.persistent_workers,
             )
         # emit_prompt2=True: 2nd independent-prompt draw for val_prompt_agreement, own RNG stream
         # (prompts_per_patch stays 1 -- val batch composition, and val_dice, are unaffected).
         it = PatchIterable(
             self.case_folder, self.dataset_dir, self.val_keys, self.val_cfg, self.final_ps, self.final_ps,
             self.label_manager.annotated_classes_key, self.val_tf, False, self.num_val_iterations,
-            self.batch_size, fold_seed(self.fold) + 2000, self.longi, self.longi_null, emit_prompt2=True,
+            self.batch_size, fold_seed(self.fold) + 2000, emit_prompt2=True,
         )
         b = self.dl_bucket
         nw = b.nw_val

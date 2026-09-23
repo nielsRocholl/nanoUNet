@@ -41,9 +41,9 @@ def train_transforms(
     regions,
     ignore_label: int | None,
 ) -> BasicTransform:
-    # No ChannelSubsetImageTransform / intensity_channels here: build_patch* no longer renders
-    # heatmaps into the image tensor entering this chain, so "image" is CT-only (1ch supervised,
-    # 2ch longi) -- intensity aug hits every channel, which is now exactly the CT channels.
+    # No ChannelSubsetImageTransform / intensity_channels here: build_patch no longer renders
+    # heatmaps into the image tensor entering this chain, so "image" is CT-only (1ch) --
+    # intensity aug hits every channel, which is now exactly the CT channel.
     transforms = []
     if do_dummy_2d_data_aug:
         ignore_axes = (0,)

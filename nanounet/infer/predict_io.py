@@ -1,65 +1,16 @@
-"""Predict-side host IO: patient-id CSV filter, raw + preprocessed b2nd case load (joint longi 2-ch)."""
+"""Predict-side host IO: patient-id CSV filter, raw case load + pad-to-patch packing."""
 
 from __future__ import annotations
 
 import csv
 import os
 
-import blosc2
 import numpy as np
-import SimpleITK as sitk
 import torch
 from acvl_utils.cropping_and_padding.padding import pad_nd_image
-from batchgenerators.utilities.file_and_folder_operations import join
 
-from nanounet.data.blosc2_dataset import Blosc2Folder, load_case_properties
 from nanounet.plan.prep.case_pp import run_case, run_case_npy
 from nanounet.prompt.coords import load_points_xyz
-
-
-def _assert_bl_geometry(scan: str, bl_scan: str) -> None:
-    fu, bl = sitk.ReadImage(scan), sitk.ReadImage(bl_scan)
-    if fu.GetSize() != bl.GetSize() or not np.allclose(fu.GetSpacing(), bl.GetSpacing()):
-        raise ValueError(
-            f"Baseline geometry does not match follow-up (joint longi preprocess needs one grid).\n"
-            f"  FU {scan}: size={fu.GetSize()} spacing={fu.GetSpacing()}\n"
-            f"  BL {bl_scan}: size={bl.GetSize()} spacing={bl.GetSpacing()}\n"
-            f"Fix: register BL into the FU frame first with nanounet_register_longi "
-            f"(see docs/steps/longi.md)."
-        )
-
-
-def baseline_resolver(baseline_image, baseline_points, baseline_dir, end):
-    """cid -> (bl_scan|None, bl_json|None) and a bl_present bool, for CLI longi inference.
-
-    Dataset mode: per-case siblings <baseline_dir>/<cid>{end} + <baseline_dir>/<cid>.json.
-    Single mode: the two explicit --baseline-* paths (or (None, None) when not longi).
-    """
-    if baseline_dir is not None:
-        def resolve(cid):
-            return os.path.join(baseline_dir, cid + end), os.path.join(baseline_dir, cid + ".json")
-        return resolve, True
-    def resolve(_cid):
-        return baseline_image, baseline_points
-    return resolve, baseline_image is not None
-
-
-def check_baseline_files(cases, resolve_bl, baseline_dir, end):
-    missing = []
-    for cid, *_ in cases:
-        bs, bj = resolve_bl(cid)
-        if not os.path.isfile(bs):
-            missing.append(bs)
-        if not os.path.isfile(bj):
-            missing.append(bj)
-    if missing:
-        raise FileNotFoundError(
-            "Missing baseline files for longi dataset inference:\n  "
-            + "\n  ".join(missing[:10])
-            + ("\n  ..." if len(missing) > 10 else "")
-            + f"\nExpected per FU case <cid>: {baseline_dir}/<cid>{end} and <cid>.json.\n"
-              "Fix: build them with nanounet_register_longi (see docs/steps/longi.md)."
-        )
 
 
 def patient_ids_from_csv(path: str) -> set[str]:
@@ -88,74 +39,19 @@ def patient_ids_from_csv(path: str) -> set[str]:
     return out
 
 
-def _pack(data, props, json_path: str, cm, bl_json=None):
+def _pack(data, props, json_path: str, cm):
     data_t = torch.from_numpy(data).float()
     pad, slicer_revert = pad_nd_image(data_t, tuple(cm.patch_size), "constant", {"value": 0}, True, None)
     points = load_points_xyz(json_path)
-    bl_points = load_points_xyz(bl_json) if bl_json else None
-    return pad, slicer_revert, props, points, bl_points
+    return pad, slicer_revert, props, points
 
 
-def preprocess_loaded(data: np.ndarray, props: dict, json_path: str, pl, cm, dj, bl_json=None):
+def preprocess_loaded(data: np.ndarray, props: dict, json_path: str, pl, cm, dj):
     """Same as preprocess_case, but CT already in memory (no second read)."""
     data, _seg, props = run_case_npy(data, None, props, pl, cm, dj, verbose=False)
-    return _pack(data, props, json_path, cm, bl_json)
+    return _pack(data, props, json_path, cm)
 
 
-def preprocess_case(scan: str, json_path: str, pl, cm, dj, bl_scan=None, bl_json=None):
-    files = [scan]
-    if bl_scan is not None:
-        _assert_bl_geometry(scan, bl_scan)  # joint 2-ch crop keeps FU/BL voxel-aligned (design: §2)
-        files = [scan, bl_scan]
-    data, _seg, props = run_case(files, None, pl, cm, dj, verbose=False)
-    return _pack(data, props, json_path, cm, bl_json)
-
-
-def _zyx_to_xyz(clicks: list) -> list[tuple[float, float, float]]:
-    return [(float(x), float(y), float(z)) for z, y, x in clicks]
-
-
-def check_preprocessed_folder(folder: str) -> list[str]:
-    if not os.path.isdir(folder):
-        raise FileNotFoundError(
-            f"Preprocessed folder not found: {folder}\n"
-            f"Expected a data_identifier dir with <case>.b2nd and click sidecars.\n"
-            f"Fix: pass -i .../NanoUNet_preprocessed/<Dataset>/nnUNetPlans_3d_fullres   (see docs/steps/predict.md)"
-        )
-    ids = Blosc2Folder(folder).identifiers
-    if not ids:
-        raise FileNotFoundError(
-            f"No .b2nd cases in {folder}.\n"
-            f"Expected preprocessed longi cases from nanounet_preprocess + nanounet_longi_clicks.\n"
-            f"Fix: nanounet_preprocess -d <id> && nanounet_longi_clicks -d <id> --plans <plans>   (see docs/steps/preprocess.md)"
-        )
-    missing = []
-    for cid in ids:
-        props = load_case_properties(folder, cid)
-        if "fu_clicks_zyx" not in props:
-            missing.append(cid)
-    if missing:
-        raise FileNotFoundError(
-            f"Missing fu_clicks_zyx sidecars for {len(missing)} case(s) in {folder}.\n"
-            f"First: {missing[0]}\n"
-            f"Fix: nanounet_longi_clicks -d <id> --plans <plans> --clicks-dir <clicksTr> --clicks-fu-dir <clicksTrFU>"
-        )
-    return ids
-
-
-def preprocess_preprocessed_case(folder: str, identifier: str, patch_size: tuple[int, int, int]):
-    props = load_case_properties(folder, identifier)
-    data = np.array(blosc2.open(join(folder, identifier + ".b2nd"), mode="r")[()], dtype=np.float32)
-    assert data.shape[0] == 2, data.shape  # ch0 FU_CT, ch1 warped BL_CT
-    pad, slicer_revert = pad_nd_image(
-        torch.from_numpy(data).float(), patch_size, "constant", {"value": 0}, True, None
-    )
-    # clicks are already in resampled preprocessed zyx; drop raw-crop keys so predict_case won't remap.
-    infer_props = {
-        k: v for k, v in props.items()
-        if k not in ("bbox_used_for_cropping", "shape_after_cropping_and_before_resampling")
-    }
-    has_bl = bool(props.get("has_baseline"))
-    fu_xyz = _zyx_to_xyz(props["fu_clicks_zyx"])
-    bl_xyz = _zyx_to_xyz(props["bl_clicks_zyx"]) if has_bl else []
-    return pad, slicer_revert, infer_props, fu_xyz, bl_xyz, has_bl
+def preprocess_case(scan: str, json_path: str, pl, cm, dj):
+    data, _seg, props = run_case([scan], None, pl, cm, dj, verbose=False)
+    return _pack(data, props, json_path, cm)

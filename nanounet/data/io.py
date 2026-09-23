@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import traceback
-from typing import List, Sequence, Tuple, Type
+from typing import Sequence, Tuple, Type
 
 import numpy as np
 import pydoc

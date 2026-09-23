@@ -8,7 +8,7 @@ from collections.abc import Callable
 import torch
 from torch import autocast
 
-from nanounet.infer.longi_row import encode_inference_row
+from nanounet.infer.inference_row import encode_inference_row
 from nanounet.infer.points_pad import resolve_pts_pad
 from nanounet.infer.roi_slices import (
     background_logits_vector,
@@ -16,13 +16,11 @@ from nanounet.infer.roi_slices import (
     face_fg_click_global,
     fg_face_touch,
     grow_canvas,
-    map_points_zyx_unpadded_to_padded,
     seed_slices_for_points,
 )
 from nanounet.infer.patch_export import patch_unpadded_overlap
 from nanounet.infer.tta import max_cat, predict_batch_with_tta
 from nanounet.prompt.cluster import cell_slices, face_neighbours, grid_stride
-from nanounet.prompt.coords import points_to_centers_zyx
 from nanounet.prompt.encoding import N_PROMPT_CHANNELS
 
 MAX_BORDER_EXTRA = 16
@@ -57,9 +55,6 @@ def predict_case_logits(
     use_amp: bool,
     cluster_margin_frac: float = 0.1,
     mode: str = "clustered",
-    is_longi: bool = False,
-    bl_present: bool = False,
-    bl_points_xyz: list | None = None,
     points_zyx_unpadded: list[tuple[int, int, int]] | None = None,
     on_forward: Callable[[int, int], None] | None = None,
 ) -> tuple[torch.Tensor, list[tuple[slice, slice, slice]]]:
@@ -68,9 +63,9 @@ def predict_case_logits(
     padded_shape = tuple(pad.shape[1:])
     unpadded_shape = tuple(s.stop - s.start for s in slicer_revert[1:])
     nh = lm.num_segmentation_heads
-    n_img = pad.shape[0] // 2 if (is_longi and bl_present) else pad.shape[0]
+    n_img = pad.shape[0]
     n_stream = n_img + N_PROMPT_CHANNELS
-    row_ch = 2 * n_stream if is_longi else n_stream
+    row_ch = n_stream
     acc_dtype = _accum_dtype(dev)
     bg_vec = background_logits_vector(lm, nh, dev, acc_dtype)
     amp_on = use_amp and dev.type == "cuda"
@@ -84,14 +79,6 @@ def predict_case_logits(
     )
     if not pts_pad:
         return torch.zeros(unpadded_shape, dtype=torch.uint8), []
-
-    bl_pts_pad = None
-    if is_longi and bl_present and bl_points_xyz:
-        bl_zyx = [(z, y, x) for x, y, z in bl_points_xyz]
-        bl_pre = points_to_centers_zyx(
-            bl_zyx, "voxel", props, unpadded_shape, spacing, tf, voxel_coordinate_frame="full",
-        )
-        bl_pts_pad = map_points_zyx_unpadded_to_padded(bl_pre, slicer_revert)
 
     seeds_pts, seed_slices = seed_slices_for_points(pts_pad, patch_size, padded_shape, cluster_margin_frac, mode)
 
@@ -112,7 +99,6 @@ def predict_case_logits(
         margin_bufs.append(torch.full(patch_size, neg, dtype=acc_dtype, device=dev))
         logits_accs.append(bg_vec.view(-1, 1, 1, 1).to(acc_dtype).expand(nh, *patch_size).contiguous())
     fwd_done, written = 0, []
-    enc_kw = dict(is_longi=is_longi, bl_present=bl_present, bl_pts_pad=bl_pts_pad)
     while pending:
         batch = pending[:batch_size]
         pending = pending[batch_size:]
@@ -121,7 +107,7 @@ def predict_case_logits(
             row = torch.empty((row_ch, *patch_size), device=dev, dtype=torch.float32)
             encode_inference_row(
                 row, pad, sl[0], sl[1], sl[2], n_img, seeds_pts[ci], encode_prompt,
-                cfg, patch_size, dev, extra_clicks=extra, **enc_kw,
+                cfg, patch_size, dev, extra_clicks=extra,
             )
             rows.append(row)
         with autocast(dev.type, enabled=amp_on):

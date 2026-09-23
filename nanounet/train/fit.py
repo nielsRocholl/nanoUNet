@@ -9,7 +9,6 @@ import torch
 from batchgenerators.utilities.file_and_folder_operations import join, maybe_mkdir_p
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.strategies import DDPStrategy
 
 from nanounet.common import cprint
 from nanounet.diag import log_snapshot, mem_diag_enabled
@@ -18,7 +17,6 @@ from nanounet.lightning_ckpt import (
     pl_ckpt_epoch_and_target,
     pl_ckpt_stage_done,
 )
-from nanounet.plan.plans import Plans
 from nanounet.plan.splits import fold_seed
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
 from nanounet.pretrain.module import NanoMAELM
@@ -26,15 +24,6 @@ from nanounet.train.data_module import NanoDataModule
 from nanounet.train.ema import EMACallback
 from nanounet.train.lightning_module import NanoUNetLM
 
-
-def _ddp(devices: int):
-    """static_graph: deep supervision zeroes the coarsest head's loss weight (losses.py w[-1]=0), so
-    the unused-parameter set is CONSTANT -- tell DDP once instead of re-detecting it every step, which
-    is what find_unused_parameters costs. gradient_as_bucket_view: gradients alias the comm buckets
-    instead of being copied, saving roughly one gradient-sized allocation."""
-    if devices <= 1:
-        return "auto"
-    return DDPStrategy(static_graph=True, gradient_as_bucket_view=True)
 
 def run_mae_pretrain(args, ds, pp, plans_path, dj_path, out, accel, loggers, dl_b, pm0) -> str | None:
     """Integrated MAE stage. Returns the mae checkpoint path to transfer, or None."""
@@ -123,7 +112,7 @@ def run_mae_pretrain(args, ds, pp, plans_path, dj_path, out, accel, loggers, dl_
         pre_trnr = Trainer(
             max_epochs=args.mae_epochs,
             accelerator=accel,
-            devices=args.devices, strategy=_ddp(args.devices),
+            devices=1,
             precision=args.precision,
             callbacks=pre_cb,
             logger=loggers or False,
@@ -153,7 +142,7 @@ def run_supervised(
     dm = NanoDataModule(
         ds, args.fold, args.plans_identifier, args.roi_cfg, dl_b, args.batch_size,
         args.iters_per_epoch, args.val_iters, persistent_workers=args.dl_persistent_workers,
-        only_prefix=args.only_prefix, longi=args.longi, longi_null=args.longi_null,
+        only_prefix=args.only_prefix,
         prompts_per_patch=args.prompts_per_patch, val_manifest=args.val_manifest,
     )
     lm = NanoUNetLM(
@@ -161,7 +150,7 @@ def run_supervised(
         num_epochs=args.epochs, lr_schedule=args.lr_schedule, stretched_k=args.stretched_k,
         stretched_ref=args.stretched_ref, stretched_exp=args.stretched_exp, loss_type=args.loss,
         optimizer=args.optimizer, mae_ckpt=mae_ckpt_arg, init_weights=args.init_weights,
-        longi=args.longi, consistency_weight=args.consistency_weight,
+        consistency_weight=args.consistency_weight,
         consistency_warmup_epochs=args.consistency_warmup_epochs, warmup_epochs=args.warmup_epochs,
     )
     cb = [
@@ -185,7 +174,7 @@ def run_supervised(
     tr = Trainer(
         max_epochs=args.epochs,
         accelerator=accel,
-        devices=args.devices, strategy=_ddp(args.devices),
+        devices=1,
         precision=args.precision,
         gradient_clip_val=args.grad_clip or None,
         callbacks=cb,

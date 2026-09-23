@@ -20,27 +20,21 @@ def _point_list(pts: torch.Tensor) -> list:
     return [] if pts.numel() == 0 else [tuple(v) for v in torch.round(pts).long().tolist()]
 
 
-def concat_variant_keypoints(variants: list, longi: bool) -> torch.Tensor:
+def concat_variant_keypoints(variants: list) -> torch.Tensor:
     """Concat every variant's clicks into one (N,3) tensor so one augmentation pass moves all."""
-    parts = []
-    for v in variants:
-        parts += [v["points_pos"]] + ([v["bl_points_pos"]] if longi else [])
+    parts = [v["points_pos"] for v in variants]
     if not parts:
         return torch.zeros((0, 3), dtype=torch.float32)
     return torch.from_numpy(np.concatenate(parts, axis=0)).float()
 
 
-def split_variant_keypoints(kp: torch.Tensor, variants: list, longi: bool) -> list:
+def split_variant_keypoints(kp: torch.Tensor, variants: list) -> list:
     """Inverse of concat_variant_keypoints: slice augmented `keypoints` back per variant."""
     out, off = [], 0
     for v in variants:
         n_pp = v["points_pos"].shape[0]
         pp, off = kp[off : off + n_pp], off + n_pp
-        entry = {"pp": pp, "n_fp": int(v.get("n_false_pos", 0))}
-        if longi:
-            n_bp = v["bl_points_pos"].shape[0]
-            entry["bp"], off = kp[off : off + n_bp], off + n_bp
-        out.append(entry)
+        out.append({"pp": pp, "n_fp": int(v.get("n_false_pos", 0))})
     return out
 
 
@@ -74,24 +68,13 @@ def click_inside_flags(entries: list, seg0: torch.Tensor) -> list:
     return flags
 
 
-def render_variant(o: dict, entry: dict, raw: dict, longi: bool, final_patch_size, pr) -> torch.Tensor:
+def render_variant(o: dict, entry: dict, final_patch_size, pr) -> torch.Tensor:
     shape = tuple(int(s) for s in final_patch_size)
-    fu_hm = encode_points_to_heatmap(
+    hm = encode_points_to_heatmap(
         _point_list(entry["pp"]), shape, pr.point_radius_vox, pr.encoding, None,
         pr.prompt_intensity_scale,
     ).unsqueeze(0)
-    if not longi:
-        return torch.cat([o["image"][0:1], fu_hm], dim=0)
-    fu_stream = torch.cat([o["image"][0:1], fu_hm], dim=0)
-    if raw["null_baseline"]:
-        bl_stream = fu_stream  # duplicate rendered FU stream -> identity DWB
-    else:
-        bl_hm = encode_points_to_heatmap(
-            _point_list(entry["bp"]), shape, pr.point_radius_vox, pr.encoding, None,
-            pr.prompt_intensity_scale,
-        ).unsqueeze(0)
-        bl_stream = torch.cat([o["image"][1:2], bl_hm], dim=0)
-    return torch.cat([fu_stream, bl_stream], dim=0)
+    return torch.cat([o["image"][0:1], hm], dim=0)
 
 
 _META_KEYS = ("scenario", "cohort", "size_bucket", "has_subset", "draws_matched")

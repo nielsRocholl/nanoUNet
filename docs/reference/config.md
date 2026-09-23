@@ -46,7 +46,7 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/defau
 | `large_lesion.max_extra` | int | `0` | Cap on additional large-lesion patches |
 | `propagated.mode` | `"gaussian"` \| `"empirical"` | `"empirical"` | How the propagated-click offset is drawn |
 | `propagated.error_table` | str | `/nnunet_data/Longitudinal-CT/derivatives/registration_error_table.json` | Path to the measured registration-error table (mode=`empirical` only) |
-| `propagated.backends` | `[str, ...]` | `["original", "unigradicon"]` | Registration backends to draw offsets from (mode=`empirical`) |
+| `propagated.backends` | `[str, ...]` | `["original", "unigradicon"]` | Backend keys in `propagated.error_table` to draw offsets from (mode=`empirical`); labels in the data table, not code nanoUNet runs |
 | `propagated.sigma_per_axis` | `[sz, sy, sx]` | `[5.95, 6.39, 5.93]` | Gaussian jitter sigmas, mode=`gaussian` (voxels) |
 | `propagated.max_vox` | float | `34.0` | Max jitter magnitude, mode=`gaussian` only (voxels) |
 
@@ -77,7 +77,7 @@ There is no separate `neg` mode — drop covers no-prompt training.
 size-matched to each lesion's equivalent-sphere diameter (`volume_vox` from the centroid sidecar).
 No magnitude clip -- the table is already outlier-filtered. At startup the table is validated to
 exist, parse, and have a non-empty offset pool for every `(size bin, backend)` pair in `backends`;
-otherwise the config load raises naming the fix: `python3 scripts/measure_registration_error.py`.
+otherwise the config load raises, pointing at `propagated.error_table` / `propagated.mode`.
 
 `mode: "gaussian"` keeps the legacy Gaussian jitter (`sigma_per_axis`, clipped to `max_vox`).
 

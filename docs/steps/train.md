@@ -1,6 +1,6 @@
 # Supervised training
 
-Prompt-aware supervised training on one fold. Optional integrated MAE pretrain, longitudinal two-stream finetune, and MAE encoder transfer.
+Prompt-aware supervised training on one fold. Optional integrated MAE pretrain and MAE encoder transfer.
 
 Default run dir: `$NANOUNET_RESULTS/nanounet/<DatasetFolder>_<plans>_f<fold>/`.
 
@@ -57,8 +57,6 @@ nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv \
 | `--resume` | str | none | Supervised Lightning ckpt; no auto `last.ckpt` |
 | `--init-weights` | str | none | Load full net from supervised ckpt; fresh optimizer |
 | `--only-prefix` | str | none | Train/val only case keys with prefix, e.g. `d013_` |
-| `--longi` | flag | off | Two-stream BL+FU encoder (requires `--init-weights`) |
-| `--longi-null` | flag | off | Ablation: duplicate-FU baseline (requires `--longi`) |
 | `--precision` | str | `16-mixed` | Lightning precision |
 | `--accelerator` | choice | `auto` | `auto` \| `cpu` \| `cuda` \| `gpu` \| `mps` |
 | `--mae-ckpt` | str | none | Load encoder weights only (no integrated MAE run) |
@@ -159,7 +157,6 @@ Full write-up: [dev-notes/cgroup_memory.md](../dev-notes/cgroup_memory.md).
 | Error | Cause | Fix |
 |-------|-------|-----|
 | `--mae-resume requires --mae-pretrain` | MAE resume without integrated flag | Add `--mae-pretrain` or use `--mae-ckpt` |
-| `--longi requires --init-weights` | Longi without warm-start | Pass stage-2 supervised ckpt via `--init-weights` |
 | Conflicting resume flags | `--init-weights` + `--resume` / `--mae-pretrain` | Pick one init path |
 | Cgroup OOM | tmpfs TMPDIR during checkpoint save | Set `NANOUNET_TMPDIR`; see cgroup doc |
 | Missing plans / config | Preprocess or path error | Verify `--plans` basename and `--config` path |

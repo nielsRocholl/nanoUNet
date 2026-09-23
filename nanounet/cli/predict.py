@@ -16,10 +16,9 @@ from nanounet.config import load_config
 from nanounet.infer.predict_case import MAX_BORDER_EXTRA, predict_case_logits
 from nanounet.infer.tta import cat_status
 from nanounet.infer.export import export_prediction_from_logits
-from nanounet.infer.predict_io import baseline_resolver, check_baseline_files, patient_ids_from_csv, preprocess_case
+from nanounet.infer.predict_io import patient_ids_from_csv, preprocess_case
 from nanounet.data.resampling import set_resample_device
 from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
-from nanounet.model.dwb import LongiResEncUNet
 from nanounet.plan.labels import labels_from_dataset_json
 from nanounet.plan.plans import Plans
 from nanounet.score import check_gt_dir, report, report_case, score_case, write
@@ -33,10 +32,6 @@ def main() -> None:
     ap.add_argument("--ckpt", default=None)
     ap.add_argument("--ema", action="store_true", help="Load EMACallback.shadow instead of raw net.*")
     ap.add_argument("--points", default=None, help="points JSON (single mode)")
-    ap.add_argument("--baseline-image", default=None, help="sibling BL .nii.gz for two-stream longi inference")
-    ap.add_argument("--baseline-points", default=None, help="BL click JSON (single mode); native voxel x,y,z")
-    ap.add_argument("--baseline-dir", default=None, help="dataset mode: per-case BL <cid>.nii.gz + <cid>.json")
-    ap.add_argument("--longi", action="store_true", help="force two-stream net build (else auto-detect from ckpt)")
     ap.add_argument("--no-prompt-encode", action="store_true")
     ap.add_argument("--no-border-expand", dest="border_expand", action="store_false")
     ap.set_defaults(border_expand=True)
@@ -69,14 +64,12 @@ def main() -> None:
     dj = load_json(join(md, "dataset.json"))
     cfg = load_config(join(md, "nano_config.json"))
     labels_from_dataset_json(dj)
-    if bool(args.baseline_points) != bool(args.baseline_image):
-        raise SystemExit("--baseline-points requires --baseline-image")
 
     d = args.device
     if (d == "cuda" and not torch.cuda.is_available()) or (d == "mps" and not torch.backends.mps.is_available()):
         d = "cpu"
     set_resample_device(dev := torch.device(d))
-    net, lm = load_net_from_ckpt(pick_checkpoint(md, args.ckpt), cm, dj, dev, longi=args.longi, ema=args.ema)
+    net, lm = load_net_from_ckpt(pick_checkpoint(md, args.ckpt), cm, dj, dev, ema=args.ema)
     use_tta = (not cfg.inference.disable_tta_default) if args.tta_flag is None else args.tta_flag
     end = dj["file_ending"]
     single_mode = not os.path.isdir(args.input)
@@ -105,23 +98,12 @@ def main() -> None:
         maybe_mkdir_p(out_dir)
         cases = [(case_id, scan, args.points, out_trunc)]
 
-    is_longi = isinstance(net, LongiResEncUNet)
-    if single_mode and args.baseline_dir:
-        raise SystemExit("--baseline-dir is for dataset mode; single mode uses --baseline-image/--baseline-points")
-    if not single_mode and (args.baseline_image or args.baseline_points):
-        raise SystemExit("dataset mode uses --baseline-dir (per-case BL); not --baseline-image/--baseline-points")
-    resolve_bl, bl_present = baseline_resolver(args.baseline_image, args.baseline_points, args.baseline_dir, end)
-    if bl_present and not is_longi:
-        raise SystemExit("baseline given but checkpoint is not longi (no dwb.* keys). Drop --baseline-* or pass a longi ckpt.")
-    if is_longi and not bl_present: cprint("[yellow]longi checkpoint without a baseline: running null-baseline (single-timepoint identity)[/yellow]")
-    if args.baseline_dir: check_baseline_files(cases, resolve_bl, args.baseline_dir, end)
     if args.gt_dir: check_gt_dir(args.gt_dir, cases, end)
     config_table(
         [("model_dir", args.model_dir, "cli"), ("ckpt", args.ckpt or "auto", "cli/default"), ("ema", "on" if args.ema else "off", "cli"),
          ("device", args.device, "cli/default"), ("inference_mode", args.inference_mode, "cli/default"),
          ("border_expand", args.border_expand, "cli/default"), ("batch_size", args.batch_size, "cli/default"),
          ("tta", "auto" if args.tta_flag is None else args.tta_flag, "cli/config"),
-         ("longi", "on" if bl_present else ("null-baseline" if is_longi else "off"), "cli/ckpt"),
          ("patients_csv", args.patients_csv or "off", "cli" if args.patients_csv else "default"),
          ("gt_dir", args.gt_dir or "off", "cli" if args.gt_dir else "default"),
          ("metrics_out", args.metrics_out or "off", "cli" if args.metrics_out else "default")],
@@ -135,10 +117,10 @@ def main() -> None:
             rows.append(r := score_case(cid, pred, join(args.gt_dir, cid + end), jp))
             report_case(r)
 
-    def gpu(case_id, idx, out_trunc, pack, bl_case, jp):
+    def gpu(case_id, idx, out_trunc, pack, jp):
         nonlocal logged
         t0 = time.perf_counter()
-        pad_cpu, slicer_revert, props, points_xyz, bl_points = pack
+        pad_cpu, slicer_revert, props, points_xyz = pack
         # Full torso stays on CPU; encode_inference_row H2Ds the patch. Pad-on-GPU starved TTA cat.
         pad = pad_cpu.pin_memory() if dev.type == "cuda" else pad_cpu
         logits, tiles = predict_case_logits(
@@ -148,7 +130,6 @@ def main() -> None:
             border_expand=args.border_expand, max_border_expand_extra=args.max_border_extra,
             batch_size=args.batch_size, use_amp=not args.no_amp,
             cluster_margin_frac=args.cluster_margin_frac, mode=args.inference_mode,
-            is_longi=is_longi, bl_present=bl_case, bl_points_xyz=bl_points,
         )
         if not logged:
             logged = True
@@ -165,9 +146,8 @@ def main() -> None:
                 cprint(f"[dim][{i}/{n}] skip {cid} (exists)[/dim]")
                 emit(cid, out + end, jp)
                 continue
-            bs, bj = resolve_bl(cid)
             cprint(f"[dim][{i}/{n}] {cid}[/dim]")
-            gpu(cid, i, out, preprocess_case(scan, jp, pl, cm, dj, bs, bj), bs is not None, jp)
+            gpu(cid, i, out, preprocess_case(scan, jp, pl, cm, dj), jp)
     else:
         pool = ThreadPoolExecutor(max_workers=args.num_workers)
         inflight: deque = deque()
@@ -177,16 +157,14 @@ def main() -> None:
                 cprint(f"[dim][{i}/{n}] skip {cid} (exists)[/dim]")
                 emit(cid, out + end, jp)
                 continue
-            bs, bj = resolve_bl(cid)
             cprint(f"[dim][{i}/{n}] {cid}[/dim]")
-            inflight.append((i, cid, out, bs is not None, jp,
-                             pool.submit(preprocess_case, scan, jp, pl, cm, dj, bs, bj)))
+            inflight.append((i, cid, out, jp, pool.submit(preprocess_case, scan, jp, pl, cm, dj)))
             if len(inflight) > 1:
-                idx, case_id, ot, bl_case, j, fut = inflight.popleft()
-                gpu(case_id, idx, ot, fut.result(), bl_case, j)
+                idx, case_id, ot, j, fut = inflight.popleft()
+                gpu(case_id, idx, ot, fut.result(), j)
         while inflight:
-            idx, case_id, ot, bl_case, j, fut = inflight.popleft()
-            gpu(case_id, idx, ot, fut.result(), bl_case, j)
+            idx, case_id, ot, j, fut = inflight.popleft()
+            gpu(case_id, idx, ot, fut.result(), j)
         pool.shutdown(wait=True)
     if args.gt_dir:
         report(rows)

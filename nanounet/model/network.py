@@ -11,7 +11,6 @@ import torch
 
 from nanounet.plan.labels import Labels
 from nanounet.plan.plans import Config3d, determine_num_input_channels
-from nanounet.model.dwb import LongiResEncUNet
 from nanounet.prompt.encoding import N_PROMPT_CHANNELS
 
 
@@ -50,29 +49,6 @@ def build_net(
     if hasattr(net, "initialize"):
         net.apply(net.initialize)
     return net
-
-
-def build_net_longi(
-    cm: Config3d,
-    lm: Labels,
-    dataset_json: dict,
-    enable_deep_supervision: bool,
-    num_classes_override: int | None = None,
-):
-    # The longi dataset stores 2 CT channels (FU, BL). Each DWB stream sees only 1 CT + N_PROMPT_CHANNELS
-    # heatmap channels; the BL channel is consumed into the second encoder pass, not stacked onto the first.
-    assert determine_num_input_channels(cm, dataset_json) == 2, "longi dataset must have 2 CT channels"
-    base = build_net(
-        cm,
-        lm,
-        dataset_json,
-        enable_deep_supervision,
-        n_extra_in=N_PROMPT_CHANNELS,
-        num_classes_override=num_classes_override,
-        n_in_override=1,
-    )
-    n_stream = 1 + N_PROMPT_CHANNELS  # per stream: 1 CT modality + prompt heatmap
-    return LongiResEncUNet(base, n_stream)
 
 
 def estimate_conv_feature_map_size(

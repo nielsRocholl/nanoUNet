@@ -39,11 +39,8 @@ def build_train_parser() -> argparse.ArgumentParser:
     ap.add_argument("--resume", default=None)
     ap.add_argument("--init-weights", default=None)
     ap.add_argument("--only-prefix", default=None)
-    ap.add_argument("--longi", action="store_true")
-    ap.add_argument("--longi-null", action="store_true")
     ap.add_argument("--precision", default="16-mixed")
     ap.add_argument("--accelerator", default="auto", choices=("auto", "cpu", "cuda", "gpu", "mps"))
-    ap.add_argument("--devices", type=int, default=1, help="GPUs for data-parallel training. >1 uses DDP; each rank runs its own dataloader workers, so effective batch stays the plans batch_size split across ranks.")
     ap.add_argument("--mae-ckpt", default=None)
     ap.add_argument("--mae-pretrain", action="store_true")
     ap.add_argument("--mae-resume", default=None)
@@ -79,10 +76,6 @@ def validate_train_args(args) -> None:
             raise ValueError("--init-weights conflicts with --mae-ckpt")
         if args.mae_pretrain:
             raise ValueError("--init-weights conflicts with --mae-pretrain")
-    if args.longi and not args.init_weights:
-        raise ValueError("--longi requires --init-weights (warm-start from stage-2 supervised net)")
-    if args.longi_null and not args.longi:
-        raise ValueError("--longi-null requires --longi")
     if args.consistency_weight > 0 and args.prompts_per_patch < 2:
         raise ValueError(
             f"--consistency-weight {args.consistency_weight} requires --prompts-per-patch >= 2 "
@@ -118,7 +111,6 @@ def train_config_rows(args, ds: str, out: str) -> list[tuple[str, object, str]]:
         ("accelerator", args.accelerator, "cli/default"),
         ("dl_bucket", args.dl_bucket, "cli/default"),
         ("mae_pretrain", args.mae_pretrain, "cli"),
-        ("longi", args.longi, "cli"),
         ("prompts_per_patch", args.prompts_per_patch, "cli/default"),
         ("consistency_weight", args.consistency_weight, "cli/default"),
         ("warmup_epochs", args.warmup_epochs, "cli/default"),

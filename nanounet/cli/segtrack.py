@@ -126,7 +126,7 @@ def main() -> None:
     cm, dj = pl.get_configuration("3d_fullres"), load_json(join(str(model_dir), "dataset.json"))
     cfg = load_config(join(str(model_dir), "nano_config.json"))
     set_resample_device(dev := torch.device(d))
-    net, lm = load_net_from_ckpt(pick_checkpoint(str(model_dir), args.ckpt), cm, dj, dev, longi=False, ema=args.ema)
+    net, lm = load_net_from_ckpt(pick_checkpoint(str(model_dir), args.ckpt), cm, dj, dev, ema=args.ema)
     use_tta = (not cfg.inference.disable_tta_default) if args.tta_flag is None else args.tta_flag
     seg_kw = dict(
         use_tta=use_tta, batch_size=args.batch_size, use_amp=not args.no_amp,

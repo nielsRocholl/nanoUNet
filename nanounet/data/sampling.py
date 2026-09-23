@@ -57,7 +57,7 @@ def select_prompt_points(
         else:
             # Kept set fixed per patch (instance_targets): a kept lesion ALWAYS gets a click -- if
             # displaced out of the patch, fall back to a point on its own tissue (inference does the
-            # same, longi_row.py:37-39) rather than drop it and train "no click => background".
+            # same, inference_row.py) rather than drop it and train "no click => background".
             kept_ = kept_clicks(displaced, kept, pslc, fallback)
         pp = list(kept_)
         if false_pos:

@@ -1,4 +1,4 @@
-"""Soft Dice loss + TP/FP/FN core (nnU-Net dice.py port, ddp=False). Used by the training losses
+"""Soft Dice loss + TP/FP/FN core (nnU-Net dice.py port). Used by the training losses
 (losses.py, cc_dice_ce.py); validation-time metrics built on the same tp/fp/fn live in
 dice_helpers.py."""
 
@@ -53,15 +53,12 @@ class MemoryEfficientSoftDiceLoss(nn.Module):
         batch_dice: bool = False,
         do_bg: bool = True,
         smooth: float = 1.0,
-        ddp: bool = False,
     ):
         super().__init__()
         self.do_bg = do_bg
         self.batch_dice = batch_dice
         self.apply_nonlin = apply_nonlin
         self.smooth = smooth
-        self.ddp = ddp
-        assert not ddp
 
     def forward(self, x, y, loss_mask=None):
         if self.apply_nonlin is not None:

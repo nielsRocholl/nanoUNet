@@ -1,16 +1,16 @@
-# Graph Report - nanoUNet  (2026-08-05)
+# Graph Report - nanoUNet  (2026-09-23)
 
 ## Corpus Check
-- 140 files · ~84,428 words
+- 159 files · ~128,171 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1473 nodes · 2609 edges · 210 communities (88 shown, 122 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 62 edges (avg confidence: 0.6)
+- 1726 nodes · 2978 edges · 228 communities (105 shown, 123 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 86 edges (avg confidence: 0.63)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c4217967`
+- Built from commit: `5b66c49e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -42,12 +42,13 @@
 - [[_COMMUNITY_Slurm Longi Finetune|Slurm Longi Finetune]]
 - [[_COMMUNITY_Slurm Sup Overlap|Slurm Sup Overlap]]
 - [[_COMMUNITY_Slurm Sup Scratch XL|Slurm Sup Scratch XL]]
-- [[_COMMUNITY_Geometry Utils|Geometry Utils]]
+- [[_COMMUNITY_lesion_weights.py|lesion_weights.py]]
 - [[_COMMUNITY_Fix OOM Doc|Fix OOM Doc]]
 - [[_COMMUNITY_LR Schedule|LR Schedule]]
 - [[_COMMUNITY_Longi FU Dice Eval|Longi FU Dice Eval]]
-- [[_COMMUNITY_Slurm Register Longi|Slurm Register Longi]]
+- [[_COMMUNITY_instance_target.py|instance_target.py]]
 - [[_COMMUNITY_Config Reference|Config Reference]]
+- [[_COMMUNITY_Data Augmentation|Data Augmentation]]
 - [[_COMMUNITY_TTA Inference|TTA Inference]]
 - [[_COMMUNITY_Splits|Splits]]
 - [[_COMMUNITY_Pretrain Augment|Pretrain Augment]]
@@ -117,7 +118,8 @@
 - [[_COMMUNITY_Border Expand Module|Border Expand Module]]
 - [[_COMMUNITY_Type Utilities|Type Utilities]]
 - [[_COMMUNITY_PyTorch Modules|PyTorch Modules]]
-- [[_COMMUNITY_Basic Transform|Basic Transform]]
+- [[_COMMUNITY_Code structure, naming, idioms|Code: structure, naming, idioms]]
+- [[_COMMUNITY_Code structure, naming, idioms|Code: structure, naming, idioms]]
 - [[_COMMUNITY_nanoUNet Core|nanoUNet Core]]
 - [[_COMMUNITY_Pretrain CLI|Pretrain CLI]]
 - [[_COMMUNITY_Wald MAE Paper|Wald MAE Paper]]
@@ -199,11 +201,11 @@
 - [[_COMMUNITY_AGENTS|AGENTS.md]]
 - [[_COMMUNITY_slurm_supervised_999_h200.sh|slurm_supervised_999_h200.sh]]
 - [[_COMMUNITY_slurm_supervised_999_smoke_arceus.sh|slurm_supervised_999_smoke_arceus.sh]]
-- [[_COMMUNITY_dice_helpers.py|dice_helpers.py]]
+- [[_COMMUNITY_check.py|check.py]]
 - [[_COMMUNITY_slurm_nanounet_finetune_registered_stratified_longi_d114.sh|slurm_nanounet_finetune_registered_stratified_longi_d114.sh]]
 - [[_COMMUNITY_slurm_nanounet_finetune_registered_stratified_longi_d114_2gpu.sh|slurm_nanounet_finetune_registered_stratified_longi_d114_2gpu.sh]]
 - [[_COMMUNITY_1. Background — what was observed and what it means|1. Background — what was observed and what it means]]
-- [[_COMMUNITY_config_table|config_table]]
+- [[_COMMUNITY_nanochat evidence digest|nanochat evidence digest]]
 - [[_COMMUNITY_measure_registration_error.py|measure_registration_error.py]]
 - [[_COMMUNITY_Handoff — Single-Stage Stratified Training Overhaul|Handoff — Single-Stage Stratified Training Overhaul]]
 - [[_COMMUNITY_Step 1 — Fixed, stratified validation set|Step 1 — Fixed, stratified validation set]]
@@ -212,37 +214,53 @@
 - [[_COMMUNITY_Step 3 — Cohort-weighted sampling|Step 3 — Cohort-weighted sampling]]
 - [[_COMMUNITY_Step 6 — Instance-conditional targets (CONDITIONAL — do not start unsolicited)|Step 6 — Instance-conditional targets (CONDITIONAL — do not start unsolicited)]]
 - [[_COMMUNITY_consistency_dice_term|consistency_dice_term]]
-- [[_COMMUNITY_centroids.py|centroids.py]]
+- [[_COMMUNITY_check.py|check.py]]
 - [[_COMMUNITY_Step 4 — Warmup, EMA, checkpoint-monitor fix|Step 4 — Warmup, EMA, checkpoint-monitor fix]]
 - [[_COMMUNITY_Step 5 — LR probe, then the long run|Step 5 — LR probe, then the long run]]
 - [[_COMMUNITY__cc_voronoi|_cc_voronoi]]
 - [[_COMMUNITY_run_measure_registration_error.sh|run_measure_registration_error.sh]]
 - [[_COMMUNITY_run_preprocess_sidecars.sh|run_preprocess_sidecars.sh]]
-- [[_COMMUNITY_dataset_id.py|dataset_id.py]]
+- [[_COMMUNITY_centroids.py|centroids.py]]
+- [[_COMMUNITY_Handoff — everything is built; the 1200-epoch run is ready to launch|Handoff — everything is built; the 1200-epoch run is ready to launch]]
+- [[_COMMUNITY_EMACallback|EMACallback]]
+- [[_COMMUNITY_valset.py|valset.py]]
+- [[_COMMUNITY_Handoff — `nanounet_segtrack` (26 Aug 2026)|Handoff — `nanounet_segtrack` (26 Aug 2026)]]
+- [[_COMMUNITY_CohortSampler|CohortSampler]]
+- [[_COMMUNITY_export.py|export.py]]
+- [[_COMMUNITY_CLI, output, errors for humans and agents|CLI, output, errors: for humans and agents]]
+- [[_COMMUNITY_Instance-conditional targets|Instance-conditional targets]]
+- [[_COMMUNITY_Fixed validation set|Fixed validation set]]
+- [[_COMMUNITY_GPU efficiency compute is the bottleneck, always|GPU efficiency: compute is the bottleneck, always]]
+- [[_COMMUNITY_Final-run scratch (2026-09-03)|Final-run scratch (2026-09-03)]]
+- [[_COMMUNITY_Track (seg × track)|Track (seg × track)]]
+- [[_COMMUNITY_nanochat-style the nanoUNet standard|nanochat-style: the nanoUNet standard]]
+- [[_COMMUNITY_Docs small, structured, never stale|Docs: small, structured, never stale]]
+- [[_COMMUNITY_Docs small, structured, never stale|Docs: small, structured, never stale]]
+- [[_COMMUNITY_.__init__|.__init__]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `Plans` - 48 edges
-2. `cprint()` - 40 edges
+1. `Plans` - 50 edges
+2. `cprint()` - 42 edges
 3. `Config3d` - 37 edges
-4. `Labels` - 35 edges
-5. `nano_header()` - 26 edges
-6. `preprocessed_dir()` - 24 edges
-7. `main()` - 21 edges
-8. `raw_dir()` - 21 edges
-9. `Blosc2Folder` - 21 edges
-10. `predict_case_logits()` - 21 edges
+4. `Labels` - 32 edges
+5. `preprocessed_dir()` - 29 edges
+6. `convert_id_to_dataset_name()` - 28 edges
+7. `raw_dir()` - 25 edges
+8. `Blosc2Folder` - 24 edges
+9. `predict_case_logits()` - 23 edges
+10. `main()` - 22 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `body_mask elastix fixed/moving masks` --conceptually_related_to--> `register()`  [EXTRACTED]
-  docs/longi_registration_refine_plan.md → nanounet/register/elastix.py
-- `landmark_align rigid FU<-BL transform` --conceptually_related_to--> `register()`  [EXTRACTED]
-  docs/longi_registration_landmark_align_plan.md → nanounet/register/elastix.py
-- `main()` --calls--> `cprint()`  [EXTRACTED]
-  scripts/export_d115_viewer_bundle.py → nanounet/common.py
-- `main()` --calls--> `cprint()`  [EXTRACTED]
-  scripts/measure_registration_error.py → nanounet/common.py
-- `main()` --calls--> `nano_header()`  [EXTRACTED]
-  scripts/export_d115_viewer_bundle.py → nanounet/common.py
+- `Host RAM cgroup OOM documentation` --references--> `MAE cgroup OOM fix plan`  [INFERRED]
+  docs/cgroup_memory.md → .cursor/plans/fix_oom.md
+- `MAE default num_workers=0` --conceptually_related_to--> `residual ~98 MB/epoch worker IPC shmem`  [INFERRED]
+  .cursor/plans/fix_oom.md → docs/cgroup_memory.md
+- `Host RAM cgroup OOM documentation` --references--> `MAE cgroup OOM fix plan v2 (TMPDIR)`  [INFERRED]
+  docs/cgroup_memory.md → .cursor/plans/fix_oom_2.md
+- `main()` --indirect_call--> `case_info()`  [INFERRED]
+  nanounet/cli/build_valset.py → nanounet/data/valset_build.py
+- `build_train_parser()` --indirect_call--> `parse_fold()`  [INFERRED]
+  nanounet/cli/train_parser.py → nanounet/plan/splits.py
 
 ## Import Cycles
 - None detected.
@@ -255,39 +273,39 @@
 - **Longitudinal DWB finetune end-to-end pipeline** — nanounet_cli_register_longi_register_longi, nanounet_cli_longi_build_longi_build, docs_longitudinal_dwb_design_build_patch_longi, docs_longitudinal_dwb_design_longiresencunet, nanounet_model_dwb_dwb, docs_longi_inference_baseline_image_flag [EXTRACTED 1.00]
 - **BL to FU registration upgrade chain** — docs_longi_registration_refine_plan_geometric_center_init, docs_longi_registration_landmark_align_plan_landmark_align, docs_longi_registration_refine_plan_body_mask_metric, docs_longi_registration_refine_plan_refine_clicks, nanounet_register_elastix_register [INFERRED 0.85]
 
-## Communities (210 total, 122 thin omitted)
+## Communities (228 total, 123 thin omitted)
 
 ### Community 0 - "Longi Build CLI"
-Cohesion: 0.20
-Nodes (23): ArgumentParser, main(), Pretrain NanoUNet backbone with CNN-MAE (Lightning)., main(), build_train_parser(), Argparse + validation for nanounet_train., train_config_rows(), validate_train_args() (+15 more)
+Cohesion: 0.26
+Nodes (14): main(), Pretrain NanoUNet backbone with CNN-MAE (Lightning)., set_mem_diag(), pl_ckpt_assert_epochs_match(), pl_ckpt_epoch_and_target(), pl_ckpt_stage_done(), Lightning 2.x checkpoint metadata: fit epoch index vs saved ``num_epochs``.  ``e, fold_seed() (+6 more)
 
 ### Community 1 - "Predict CLI"
-Cohesion: 0.05
-Nodes (69): dtype, plan_border_expansion_centers_from_fg(), plan_border_expansion_centers_from_logits(), ndarray, slice, Tensor, BFS neighbors from hull-shell contact of foreground at patch faces (cc3d shell l, accum_dtype() (+61 more)
+Cohesion: 0.06
+Nodes (61): dtype, encode_inference_row(), device, slice, Tensor, Single-timepoint inference row: image channels copied from the padded volume, pr, ZYX, Padded click coords from scanner JSON (x,y,z) or caller-supplied preprocessed (z (+53 more)
 
 ### Community 2 - "Registration Landmarks"
-Cohesion: 0.06
-Nodes (58): disjoint DICOM frame registration case 45fbc6d3e0_00, landmark_align rigid FU<-BL transform, MIN_SPREAD_MM collinear click guard, body_mask elastix fixed/moving masks, elastix GeometricalCenter transform init, main(), _process(), _quiet_stderr() (+50 more)
+Cohesion: 0.50
+Nodes (4): disjoint DICOM frame registration case 45fbc6d3e0_00, landmark_align rigid FU<-BL transform, MIN_SPREAD_MM collinear click guard, elastix GeometricalCenter transform init
 
 ### Community 3 - "Cgroup Diagnostics"
-Cohesion: 0.07
-Nodes (56): BaseException, _cgroup_dir(), cgroup_scope(), Path, Host resource readers: cgroup scope, mount fs-type (used by TMPDIR selection + p, tmp_fs_type(), Runtime resource plumbing: cgroup scope, tmpfs detection, orphan temp-file purge, append_jsonl() (+48 more)
+Cohesion: 0.15
+Nodes (29): BaseException, _cgroup_dir(), cgroup_scope(), Path, Host resource readers: cgroup scope, mount fs-type (used by TMPDIR selection + p, Runtime resource plumbing: cgroup scope, tmpfs detection, orphan temp-file purge, append_jsonl(), cgroup_epoch_deltas() (+21 more)
 
 ### Community 4 - "CC-DiceCE Loss"
-Cohesion: 0.17
-Nodes (13): CC_DC_and_CE_loss, Tensor, CC-DiceCE: global Dice+CE plus per-connected-component Dice+CE over GT Voronoi c, L = DC+CE (global) + λ · mean_{s,c} (DiceCE on Voronoi cell of CC c in sample s), MemoryEfficientSoftDiceLoss, Tensor, softmax_helper_dim1(), build_loss() (+5 more)
+Cohesion: 0.19
+Nodes (13): CC_DC_and_CE_loss, CC-DiceCE: global Dice+CE plus per-connected-component Dice+CE over GT Voronoi c, L = DC+CE (global) + λ · mean_{s,c} (DiceCE on Voronoi cell of CC c in sample s), MemoryEfficientSoftDiceLoss, Tensor, Soft Dice loss + TP/FP/FN core (nnU-Net dice.py port). Used by the training loss, softmax_helper_dim1(), build_loss() (+5 more)
 
 ### Community 5 - "Lesion Weights CLI"
-Cohesion: 0.14
-Nodes (24): main(), Offline build of per-centroid sampling weights for d013 hard-type oversampling., main(), _map_points(), Map warped-BL and FU union clicks (register xyz, FU frame) into preprocessed vox, Read a clicksXX/<case>.json and forward-map each point into preprocessed voxel z, case_spatial_shape(), _close_b2() (+16 more)
+Cohesion: 0.15
+Nodes (29): main(), Write a single train/val split balanced within each source dataset.  Replaces th, main(), Fingerprint -> plan (ResEnc) -> preprocess 3d_fullres -> balanced splits -> coho, In-process call into nanounet_build_valset's own main(), which owns its argparse, _run_build_valset(), _write_splits_and_cohorts(), _env_path() (+21 more)
 
 ### Community 6 - "Nanochat Philosophy"
 Cohesion: 0.67
 Nodes (3): CC-DiceCE (cc_dc_ce), Dual-Scale Lesion Patch Strategy, Primus Patch Size Benchmarks (arXiv:2503.01835)
 
 ### Community 7 - "Patch Sampling"
-Cohesion: 0.17
-Nodes (20): ClickModeConfig, InferenceConfig, LargeLesionConfig, load_config(), _load_inf(), _load_large(), _load_prompt(), _load_prop() (+12 more)
+Cohesion: 0.21
+Nodes (16): ClickModeConfig, InferenceConfig, load_config(), _load_inf(), _load_prompt(), _load_prop(), _load_sampling(), _load_validation() (+8 more)
 
 ### Community 8 - "Crop & Blosc2"
 Cohesion: 0.06
@@ -298,28 +316,28 @@ Cohesion: 0.08
 Nodes (24): 0.5. Coding philosophy and style (read this first), 0. Goals (in scope), 10. CLIs and entry points, 11. Reproducibility and resume, 12. Performance discipline (no GPU starvation), 13. Output folder layout, 14. Validation and removal-after-test plan, 15. Optional follow-ups (NOT in v1) (+16 more)
 
 ### Community 10 - "Longi Inference Plan"
-Cohesion: 0.22
-Nodes (9): Backends, Longitudinal workflow, `nanounet_longi_build`, `nanounet_longi_clicks`, `nanounet_register_longi`, `nanounet_repair_longi_fu`, Pipeline, Training finetune (+1 more)
+Cohesion: 0.24
+Nodes (12): main(), build_train_parser(), ArgumentParser, Argparse + validation for nanounet_train., train_config_rows(), validate_train_args(), Train NanoUNet (Lightning)., config_table() (+4 more)
 
 ### Community 11 - "Dataloader Prefs"
 Cohesion: 0.06
-Nodes (55): IterableDataset, Blosc2Folder, ndarray, _bucket_workers(), build_iter_dataloader(), dataloader_bucket(), DataloaderBucket, dl_force_no_workers() (+47 more)
+Nodes (56): Dataset, Event, IterableDataset, RoiPromptConfig, Blosc2Folder, CohortSampler, load_cohort_weights(), Cohort-weighted case sampling: draw a source dataset, then a case uniformly insi (+48 more)
 
 ### Community 12 - "Resampling"
-Cohesion: 0.16
-Nodes (20): compute_new_shape(), determine_do_sep_z_and_axis(), get_do_separate_z(), get_lowres_axis(), ndarray, Tensor, 3D resampling: scipy map_coordinates + batchgenerators seg resize. nnU-Net-defau, resample_data_or_seg() (+12 more)
+Cohesion: 0.25
+Nodes (6): bottleneck_mask(), device, Tensor, Bottleneck-grid random masks upsampled to voxel resolution (Spark3D-style)., NanoMAELM, Tensor
 
 ### Community 13 - "Standalone Port Plan"
 Cohesion: 0.10
 Nodes (20): Coding philosophy and style — non-negotiable, Constraints, Goal, Hard rules (apply to every file in `nanounet/`), Key snippets to mirror, Module layout after the port, Naming, Phase 1 — Plans/labels + network + losses (in-place training works without nnunetv2) (+12 more)
 
 ### Community 14 - "Config Dataclasses"
-Cohesion: 0.12
-Nodes (29): centroids_from_seg(), ndarray, click_inside_flags(), Per real-variant row: 1 if a strict majority of its positive (FU) LESION clicks, _entry(), Regression tests for the two prompt-robustness validation metrics.  Both bugs co, 2 of 3 lesion clicks inside -> inside; 1 of 3 -> outside. Decoys never shift the, n_fp=0 (training, false_pos_probability=0.05 misses) must behave as before. (+21 more)
+Cohesion: 0.09
+Nodes (19): 1. Frames, 2. Rename the misleading parser, 3. Keep the documented `cog_fu` fallback — do not remove it, 4. Fix slim CSV order, 5. Preserve graph-partition exclusions, 6. Verification, segtrack propagated-coordinate contract, 1. Preserve every predicted component (+11 more)
 
 ### Community 15 - "Normalization"
-Cohesion: 0.15
-Nodes (7): CTNormalization, NoNormalization, ndarray, RescaleTo01Normalization, RGBTo01Normalization, ZScoreNormalization, number
+Cohesion: 0.06
+Nodes (37): ndarray, crop_to_nonzero(), _nonzero_mask(), ndarray, Nonzero bounding-box crop; seg voxels outside mask set to ``nonzero_label`` (def, normalization_class_from_plan_name(), compute_new_shape(), determine_do_sep_z_and_axis() (+29 more)
 
 ### Community 16 - "MAE Pretrain Plan"
 Cohesion: 0.10
@@ -330,20 +348,20 @@ Cohesion: 0.12
 Nodes (16): 1. Checkpoint temp files on RAM-backed `/tmp` (main OOM), 2. Page cache from Blosc2 reads (secondary), 3. Misleading metrics on the interactive node, Fixes in code, Home disk quota, Host RAM / cgroup OOM (MAE & supervised training), Monitoring (historical: `--mem-diag`), Purge safety (Docker / shared node) (+8 more)
 
 ### Community 18 - "Export & Segmentation"
-Cohesion: 0.19
-Nodes (9): LongiResEncUNet, Module, Tensor, Two-stream shared-encoder UNet with Difference Weighting at every skip (LongiSeg, _build_class(), build_net(), build_net_longi(), Instantiate ResidualEncoderUNet (optional extra input channels for prompts) from (+1 more)
+Cohesion: 0.36
+Nodes (8): case_spatial_shape(), _close_b2(), _fadvise_dontneed(), load_case_properties(), _open_b2(), Blosc2 preprocessed cases: open_case context manager, save_case, identifiers.  T, case_info(), Cached per-case centroid/volume properties (from the sidecar, no cc3d) + spatial
 
 ### Community 19 - "DWB Longi Model"
-Cohesion: 0.23
-Nodes (12): main(), _assert_bl_geometry(), baseline_resolver(), check_baseline_files(), patient_ids_from_csv(), preprocess_case(), preprocess_preprocessed_case(), Predict-side host IO: patient-id CSV filter, raw + preprocessed b2nd case load ( (+4 more)
+Cohesion: 0.15
+Nodes (18): fold_keys(), load_splits(), Balanced train/val splits; same on-disk file format as nnU-Net (list of {train,, apply_spatial_tf(), BasicTransform, ndarray, MAE pretrain spatial aug: rotation + scale + mirror (nnssl BaseMAE recipe)., _rotation_for_da() (+10 more)
 
 ### Community 20 - "Labels & Metadata"
-Cohesion: 0.12
-Nodes (7): _collect_labels(), filter_background(), Labels, ndarray, Tensor, Single-task segmentation (no region heads). Mirrors nnU-Net LabelManager subset., _softmax_class_dim()
+Cohesion: 0.05
+Nodes (46): main(), Dataset / single-case prompt-driven inference: CPU prefetch, depth-1 export over, _ema_shadow(), load_net_from_ckpt(), device, Checkpoint load: strip Lightning prefix, optional EMA shadow, build net, pick ck, _strip_pl_state(), cat_status() (+38 more)
 
 ### Community 21 - "Slurm Finetune Registered"
-Cohesion: 0.16
-Nodes (24): RoiPromptConfig, crop_patch(), _lbs_ubs(), ndarray, Patch bbox geometry: where in the volume a training patch is cut from.  Kept apa, _sample_bbox(), build_patch(), draw_false_pos() (+16 more)
+Cohesion: 0.17
+Nodes (18): kept_clicks(), Patch-local click for every kept lesion. A kept lesion is NEVER left unclicked:, crop_patch(), _lbs_ubs(), ndarray, Patch bbox geometry: where in the volume a training patch is cut from.  Kept apa, _sample_bbox(), build_patch() (+10 more)
 
 ### Community 22 - "Fix OOM v2 Doc"
 Cohesion: 0.17
@@ -351,43 +369,43 @@ Nodes (11): 1. Move tempfile root off tmpfs (primary OOM fix), 2. Detect & prune
 
 ### Community 23 - "Slurm Preprocess Registered"
 Cohesion: 0.15
-Nodes (16): Event, CaseMetaCache, _ddp_rank_world(), Supervised patch iterable: nnUNet-aligned per-patch case draw, IO/aug overlap th, (global rank, world size), 0/1 when not running under DDP., concat_variant_keypoints(), _point_list(), Tensor (+8 more)
+Nodes (8): CTNormalization, NoNormalization, ndarray, ZScore / CT / none / rescale normalization (names stored in ``plans.json``)., RescaleTo01Normalization, RGBTo01Normalization, ZScoreNormalization, number
 
 ### Community 24 - "Slurm Longi Finetune"
 Cohesion: 0.10
 Nodes (19): 0. Inputs the human will give you, 1.1 Two inference geometries — READ THIS CAREFULLY, 1. Background — why this task exists, 2. Confirmed code facts (already verified — use as anchors), 3. Before you write anything — locate the inference path, 4.1 Subset & determinism, 4.2 Per-lesion click grid (deterministic), 4.3 The four conditions (+11 more)
 
 ### Community 25 - "Slurm Sup Overlap"
-Cohesion: 0.23
-Nodes (14): main(), Longi inference on preprocessed b2nd cases: CPU prefetch, GPU batched, no raw pr, Dataset / single-case prompt-driven inference with CPU prefetch., Logits in preprocessed space → resample, uncrop, untranspose, SimpleITK seg writ, save_preprocessed_seg(), check_preprocessed_folder(), load_net_from_ckpt(), pick_checkpoint() (+6 more)
+Cohesion: 0.20
+Nodes (16): _bin_index(), _draw_from_bin(), draw_propagated_offset(), load_table(), parse_propagated(), Registration-error offset table: load-once-per-process cache, validation, and th, One offset (dz,dy,dx) in RESAMPLED voxels, drawn from the measured table, size-m, Offset drawn from a uniformly-random size bin -- used when no lesion volume is k (+8 more)
 
 ### Community 26 - "Slurm Sup Scratch XL"
-Cohesion: 0.19
-Nodes (16): main(), _ok_cases(), Build a 2-channel raw longi dataset from register_longi output.  Each FU case be, Cases marked "ok" in clickfix_report.csv, or None if no report (no filtering)., main(), Fingerprint → plan (ResEnc) → preprocess 3d_fullres., cprint(), nano_header() (+8 more)
+Cohesion: 0.22
+Nodes (15): normalization_class_for_channel(), _fix_iterable(), get_filenames_of_train_images_and_targets(), _identifiers_images_tr(), _paths_for_id(), Resolve dataset id → folder name; raw train paths; JSON export coercion for plan, recursive_fix_for_json_export(), _fullres_spacing() (+7 more)
 
-### Community 27 - "Geometry Utils"
-Cohesion: 0.29
-Nodes (9): insert_crop(), nonzero_slices_3d(), ndarray, slice, Tensor, Nonzero crop, transpose, resample delegate, insert crop (acvl_utils)., resample_tensor(), transpose_backward_np() (+1 more)
+### Community 27 - "lesion_weights.py"
+Cohesion: 0.22
+Nodes (14): main(), Offline build of per-centroid sampling weights for d013 hard-type oversampling., build_case_weights(), case_to_csv(), cog_to_preprocessed(), load_lesion_pairs(), load_lesions(), ndarray (+6 more)
 
 ### Community 28 - "Fix OOM Doc"
 Cohesion: 0.22
 Nodes (8): Fix A: Page-cache eviction (the only sound way to stop `cgroup_file`), Fix B: Eliminate DataLoader IPC shmem leakage, Fix C: Diagnostics to prove the fix, Fix MAE cgroup OOM at the source, Out of scope, Root cause (confirmed), Sequence diagram of the read+evict flow, Validation protocol (success criteria)
 
 ### Community 29 - "LR Schedule"
-Cohesion: 0.15
-Nodes (12): 1. Code style (distilled from Karpathy's nanochat), 2. UX: rich CLI, always, 3. Errors that teach, 4. GPU efficiency: compute is the bottleneck, always, 5. Documentation: small, structured, current, Hard rules, How nanoUNet adopts this (deviations, all deliberate), Naming (+4 more)
+Cohesion: 0.29
+Nodes (6): nanochat-style: the nanoUNet standard, Red flags: stop and rewrite, Reference map (load on demand), Review checklist (paste into the report), Rule index, Workflow: run this on every change
 
 ### Community 30 - "Longi FU Dice Eval"
-Cohesion: 0.12
-Nodes (16): AlphaFold precedent for D4/D5, Commands, Deferred, EPCM: error-predictive confidence for nanoUNet, Files, Head, Locked decisions, Per-component normalisation across patches (+8 more)
+Cohesion: 0.07
+Nodes (27): 10. Evaluation and future work (short), 1. The idea in plain words, 2. Inputs, 3. Outputs, 4. Targets (how "the answer" is computed), 5. Training, 6. Inference, 7. Files (+19 more)
 
-### Community 31 - "Slurm Register Longi"
-Cohesion: 0.20
-Nodes (16): _bin_index(), _draw_from_bin(), draw_propagated_offset(), load_table(), parse_propagated(), Registration-error offset table: load-once-per-process cache, validation, and th, One offset (dz,dy,dx) in RESAMPLED voxels, drawn from the measured table, size-m, Offset drawn from a uniformly-random size bin -- used when no lesion volume is k (+8 more)
+### Community 31 - "instance_target.py"
+Cohesion: 0.21
+Nodes (13): _clip(), draw_kept(), _in_bbox(), _lesion_for_point(), _map_components(), ndarray, ZYX, Click-conditional targets: foreground only for lesion instances that received a (+5 more)
 
 ### Community 34 - "TTA Inference"
-Cohesion: 0.21
-Nodes (14): crop_to_nonzero(), _nonzero_mask(), ndarray, Nonzero bounding-box crop; seg voxels outside mask set to ``nonzero_label`` (def, normalization_class_from_plan_name(), ZScore / CT / none / rescale normalization (names stored in ``plans.json``)., _load_dj(), ndarray (+6 more)
+Cohesion: 0.05
+Nodes (39): 0. Decisions already made — do not reopen, 10.1 Correctness, 10.2 GPU utilisation — hard gate, not optional, 10.3 Report to the human, 10. Verification — run all of it, report the numbers, 11. Do not do, 1. Verified facts about the current code, 2. What gets built (+31 more)
 
 ### Community 35 - "Splits"
 Cohesion: 0.20
@@ -402,20 +420,20 @@ Cohesion: 0.33
 Nodes (6): refine_clicks per-lesion VOI instance optimization, build_patch_longi 6-channel patch construction, stamping baseline collage rejected, warp-based two-stream finetune pipeline, nanounet.cli.longi_build 2-channel dataset, nanounet.cli.register_longi pipeline
 
 ### Community 38 - "Predict IO"
-Cohesion: 0.11
-Nodes (4): _bind_resample(), Config3d, _migrate_old_architecture(), One nnU-Net configuration block after `inherits_from` merge.
+Cohesion: 0.16
+Nodes (10): nano_progress(), _migrate_old_architecture(), Plans, Load plans.json: inheritance, 3d_fullres Config3d, resampling partials, old-UNet, _cgroup_mem_limit_gb(), _cgroup_oom_kills(), _dead_worker_error(), Spawn-pool case preprocess, GT copy into preprocessed tree, optional centroid JS (+2 more)
 
 ### Community 39 - "Slurm Preprocess Merge"
-Cohesion: 0.36
-Nodes (9): normalization_class_for_channel(), _fullres_spacing(), _maybe_copy_splits(), _norm_schemes(), ndarray, ``dataset_fingerprint.json`` + ResEnc preset → ``<plans>.json`` with only ``3d_f, run_plan(), _save_plans() (+1 more)
+Cohesion: 0.16
+Nodes (21): tmp_fs_type(), _is_pytorch_zip_stage(), _purge_ckpt_stage_files(), _purge_dev_shm_torch(), _purge_ipc_files(), purge_torch_tmp(), Purge orphaned torch checkpoint-stage + IPC temp files from /tmp, TMPDIR, /dev/s, _fs_type() (+13 more)
 
 ### Community 40 - "Slurm MAE Train"
-Cohesion: 0.19
-Nodes (11): agreement_mean(), click_split_means(), pooled_fg_dice(), nnU-Net global pseudo-Dice: pool per-class fg tp/fp/fn over the whole val buffer, val_dice_click_inside / val_dice_click_outside: mean per-row Dice (see val_step_, val_prompt_agreement: mean of prompt_pair_dice per-row values, skipping NaN, load_full_net(), load_mae_encoder() (+3 more)
+Cohesion: 0.20
+Nodes (12): prompt_pair_dice(), Validation-time Dice metrics, built on the tp/fp/fn core in dice_loss.py: pooled, Per-row fg tp/fp/fn of the SAME prediction `out` against the clicked-subset targ, val_prompt_agreement: per-row foreground Dice between two predictions on the SAM, Split a val batch into the two prompted-test cases by GT foreground presence., One validation batch → per-region metric row (tp/fp/fn, macro dice, fp count, lo, subset_dice_row(), val_split_metrics() (+4 more)
 
 ### Community 41 - "Lightning Checkpoint"
-Cohesion: 0.17
-Nodes (6): _LRScheduler, PolyLRScheduler, Polynomial LR + stretched-tail variant (nnU-Net)., StretchedTailPolyLRScheduler, NanoUNetLM, Tensor
+Cohesion: 0.15
+Nodes (6): _LRScheduler, PolyLRScheduler, Polynomial LR + stretched-tail variant (nnU-Net), with optional linear warmup., StretchedTailPolyLRScheduler, NanoUNetLM, Tensor
 
 ### Community 42 - "DWB Design Concepts"
 Cohesion: 0.50
@@ -438,20 +456,24 @@ Cohesion: 0.29
 Nodes (7): Arguments (planning-related), Command, Common errors, Further reading, Inputs / outputs, Planner presets, Planning knobs
 
 ### Community 102 - "PyTorch Modules"
-Cohesion: 0.22
-Nodes (9): Arguments, Command, Common errors, Host RAM / cgroup OOM, Inputs / outputs, Loss throughput, Prompt-robustness validation metrics, Supervised training (+1 more)
+Cohesion: 0.20
+Nodes (10): Arguments, Cohort-weighted sampling, Command, Common errors, Host RAM / cgroup OOM, Inputs / outputs, Loss throughput, Prompt-robustness validation metrics (+2 more)
 
-### Community 103 - "Basic Transform"
-Cohesion: 0.23
-Nodes (5): convert_logits_to_seg_shape(), export_prediction_from_logits(), ndarray, Tensor, Plans
+### Community 103 - "Code: structure, naming, idioms"
+Cohesion: 0.22
+Nodes (8): Code: structure, naming, idioms, Deliberate nanoUNet deviations, Exemplars: read one of these before writing a new file, Hard rules in detail, Naming, Package layout (keep this accurate; update it when you add a folder), Things we will not write, What nanochat actually does (verified at commit 92d63d4)
+
+### Community 104 - "Code: structure, naming, idioms"
+Cohesion: 0.22
+Nodes (8): Code: structure, naming, idioms, Deliberate nanoUNet deviations, Exemplars: read one of these before writing a new file, Hard rules in detail, Naming, Package layout (keep this accurate; update it when you add a folder), Things we will not write, What nanochat actually does (verified at commit 92d63d4)
 
 ### Community 108 - "Predict"
-Cohesion: 0.22
-Nodes (9): Arguments, Checkpoint selection, Command, Common errors, Inputs / outputs, Interactive / embed (library), Predict, Preprocessed longi test inference (`nanounet_predict_preprocessed`) (+1 more)
+Cohesion: 0.25
+Nodes (8): Arguments, Checkpoint selection, Command, Common errors, Engine, Inputs / outputs, Interactive / embed (library), Predict
 
 ### Community 109 - "Preprocess"
-Cohesion: 0.33
-Nodes (6): Arguments, Command, Common errors, Inputs / outputs, Preprocess, seed_zyx and volume_vox
+Cohesion: 0.29
+Nodes (7): Arguments, Command, Common errors, Inputs / outputs, lesion_site and cohorts.json, Preprocess, seed_zyx and volume_vox
 
 ### Community 110 - "MAE pretrain"
 Cohesion: 0.40
@@ -466,76 +488,72 @@ Cohesion: 0.50
 Nodes (4): Documentation map, nanoUNet documentation, Pipeline overview, Quickstart
 
 ### Community 113 - "coords.py"
-Cohesion: 0.23
-Nodes (13): _axis_overlap(), _convert_preprocessed_seg_to_native(), native_seg_to_nifti_bytes(), patch_logits_to_native_seg(), patch_unpadded_overlap(), ndarray, slice, Tensor (+5 more)
+Cohesion: 0.21
+Nodes (16): _axis_overlap(), _map_ix(), native_seg_to_nifti_bytes(), _paste_max(), patch_logits_to_native_seg(), patch_unpadded_overlap(), ndarray, slice (+8 more)
 
 ### Community 114 - "README.md"
-Cohesion: 0.14
-Nodes (13): MKL_NUM_THREADS, NANOUNET_PREPROCESSED, NANOUNET_RAW, NANOUNET_RESULTS, NANOUNET_TMPDIR, nnUNet_preprocessed, nnUNet_raw, nnUNet_results (+5 more)
+Cohesion: 0.11
+Nodes (28): _fill_scenario(), main(), _parse_mix(), Offline build of the fixed validation manifest: 1500 patches over 4 prompt scena, Rejection-sample `want` accepted patches for one (cohort, scenario). `rngs` is t, allocate(), allocate_subset(), _largest_remainder() (+20 more)
 
 ### Community 142 - "sol_pressure.md"
-Cohesion: 0.14
-Nodes (13): MKL_NUM_THREADS, NANOUNET_PREPROCESSED, NANOUNET_RAW, NANOUNET_RESULTS, NANOUNET_TMPDIR, nnUNet_preprocessed, nnUNet_raw, nnUNet_results (+5 more)
+Cohesion: 0.06
+Nodes (30): 0. Mission, constraints, non-goals, 10. Explicitly rejected — do not re-litigate, 11. Verification checklist, 12. Segtrack scorer caveat, 13. Implementation order, 1. Evidence base — why these changes, and only these, 2.1 Constant, 2.2 Exact edits (+22 more)
 
 ### Community 180 - "ChannelSubsetImageTransform"
 Cohesion: 0.13
 Nodes (16): MirrorTransform, BasicTransform, ndarray, Spatial + intensity augment chains (nnUNetTrainer.get_*_transforms port, 3D only, train_transforms(), val_transforms(), _invert_spatial(), MirrorPointsTransform (+8 more)
 
 ### Community 181 - "runtime.py"
-Cohesion: 0.14
-Nodes (13): MKL_NUM_THREADS, NANOUNET_PREPROCESSED, NANOUNET_RAW, NANOUNET_RESULTS, NANOUNET_TMPDIR, nnUNet_preprocessed, nnUNet_raw, nnUNet_results (+5 more)
-
-### Community 182 - "io.py"
-Cohesion: 0.33
-Nodes (8): ndarray, SimpleITK reader/writer: nnU-Net channel stacking, ``sitk_stuff`` in properties,, read_images(), read_seg(), reader_writer_class_from_dataset(), _same_shape(), SimpleITKIO, write_seg()
+Cohesion: 0.19
+Nodes (15): One random background voxel >= _FALSE_POS_GUARD_VOX from foreground. KD-tree rej, _sample_false_pos(), CaseInfo, _crop_seg(), draw_bbox(), draw_lesion_clicks(), _in_patch_idxs(), LabelCache (+7 more)
 
 ### Community 183 - "Longi finetune GPU starvation — diagnosis + fix (2026-07-10)"
 Cohesion: 0.22
 Nodes (8): Augmentation synchronization (verified — no bug), Evidence (A100-40GB, 38 usable cores, 120-iter burst), Fix, Fix 2 — CT-only intensity augmentation (applied), Longi finetune GPU starvation — diagnosis + fix (2026-07-10), Resource sizing (CPU / mem), Root cause, Symptom
 
 ### Community 184 - "augment.py"
-Cohesion: 0.14
-Nodes (13): MKL_NUM_THREADS, NANOUNET_PREPROCESSED, NANOUNET_RAW, NANOUNET_RESULTS, NANOUNET_TMPDIR, nnUNet_preprocessed, nnUNet_raw, nnUNet_results (+5 more)
+Cohesion: 0.09
+Nodes (21): 1. Add two functions to `nanounet/infer/roi_slices.py`, 2. Edit `nanounet/infer/predict_case.py`, 3. LOC check, 4. Verify, B.1 — Mandatory numeric self-check, before touching any pipeline code, B.2 — Refactor `nanounet/plan/prep/case_pp.py`: split `run_case_npy`, B.3 — New file `nanounet/infer/grid_resample.py`, B.4 — New file `nanounet/infer/click_resample.py` (+13 more)
 
 ### Community 185 - "Radiom in-process embed API"
 Cohesion: 0.40
 Nodes (4): Interactive patch API, `on_forward`, `points_zyx_unpadded`, Radiom in-process embed API
 
 ### Community 186 - "bottleneck_mask"
-Cohesion: 0.14
-Nodes (13): MKL_NUM_THREADS, NANOUNET_PREPROCESSED, NANOUNET_RAW, NANOUNET_RESULTS, NANOUNET_TMPDIR, nnUNet_preprocessed, nnUNet_raw, nnUNet_results (+5 more)
+Cohesion: 0.25
+Nodes (7): Code facts, Known nanochat inconsistencies (don't copy them), nanochat evidence digest, Performance facts (gpu.md builds on these), Philosophy (README), Project practice, Script / UX facts
 
 ### Community 188 - "slurm_supervised_999_h200.sh"
-Cohesion: 0.14
-Nodes (13): MKL_NUM_THREADS, NANOUNET_PREPROCESSED, NANOUNET_RAW, NANOUNET_RESULTS, NANOUNET_TMPDIR, nnUNet_preprocessed, nnUNet_raw, nnUNet_results (+5 more)
+Cohesion: 0.09
+Nodes (45): Namespace, collect_cases(), _folder(), Path, Build SegTrackCase list from argparse: folder vs single, optional BL instance ma, _single(), main(), _mode() (+37 more)
 
 ### Community 189 - "slurm_supervised_999_smoke_arceus.sh"
-Cohesion: 0.14
-Nodes (13): MKL_NUM_THREADS, NANOUNET_PREPROCESSED, NANOUNET_RAW, NANOUNET_RESULTS, NANOUNET_TMPDIR, nnUNet_preprocessed, nnUNet_raw, nnUNet_results (+5 more)
+Cohesion: 0.18
+Nodes (16): agreement_mean(), click_split_means(), pooled_dice_from_rows(), pooled_fg_dice(), Tensor, pooled_fg_dice for an arbitrary row subset: same formula, rows selected by a mas, nnU-Net global pseudo-Dice: pool per-class fg tp/fp/fn over the whole val buffer, val_dice_click_inside / val_dice_click_outside: mean per-row Dice (see val_step_ (+8 more)
 
-### Community 190 - "dice_helpers.py"
-Cohesion: 0.21
-Nodes (10): prompt_pair_dice(), Tensor, Validation-time Dice metrics, built on the tp/fp/fn core in dice_loss.py: pooled, val_prompt_agreement: per-row foreground Dice between two predictions on the SAM, Split a val batch into the two prompted-test cases by GT foreground presence., One validation batch → per-region metric row (tp/fp/fn, macro dice, fp count, lo, val_split_metrics(), val_step_row() (+2 more)
+### Community 190 - "check.py"
+Cohesion: 0.50
+Nodes (7): changed_files(), check_docs(), check_py(), doc_files(), main(), Path, waived()
 
 ### Community 191 - "slurm_nanounet_finetune_registered_stratified_longi_d114.sh"
-Cohesion: 0.15
-Nodes (12): MKL_NUM_THREADS, NANOUNET_PREPROCESSED, NANOUNET_RAW, NANOUNET_RESULTS, NANOUNET_TMPDIR, nnUNet_preprocessed, nnUNet_raw, nnUNet_results (+4 more)
+Cohesion: 0.11
+Nodes (17): CIFS-mount gotcha — will bite you again if you forget it, Decisions already made, don't re-litigate, Dry-run findings — what's safe, what isn't, Goal, Governing rule — already established project convention, Handoff: dataset cleaning (speck filter + MSWAL/MCT_LTDiag cancer-only) — 2026-09-02, Key fact that motivates all of this, Live background agent — verify before trusting (+9 more)
 
 ### Community 192 - "slurm_nanounet_finetune_registered_stratified_longi_d114_2gpu.sh"
-Cohesion: 0.15
-Nodes (12): MKL_NUM_THREADS, NANOUNET_PREPROCESSED, NANOUNET_RAW, NANOUNET_RESULTS, NANOUNET_TMPDIR, nnUNet_preprocessed, nnUNet_raw, nnUNet_results (+4 more)
+Cohesion: 0.12
+Nodes (16): 0. What we are building, 1. Evidence (measured, not guessed), 2. Why the current engine is wrong, 3.1 Seeds — keep greedy clustering, 3.2 Grid — replace `border_expand.py`, 3.3 Prompt on a tile (load-bearing), 3.4 Loop — one queue, always batched, 3.5 Merge — `max` only (+8 more)
 
 ### Community 193 - "1. Background — what was observed and what it means"
 Cohesion: 0.18
 Nodes (11): 1. Background — what was observed and what it means, A real bug found along the way, Compute budget — direction is certain, magnitude is NOT, Evidence that the model is underfit, Finetune run — what went wrong, The decisive test (buildable, needs nothing we lack), The leading hypothesis for `val_dice_prompt_ablated = 0.72`, The primary problem: variance under prompt placement (+3 more)
 
-### Community 194 - "config_table"
-Cohesion: 0.31
-Nodes (9): config_table(), Any, Render resolved config as a rich Table: (argument, value, source: cli/config/def, export_preprocessed_seg_to_native(), Preprocessed-space binary seg → native scanner grid (inverse of save_preprocesse, _copy(), main(), _require_dir() (+1 more)
+### Community 194 - "nanochat evidence digest"
+Cohesion: 0.25
+Nodes (7): Code facts, Known nanochat inconsistencies (don't copy them), nanochat evidence digest, Performance facts (gpu.md builds on these), Philosophy (README), Project practice, Script / UX facts
 
 ### Community 195 - "measure_registration_error.py"
-Cohesion: 0.42
-Nodes (8): load_original_records(), load_unigrad_records(), main(), parse_pt(), ndarray, Path, Measure propagated-click registration error against true follow-up lesion centre, size_bin()
+Cohesion: 0.12
+Nodes (16): 0. Decisions already made — do not reopen, 1. The mechanism, 2. Files, 3. `nanounet/data/instance_target.py`, 4. `nanounet/data/sampling.py` — the edits, 5. Config, 6. Verification, 6a. Correctness — before any training (+8 more)
 
 ### Community 196 - "Handoff — Single-Stage Stratified Training Overhaul"
 Cohesion: 0.29
@@ -565,9 +583,9 @@ Nodes (6): Expect the loss curves to get worse before they get better, Explicitl
 Cohesion: 0.40
 Nodes (3): consistency_dice_term(), Tensor, 1 - soft Dice between the two foreground-probability maps of each pair, at the f
 
-### Community 203 - "centroids.py"
-Cohesion: 0.47
-Nodes (5): _one_case(), precompute_folder(), Any, cc3d centroids/bboxes JSON next to *_seg.b2nd; propagation-offset for simulated, _write_centroids_for_case()
+### Community 203 - "check.py"
+Cohesion: 0.50
+Nodes (7): changed_files(), check_docs(), check_py(), doc_files(), main(), Path, waived()
 
 ### Community 204 - "Step 4 — Warmup, EMA, checkpoint-monitor fix"
 Cohesion: 0.40
@@ -578,32 +596,100 @@ Cohesion: 0.50
 Nodes (4): 5a. Probe, 5b. Long run, On early stopping, Step 5 — LR probe, then the long run
 
 ### Community 206 - "_cc_voronoi"
-Cohesion: 0.67
-Nodes (3): _cc_voronoi(), ndarray, binary (Z,Y,X) → (cc_labels, voronoi_id, n_fg_cc). vor==0 if n==0.
+Cohesion: 0.40
+Nodes (4): _cc_voronoi(), ndarray, Tensor, binary (Z,Y,X) → (cc_labels, voronoi_id, n_fg_cc). vor==0 if n==0.
 
-### Community 209 - "dataset_id.py"
-Cohesion: 0.24
-Nodes (12): _fix_iterable(), get_filenames_of_train_images_and_targets(), _identifiers_images_tr(), _paths_for_id(), Resolve dataset id → folder name; raw train paths; JSON export coercion for plan, recursive_fix_for_json_export(), _assert_compatible(), build_merged_raw() (+4 more)
+### Community 207 - "run_measure_registration_error.sh"
+Cohesion: 0.16
+Nodes (15): compute_main_args(), MKL_NUM_THREADS, NANOUNET_PREPROCESSED, NANOUNET_RAW, NANOUNET_RESULTS, NANOUNET_TMPDIR, NUMEXPR_NUM_THREADS, OMP_NUM_THREADS (+7 more)
+
+### Community 208 - "run_preprocess_sidecars.sh"
+Cohesion: 0.13
+Nodes (14): D-A1 — Cohort names are bare prefixes (`d013`), not underscored (`d013_`), D-A2 — SUPERSEDED by the membership fix. `pos = 0.80` everywhere., D-A3 — Cohort weights: d013 0.25, d025 0.08, D-A4 — The probe changes exactly one thing, D-A5 — Long run: 1200 epochs, stretched-tail retuned to 376/500, D-A6 — EMA left OFF in the long run, D-A7 — `LR=0.01` is a placeholder in the long-run script, Decisions taken without the human — review these (+6 more)
+
+### Community 209 - "centroids.py"
+Cohesion: 0.32
+Nodes (7): centroids_from_seg(), _one_case(), precompute_folder(), Any, ndarray, cc3d centroids/bboxes JSON next to *_seg.b2nd; propagation-offset for simulated, _write_centroids_for_case()
+
+### Community 210 - "Handoff — everything is built; the 1200-epoch run is ready to launch"
+Cohesion: 0.13
+Nodes (14): 0. Environment — this bites every fresh container, 1. The problem, and what was found, 2. What is built (all pushed), 3. The membership fix — the most important code change, 4. Probe results — read before interpreting any early metric, 5. The production run — ready, 6. Open items, 7. Working notes (+6 more)
+
+### Community 212 - "valset.py"
+Cohesion: 0.29
+Nodes (6): CLI, output, errors: for humans and agents, Command anatomy (R13), Errors (E1–E6), Helpers that already exist (`nanounet/common.py`): use them, don't reinvent, Machine contract (U8–U12), Output hygiene (U6, U7)
+
+### Community 213 - "Handoff — `nanounet_segtrack` (26 Aug 2026)"
+Cohesion: 0.17
+Nodes (11): 1. Product = RAM + `.mha` (pushed), 2. `--bl-mask` / `--bl-mask-dir` (uncommitted), Do not, Env (this box), Git (now), GT BL mask + predict FU (ids comparable to `targetsTrFU`), Handoff — `nanounet_segtrack` (26 Aug 2026), Holdout folder (GT BL) (+3 more)
+
+### Community 214 - "CohortSampler"
+Cohesion: 0.29
+Nodes (6): GPU efficiency: compute is the bottleneck, always, Inference (G7), Known wins: candidates, each must pass the protocol above, Measurement protocol (G4): how to produce the number, The data path (G1, G3, G6), The step (G2)
+
+### Community 215 - "export.py"
+Cohesion: 0.18
+Nodes (18): cprint(), SimpleITK reader/writer: nnU-Net channel stacking, ``sitk_stuff`` in properties,, reader_writer_class_from_dataset(), export_prediction_from_logits(), export_preprocessed_seg_to_native(), native_seg_from_logits(), ndarray, slice (+10 more)
+
+### Community 216 - "CLI, output, errors: for humans and agents"
+Cohesion: 0.29
+Nodes (6): CLI, output, errors: for humans and agents, Command anatomy (R13), Errors (E1–E6), Helpers that already exist (`nanounet/common.py`): use them, don't reinvent, Machine contract (U8–U12), Output hygiene (U6, U7)
+
+### Community 217 - "Instance-conditional targets"
+Cohesion: 0.22
+Nodes (8): Enabling it, Instance-conditional targets, Interaction with the consistency term, Mechanism, Metrics to watch, The rule, Two consequences worth knowing, Why
+
+### Community 218 - "Fixed validation set"
+Cohesion: 0.22
+Nodes (8): Commands, Common errors, Fixed validation set, Logged metrics (`--val-manifest` runs only), Manifest schema, `nanounet_build_splits` arguments, `nanounet_build_valset` arguments, Scenarios
+
+### Community 219 - "GPU efficiency: compute is the bottleneck, always"
+Cohesion: 0.29
+Nodes (6): GPU efficiency: compute is the bottleneck, always, Inference (G7), Known wins: candidates, each must pass the protocol above, Measurement protocol (G4): how to produce the number, The data path (G1, G3, G6), The step (G2)
+
+### Community 220 - "Final-run scratch (2026-09-03)"
+Cohesion: 0.33
+Nodes (5): Data 900 vs 999, Final-run scratch (2026-09-03), Last run, right numbers, Loss (settled), Recipe
+
+### Community 221 - "Track (seg × track)"
+Cohesion: 0.40
+Nodes (5): Arguments, Command, Errors, Inputs / outputs, Track (seg × track)
+
+### Community 224 - "nanochat-style: the nanoUNet standard"
+Cohesion: 0.29
+Nodes (6): nanochat-style: the nanoUNet standard, Red flags: stop and rewrite, Reference map (load on demand), Review checklist (paste into the report), Rule index, Workflow: run this on every change
+
+### Community 225 - "Docs: small, structured, never stale"
+Cohesion: 0.33
+Nodes (5): Docs: small, structured, never stale, Experiment log format (dev-notes): borrowed from nanochat `dev/LOG.md` (example numbers are illustrative), Handoff format (handoffs/), Step doc template (D2): this exact section order, Tree
+
+### Community 226 - "Docs: small, structured, never stale"
+Cohesion: 0.33
+Nodes (5): Docs: small, structured, never stale, Experiment log format (dev-notes): borrowed from nanochat `dev/LOG.md` (example numbers are illustrative), Handoff format (handoffs/), Step doc template (D2): this exact section order, Tree
+
+### Community 227 - ".__init__"
+Cohesion: 0.47
+Nodes (4): load_full_net(), load_mae_encoder(), Module, Lightning checkpoint loaders: MAE encoder-only (stem zero-pad) or full supervise
 
 ## Knowledge Gaps
-- **497 isolated node(s):** `nanounet`, `run_measure_registration_error.sh script`, `run_preprocess_sidecars.sh script`, `slurm_finetune_d013_stratified_2gpu.sh script`, `PIP_CACHE_DIR` (+492 more)
+- **626 isolated node(s):** `nanounet`, `PIP_CACHE_DIR`, `NANOUNET_RAW`, `NANOUNET_RESULTS`, `NANOUNET_TMPDIR` (+621 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **122 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **123 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Plans` connect `Basic Transform` to `Longi Build CLI`, `config_table`, `TTA Inference`, `Cgroup Diagnostics`, `Lesion Weights CLI`, `Slurm MAE Train`, `Lightning Checkpoint`, `Dataloader Prefs`, `Export & Segmentation`, `DWB Longi Model`, `Labels & Metadata`, `Slurm Sup Overlap`?**
-  _High betweenness centrality (0.032) - this node is a cross-community bridge._
-- **Why does `cprint()` connect `Slurm Sup Scratch XL` to `Longi Build CLI`, `Registration Landmarks`, `config_table`, `TTA Inference`, `Lesion Weights CLI`, `Cgroup Diagnostics`, `Slurm Preprocess Merge`, `measure_registration_error.py`, `Dataloader Prefs`, `DWB Longi Model`, `io.py`, `Slurm Sup Overlap`?**
-  _High betweenness centrality (0.032) - this node is a cross-community bridge._
-- **Why does `Labels` connect `Labels & Metadata` to `Predict CLI`, `CC-DiceCE Loss`, `Predict IO`, `Basic Transform`, `Export & Segmentation`, `Slurm Sup Overlap`?**
-  _High betweenness centrality (0.015) - this node is a cross-community bridge._
+- **Why does `Plans` connect `Predict IO` to `Longi Build CLI`, `Cgroup Diagnostics`, `.__init__`, `Lesion Weights CLI`, `Slurm MAE Train`, `Lightning Checkpoint`, `Longi Inference Plan`, `Dataloader Prefs`, `Resampling`, `Normalization`, `README.md`, `DWB Longi Model`, `Labels & Metadata`, `export.py`, `lesion_weights.py`, `slurm_supervised_999_h200.sh`?**
+  _High betweenness centrality (0.030) - this node is a cross-community bridge._
+- **Why does `cprint()` connect `export.py` to `Longi Build CLI`, `Lesion Weights CLI`, `Predict IO`, `Slurm Preprocess Merge`, `Longi Inference Plan`, `Normalization`, `README.md`, `Labels & Metadata`, `runtime.py`, `Slurm Sup Scratch XL`, `lesion_weights.py`, `slurm_supervised_999_h200.sh`?**
+  _High betweenness centrality (0.020) - this node is a cross-community bridge._
+- **Why does `Labels` connect `Labels & Metadata` to `Predict CLI`, `CC-DiceCE Loss`, `Predict IO`, `Normalization`?**
+  _High betweenness centrality (0.016) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `Plans` (e.g. with `Labels` and `PretrainPatchIterable`) actually correct?**
   _`Plans` has 5 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 4 inferred relationships involving `Config3d` (e.g. with `DC_and_CE_loss` and `DeepSupervisionWrapper`) actually correct?**
   _`Config3d` has 4 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 5 inferred relationships involving `Labels` (e.g. with `DC_and_CE_loss` and `DeepSupervisionWrapper`) actually correct?**
   _`Labels` has 5 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `nanoUNet: prompt-aware 3D ResEnc U-Net (Lightning + bundled preprocess/infer).`, `CLI entry points: preprocess, train, predict, pretrain, longi registration.`, `Offline build of per-centroid sampling weights for d013 hard-type oversampling.` to the rest of the system?**
-  _685 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **What connects `nanoUNet: prompt-aware 3D ResEnc U-Net (Lightning + bundled preprocess/infer).`, `CLI entry points: preprocess, train, predict, pretrain, segtrack.`, `Write a single train/val split balanced within each source dataset.  Replaces th` to the rest of the system?**
+  _830 weakly-connected nodes found - possible documentation gaps or missing edges._
