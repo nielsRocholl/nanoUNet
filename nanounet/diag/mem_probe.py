@@ -19,7 +19,7 @@ def proc_rss_kb(pid: int | None = None) -> int | None:
         for line in Path(f"/proc/{pid}/status").read_text().splitlines():
             if line.startswith("VmRSS:"):
                 return int(line.split(":", 1)[1].strip().split()[0])
-    except OSError:
+    except OSError:  # nanochat-style: allow E4 (no /proc on macOS; RSS is best-effort)
         pass
     return None
 
@@ -60,7 +60,7 @@ def cgroup_mem_bytes(pid: int | None = None) -> dict[str, int | None]:
             k, v = line.split(maxsplit=1)
             if k in ("anon", "file", "shmem"):
                 out[k] = int(v)
-    except OSError:
+    except OSError:  # nanochat-style: allow E4 (memory.stat absent; other fields still returned)
         pass
     return out
 
@@ -86,7 +86,7 @@ def gpu_mem_bytes() -> dict[str, int | None]:
             "reserved": torch.cuda.memory_reserved(),
             "max_allocated": torch.cuda.max_memory_allocated(),
         }
-    except Exception:
+    except Exception:  # nanochat-style: allow E4 (torch/cuda probe; narrowing is L26)
         return {"allocated": None, "reserved": None, "max_allocated": None}
 
 

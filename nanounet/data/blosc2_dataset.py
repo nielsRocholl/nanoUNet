@@ -31,7 +31,7 @@ def _fadvise_dontneed(path: str) -> None:
             os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)
         finally:
             os.close(fd)
-    except OSError:
+    except OSError:  # nanochat-style: allow E4 (posix_fadvise hint; missing /proc or fd is fine)
         pass
 
 
@@ -46,7 +46,7 @@ def _open_b2(path: str, mmap: bool):
                 os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_RANDOM)
             finally:
                 os.close(fd)
-        except OSError:
+        except OSError:  # nanochat-style: allow E4 (posix_fadvise hint; missing fd is fine)
             pass
     return arr
 

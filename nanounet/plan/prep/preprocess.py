@@ -28,13 +28,13 @@ def _cgroup_mem_limit_gb() -> Optional[float]:
         try:
             with open(p, encoding="utf-8") as f:
                 raw = f.read().strip()
-        except OSError:
+        except OSError:  # nanochat-style: allow E4 (cgroup file gone mid-read)
             continue
         if raw == "max":
             continue
         try:
             v = int(raw)
-        except ValueError:
+        except ValueError:  # nanochat-style: allow E4 (malformed cgroup int)
             continue
         if v < (1 << 40) * 1024:  # exclude the "no limit" sentinel some kernels report as a huge int
             return v / 1e9
@@ -47,7 +47,7 @@ def _cgroup_oom_kills() -> Optional[int]:
             for line in f:
                 if line.startswith("oom_kill "):
                     return int(line.split()[1])
-    except OSError:
+    except OSError:  # nanochat-style: allow E4 (no memory.events)
         return None
     return None
 

@@ -98,7 +98,7 @@ def _git_head() -> str | None:
         )
         if r.returncode == 0:
             return r.stdout.strip()[:12]
-    except (OSError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.TimeoutExpired):  # nanochat-style: allow E4 (df timeout; fs type unknown)
         pass
     return None
 

@@ -66,7 +66,7 @@ def pin_worker_threads() -> None:
         import threadpoolctl
 
         threadpoolctl.threadpool_limits(1)
-    except ImportError:
+    except ImportError:  # nanochat-style: allow E4 (threadpoolctl optional)
         pass
 
 

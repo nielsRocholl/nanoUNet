@@ -19,7 +19,7 @@ def _cgroup_dir(pid: int | None = None) -> Path | None:
                 unified = Path("/sys/fs/cgroup") / path.lstrip("/")
                 if (unified / "memory.current").is_file():
                     return unified
-    except OSError:
+    except OSError:  # nanochat-style: allow E4 (no cgroup fs; mem-diag degrades)
         pass
     return None
 

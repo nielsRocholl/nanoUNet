@@ -152,5 +152,5 @@ def native_seg_to_nifti_bytes(seg: np.ndarray, props: dict) -> bytes:
     finally:
         try:
             os.unlink(path)
-        except OSError:
+        except OSError:  # nanochat-style: allow E4 (temp nifti already gone)
             pass
