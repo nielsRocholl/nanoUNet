@@ -39,9 +39,9 @@ MIX_ORDER = ("all_clicked", "lesion_free_decoy", "subset_clicked", "none_clicked
 def _parse_mix(s: str) -> dict[str, float]:
     parts = [float(x) for x in s.split(",")]
     if len(parts) != 4:
-        raise ValueError(f"--mix needs 4 comma-separated shares (got {s!r}), order: {MIX_ORDER}")
+        raise ValueError(f"--mix {s!r} does not have 4 comma-separated shares.\nExpected shares for {MIX_ORDER}, e.g. \"0.40,0.25,0.20,0.15\".\nFix: pass --mix with exactly 4 comma-separated shares in that order   (see docs/steps/valset.md)")
     if abs(sum(parts) - 1.0) > 1e-6:
-        raise ValueError(f"--mix shares must sum to 1.0, got {sum(parts)} ({s!r})")
+        raise ValueError(f"--mix {s!r} shares sum to {sum(parts)}, not 1.0.\nExpected the 4 shares for {MIX_ORDER} to add up to 1.0.\nFix: adjust --mix so its 4 values sum to 1.0, e.g. \"0.40,0.25,0.20,0.15\"   (see docs/steps/valset.md)")
     return dict(zip(MIX_ORDER, parts))
 
 

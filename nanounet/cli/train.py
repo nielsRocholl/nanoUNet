@@ -56,7 +56,9 @@ def main() -> None:
         ckpt_dir = os.path.basename(os.path.dirname(os.path.abspath(args.resume)))
         if ckpt_dir not in ("checkpoints", "finetune"):
             raise ValueError(
-                f"--resume must sit in a checkpoints/ or finetune/ directory, got {args.resume}"
+                f"--resume {args.resume} sits in a '{ckpt_dir}' directory.\n"
+                f"Expected the checkpoint's parent directory to be named checkpoints/ or finetune/ (nanounet_train's own layout).\n"
+                f"Fix: pass --resume pointing at a checkpoint under out/checkpoints/ or out/finetune/   (see docs/steps/train.md)"
             )
     set_safe_tmpdir(results_tmp=join(out, ".tmp"))
     maybe_mkdir_p(out)
@@ -75,7 +77,11 @@ def main() -> None:
     pm0 = Plans(plans_path)
     sup_resume = args.resume
     if sup_resume and not os.path.isfile(sup_resume):
-        raise ValueError(sup_resume)
+        raise ValueError(
+            f"--resume {sup_resume} does not exist.\n"
+            f"Expected a checkpoint file written by a previous nanounet_train run.\n"
+            f"Fix: pass an existing --resume path, or drop --resume to start a fresh run   (see docs/steps/train.md)"
+        )
 
     config_table(train_config_rows(args, ds, out), title="nanoUNet train")
 

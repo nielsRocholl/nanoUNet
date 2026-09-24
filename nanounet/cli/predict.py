@@ -80,7 +80,11 @@ def main() -> None:
             pids = patient_ids_from_csv(args.patients_csv)
             cases = [(cid, scan, jp, ot) for cid, scan, jp, ot in cases if cid.split("_", 1)[0] in pids]
             if not cases:
-                raise SystemExit(f"no cases match --patients-csv '{args.patients_csv}'.\nExpected CSV column 'patient' matching -i id prefix (e.g. 03b90eb112_00).\nFix: --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv  (see docs/steps/predict.md)")
+                raise SystemExit(
+                    f"No cases match --patients-csv {args.patients_csv!r}.\n"
+                    f"Expected the CSV's 'patient' column to match an -i case id prefix (e.g. 03b90eb112_00).\n"
+                    f"Fix: check --patients-csv {args.patients_csv} for a 'patient' column matching your case ids   (see docs/steps/predict.md)"
+                )
         missing = [cid for cid, _, jp, _ in cases if not os.path.isfile(jp)]
         if missing:
             raise SystemExit(f"missing points JSON for: {', '.join(missing)}.\nExpected sibling <case>.json next to each scan in -i.\nFix: add the JSON (empty points [] if no clicks)  (see docs/steps/predict.md)")
@@ -88,7 +92,7 @@ def main() -> None:
         maybe_mkdir_p(out_dir)
     else:
         if not args.points:
-            raise SystemExit("single mode requires --points")
+            raise SystemExit("single mode requires --points\nExpected --points <case>.json next to the scan.\nFix: nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json -m <run>  (see docs/steps/predict.md)")
         scan = args.input
         case_id = os.path.basename(scan)
         if case_id.endswith(end):

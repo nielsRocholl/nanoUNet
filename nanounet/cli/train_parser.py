@@ -64,18 +64,42 @@ def build_train_parser() -> argparse.ArgumentParser:
 
 def validate_train_args(args) -> None:
     if args.mae_resume and not args.mae_pretrain:
-        raise ValueError("--mae-resume requires --mae-pretrain")
+        raise ValueError(
+            f"--mae-resume {args.mae_resume} was given without --mae-pretrain.\n"
+            f"Expected --mae-pretrain whenever --mae-resume points at an MAE checkpoint to continue.\n"
+            f"Fix: add --mae-pretrain   (see docs/steps/train.md)"
+        )
     if args.mae_resume and args.mae_ckpt:
-        raise ValueError("--mae-resume conflicts with --mae-ckpt")
+        raise ValueError(
+            f"--mae-resume {args.mae_resume} and --mae-ckpt {args.mae_ckpt} were both given.\n"
+            f"Expected exactly one: --mae-resume continues an in-progress MAE run, --mae-ckpt transfers a finished one.\n"
+            f"Fix: drop --mae-ckpt if resuming, or drop --mae-resume if transferring a finished MAE checkpoint"
+        )
     if args.init_weights:
         if not os.path.isfile(args.init_weights):
-            raise ValueError(args.init_weights)
+            raise ValueError(
+                f"--init-weights {args.init_weights} does not exist.\n"
+                f"Expected a checkpoint file to warm-start from.\n"
+                f"Fix: pass an existing --init-weights path   (see docs/steps/train.md)"
+            )
         if args.resume:
-            raise ValueError("--init-weights conflicts with --resume")
+            raise ValueError(
+                f"--init-weights {args.init_weights} and --resume {args.resume} were both given.\n"
+                f"Expected exactly one: --init-weights warm-starts a fresh run, --resume continues an existing one.\n"
+                f"Fix: drop --resume for a warm-started run, or drop --init-weights to resume {args.resume}"
+            )
         if args.mae_ckpt:
-            raise ValueError("--init-weights conflicts with --mae-ckpt")
+            raise ValueError(
+                f"--init-weights {args.init_weights} and --mae-ckpt {args.mae_ckpt} were both given.\n"
+                f"Expected exactly one weight source: --init-weights warm-starts from a supervised checkpoint, --mae-ckpt transfers an MAE-pretrained backbone.\n"
+                f"Fix: drop --mae-ckpt, or drop --init-weights and rely on --mae-ckpt instead"
+            )
         if args.mae_pretrain:
-            raise ValueError("--init-weights conflicts with --mae-pretrain")
+            raise ValueError(
+                f"--init-weights {args.init_weights} was given together with --mae-pretrain.\n"
+                f"Expected --init-weights only for a plain supervised warm start; --mae-pretrain runs its own MAE stage first.\n"
+                f"Fix: drop --mae-pretrain, or drop --init-weights and pass --mae-ckpt after MAE finishes"
+            )
     if args.consistency_weight > 0 and args.prompts_per_patch < 2:
         raise ValueError(
             f"--consistency-weight {args.consistency_weight} requires --prompts-per-patch >= 2 "

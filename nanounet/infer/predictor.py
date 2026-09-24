@@ -50,7 +50,11 @@ def load_net_from_ckpt(
     sd = ck.get("state_dict", ck)
     st = _strip_pl_state(sd)
     if not st:
-        raise RuntimeError("no net.* keys in checkpoint")
+        raise RuntimeError(
+            "no net.* keys in checkpoint\n"
+            f"Expected state_dict keys prefixed with 'net.' (Lightning module wraps the network as self.net) in '{ckpt_path}'.\n"
+            f"Fix: verify '{ckpt_path}' is a nanoUNet-trained checkpoint, not a raw torch state_dict   (see docs/steps/predict.md)"
+        )
     if ema:
         st = _ema_shadow(ck, ckpt_path, st)
     net = build_net(cm, lm, dj, enable_deep_supervision=False)

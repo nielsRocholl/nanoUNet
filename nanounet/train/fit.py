@@ -43,7 +43,11 @@ def run_mae_pretrain(args, ds, pp, plans_path, dj_path, out, accel, loggers, dl_
     mae_fit_ckpt: str | None = None
     if args.mae_resume:
         if not os.path.isfile(args.mae_resume):
-            raise ValueError(args.mae_resume)
+            raise ValueError(
+                f"--mae-resume {args.mae_resume} does not exist.\n"
+                f"Expected a Lightning checkpoint from a previous nanounet_train --mae-pretrain run.\n"
+                f"Fix: pass an existing --mae-resume path, or drop --mae-resume to start MAE fresh   (see docs/steps/train.md)"
+            )
         pl_ckpt_assert_epochs_match(args.mae_resume, args.mae_epochs)
         ep_m, tgt_m = pl_ckpt_epoch_and_target(args.mae_resume)
         if pl_ckpt_stage_done(ep_m, tgt_m):

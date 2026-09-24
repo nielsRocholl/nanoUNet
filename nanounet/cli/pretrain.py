@@ -118,7 +118,11 @@ def main() -> None:
     ckpt = args.resume
     if ckpt:
         if not os.path.isfile(ckpt):
-            raise ValueError(ckpt)
+            raise ValueError(
+                f"--resume {ckpt} does not exist.\n"
+                f"Expected a Lightning checkpoint written by a previous nanounet_pretrain run.\n"
+                f"Fix: pass an existing --resume path, or drop --resume to start a fresh MAE run   (see docs/steps/pretrain.md)"
+            )
         ep0, tgt0 = pl_ckpt_epoch_and_target(ckpt)
         if pl_ckpt_stage_done(ep0, tgt0):
             cprint("[dim]MAE pretrain already reached num_epochs; nothing to do.[/dim]")

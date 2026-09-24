@@ -63,9 +63,17 @@ def convert_id_to_dataset_name(dataset_id: int) -> str:
             found.extend(subdirs(base, prefix=prefix, join=False))
     u = sorted(set(found))
     if len(u) > 1:
-        raise RuntimeError(f"ambiguous dataset id {dataset_id}: {u}")
+        raise RuntimeError(
+            f"Multiple folders match dataset id {dataset_id}: {u}.\n"
+            f"Expected exactly one {prefix}_<name> folder under raw/preprocessed/results.\n"
+            f"Fix: remove or rename the extra folder(s) so only one {prefix}_<name> remains, then rerun."
+        )
     if not u:
-        raise RuntimeError(f"no folder starting with {prefix!r} under raw/preprocessed/results")
+        raise RuntimeError(
+            f"No folder found for dataset id {dataset_id} (expected prefix {prefix!r}).\n"
+            f"Expected a {prefix}_<name> folder under raw, preprocessed, or results env dirs.\n"
+            f"Fix: nanounet_preprocess -d {dataset_id} --planner nnUNetPlannerResEncL   (see docs/steps/preprocess.md)"
+        )
     return u[0]
 
 

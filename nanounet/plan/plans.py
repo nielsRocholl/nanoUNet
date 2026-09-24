@@ -99,7 +99,7 @@ class Plans:
     def _resolve(self, configuration_name: str, visited: tuple[str, ...] | None = None) -> dict:
         cfgs = self.plans["configurations"]
         if configuration_name not in cfgs:
-            raise KeyError(f"{configuration_name!r} not in plans")
+            raise KeyError(f"Configuration {configuration_name!r} not in plans.\nExpected {configuration_name!r} to be a key under plans[\"configurations\"]; nanoUNet only writes \"3d_fullres\".\nFix: regenerate the plans with nanounet_preprocess -d 501   (see docs/steps/preprocess.md)")
         configuration = deepcopy(cfgs[configuration_name])
         if "inherits_from" not in configuration:
             return configuration
@@ -108,7 +108,7 @@ class Plans:
             visited = (configuration_name,)
         else:
             if parent in visited:
-                raise RuntimeError("circular inherits_from")
+                raise RuntimeError(f"Circular inherits_from: {parent!r} already visited in {visited}.\nExpected each configuration's \"inherits_from\" chain to terminate without repeating a name.\nFix: fix the \"inherits_from\" chain in the plans JSON (remove the cycle), or regenerate with nanounet_preprocess -d 501   (see docs/steps/preprocess.md)")
             visited = (*visited, configuration_name)
         base = self._resolve(parent, visited)
         base.update(configuration)
@@ -149,7 +149,7 @@ def _migrate_old_architecture(configuration: dict) -> dict:
         net_cls = "dynamic_network_architectures.architectures.residual_unet.ResidualEncoderUNet"
         key_blk = "n_blocks_per_stage"
     else:
-        raise RuntimeError(u)
+        raise RuntimeError(f"Unknown UNet_class_name {u!r} in old-format plans.\nExpected \"PlainConvUNet\" or \"ResidualEncoderUNet\" (the only classes the migration knows how to convert).\nFix: regenerate plans in the new \"architecture\" format with nanounet_preprocess -d 501 --planner nnUNetPlannerResEncL   (see docs/steps/preprocess.md)")
     n_stg = len(configuration["n_conv_per_stage_encoder"])
     dim = len(configuration["patch_size"])
     cop = convert_dim_to_conv_op(dim)

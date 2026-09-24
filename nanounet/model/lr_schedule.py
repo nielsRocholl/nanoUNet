@@ -63,9 +63,17 @@ class StretchedTailPolyLRScheduler(_LRScheduler):
         self.warmup_epochs = warmup_epochs
         self.ctr = 0
         if not (0 < k_transition < ref_poly_steps):
-            raise ValueError("require 0 < k_transition < ref_poly_steps")
+            raise ValueError(
+                f"--stretched-k {k_transition} is not within 0 < --stretched-k < --stretched-ref {ref_poly_steps}.\n"
+                f"Expected 0 < k_transition < ref_poly_steps (the poly -> linear-tail switch step).\n"
+                f"Fix: pass --stretched-k and --stretched-ref with 0 < --stretched-k < --stretched-ref, e.g. --stretched-k 750 --stretched-ref 1000   (see docs/steps/train.md)"
+            )
         if not (0 <= epoch_offset < num_epochs):
-            raise ValueError("epoch_offset")
+            raise ValueError(
+                f"epoch_offset={epoch_offset} is not within 0 <= epoch_offset < num_epochs={num_epochs}.\n"
+                f"Expected epoch_offset to be a valid starting epoch index for the schedule (used to resume mid-schedule).\n"
+                f"Fix: construct StretchedTailPolyLRScheduler with 0 <= epoch_offset < num_epochs   (see docs/steps/train.md)"
+            )
         super().__init__(optimizer, last_epoch if last_epoch is not None else -1)
 
     def step(self, current_step=None):

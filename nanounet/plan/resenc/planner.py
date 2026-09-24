@@ -125,7 +125,11 @@ def run_plan(
     med = np.median(np.stack(new_shapes, 0), 0)
     med_t = med[tf]
     if med_t[0] == 1:
-        raise RuntimeError("2D-only dataset not supported")
+        raise RuntimeError(
+            f"Dataset is 2D after transpose (median shape along axis 0 is {med_t[0]}).\n"
+            f"Expected a 3D volume; nanoUNet only implements the \"3d_fullres\" configuration.\n"
+            f"Fix: this dataset needs a 2D pipeline nanoUNet does not provide; verify the raw data isn't 2D slices, or use a different tool   (see docs/steps/preprocess.md)"
+        )
     approx_nvox = float(np.prod(med_t, dtype=np.float64) * dj["numTraining"])
     norm_n, norm_m = _norm_schemes(dj, fp)
     cache: dict = {}
