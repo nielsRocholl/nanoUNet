@@ -38,7 +38,7 @@ nanounet/
 ├── plan/       dataset ids, plans, splits, labels; prep/ = preprocessing, resenc/ = ResEnc planner
 ├── model/      network, losses (dice, cc_dice_ce), dice_metrics, lr schedule, MAE transfer
 ├── train/      LightningModule, data module, fit, EMA, patch iterable/render, val metrics
-├── pretrain/   MAE pretraining (dataset, masking, module)
+├── pretrain/   MAE pretraining (dataset, module)
 ├── infer/      predictor, predict_case/io, TTA, ROI slices, export, segtrack
 ├── diag/       cgroup, mem_diag, tmp_purge (runtime diagnostics)
 ├── common.py   console + rich helpers, env paths, logging

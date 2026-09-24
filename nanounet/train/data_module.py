@@ -19,7 +19,7 @@ from nanounet.dataloader_prefs import DataloaderBucket, build_iter_dataloader, i
 from nanounet.plan.plans import Plans
 from nanounet.plan.splits import fold_keys, fold_seed, load_splits
 from nanounet.train.patch_iterable import PatchIterable, collate_patches, worker_init
-from nanounet.train.patch_size import get_patch_size
+from nanounet.data.augment import get_patch_size
 
 setup_logging()
 
