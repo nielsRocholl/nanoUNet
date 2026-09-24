@@ -54,11 +54,11 @@ nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv \
 | `--wandb-project` | str | `nanounet` | W&B project |
 | `--wandb-name` | str | auto | W&B run name |
 | `--loss`, `-loss` | choice | `dc_ce` | `dc_ce` \| `cc_dc_ce` — see [losses.md](../reference/losses.md) |
-| `--resume` | str | none | Supervised Lightning ckpt; no auto `last.ckpt` |
+| `--resume` | str | none | Supervised Lightning ckpt; must sit in a `checkpoints/` or `finetune/` dir and match `--epochs`; no auto `last.ckpt` |
 | `--init-weights` | str | none | Load full net from supervised ckpt; fresh optimizer |
 | `--only-prefix` | str | none | Train/val only case keys with prefix, e.g. `d013_` |
 | `--precision` | str | `16-mixed` | Lightning precision |
-| `--accelerator` | choice | `auto` | `auto` \| `cpu` \| `cuda` \| `gpu` \| `mps` |
+| `--accelerator` | choice | `auto` | `auto` \| `cpu` \| `cuda` \| `gpu` \| `mps`; `gpu` maps to `cuda` |
 | `--mae-ckpt` | str | none | Load encoder weights only (no integrated MAE run) |
 | `--mae-pretrain` | flag | off | Run MAE under `<run>/mae_pretrain/` then supervised |
 | `--mae-resume` | str | none | With `--mae-pretrain`: MAE ckpt; conflicts with `--mae-ckpt` |
@@ -72,6 +72,7 @@ nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv \
 | `--mae-iters-per-epoch` | int | same as train | MAE batches per epoch |
 | `--dl-bucket` | choice | `m` | DataLoader worker preset: `s` / `m` / `l` / `xl` |
 | `--dl-persistent-workers` | flag | off | Keep workers between epochs |
+| `--mem-diag` | flag | off | Log cgroup/process RAM to `OUT/mem_diag.jsonl` |
 | `--prompts-per-patch` | int | `1` | Independent click draws rendered per patch (same CT crop + augmentation); 2 enables the consistency loss below |
 | `--consistency-weight` | float | `0.0` | Lambda max for the two-prompt consistency term; `0` disables it. Requires `--prompts-per-patch >= 2` |
 | `--consistency-warmup-epochs` | int | `50` | Epochs to linearly ramp lambda from 0 to `--consistency-weight` |

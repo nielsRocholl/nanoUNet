@@ -44,7 +44,7 @@ from nanounet.runtime import assert_mem_diag_cgroup, runtime_banner
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("-d", "--dataset_id", type=int, required=True)
+    ap.add_argument("-d", "--dataset_id", type=int, required=True, help="Dataset id, matched against Dataset<NNN>_* under raw/preprocessed/results (zero-padded to 3 digits).")
     ap.add_argument(
         "-f",
         "--fold",
@@ -52,22 +52,22 @@ def main() -> None:
         default=0,
         help="Fold index 0-4, or 'all' for full-data training (val=train).",
     )
-    ap.add_argument("--plans", dest="plans_identifier", required=True)
-    ap.add_argument("--epochs", type=int, default=1000)
-    ap.add_argument("--lr", type=float, default=1e-2)
-    ap.add_argument("--lr-schedule", choices=("cosine_warm_restarts", "poly"), default="cosine_warm_restarts")
-    ap.add_argument("--cosine-t0", type=int, default=250)
-    ap.add_argument("--cosine-t-mult", type=int, default=1)
-    ap.add_argument("--cosine-eta-min", type=float, default=0.0)
-    ap.add_argument("--wd", type=float, default=3e-5)
-    ap.add_argument("--mask-ratio", type=float, default=0.75)
-    ap.add_argument("--batch-size", type=int, default=None)
-    ap.add_argument("--iters-per-epoch", type=int, default=250)
-    ap.add_argument("--val-iters", type=int, default=50)
-    ap.add_argument("--out", default=None)
-    ap.add_argument("--no-wandb", action="store_true")
-    ap.add_argument("--wandb-project", default="nanounet-mae")
-    ap.add_argument("--wandb-name", default=None)
+    ap.add_argument("--plans", dest="plans_identifier", required=True, help="Plans identifier: basename of the plans JSON under the preprocessed dataset dir (no .json suffix).")
+    ap.add_argument("--epochs", type=int, default=1000, help="MAE pretrain epoch budget.")
+    ap.add_argument("--lr", type=float, default=1e-2, help="MAE initial learning rate.")
+    ap.add_argument("--lr-schedule", choices=("cosine_warm_restarts", "poly"), default="cosine_warm_restarts", help="MAE LR schedule.")
+    ap.add_argument("--cosine-t0", type=int, default=250, help="cosine_warm_restarts restart period (epochs).")
+    ap.add_argument("--cosine-t-mult", type=int, default=1, help="cosine_warm_restarts period multiplier after each restart.")
+    ap.add_argument("--cosine-eta-min", type=float, default=0.0, help="cosine_warm_restarts minimum LR.")
+    ap.add_argument("--wd", type=float, default=3e-5, help="Weight decay.")
+    ap.add_argument("--mask-ratio", type=float, default=0.75, help="Fraction of voxels masked per patch.")
+    ap.add_argument("--batch-size", type=int, default=None, help="Batch size; None takes it from plans 3d_fullres.batch_size.")
+    ap.add_argument("--iters-per-epoch", type=int, default=250, help="Training batches per epoch.")
+    ap.add_argument("--val-iters", type=int, default=50, help="Validation batches per epoch.")
+    ap.add_argument("--out", default=None, help="Output directory; default <results-env>/nanounet/<Dataset>_<plans>_mae_pretrain_f<fold>.")
+    ap.add_argument("--no-wandb", action="store_true", help="Disable Weights & Biases logging.")
+    ap.add_argument("--wandb-project", default="nanounet-mae", help="W&B project name.")
+    ap.add_argument("--wandb-name", default=None, help="W&B run name; default <Dataset>_mae_f<fold>.")
     ap.add_argument(
         "--dl-bucket",
         choices=("s", "m", "l", "xl"),
@@ -84,7 +84,7 @@ def main() -> None:
         default=None,
         help="Resume MAE from this Lightning ckpt; omit for a fresh run (no auto last.ckpt).",
     )
-    ap.add_argument("--precision", default="16-mixed")
+    ap.add_argument("--precision", default="16-mixed", help="Precision passed to the Lightning Trainer.")
     ap.add_argument(
         "--accelerator",
         default="auto",

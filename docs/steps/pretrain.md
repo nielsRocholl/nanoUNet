@@ -41,9 +41,10 @@ nanounet_pretrain -d 001 -f 0 --plans nnUNetResEncUNetLPlans \
 | `--wandb-name` | str | auto | W&B run name |
 | `--dl-bucket` | choice | `m` | `s`: 2/1 workers (0 on tmpfs TMPDIR). `m`: 4/2. `l`: 8/4. `xl`: 16/8 |
 | `--dl-persistent-workers` | flag | off | Keep DataLoader workers between epochs |
-| `--resume` | str | none | MAE Lightning checkpoint; must exist; epoch target must match `--epochs` |
+| `--resume` | str | none | MAE Lightning checkpoint; must exist; skipped if it already reached its own saved epoch target |
 | `--precision` | str | `16-mixed` | Lightning precision (e.g. `32-true`) |
-| `--accelerator` | choice | `auto` | `auto` \| `cpu` \| `cuda` \| `gpu` \| `mps` |
+| `--accelerator` | choice | `auto` | `auto` \| `cpu` \| `cuda` \| `gpu` \| `mps`; `gpu` maps to `cuda` |
+| `--mem-diag` | flag | off | Log cgroup/process RAM to `OUT/mem_diag.jsonl` |
 
 ## Inputs / outputs
 
@@ -64,6 +65,5 @@ Encoder weights load into supervised training via `nanounet_train --mae-ckpt <pa
 | Error | Cause | Fix |
 |-------|-------|-----|
 | Cgroup OOM on long runs | Checkpoint temp files on tmpfs `/tmp` | Set `NANOUNET_TMPDIR` to local disk; see [cgroup_memory.md](../dev-notes/cgroup_memory.md) |
-| Resume epoch mismatch | `--resume` ckpt trained for different `--epochs` | Match `--epochs` to checkpoint target or start fresh |
 | Missing plans | Preprocess not run | Run `nanounet_preprocess` first with matching `--plans` |
 | `MAE pretrain already reached num_epochs` | Resume on finished run | Expected clean exit; use ckpt for `--mae-ckpt` |
