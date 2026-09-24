@@ -3,7 +3,8 @@
 build_patch/producer hand over CT crop + click COORDINATES ("keypoints"); the consumer runs the
 augmentation chain on CT + points (see spatial_points.py) and only then renders heatmaps at the
 final patch size -- grid_sample only ever sees the CT channel. Variant
-concat/split/render, click-inside bookkeeping, and collate live in patch_render.py.
+concat/split/render and click-inside bookkeeping live in patch_render.py.
+collate_patches and worker_init live in data/loader_workers.py and are re-exported here.
 
 Two-prompt consistency: build_patch* returns `points_variants`, one independent click draw per
 prompt, all sharing ONE bbox/crop. All variants' points ride through a SINGLE augmentation pass
@@ -31,10 +32,9 @@ from nanounet.config import RoiPromptConfig
 from nanounet.data.blosc2_dataset import Blosc2Folder, load_case_properties
 from nanounet.data.cohorts import CohortSampler
 from nanounet.data.sampling import build_patch
-from nanounet.dataloader_prefs import pin_worker_threads
+from nanounet.data.loader_workers import collate_patches, worker_init
 from nanounet.train.patch_render import (
     click_inside_flags,
-    collate_patches,
     concat_variant_keypoints,
     render_variant,
     split_variant_keypoints,
@@ -57,11 +57,6 @@ class CaseMetaCache:
             self._d.pop(next(iter(self._d)))
         self._d[cid] = prop
         return prop
-
-def worker_init(worker_id: int) -> None:
-    from nanounet.runtime import set_safe_tmpdir
-    set_safe_tmpdir()
-    pin_worker_threads()
 
 class PatchIterable(IterableDataset):
     def __init__(

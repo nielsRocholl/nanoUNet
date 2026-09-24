@@ -31,7 +31,7 @@ from nanounet.config import RoiPromptConfig
 from nanounet.data.blosc2_dataset import Blosc2Folder
 from nanounet.data.patch_bbox import crop_patch
 from nanounet.dataloader_prefs import DataloaderBucket, build_iter_dataloader
-from nanounet.train.patch_iterable import collate_patches, worker_init
+from nanounet.data.loader_workers import collate_patches, worker_init
 from nanounet.train.patch_render import concat_variant_keypoints, render_variant, split_variant_keypoints
 
 SCHEMA_VERSION = 1
