@@ -160,7 +160,9 @@ def build_pretrain_dataloaders(
     if not tr_k or not va_k:
         raise ValueError(
             "MAE pretrain needs at least one case per split with spatial shape >= patch; "
-            f"patch={tuple(ps.tolist())} train_ok={len(tr_k)} val_ok={len(va_k)}"
+            f"patch={tuple(ps.tolist())} train_ok={len(tr_k)} val_ok={len(va_k)}\n"
+            f"Expected every fold split to keep at least one train and one val case big enough for the patch.\n"
+            f"Fix: nanounet_preprocess -d 501 --patch-vol medium, or check splits_final.json / preprocessed case shapes for dataset {dataset_name} fold {fold}. See docs/steps/pretrain.md"
         )
     init_dataloader_ipc()
     nw_tr, nw_va = bucket.nw_train, bucket.nw_val

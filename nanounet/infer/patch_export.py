@@ -118,7 +118,11 @@ def patch_logits_to_native_seg(
     elif m.ndim == 3:
         patch_seg = m.argmax(dim=0)
     else:
-        raise ValueError(f"unexpected patch_logits shape {tuple(patch_logits.shape)}")
+        raise ValueError(
+            f"unexpected patch_logits shape {tuple(patch_logits.shape)}\n"
+            f"Expected patch_logits with 3, 4, or 5 dims (C,Z,Y,X or 1,C,Z,Y,X after squeeze).\n"
+            f"Fix: pass the raw model output for one patch, unreduced over the class/channel dim. See docs/steps/predict.md"
+        )
     crop = patch_seg.to(torch.uint8).cpu().numpy()[pz, py, px]
     return tiles_to_native_seg([(crop, (uz, uy, ux))], pl, cm, props, _unpadded_shape(slicer_revert))
 

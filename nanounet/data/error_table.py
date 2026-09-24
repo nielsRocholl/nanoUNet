@@ -32,7 +32,11 @@ def parse_propagated(d: dict | None) -> dict:
     d = d if isinstance(d, dict) else {}
     mode = str(d.get("mode", "empirical"))
     if mode not in ("gaussian", "empirical"):
-        raise ValueError(f"propagated.mode must be 'gaussian' or 'empirical', got {mode!r}")
+        raise ValueError(
+            f"propagated.mode must be 'gaussian' or 'empirical', got {mode!r}\n"
+            f"Expected config sampling.propagated.mode to be one of 'gaussian' or 'empirical'.\n"
+            f"Fix: set sampling.propagated.mode to 'gaussian' or 'empirical' in the training config JSON. See docs/reference/config.md"
+        )
     sg = d.get("sigma_per_axis", DEFAULT_SIGMA)
     assert isinstance(sg, (list, tuple)) and len(sg) == 3
     backends_raw = d.get("backends", DEFAULT_BACKENDS)
@@ -78,19 +82,19 @@ def validate_table(path: str, backends: Tuple[str, ...]) -> None:
     table_backends = table.get("backends", {})
     for b in backends:
         if b not in table_backends:
-            raise ValueError(
+            raise ValueError(  # nanochat-style: allow E1 (Fix: line is in the `fix` variable)
                 f"propagated.backends requests {b!r} but {path!r} only has "
                 f"{list(table_backends)}.\n{fix}"
             )
         offsets = table_backends[b].get("offsets_zyx", [])
         if len(offsets) != len(size_bins):
-            raise ValueError(
+            raise ValueError(  # nanochat-style: allow E1 (Fix: line is in the `fix` variable)
                 f"propagated.error_table {path!r} backend {b!r} has {len(offsets)} size-bin "
                 f"entries, expected {len(size_bins)}.\n{fix}"
             )
         for i, bin_offsets in enumerate(offsets):
             if len(bin_offsets) == 0:
-                raise ValueError(
+                raise ValueError(  # nanochat-style: allow E1 (Fix: line is in the `fix` variable)
                     f"propagated.error_table {path!r} backend {b!r} size bin {size_bins[i]} "
                     f"is empty.\n{fix}"
                 )

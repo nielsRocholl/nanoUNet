@@ -49,7 +49,7 @@ class ValManifest:
 
 def sidecar_path(manifest_path: str) -> str:
     if not manifest_path.endswith(".json"):
-        raise ValueError(f"manifest path must end in .json, got {manifest_path!r}")
+        raise ValueError(f"manifest path must end in .json, got {manifest_path!r}\nExpected the --out path passed to nanounet_build_valset to end in .json.\nFix: pass a path ending in .json, e.g. --out valset.json. See docs/steps/valset.md")
     return manifest_path[: -len(".json")] + ".targets.npz"
 
 def config_stamp(cfg: RoiPromptConfig) -> dict:
@@ -82,7 +82,7 @@ def load_manifest(path: str, cfg: RoiPromptConfig) -> ValManifest:
             f"{path} has no config_stamp (built by an older nanounet_build_valset).\n"
             f"Without it a manifest built under a different sampling config loads silently, and "
             f"the val curve becomes meaningless.\n"
-            f"Fix: nanounet_build_valset -d <id> --plans <plans> --config <cfg> --out {path}"
+            f"Fix: nanounet_build_valset -d 501 --plans <plans> --config <cfg> --out {path}"
         )
     # stamp came back from load_json (tuples -> lists); round-trip live the same way so e.g.
     # PropagatedConfig.backends (a tuple) doesn't fail equality against its own manifest just
@@ -93,7 +93,7 @@ def load_manifest(path: str, cfg: RoiPromptConfig) -> ValManifest:
         diff = "\n".join(f"  {k}: manifest={stamp.get(k)!r} vs live={live.get(k)!r}" for k in keys if stamp.get(k) != live.get(k))
         raise ValueError(
             f"{path} was built under a different sampling config than the one now in use:\n{diff}\n"
-            f"Fix: nanounet_build_valset -d <id> --plans <plans> --config <cfg> --out {path}"
+            f"Fix: nanounet_build_valset -d 501 --plans <plans> --config <cfg> --out {path}"
         )
     entries = header["entries"]
     patch_size = tuple(int(x) for x in header["patch_size"])
