@@ -144,7 +144,7 @@ No R3/R6/R11/R14 violations anywhere. Near the R1 cap: `valset.py` 198, `samplin
 Outcomes (2026-09-24, `nanochat-refactor`): PR-0 `187362c`, PR-1 `9ecb399`, PR-2 `bf3bf52`, PR-3 `8b5f2bd`, PR-4 `d9c9265`, PR-5 `6ca4287`, PR-6 `ddb350e`, PR-7 `2c4e5e6`, PR-8 `e43d160`, PR-9 `545f96f`, PR-10 `0f4d1fa`, PR-11 `ddf62a7`, opt-A `b571c1b`, opt-B `06b2246`. opt-C / S11 / X01–X06: not approved. G4 for PR-3 and opt-B is PENDING (cluster). PR-2 and PR-8 G4 optional, also PENDING. Harness removed in `5b3b265`.
 | opt-D | skill/checker edits (§9) | – | `check.py` self-run |
 
-After the series: delete `equiv/`, run `graphify update .`, then `check.py`. Expected result: 0 errors; U8/E1/E4/D3/D6 warns → ~0 (7 snake_case U8 warns remain unless L28 is approved).
+After the series: delete `equiv/`, run `graphify update .`, then `check.py`. Expected result: 0 errors; U8/E1/E4/D3/D6 warns → ~0 (7 snake_case U8 warns remain unless L22 is approved).
 
 ## 7. L table (logic candidates, incl. perf). **Not scheduled.**
 
