@@ -1,5 +1,9 @@
 # Plan — Step 6: instance-conditional targets
 
+Date: 2026-08-05
+Status: in progress — decisions settled (e.g. click dropout `pos = 0.90`), implementation ongoing.
+Branch/commit: 5d4961f
+
 **Audience:** a coding agent with no access to the session that produced this. Read
 `docs/handoffs/HANDOFF_training_overhaul.md` §Step 6 (the parent spec) and
 `docs/handoffs/HANDOFF_step1_done_step6_next.md` (session state, diagnosis, benchmark) first.

@@ -1,5 +1,9 @@
 # Handoff — everything is built; the 1200-epoch run is ready to launch
 
+Date: 2026-08-07
+Status: done — build and verification complete; launch pending on GPU time.
+Branch/commit: b590c6c
+
 **Updated 2026-08-07.** Audience: an agent or human with no access to the sessions that produced
 this. Read this file first; `docs/handoffs/HANDOFF_training_overhaul.md` is the original plan and is
 now largely historical.

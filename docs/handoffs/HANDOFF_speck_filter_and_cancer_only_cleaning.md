@@ -1,5 +1,9 @@
 # Handoff: dataset cleaning (speck filter + MSWAL/MCT_LTDiag cancer-only) — 2026-09-02
 
+Date: 2026-09-02
+Status: in progress — two workstreams mid-flight, one with a live background agent running.
+Branch/commit: 350bf80
+
 You have no memory of the conversation that produced this. Read it fully before touching anything —
 two workstreams are mid-flight on the same training data, one has a live background agent still
 running, and there is a shared doc both workstreams write to.

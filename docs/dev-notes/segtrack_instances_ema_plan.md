@@ -1,6 +1,7 @@
 # segtrack instance labels, tracking IDs, and EMA
 
-Status: implementation-ready. Complete this document before coordinate or registration work.
+Date: 2026-08-29
+Status: proposal — implementation-ready. Complete this document before coordinate or registration work.
 
 ## 1. Preserve every predicted component
 

@@ -1,6 +1,9 @@
 # Plan: longitudinal clustered inference (joint 2-channel preprocessing)
 
-Status: implementation spec. A coding agent with no prior context implements this end to end.
+Date: 2026-07-09
+Status: archived (2026-09-23) — describes the removed longitudinal pipeline; kept as history.
+
+Originally: implementation spec. A coding agent with no prior context implements this end to end.
 **Every code change MUST obey `.claude/skills/nanochat-style/SKILL.md` (hard rule).** The relevant hard
 rules are called out inline (R1 <200 LOC/file, R3 no dead code/one way, R5/E1 teaching errors, R11 no
 bare print, R12 no silent fallback, R13 CLI procedural, R15 validate at startup, D2/D3/D4 docs).

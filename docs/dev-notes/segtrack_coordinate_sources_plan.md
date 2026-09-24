@@ -1,6 +1,7 @@
 # segtrack propagated-coordinate contract
 
-Status: implementation-ready after
+Date: 2026-08-29
+Status: proposal — implementation-ready after
 [instance labels and EMA](segtrack_instances_ema_plan.md).
 
 ## 1. Frames

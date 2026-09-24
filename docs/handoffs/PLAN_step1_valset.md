@@ -1,5 +1,9 @@
 # Plan — Step 1+2: Fixed stratified validation set & layered metrics
 
+Date: 2026-08-05
+Status: done — step 1 shipped (see `HANDOFF_step1_done_step6_next.md` referenced from `PLAN_step6_instance_targets.md`).
+Branch/commit: 5aca661
+
 **Audience:** a coding agent with no access to the conversation that produced this plan. Everything
 needed is here. Read it fully before writing code.
 

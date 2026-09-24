@@ -1,5 +1,9 @@
 # Handoff — Single-Stage Stratified Training Overhaul
 
+Date: 2026-08-05
+Status: done — superseded by `docs/handoffs/HANDOFF_ready_to_launch.md`; kept as history.
+Branch/commit: e6740cf
+
 **Audience:** a coding agent working on the GPU cluster. You do **not** have access to the chat
 that produced this doc. Everything you need is here. Read it fully before writing code.
 

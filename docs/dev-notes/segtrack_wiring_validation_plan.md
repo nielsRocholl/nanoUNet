@@ -1,7 +1,9 @@
 # segtrack post-gate wiring and validation
 
-Status: implement only after
-[live-registration gate](segtrack_registration_gate_plan.md) passes.
+Date: 2026-08-29
+Status: archived (2026-09-23) — gated on `segtrack_registration_gate_plan.md`, which was deleted
+(along with `nanounet/register/`) in the longitudinal-pipeline removal; never implemented, kept as
+history.
 
 ## 1. Matcher API: in-memory propagated points
 

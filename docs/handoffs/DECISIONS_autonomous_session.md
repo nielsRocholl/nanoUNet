@@ -1,5 +1,9 @@
 # Decisions taken without the human — review these
 
+Date: 2026-08-06
+Status: done — decisions recorded for review.
+Branch/commit: 54295ae
+
 The human authorised autonomous work to completion, on the condition that every choice normally
 reserved for them is recorded here with the reasoning, for review afterwards.
 

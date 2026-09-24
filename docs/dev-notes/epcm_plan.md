@@ -1,5 +1,8 @@
 # EPCM: a self-grading head for nanoUNet
 
+Date: 2026-09-23
+Status: proposal — implementation scope drafted, evaluation sketched but not planned.
+
 Previous version: [epcm_plan_v0.md](epcm_plan_v0.md). Scope: implementation. Evaluation is sketched, not planned.
 
 ## 1. The idea in plain words

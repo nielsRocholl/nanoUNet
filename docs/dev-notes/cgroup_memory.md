@@ -1,5 +1,8 @@
 # Host RAM / cgroup OOM (MAE & supervised training)
 
+Date: 2026-05-20
+Status: done — postmortem; the fixes below are live in code.
+
 Dataset999 MAE on `dlc-slowpoke` was killed by Linux **cgroup OOM** around epoch 100 (`oom_kill`, no Python traceback). GPU memory was fine (~33 GB). Process RSS stayed ~5–10 GB while **cgroup memory** kept climbing.
 
 This doc summarizes what we saw, what actually caused it, and what the code does now.
@@ -47,14 +50,14 @@ Under a real Slurm step cgroup, page cache is usually reclaimable; tmpfs checkpo
 
 ### 3. Misleading metrics on the interactive node
 
-On VS Code / interactive sessions, `/proc/self/cgroup` is often `0::/` (root cgroup). The now-removed `--mem-diag` instrumentation reported **node-wide** memory in that case, not just your process — use Slurm for authoritative cgroup accounting.
+On VS Code / interactive sessions, `/proc/self/cgroup` is often `0::/` (root cgroup). The `--mem-diag` instrumentation (`nanounet_train --mem-diag` / `nanounet_pretrain --mem-diag`, still in the code) reports **node-wide** memory in that case, not just your process — use Slurm for authoritative cgroup accounting.
 
 ---
 
 ## What we tried (short history)
 
 1. **Handle hygiene** — context managers, case-sticky I/O, small dl bucket. OOM continued.
-2. **`--mem-diag`** (instrumentation, since removed) — confirmed growth in `cgroup_file` + `cgroup_shmem`, flat `cgroup_anon`.
+2. **`--mem-diag`** (instrumentation, still in the code) — confirmed growth in `cgroup_file` + `cgroup_shmem`, flat `cgroup_anon`.
 3. **Disable mmap** — helped micro-benchmarks; full training still grew.
 4. **`posix_fadvise` + `num_workers=0`** — shmem still climbed until we moved TMPDIR off tmpfs.
 5. **TMPDIR redirect** — shmem flat; workers re-enabled when TMPDIR is on disk.
@@ -155,12 +158,14 @@ Final outputs stay under `$NANOUNET_RESULTS/...` (checkpoints, configs).
 
 ---
 
-## Monitoring (historical: `--mem-diag`)
+## Monitoring (`--mem-diag`)
 
-The original fix was validated with a `--mem-diag` instrumentation flag (per-epoch cgroup/RSS/GPU
-JSONL + W&B `mem/*` scalars, worker-level open/close counters). Once the root cause — checkpoint
-temp files on tmpfs `TMPDIR` — was fixed and `purge_torch_tmp()` wired in unconditionally every
-epoch, the instrumentation was no longer load-bearing and was removed. The permanent fixes
+The original fix was validated with the `--mem-diag` instrumentation flag (per-epoch cgroup/RSS/GPU
+JSONL + W&B `mem/*` scalars, worker-level open/close counters; `nanounet_train --mem-diag` /
+`nanounet_pretrain --mem-diag`, see `nanounet/cli/train_parser.py`, `nanounet/cli/pretrain.py`).
+Once the root cause — checkpoint temp files on tmpfs `TMPDIR` — was fixed and `purge_torch_tmp()`
+wired in unconditionally every epoch, the instrumentation was no longer load-bearing for day-to-day
+runs, but **the flag was not removed** — it is still in the code today. The permanent fixes
 (`set_safe_tmpdir`, per-epoch `purge_torch_tmp`, `fadvise` on close) remain in `nanounet/runtime.py`
 and `nanounet/diag/`.
 

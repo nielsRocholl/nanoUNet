@@ -1,5 +1,8 @@
 # EPCM: error-predictive confidence for nanoUNet
 
+Date: 2026-09-23
+Status: archived — superseded by `epcm_plan.md`; kept as history.
+
 Auxiliary head predicting **expected signed boundary displacement** per voxel, from frozen
 nanoUNet decoder features + its own prediction. One forward pass. AlphaFold pLDDT/PAE structure,
 segmentation target.

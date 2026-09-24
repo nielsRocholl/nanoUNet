@@ -1,5 +1,8 @@
 # segtrack speedup: sparse canvas + click-AABB preprocess + prefetch
 
+Date: 2026-08-28
+Status: proposal.
+
 Implementation plan for a lesser coding agent with **no prior context**. Follow it literally.
 Read `.claude/skills/nanochat-style/SKILL.md` first — every edit below must obey it (files
 `<200` LOC, no bare `print`, rich `cprint`/tables for any new CLI output, comments explain
