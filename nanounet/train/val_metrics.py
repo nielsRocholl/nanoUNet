@@ -21,7 +21,7 @@ import numpy as np
 import torch
 
 from nanounet.data.valset import SCENARIOS, SIZE_BUCKETS
-from nanounet.model.dice_helpers import agreement_mean, click_split_means, pooled_dice_from_rows, pooled_fg_dice
+from nanounet.model.dice_metrics import agreement_mean, click_split_means, pooled_dice_from_rows, pooled_fg_dice
 
 
 def _dice_sel(tp, fp, fn, sel):

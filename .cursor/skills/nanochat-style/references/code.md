@@ -36,7 +36,7 @@ nanounet/
 ├── data/       blosc2 dataset, crop/resample/normalize, augment, sampling, valset build
 ├── prompt/     centroids, click coords, encoding, clustering
 ├── plan/       dataset ids, plans, splits, labels; prep/ = preprocessing, resenc/ = ResEnc planner
-├── model/      network, losses (dice, cc_dice_ce), lr schedule, MAE transfer
+├── model/      network, losses (dice, cc_dice_ce), dice_metrics, lr schedule, MAE transfer
 ├── train/      LightningModule, data module, fit, EMA, patch iterable/render, val metrics
 ├── pretrain/   MAE pretraining (dataset, masking, module)
 ├── infer/      predictor, predict_case/io, TTA, ROI slices, export, segtrack

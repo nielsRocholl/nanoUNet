@@ -1,6 +1,8 @@
 {
   "symbols": {},
-  "modules": {},
+  "modules": {
+    "nanounet.model.dice_helpers": "nanounet.model.dice_metrics"
+  },
   "deleted": [],
   "reexports": []
 }

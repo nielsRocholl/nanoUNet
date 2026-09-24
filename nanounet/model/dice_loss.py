@@ -1,6 +1,6 @@
 """Soft Dice loss + TP/FP/FN core (nnU-Net dice.py port). Used by the training losses
 (losses.py, cc_dice_ce.py); validation-time metrics built on the same tp/fp/fn live in
-dice_helpers.py."""
+dice_metrics.py."""
 
 from __future__ import annotations
 

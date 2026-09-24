@@ -14,7 +14,7 @@ from torch import autocast
 
 from nanounet.config import RoiPromptConfig, load_config, save_config
 from nanounet.diag import purge_torch_tmp
-from nanounet.model.dice_helpers import prompt_pair_dice, subset_dice_row, val_step_row
+from nanounet.model.dice_metrics import prompt_pair_dice, subset_dice_row, val_step_row
 from nanounet.model.losses import build_loss, consistency_dice_term
 from nanounet.model.lr_schedule import PolyLRScheduler, StretchedTailPolyLRScheduler
 from nanounet.model.mae_transfer import load_full_net, load_mae_encoder

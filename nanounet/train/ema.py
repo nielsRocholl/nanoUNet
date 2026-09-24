@@ -20,7 +20,7 @@ import pytorch_lightning as pl
 import torch
 from torch import autocast
 
-from nanounet.model.dice_helpers import pooled_fg_dice, val_step_row
+from nanounet.model.dice_metrics import pooled_fg_dice, val_step_row
 
 
 # The shadow weights themselves are free -- one multiply-add per step, no extra pass. Logging
