@@ -29,15 +29,15 @@ from nanounet.plan.plans import Plans
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("-d", "--dataset_id", type=int, required=True)
-    ap.add_argument("--plans", required=True)
+    ap.add_argument("-d", "--dataset_id", type=int, required=True, help="dataset id, e.g. 13")
+    ap.add_argument("--plans", required=True, help="plans identifier, no .json (e.g. nnUNetResEncUNetLPlans)")
     ap.add_argument("--meta-dir", required=True, help="folder of <hash>.csv lesion-type files")
     ap.add_argument(
         "--only-prefix", default="d013_Longitudinal_CT_",
         help="case id prefix up to the per-patient hash, e.g. 'd013_Longitudinal_CT_' -- used "
         "both to filter case ids and to parse hash/timepoint from each id (case_to_csv)",
     )
-    ap.add_argument("--cog-axis-order", choices=("xyz", "zyx"), default="xyz")
+    ap.add_argument("--cog-axis-order", choices=("xyz", "zyx"), default="xyz", help="axis order of cog_bl/cog_fu columns in the meta CSV")
     ap.add_argument("--max-match-dist", type=float, default=10.0, help="voxels")
     ap.add_argument("--max-median-dist", type=float, default=8.0, help="sanity gate on overall median")
     args = ap.parse_args()

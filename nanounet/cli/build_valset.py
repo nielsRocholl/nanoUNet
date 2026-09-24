@@ -88,15 +88,18 @@ def _fill_scenario(scenario, ds, case_dir, ids, want, max_tries, rngs, patch_siz
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("-d", "--dataset_id", type=int, required=True)
-    ap.add_argument("--plans", required=True)
-    ap.add_argument("--config", required=True)
-    ap.add_argument("--out", required=True)
-    ap.add_argument("--n-patches", type=int, default=1500)
-    ap.add_argument("--floor", type=int, default=40)
-    ap.add_argument("--mix", default="0.40,0.25,0.20,0.15")
-    ap.add_argument("--seed", type=int, default=1234)
-    ap.add_argument("--max-tries", type=int, default=60)
+    ap.add_argument("-d", "--dataset_id", type=int, required=True, help="dataset id, e.g. 999")
+    ap.add_argument("--plans", required=True, help="plans identifier, no .json (e.g. nnUNetResEncUNetLPlans)")
+    ap.add_argument("--config", required=True, help="ROI/prompt config JSON path (e.g. configs/default.json)")
+    ap.add_argument("--out", required=True, help="manifest output path (.json); the .targets.npz sidecar is written next to it")
+    ap.add_argument("--n-patches", type=int, default=1500, help="total validation patches across all cohorts")
+    ap.add_argument("--floor", type=int, default=40, help="minimum patches guaranteed per cohort before proportional allocation of the rest")
+    ap.add_argument(
+        "--mix", default="0.40,0.25,0.20,0.15",
+        help="4 comma-separated shares summing to 1.0, order: all_clicked,lesion_free_decoy,subset_clicked,none_clicked",
+    )
+    ap.add_argument("--seed", type=int, default=1234, help="RNG seed for case/bbox/click draws, recorded in the manifest header")
+    ap.add_argument("--max-tries", type=int, default=60, help="rejection-sampling budget per wanted patch (tries = --max-tries * patches wanted for that scenario)")
     args = ap.parse_args()
 
     ds_name = convert_id_to_dataset_name(args.dataset_id)

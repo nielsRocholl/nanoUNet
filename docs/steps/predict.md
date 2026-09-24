@@ -42,7 +42,7 @@ nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json \
 | `-i`, `--input` | str | (required) | Folder (dataset) or single `.nii.gz` |
 | `-o`, `--output` | str | (required) | Output folder (dataset) or single `.nii.gz` |
 | `-m`, `--model-dir` | str | (required) | Run dir with `plans.json`, `dataset.json`, `nano_config.json`, checkpoint |
-| `--ckpt` | str | auto | Basename or path; `auto` / `last.ckpt` → `checkpoints/` then `finetune/` |
+| `--ckpt` | str | auto | Basename or path; auto = `last.ckpt`, tried as-is then `<model-dir>/`, `checkpoints/`, `finetune/` |
 | `--ema` | flag | off | Load `callbacks/EMACallback/shadow` from the same `.ckpt` instead of raw `net.*`. Empty/missing shadow is an error. Use a different `-o` than the raw run. |
 | `--points` | str | none | Points JSON (**single mode only**) |
 | `--no-prompt-encode` | flag | off | Zero the 2 prompt channels |

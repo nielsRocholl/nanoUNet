@@ -24,11 +24,11 @@ from nanounet.plan.splits import cohort_of, make_balanced_split
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("-d", "--dataset_id", type=int, required=True)
-    ap.add_argument("--plans", required=True)
-    ap.add_argument("--val-frac", type=float, default=0.15)
-    ap.add_argument("--seed", type=int, default=12345)
-    ap.add_argument("--force", action="store_true")
+    ap.add_argument("-d", "--dataset_id", type=int, required=True, help="dataset id, e.g. 999")
+    ap.add_argument("--plans", required=True, help="plans identifier, no .json (e.g. nnUNetResEncUNetLPlans)")
+    ap.add_argument("--val-frac", type=float, default=0.15, help="held-out fraction, applied within each source dataset")
+    ap.add_argument("--seed", type=int, default=12345, help="RNG seed for the balanced train/val draw, recorded in the printed table")
+    ap.add_argument("--force", action="store_true", help="overwrite an existing splits_final.json (old file is backed up first)")
     args = ap.parse_args()
 
     ds = convert_id_to_dataset_name(args.dataset_id)

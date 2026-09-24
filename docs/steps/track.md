@@ -56,12 +56,12 @@ Writes `$NANOUNET_RESULTS/segtrack/inputsTrFU/{stem}/` (folder) or `$NANOUNET_RE
 | `--meta` | path | unset | Single: lesion CSV (`cog_propagated` / `cog_fu` / `img_id_fu` / `lesion_type`) |
 | `--meta-dir` | path | `{dataset}/meta` if present | Folder: `{pid}.csv`. Inferred from `--bl-dir` parent. Coords + types |
 | `-o, --out` | path | `$NANOUNET_RESULTS/segtrack/...` | Parent (folder) or case dir (single) |
-| `-m, --model-dir` | path | Dataset999 `h200_instance_1200ep` | Seg run dir (`plans.json` + ckpt) |
-| `--ckpt` | str | `last.ckpt` | Seg checkpoint name |
-| `--track-ckpt` | path | `v7_complete/last.ckpt` | Matcher (EMA, hungarian, `dust_tau=0.125`). `drop_dp` ckpts skip `cog_propagated` |
+| `-m, --model-dir` | path | `$NANOUNET_SEGTRACK_MODEL` env, else Dataset999 `h200_instance_1200ep` | Seg run dir (`plans.json` + ckpt) |
+| `--ckpt` | str | `last.ckpt` | Seg checkpoint name, tried as-is then `<model-dir>/`, `checkpoints/`, `finetune/` |
+| `--track-ckpt` | path | `$NANOUNET_SEGTRACK_TRACK` env, else `tracking.common.DEPLOYED_CKPT` (`v7_complete/last.ckpt`) | Matcher (EMA, hungarian, `dust_tau=0.125`). `drop_dp` ckpts skip `cog_propagated` |
 | `--decode` | choice | `hungarian` | `hungarian` / `dense` / `sinkhorn` |
 | `--thresh` | float | `0.5` | Dense pair cutoff only |
-| `--device` | choice | `cuda` | `cuda` \| `cpu` \| `mps` |
+| `--device` | choice | `cuda` | `cuda` \| `cpu` \| `mps`; exits if unavailable (no silent fallback, unlike `nanounet_predict`) |
 | `--patients-csv` | path | unset | Optional holdout filter on stem prefix. Unpaired / missing JSON are skipped. |
 | `--overwrite` | flag | off | Redo cases that already have `matches.csv` |
 | `--keep-pred` | flag | off | Binary FG `pred_bl.mha` / `pred_fu.mha`. Mask mode: `pred_fu.mha` only |
