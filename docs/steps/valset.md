@@ -66,6 +66,11 @@ randomises.
 redistributed to the other 3 scenarios within the same cohort. Per-cohort metrics are therefore
 computed over `all_clicked` rows only, so they compare model quality, not scenario difficulty.
 
+## Inputs / outputs
+
+**Inputs:** preprocessed dataset dir, `splits_final.json`, plans JSON, ROI/prompt config.
+**Outputs:** `--out` manifest `.json` plus sibling `.targets.npz` sidecar.
+
 ## Manifest schema
 
 One JSON file plus a `.targets.npz` sidecar (packed-bit clicked-subset masks, `.json` -> same path

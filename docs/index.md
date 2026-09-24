@@ -50,6 +50,9 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetTinyPlans --config configs/de
 | Supervised train | [steps/train.md](steps/train.md) |
 | Inference (clustered + scores) | [steps/predict.md](steps/predict.md) |
 | Track (scans + clicks → linked masks) | [steps/track.md](steps/track.md) |
+| Fixed valset | [steps/valset.md](steps/valset.md) |
+| Lesion weights | [steps/lesion_weights.md](steps/lesion_weights.md) |
+| Instance targets | [reference/instance_targets.md](reference/instance_targets.md) |
 | Tracking ids on masks | [reference/track_ids.md](reference/track_ids.md) |
 | ROI / prompt config | [reference/config.md](reference/config.md) |
 | Patch size playbook | [reference/patch_size.md](reference/patch_size.md) |

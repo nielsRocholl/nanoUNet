@@ -85,7 +85,7 @@ Env overrides: `NANOUNET_SEGTRACK_MODEL`, `NANOUNET_SEGTRACK_TRACK`.
 
 `track_id` is the voxel value on `fu.mha` for that pair. Unmatched lesions are not extra CSV rows; they only appear as ids on one mask.
 
-## Errors
+## Common errors
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|

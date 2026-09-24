@@ -41,6 +41,9 @@ python -c "import sys; import nanounet.cli.preprocess, nanounet.cli.train, nanou
 | Supervised train               | [docs/steps/train.md](docs/steps/train.md)                         |
 | Inference                      | [docs/steps/predict.md](docs/steps/predict.md)                     |
 | Track (seg × track)            | [docs/steps/track.md](docs/steps/track.md)                         |
+| Fixed valset                   | [docs/steps/valset.md](docs/steps/valset.md)                       |
+| Lesion weights                 | [docs/steps/lesion_weights.md](docs/steps/lesion_weights.md)       |
+| Instance targets               | [docs/reference/instance_targets.md](docs/reference/instance_targets.md) |
 | Tracking ids                   | [docs/reference/track_ids.md](docs/reference/track_ids.md)         |
 | ROI / prompt config            | [docs/reference/config.md](docs/reference/config.md)               |
 | Patch size playbook            | [docs/reference/patch_size.md](docs/reference/patch_size.md)       |
@@ -48,4 +51,4 @@ python -c "import sys; import nanounet.cli.preprocess, nanounet.cli.train, nanou
 | Host RAM / cgroup OOM          | [docs/dev-notes/cgroup_memory.md](docs/dev-notes/cgroup_memory.md) |
 
 
-Entry points: `nanounet_preprocess`, `nanounet_train`, `nanounet_pretrain`, `nanounet_predict`, `nanounet_segtrack` (see [pyproject.toml](pyproject.toml)).
+Entry points: `nanounet_preprocess`, `nanounet_train`, `nanounet_pretrain`, `nanounet_predict`, `nanounet_segtrack`, `nanounet_build_splits`, `nanounet_build_valset`, `nanounet_lesion_weights` (see [pyproject.toml](pyproject.toml)).
