@@ -14,7 +14,7 @@ Keep it that way.
 | `nano_banner(title, subtitle)` | Big centred panel. Only for long-running entry points (train/pretrain). |
 | `config_table(rows, title="config")` | `rows = [(arg, value, "cli"/"config"/"default"), ...]` (U3) |
 | `nano_progress(total, desc)` | Context manager yielding `advance(n)`. Transient, and degrades cleanly without a TTY (U4). |
-| `cprint(msg)` / `print0` | Every other line. Rich markup is allowed: `[green]`, `[bold]`, `[dim]`. |
+| `cprint(msg)` | Every other line. Rich markup is allowed: `[green]`, `[bold]`, `[dim]`. |
 | `nano_rule()` | Dim separator between phases |
 | `console()` | The singleton, for `rich.Table` / `Panel` renderables: `cprint(table)` also works |
 | `quiet_lightning_runtime()` | Silences Lightning/torch banners and warnings (U5) |

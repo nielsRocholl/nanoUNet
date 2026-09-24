@@ -47,7 +47,7 @@ class ValManifest:
     packed: np.ndarray | None  # (n, nbytes) uint8, or None when no subset entries
     patch_size: tuple[int, int, int]
 
-def _sidecar_path(manifest_path: str) -> str:
+def sidecar_path(manifest_path: str) -> str:
     if not manifest_path.endswith(".json"):
         raise ValueError(f"manifest path must end in .json, got {manifest_path!r}")
     return manifest_path[: -len(".json")] + ".targets.npz"
@@ -97,7 +97,7 @@ def load_manifest(path: str, cfg: RoiPromptConfig) -> ValManifest:
         )
     entries = header["entries"]
     patch_size = tuple(int(x) for x in header["patch_size"])
-    npz_path = _sidecar_path(path)
+    npz_path = sidecar_path(path)
     needs_packed = any(e["subset_target_index"] >= 0 for e in entries)
     packed = None
     if needs_packed:

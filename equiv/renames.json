@@ -1,8 +1,16 @@
 {
-  "symbols": {},
+  "symbols": {
+    "print0": "cprint",
+    "_sidecar_path": "sidecar_path",
+    "bbox_fits_in_patch": "_bbox_fits_in_patch"
+  },
   "modules": {
     "nanounet.model.dice_helpers": "nanounet.model.dice_metrics"
   },
-  "deleted": [],
-  "reexports": []
+  "deleted": [
+    "nanounet.common:print0",
+    "nanounet.common:cprint"
+  ],
+  "reexports": [],
+  "new": []
 }

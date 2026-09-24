@@ -115,9 +115,6 @@ def cprint(msg: str, **kw: Any) -> None:
     _CONSOLE.print(msg, **kw)
 
 
-print0 = cprint
-
-
 def nano_rule() -> None:
     _CONSOLE.print(Rule(style="dim"))
 

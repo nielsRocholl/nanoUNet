@@ -11,7 +11,7 @@ from batchgenerators.utilities.file_and_folder_operations import join
 from batchgeneratorsv2.transforms.base.basic_transform import BasicTransform
 from torch.utils.data import DataLoader, IterableDataset
 
-from nanounet.common import preprocessed_dir, print0
+from nanounet.common import preprocessed_dir, cprint
 from nanounet.dataloader_prefs import DataloaderBucket, build_iter_dataloader, init_dataloader_ipc
 from nanounet.data.blosc2_dataset import Blosc2Folder, case_spatial_shape
 from nanounet.diag import (
@@ -153,7 +153,7 @@ def build_pretrain_dataloaders(
     tr_k = _keys_fit_patch(case_dir, tr_k, ps, mem_diag_dir, "train")
     va_k = _keys_fit_patch(case_dir, va_k, ps, mem_diag_dir, "val")
     if len(tr_k) < len(tr_0) or len(va_k) < len(va_0):
-        print0(
+        cprint(
             "[dim]MAE pretrain: skipped cases smaller than patch "
             f"{tuple(ps.tolist())} — train {len(tr_0)}→{len(tr_k)}, val {len(va_0)}→{len(va_k)}[/dim]"
         )
@@ -165,7 +165,7 @@ def build_pretrain_dataloaders(
     init_dataloader_ipc()
     nw_tr, nw_va = bucket.nw_train, bucket.nw_val
     if (nw_tr > 0 or nw_va > 0) and not persistent_workers:
-        print0(
+        cprint(
             "[yellow]MAE pretrain: use --dl-persistent-workers with num_workers>0 "
             "or patch draws may repeat across epochs.[/yellow]"
         )

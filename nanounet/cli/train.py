@@ -30,7 +30,7 @@ quiet_lightning_runtime()
 
 from pytorch_lightning.loggers import CSVLogger, WandbLogger
 
-from nanounet.dataloader_prefs import dataloader_bucket, init_dataloader_ipc
+from nanounet.dataloader_prefs import dataloader_bucket
 from nanounet.plan.dataset_id import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
 from nanounet.train.fit import run_mae_pretrain, run_supervised

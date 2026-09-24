@@ -16,7 +16,7 @@ def _margin_vox(patch_size: Tuple[int, int, int], margin_frac: float) -> Tuple[i
     )
 
 
-def bbox_fits_in_patch(
+def _bbox_fits_in_patch(
     points: List[ZYX],
     patch_size: Tuple[int, int, int],
     margin: Tuple[int, int, int],
@@ -44,7 +44,7 @@ def cluster_points_for_patch_size(
     clusters: List[List[ZYX]] = []
     for p in sorted_pts:
         for c in clusters:
-            if bbox_fits_in_patch(c + [p], patch_size, margin):
+            if _bbox_fits_in_patch(c + [p], patch_size, margin):
                 c.append(p)
                 break
         else:

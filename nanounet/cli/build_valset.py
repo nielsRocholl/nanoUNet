@@ -18,7 +18,7 @@ from batchgenerators.utilities.file_and_folder_operations import join
 from nanounet.common import cprint, nano_header, nano_progress, preprocessed_dir, resolve_user_config_path
 from nanounet.config import load_config
 from nanounet.data.blosc2_dataset import Blosc2Folder
-from nanounet.data.valset import SCENARIOS, SCHEMA_VERSION, SMALL_LESION_MAX_VOX, _sidecar_path, config_stamp
+from nanounet.data.valset import SCENARIOS, SCHEMA_VERSION, SMALL_LESION_MAX_VOX, sidecar_path, config_stamp
 from nanounet.data.valset_alloc import allocate, load_cohorts, scenario_allocation
 from nanounet.data.valset_build import (
     LabelCache,
@@ -172,7 +172,7 @@ def main() -> None:
             f"allocation bug, not rounding."
         )
 
-    npz_path = _sidecar_path(args.out)
+    npz_path = sidecar_path(args.out)
     packed = np.stack(packed_rows) if packed_rows else np.zeros((0, int(np.prod(patch_size)) // 8), dtype=np.uint8)
     np.savez_compressed(npz_path, packed=packed, shape=np.array(patch_size))
 
