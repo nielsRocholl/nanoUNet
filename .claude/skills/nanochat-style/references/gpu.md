@@ -56,9 +56,9 @@ you must state the trade-off explicitly (G5).
 |---|---|---|
 | `gc.collect(); gc.freeze(); gc.disable()` after step 1, `gc.collect()` every ~5k steps | `base_train.py:586-594`: GC was costing ~500ms spikes | not done. Cheap to test. |
 | Prefetch the next batch *while* fwd/bwd runs | `base_train.py:518` | Lightning + workers does this. Keep `prefetch_factor` ≥2. |
-| `torch.backends.cudnn.benchmark = True` for a fixed patch size | n/a (transformer) | not set. 3D conv autotune often wins 5-15%. Measure it. |
-| `torch.compile(model, dynamic=False)` on the train step, eager model kept for sliding-window inference | `base_train.py:246`, `orig_model` kept for eval | not used. Test with a fixed patch shape and watch recompiles. |
-| bf16 autocast on Ampere+ (no GradScaler) vs `16-mixed` | global `COMPUTE_DTYPE` detected once | `--precision 16-mixed` default. Try `bf16-mixed` on A100/H100/H200. |
+| `torch.backends.cudnn.benchmark = True` for a fixed patch size | n/a (transformer) | **Bit-identity breaking** (kernel choice). Never inside a refactor series. Measure only as its own change. |
+| `torch.compile(model, dynamic=False)` on the train step, eager model kept for sliding-window inference | `base_train.py:246`, `orig_model` kept for eval | **Bit-identity breaking.** Never inside a refactor series. |
+| bf16 autocast on Ampere+ (no GradScaler) vs `16-mixed` | global `COMPUTE_DTYPE` detected once | **Bit-identity breaking** vs `16-mixed`. Never inside a refactor series. |
 | `channels_last_3d` memory format | n/a | untested. Wins are cudnn- and arch-dependent. |
 | 0-D tensors for scalars that change each step (LR, loss weights) under compile | `optim.py:262` avoids recompiles | relevant only if compile is adopted |
 | Meta-device init plus `to_empty` for big models or ckpt loads | `checkpoint_manager.py:99-104` | usually not needed at UNet sizes |

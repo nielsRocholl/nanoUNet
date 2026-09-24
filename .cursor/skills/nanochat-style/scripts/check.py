@@ -22,7 +22,21 @@ ROOT = Path(__file__).resolve().parents[4]  # <repo>/.claude/skills/nanochat-sty
 PKG = ROOT / "nanounet"
 USER_DOCS = ["docs/index.md", "docs/steps", "docs/reference", "README.md"]
 MAX_LOC, TINY_LOC, MAX_DOC = 200, 30, 200
-BOUNDARY_EXC = {"SystemExit", "FileNotFoundError", "FileExistsError", "ValueError", "RuntimeError", "KeyError"}
+BOUNDARY_EXC = {
+    "SystemExit", "FileNotFoundError", "FileExistsError", "ValueError", "RuntimeError", "KeyError",
+    "TypeError", "ImportError", "NotImplementedError", "OSError",
+}
+CLI_STEP = {
+    "nanounet/cli/train.py": "docs/steps/train.md",
+    "nanounet/cli/train_parser.py": "docs/steps/train.md",
+    "nanounet/cli/pretrain.py": "docs/steps/pretrain.md",
+    "nanounet/cli/predict.py": "docs/steps/predict.md",
+    "nanounet/cli/segtrack.py": "docs/steps/track.md",
+    "nanounet/cli/preprocess.py": "docs/steps/preprocess.md",
+    "nanounet/cli/build_valset.py": "docs/steps/valset.md",
+    "nanounet/cli/build_splits.py": "docs/steps/valset.md",
+    "nanounet/cli/lesion_weights.py": "docs/steps/lesion_weights.md",
+}
 HOT_FUNCS = {"forward", "training_step", "compute_loss", "__getitem__", "__iter__", "__next__"}
 SYNC_ATTRS = {"item", "cpu", "tolist", "numpy"}
 FILE_RULES = {"R1", "R2", "R6"}
@@ -38,6 +52,36 @@ def waived(lines: list[str], rule: str, line: int) -> bool:
     if rule in FILE_RULES:
         return any(tag in l for l in lines)
     return any(tag in lines[i] for i in (line - 1, line - 2) if 0 <= i < len(lines))
+
+
+def _enclosing_fn(parents: dict, node: ast.AST):
+    p = parents.get(id(node))
+    while p is not None and not isinstance(p, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        p = parents.get(id(p))
+    return p
+
+
+def _assigns_fix(fn, name: str) -> bool:
+    if fn is None:
+        return False
+    for st in ast.walk(fn):
+        tgt, val = None, None
+        if isinstance(st, ast.Assign) and len(st.targets) == 1 and isinstance(st.targets[0], ast.Name):
+            tgt, val = st.targets[0], st.value
+        elif isinstance(st, ast.AnnAssign) and isinstance(st.target, ast.Name):
+            tgt, val = st.target, st.value
+        if isinstance(tgt, ast.Name) and tgt.id == name and isinstance(val, ast.Constant) and isinstance(val.value, str):
+            if "Fix" in val.value:
+                return True
+    return False
+
+
+def _reraises(body: list) -> bool:
+    return any(isinstance(n, ast.Raise) for s in body for n in ast.walk(s))
+
+
+def _broad(h: ast.ExceptHandler) -> bool:
+    return h.type is None or ast.unparse(h.type) in ("Exception", "BaseException")
 
 
 def check_py(path: Path, add, flags: dict) -> None:
@@ -61,6 +105,7 @@ def check_py(path: Path, add, flags: dict) -> None:
     hot = {id(f) for c in ast.walk(tree) if isinstance(c, ast.ClassDef) and any(getattr(m, "name", "") == "forward" for m in c.body)
            for f in c.body if isinstance(f, ast.FunctionDef) and not re.match(r"__init__|on_|validation|test|predict", f.name)}
     # ^ every per-step method of a module that has forward(); validation/hooks may sync by design
+    parents = {id(c): n for n in ast.walk(tree) for c in ast.iter_child_nodes(n)}
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             mods = [a.name for a in node.names] if isinstance(node, ast.Import) else [node.module or ""]
@@ -72,28 +117,50 @@ def check_py(path: Path, add, flags: dict) -> None:
             if rel != "nanounet/common.py":
                 emit(node.lineno, "R11", "error", "bare print(); use cprint / rich renderable (stderr console)")
         elif isinstance(node, ast.ExceptHandler):
-            if all(isinstance(s, (ast.Pass, ast.Continue)) for s in node.body):
-                broad = node.type is None or ast.unparse(node.type) in ("Exception", "BaseException")
-                if broad:
+            silent = all(isinstance(s, (ast.Pass, ast.Continue)) for s in node.body)
+            if _broad(node) and not _reraises(node.body):
+                if silent:
                     emit(node.lineno, "E4", "error", "broad except swallows silently; crash with the fix instead")
                 else:
-                    emit(node.lineno, "E4", "warn", "narrow swallow: OK only for best-effort side effects, never the result path; waive with reason")
+                    emit(node.lineno, "E4", "warn", "broad except does not re-raise")
+            elif silent:
+                emit(node.lineno, "E4", "warn", "narrow swallow: OK only for best-effort side effects, never the result path; waive with reason")
         elif isinstance(node, ast.Raise) and isinstance(node.exc, ast.Call) and isinstance(node.exc.func, ast.Name):
             if node.exc.func.id in BOUNDARY_EXC and "Fix" not in ast.unparse(node.exc):
-                emit(node.lineno, "E1", "warn", f"{node.exc.func.id} without 'Fix:' line (what's wrong / expected / what to run)")
+                names = [n.id for n in ast.walk(node.exc) if isinstance(n, ast.Name)]
+                if not any(_assigns_fix(_enclosing_fn(parents, node), n) for n in names):
+                    emit(node.lineno, "E1", "warn", f"{node.exc.func.id} without 'Fix:' line (what's wrong / expected / what to run)")
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and (node.name in HOT_FUNCS or id(node) in hot):
             for sub in ast.walk(node):
                 if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Attribute) and sub.func.attr in SYNC_ATTRS:
                     emit(sub.lineno, "G2", "warn", f".{sub.func.attr}() in hot `{node.name}` is a CPU-GPU sync")
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "add_argument":
             longs = [a.value for a in node.args if isinstance(a, ast.Constant) and str(a.value).startswith("--")]
+            if any(k.arg == "action" and ast.unparse(k.value).endswith("BooleanOptionalAction") for k in node.keywords):
+                longs += ["--no-" + f[2:] for f in longs if f.startswith("--") and not f.startswith("--no-")]
             for f in longs:
-                flags.setdefault(f, (rel, node.lineno))
+                flags.setdefault((f, rel), node.lineno)
             kws = {k.arg for k in node.keywords}
             if longs and "help" not in kws:
                 emit(node.lineno, "U8", "warn", f"{longs[0]} has no help=")
             if longs and not any("_" not in f for f in longs):
                 emit(node.lineno, "U8", "warn", f"{longs[0]} is snake_case; new flags are kebab-case")
+    if rel.startswith("nanounet/cli/") and any(isinstance(n, ast.FunctionDef) and n.name == "main" for n in tree.body):
+        if not any(isinstance(n, ast.If) and "__name__" in ast.unparse(n.test) and "__main__" in ast.unparse(n.test) for n in tree.body):
+            emit(1, "K6", "warn", "main() but no `if __name__ == \"__main__\"` guard")
+        main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
+        calls = {n.func.id for n in ast.walk(main) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+        if "nano_header" not in calls or "config_table" not in calls or "next:" not in ast.unparse(main):
+            emit(main.lineno, "K7", "warn", "main() must call nano_header, config_table, and emit `next:`")
+
+
+def _module_exists(dotted: str) -> bool:
+    parts = dotted.split(".")
+    base = ROOT.joinpath(*parts)
+    if base.with_suffix(".py").is_file() or (base / "__init__.py").is_file():
+        return True
+    parent = ROOT.joinpath(*parts[:-1]) if len(parts) > 2 else None
+    return parent is not None and parent.with_suffix(".py").is_file()
 
 
 def doc_files() -> list[Path]:
@@ -117,14 +184,30 @@ def check_docs(add, flags: dict) -> None:
             for cmd in set(re.findall(r"(?<![\w/.-])nanounet_[a-z_]+\b(?![/.])", line)) - scripts:
                 add(rel, i, "D4", "error", f"`{cmd}` is not a console script in pyproject.toml (stale doc?)")
             if line.startswith("|"):
-                for f in set(re.findall(r"`(--[a-z0-9][a-z0-9_-]*)", line)) - set(flags):
+                for f in set(re.findall(r"`(--[a-z0-9][a-z0-9_-]*)", line)) - {k[0] for k in flags}:
                     add(rel, i, "D4", "error", f"documented flag {f} not defined by any CLI (stale doc?)")
+            for mod in set(re.findall(r"nanounet\.[a-z_.]+", line)):
+                if not _module_exists(mod):
+                    add(rel, i, "K8", "warn", f"`{mod}` does not import")
     for s in sorted(scripts):
         if s not in text:
             add("pyproject.toml", 1, "D6", "warn", f"console script `{s}` appears in no user doc")
-    for f, (rel, line) in sorted(flags.items()):
-        if rel.startswith("nanounet/cli/") and f not in text:
-            add(rel, line, "D3", "warn", f"{f} missing from every docs argument table")
+    for (flag, rel), line in sorted(flags.items()):
+        step = CLI_STEP.get(rel)
+        if step is None:
+            continue
+        if flag not in docs.get(step, ""):
+            add(rel, line, "D3", "warn", f"{flag} missing from {step}")
+    for sh in sorted((ROOT / "scripts").glob("*.sh")):
+        for i, line in enumerate(sh.read_text(encoding="utf-8").splitlines(), 1):
+            for mod in set(re.findall(r"nanounet\.[a-z_.]+", line)):
+                if not _module_exists(mod):
+                    add(str(sh.relative_to(ROOT)), i, "K8", "warn", f"`{mod}` does not import")
+    for folder in ("docs/dev-notes", "docs/handoffs"):
+        for p in sorted((ROOT / folder).glob("*.md")):
+            head = "\n".join(p.read_text(encoding="utf-8").splitlines()[:12])
+            if not re.search(r"(?m)^Date:", head) or not re.search(r"(?m)^Status:", head):
+                add(str(p.relative_to(ROOT)), 1, "K9", "warn", "dev-note/handoff must open with Date: and Status:")
 
 
 def main() -> None:

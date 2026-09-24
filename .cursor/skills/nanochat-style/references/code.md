@@ -27,20 +27,22 @@ Load this for any `.py` under `nanounet/`. Rule IDs refer to SKILL.md.
 | **PyTorch Lightning** instead of a hand-rolled loop | Multi-GPU, checkpointing, and logging for free. Non-trivial custom logic goes in the LightningModule, not in callbacks (R14). |
 | **Heavy upstream reuse** (`dynamic_network_architectures`, `batchgeneratorsv2`, `acvl_utils`, `cc3d`, `blosc2`, `SimpleITK`) | Reimplementing them is bloat. |
 | **R16: temporary tests** (nanochat keeps a small permanent `tests/`) | Research velocity. Re-evaluate if a regression bites twice. |
+| **R6: no section banners** (nanochat uses them inside big files) | We split on a concept boundary instead. nanochat banners: `optim.py:17,65,182`, `tokenizer.py:28,261`. |
+| **R7: public signatures are hinted** (nanochat hints kernels and small utils only) | `gpt.py` 0/25 defs hinted, `tokenizer.py` 0/19. We hint public signatures; tensor code still prefers a shape comment. |
 
 ## Package layout (keep this accurate; update it when you add a folder)
 
 ```
 nanounet/
 ├── cli/        one file per console script (+ train_parser.py, segtrack_cases.py helpers)
-├── data/       blosc2 dataset, crop/resample/normalize, augment, sampling, valset build
+├── data/       blosc2 dataset, crop/resample/normalize, augment, sampling, valset, loader_workers
 ├── prompt/     centroids, click coords, encoding, clustering
 ├── plan/       dataset ids, plans, splits, labels; prep/ = preprocessing, resenc/ = ResEnc planner
 ├── model/      network, losses (dice, cc_dice_ce), dice_metrics, lr schedule, MAE transfer
 ├── train/      LightningModule, data module, fit, EMA, patch iterable/render, val metrics
 ├── pretrain/   MAE pretraining (dataset, module)
 ├── infer/      predictor, predict_case/io, TTA, ROI slices, export, segtrack
-├── diag/       cgroup, mem_diag, tmp_purge (runtime diagnostics)
+├── diag/       cgroup, mem_diag (flag + JSONL), mem_probe (RSS/cgroup/GPU readers), tmp_purge
 ├── common.py   console + rich helpers, env paths, logging
 ├── config.py   dataclass config + load/save
 └── runtime.py  dataloader_prefs.py  lightning_ckpt.py  score.py   (flat single-concept modules)

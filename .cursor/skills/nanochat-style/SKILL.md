@@ -67,6 +67,8 @@ IDs are stable. Code comments cite them, e.g. `(R12)`. **auto** = `scripts/check
 | R15 | Validate everything at startup. The loop assumes valid state. | |
 | R16 | Tests are temporary: write, validate, delete. No permanent `tests/`. (nanochat differs, see nanochat.md.) | |
 | R17 | Hardware capability differences are detected **once at import**, with the reason logged, e.g. `COMPUTE_DTYPE, REASON = ...`. This is the only allowed "fallback". | |
+| R18 | **On-disk and ckpt names are frozen.** `EMACallback`, `self.net`, LightningModule ctor kwargs, `config.py` field names, plans.json `__name__` strings, sidecar keys, `NANOUNET_*` env names. Renaming any of them is a logic change. | |
+| R19 | **Pure-refactor protocol.** Changes are S (move, byte-identical body), C (comments, help, error text, docs), or L (anything else). L is never mixed into an S/C commit. Hot paths are move-only. A series ships with an AST guard, a golden capture, and a CLI surface diff. | | |
 | U1 | One stderr `Console` (`common.py`). No raw `print`, no tqdm. | auto |
 | U2 | Every command opens with `nano_header` and closes with a summary (outputs, paths, time) plus `next: <literal command>`. | |
 | U3 | Show the resolved config via `config_table` (argument, value, source) before work starts. | |
@@ -75,14 +77,14 @@ IDs are stable. Code comments cite them, e.g. `(R12)`. **auto** = `scripts/check
 | U6 | Tabular info is a rich `Table`, never text aligned by hand. | |
 | U7 | Output is calm: no duplicates, no debug leftovers, no progress spam in logs. | |
 | U8 | Flags are kebab-case and every one has `help=`. `-1`/`None` means "auto" and the help text says so. | auto |
-| U9 | **Machine contract.** Humans read stderr. `--json` prints one JSON object as the **last stdout line**. | |
+| U9 | **Machine contract.** Humans read stderr. `--json` prints one JSON object as the **last stdout line**. No command implements it yet (L20). nanochat prints that JSON unconditionally (`infer_bench.py:241`). | |
 | U10 | Exit codes: 0 ok, 1 user error (`SystemExit(msg)`), 2 argparse usage. A traceback means *our* bug. | |
 | U11 | Never block on input. No `input()`, no confirmation prompts. Destructive actions need an explicit flag (`--force`). | |
-| U12 | Status lines are a stable, greppable contract: `key: value \| key: value`. Changing one is a breaking change. | |
+| U12 | Status lines are a stable, greppable contract: `key: value \| key: value`. Changing one is a breaking change. nanochat's own grep is already stale: `miniseries.sh:85` looks for `Number of parameters:`, which `base_train.py` never prints. | |
 | E1 | Boundary errors answer 3 lines: **what is wrong**, **expected**, `Fix: <literal command>` (plus a doc link). | auto |
 | E2 | An internal invariant is a bare `assert`. If it fires, the bug is ours. | |
 | E3 | Everything checkable at t=0 fails at t=0: paths, fields, GPU, checkpoint compatibility. | |
-| E4 | No swallowing. A narrow `except OSError: pass` is allowed only for best-effort side effects, with a waiver. | auto |
+| E4 | No swallowing. A narrow `except OSError: pass` is allowed only for best-effort side effects, with a waiver. A broad `except` is allowed only inside an R17 import-time capability probe, and it still needs the waiver. | auto |
 | E5 | User mistakes exit through `raise SystemExit(msg)`, which prints cleanly with exit code 1. No 40-frame stack. | |
 | E6 | Report **all** startup problems in one error, not one per run. Invalid choice means list the valid ones. | |
 | G1 | Data path: pinned staging, `non_blocking=True`, prefetch while the GPU runs, workers per `dataloader_prefs`. | |
@@ -98,6 +100,10 @@ IDs are stable. Code comments cite them, e.g. `(R12)`. **auto** = `scripts/check
 | D4 | User docs are under 200 lines, runnable, and **never stale**: no dead commands or flags. Update in the same change. | auto |
 | D5 | Doc commands are literal and runnable (`-d 501`). No pseudo-syntax. | |
 | D6 | Every console script is documented. `dev-notes/` and `handoffs/` are dated scratch, exempt from the 200-line cap. | auto |
+| K6 | A `nanounet/cli/*.py` module with `main` and no `__main__` guard. | auto |
+| K7 | `main()` calls `nano_header` and `config_table`, and emits `next:`. | auto |
+| K8 | A `nanounet.<module>` path in user docs or `scripts/*.sh` must be a real module. | auto |
+| K9 | `docs/dev-notes/` and `docs/handoffs/` open with `Date:` and `Status:`. | auto |
 
 ## Red flags: stop and rewrite
 
