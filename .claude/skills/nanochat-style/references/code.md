@@ -40,7 +40,7 @@ nanounet/
 ├── train/      LightningModule, data module, fit, EMA, patch iterable/render, val metrics
 ├── pretrain/   MAE pretraining (dataset, masking, module)
 ├── infer/      predictor, predict_case/io, TTA, ROI slices, export, segtrack
-├── diag/       cgroup, mem_diag, tmp_purge (runtime diagnostics)
+├── diag/       cgroup, mem_diag (flag + JSONL), mem_probe (RSS/cgroup/GPU readers), tmp_purge
 ├── common.py   console + rich helpers, env paths, logging
 ├── config.py   dataclass config + load/save
 └── runtime.py  dataloader_prefs.py  lightning_ckpt.py  score.py   (flat single-concept modules)
