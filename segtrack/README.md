@@ -2,14 +2,14 @@
 
 One command: two CTs + click JSON → instance masks with shared tracking ids + match CSV. Predicts both timepoints (Dataset999 single-stream), instance-izes click-on-FG, then matches. `--bl-mask` / `--bl-mask-dir` skips BL predict and copies those instance ids. Requires `pip install -e /lesion-tracking`.
 
-Default matcher: `v7_complete/last.ckpt`, matcher EMA on, `--decode hungarian`, `dust_tau=0.125`. `--ema` is the **seg** UNet only. Pair by exact stem (`pid_00` ≠ `pid_01`). Matcher BL positions come from `{dataset}/meta/{pid}.csv` (`cog_propagated`, else `cog_fu`, rows with `img_id_fu` = this stem’s region) when that folder exists. A `drop_dp` matcher checkpoint skips that warp and uses native mask centroids. See [track_ids.md](../reference/track_ids.md).
+Default matcher: `v7_complete/last.ckpt`, matcher EMA on, `--decode hungarian`, `dust_tau=0.125`. `--ema` is the **seg** UNet only. Pair by exact stem (`pid_00` ≠ `pid_01`). Matcher BL positions come from `{dataset}/meta/{pid}.csv` (`cog_propagated`, else `cog_fu`, rows with `img_id_fu` = this stem’s region) when that folder exists. A `drop_dp` matcher checkpoint skips that warp and uses native mask centroids. See [track_ids.md](docs/track_ids.md).
 
 ## Command
 
 Folder (sibling `{stem}.nii.gz` + `{stem}.json`, pair by exact stem):
 
 ```bash
-nanounet_segtrack \
+segtrack_run \
   --bl-dir /nnunet_data/Longitudinal-CT/inputsTrBL \
   --fu-dir /nnunet_data/Longitudinal-CT/inputsTrFU
 ```
@@ -17,7 +17,7 @@ nanounet_segtrack \
 Single case:
 
 ```bash
-nanounet_segtrack \
+segtrack_run \
   --bl-img /nnunet_data/Longitudinal-CT/inputsTrBL/01161aaa0b_00.nii.gz \
   --bl-clicks /nnunet_data/Longitudinal-CT/inputsTrBL/01161aaa0b_00.json \
   --fu-img /nnunet_data/Longitudinal-CT/inputsTrFU/01161aaa0b_00.nii.gz \
@@ -27,7 +27,7 @@ nanounet_segtrack \
 GT baseline mask (skip BL UNet; BL clicks omitted). Folder:
 
 ```bash
-nanounet_segtrack \
+segtrack_run \
   --bl-dir /nnunet_data/Longitudinal-CT/inputsTrBL \
   --fu-dir /nnunet_data/Longitudinal-CT/inputsTrFU \
   --bl-mask-dir /nnunet_data/Longitudinal-CT/targetsTrBL
@@ -36,7 +36,7 @@ nanounet_segtrack \
 Single:
 
 ```bash
-nanounet_segtrack \
+segtrack_run \
   --bl-img /nnunet_data/Longitudinal-CT/inputsTrBL/01161aaa0b_00.nii.gz \
   --bl-mask /nnunet_data/Longitudinal-CT/targetsTrBL/01161aaa0b_00.nii.gz \
   --fu-img /nnunet_data/Longitudinal-CT/inputsTrFU/01161aaa0b_00.nii.gz \
@@ -99,4 +99,4 @@ Env overrides: `NANOUNET_SEGTRACK_MODEL`, `NANOUNET_SEGTRACK_TRACK`.
 | `--bl-clicks was set with --bl-mask` | both given | drop `--bl-clicks` |
 | `skip {stem} (no BL mask)` | missing mask for that stem | skipped |
 | `skip {stem} (BL mask grid != BL CT grid)` | wrong space / registered mask | native `targetsTrBL`, not FU-warped |
-| Empty instance mask | No click hit predicted FG | Check clicks; see [track_ids.md](../reference/track_ids.md) |
+| Empty instance mask | No click hit predicted FG | Check clicks; see [track_ids.md](docs/track_ids.md) |

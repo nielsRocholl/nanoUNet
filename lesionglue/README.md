@@ -2,7 +2,7 @@
 
 Graph neural network that matches lesions between a baseline CT and a follow-up CT: dense bipartite BL↔FU edges, pair logits, and dust (no-match) heads. PyTorch Geometric + Lightning; layout follows [nanochat](https://github.com/karpathy/nanochat) style.
 
-**Deployed matcher** — local weights, nothing to download. `lesionglue_track` / `lesionglue_eval` / `nanounet_segtrack` use this unless overridden:
+**Deployed matcher** — local weights, nothing to download. `lesionglue_track` / `lesionglue_eval` / `segtrack_run` use this unless overridden:
 
 | Knob | Value |
 |------|-------|

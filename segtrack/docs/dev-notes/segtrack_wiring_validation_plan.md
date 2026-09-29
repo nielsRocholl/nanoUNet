@@ -116,7 +116,7 @@ In `/nanoUNet/nanounet/cli/segtrack_cases.py::_folder`, missing per-patient meta
 
 Do not make `meta_dir` itself mandatory. Single-case no-metadata follows the same policy.
 
-Add to `nanounet/cli/segtrack.py`:
+Add to `segtrack/cli/run.py`:
 
 ```python
 ap.add_argument(
@@ -131,7 +131,7 @@ ap.add_argument(
 
 `FROZEN_IO_ITERATIONS` is the exact winner from the registration gate; do not choose a
 value while wiring. Reject negative values immediately. Add config-table rows for
-registration policy and IO iterations. Update `nanounet/docs/steps/track.md` in the same change.
+registration policy and IO iterations. Update `segtrack/README.md` in the same change.
 
 ## 4. Registration model lifecycle
 

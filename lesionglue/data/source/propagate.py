@@ -99,14 +99,14 @@ def load_types(path: Path) -> dict[int, str]:
         raise FileNotFoundError(
             f"No types CSV at {path}.\n"
             f"Expected columns lesion_id, lesion_type.\n"
-            f"Fix: --meta /nnunet_data/Longitudinal-CT/meta/<pid>.csv  (see docs/steps/track.md)"
+            f"Fix: --meta /nnunet_data/Longitudinal-CT/meta/<pid>.csv  (see segtrack/README.md)"
         )
     df = pd.read_csv(path)
     if "lesion_id" not in df.columns or "lesion_type" not in df.columns:
         raise SystemExit(
             f"Types CSV at {path} is missing lesion_id or lesion_type.\n"
             f"Expected columns lesion_id, lesion_type (other columns ignored).\n"
-            f"Fix: pass a meta CSV or omit --meta  (see docs/steps/track.md)"
+            f"Fix: pass a meta CSV or omit --meta  (see segtrack/README.md)"
         )
     out: dict[int, str] = {}
     for _, r in df.iterrows():
@@ -117,7 +117,7 @@ def load_types(path: Path) -> dict[int, str]:
             raise SystemExit(
                 f"unknown lesion_type {lt!r} in {path}.\n"
                 f"Expected one of {list(LESION_TYPES)}.\n"
-                f"Fix: edit the meta row or omit --meta  (see docs/steps/track.md)"
+                f"Fix: edit the meta row or omit --meta  (see segtrack/README.md)"
             )
         out[int(r["lesion_id"])] = lt
     return out

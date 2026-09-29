@@ -14,10 +14,10 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeEl
 from nanounet.common import config_table, console, cprint, nano_banner, quiet_lightning_runtime
 from nanounet.config import load_config
 from nanounet.data.volume.resampling import set_resample_device
-from nanounet.cli.segtrack_cases import collect_cases
+from segtrack.cases import collect_cases
 from nanounet.infer.predict.predictor import load_net_from_ckpt, pick_checkpoint
-from nanounet.infer.segtrack.track import DEFAULT_MODEL, load_case_io, run_case
-from nanounet.infer.segtrack.case import resolve_ckpt_path, resolve_out
+from segtrack.track import DEFAULT_MODEL, load_case_io, run_case
+from segtrack.case import resolve_ckpt_path, resolve_out
 from nanounet.plan.plans import Plans
 
 
@@ -72,19 +72,19 @@ def main() -> None:
         raise SystemExit(
             f"No seg model at {model_dir}.\n"
             f"Expected a nanoUNet run dir with plans.json and checkpoints/last.ckpt.\n"
-            f"Fix: nanounet_segtrack -m $NANOUNET_RESULTS/nanounet/<run>   or export NANOUNET_SEGTRACK_MODEL=...\n"
-            f"(see nanounet/docs/steps/track.md)"
+            f"Fix: segtrack_run -m $NANOUNET_RESULTS/nanounet/<run>   or export NANOUNET_SEGTRACK_MODEL=...\n"
+            f"(see segtrack/README.md)"
         )
     if not track_ckpt.is_file():
         raise SystemExit(
             f"No checkpoint at {track_ckpt}.\n"
             f"Expected a Lightning .ckpt from lesionglue_train.\n"
-            f"Fix: --track-ckpt {DEPLOYED_CKPT}  (see nanounet/docs/steps/track.md)"
+            f"Fix: --track-ckpt {DEPLOYED_CKPT}  (see segtrack/README.md)"
         )
     d = args.device
     if (d == "cuda" and not torch.cuda.is_available()) or (d == "mps" and not torch.backends.mps.is_available()):
         raise SystemExit(
-            f"--device {d} is not available.\nExpected a working {d} device.\nFix: --device cpu  (see nanounet/docs/steps/track.md)"
+            f"--device {d} is not available.\nExpected a working {d} device.\nFix: --device cpu  (see segtrack/README.md)"
         )
     matcher = load_matcher(track_ckpt, d)
     gcfg = graph_cfg_from_ckpt(matcher, int(getattr(matcher.hparams, "k_intra", 8)))
@@ -118,7 +118,7 @@ def main() -> None:
             f"{n_all} cases  ·  0 linked  ·  0 empty  ·  {n_skip} skip\n"
             f"0 pairs  ·  0m 00s\n"
             f"wrote  {parent}\n"
-            f"next   nanounet/docs/steps/track.md",
+            f"next   segtrack/README.md",
             border_style="green",
         ))
         return
@@ -180,7 +180,7 @@ def main() -> None:
         f"{n_pairs} pairs  ·  {mins}m {secs:02d}s\n"
         f"wrote  {parent}\n"
         f"next   open fu.mha — same integer = same lesion\n"
-        f"       nanounet/docs/reference/track_ids.md",
+        f"       segtrack/docs/track_ids.md",
         border_style="green",
     ))
 

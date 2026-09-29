@@ -40,15 +40,15 @@ python -c "import sys; import nanounet.cli.preprocess, nanounet.cli.train, nanou
 | MAE pretrain                   | [nanounet/docs/steps/pretrain.md](docs/steps/pretrain.md)                   |
 | Supervised train               | [nanounet/docs/steps/train.md](docs/steps/train.md)                         |
 | Inference                      | [nanounet/docs/steps/predict.md](docs/steps/predict.md)                     |
-| Track (seg × track)            | [nanounet/docs/steps/track.md](docs/steps/track.md)                         |
+| Track (seg × track)            | [segtrack/README.md](../segtrack/README.md)                         |
 | Fixed valset                   | [nanounet/docs/steps/valset.md](docs/steps/valset.md)                       |
 | Lesion weights                 | [nanounet/docs/steps/lesion_weights.md](docs/steps/lesion_weights.md)       |
 | Instance targets               | [nanounet/docs/reference/instance_targets.md](docs/reference/instance_targets.md) |
-| Tracking ids                   | [nanounet/docs/reference/track_ids.md](docs/reference/track_ids.md)         |
+| Tracking ids                   | [segtrack/docs/track_ids.md](../segtrack/docs/track_ids.md)         |
 | ROI / prompt config            | [nanounet/docs/reference/config.md](docs/reference/config.md)               |
 | Patch size playbook            | [nanounet/docs/reference/patch_size.md](docs/reference/patch_size.md)       |
 | Loss functions                 | [nanounet/docs/reference/losses.md](docs/reference/losses.md)               |
 | Host RAM / cgroup OOM          | [nanounet/docs/dev-notes/cgroup_memory.md](docs/dev-notes/cgroup_memory.md) |
 
 
-Entry points: `nanounet_preprocess`, `nanounet_train`, `nanounet_pretrain`, `nanounet_predict`, `nanounet_segtrack`, `nanounet_build_splits`, `nanounet_build_valset`, `nanounet_lesion_weights` (see [pyproject.toml](../pyproject.toml)).
+Entry points: `nanounet_preprocess`, `nanounet_train`, `nanounet_pretrain`, `nanounet_predict`, `segtrack_run`, `nanounet_build_splits`, `nanounet_build_valset`, `nanounet_lesion_weights` (see [pyproject.toml](../pyproject.toml)).

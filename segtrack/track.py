@@ -17,7 +17,7 @@ from nanounet.data.store.io import SimpleITKIO
 from nanounet.infer.export.volume import native_seg_from_logits
 from nanounet.infer.predict.case import MAX_BORDER_EXTRA, predict_case_logits
 from nanounet.infer.predict.io import preprocess_loaded
-from nanounet.infer.segtrack.case import SegTrackCase, load_ct, load_instance_zyx, stem_pid_region
+from segtrack.case import SegTrackCase, load_ct, load_instance_zyx, stem_pid_region
 
 DEFAULT_MODEL = Path(
     "/nnunet_data/NanoUNet_results/nanounet/"

@@ -53,7 +53,7 @@ Classes: **S** = move/rename/inline/split with byte-identical function bodies ·
 |---|---|
 | `diag/mem_diag.py` R1 216 LOC | real → S01 |
 | `model/dice_helpers.py` R4 | real → S02 |
-| `nanounet/docs/steps/track.md:68` D4 `--no-ema` | **false positive**: `cli/segtrack.py:53` uses `BooleanOptionalAction`, which generates `--no-ema` (→ K-1) |
+| `segtrack/README.md:68` D4 `--no-ema` | **false positive**: `cli/segtrack.py:53` uses `BooleanOptionalAction`, which generates `--no-ema` (→ K-1) |
 
 No R3/R6/R11/R14 violations anywhere. Near the R1 cap: `valset.py` 198, `sampling.py` 197, `resampling.py` 197, `score.py` 197, `case_pp.py` 197,
 `build_valset.py` 195, `data_module.py` 193, `lightning_module.py` 191, `segtrack.py` 189. The next feature in any of these needs a split plan, not +LOC.

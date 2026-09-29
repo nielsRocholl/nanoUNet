@@ -41,7 +41,7 @@ nanounet_predict = "nanounet.cli.predict:main"
 nanounet_lesion_weights = "nanounet.cli.lesion_weights:main"
 nanounet_build_splits = "nanounet.cli.build_splits:main"
 nanounet_build_valset = "nanounet.cli.build_valset:main"
-nanounet_segtrack = "nanounet.cli.segtrack:main"
+segtrack_run = "segtrack.cli.run:main"
 lesionglue_track = "lesionglue.cli.track:main"
 lesionglue_split = "lesionglue.cli.split:main"
 lesionglue_preprocess = "lesionglue.cli.preprocess:main"
@@ -54,4 +54,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["nanounet*", "lesionglue*"]
+include = ["nanounet*", "lesionglue*", "segtrack*"]

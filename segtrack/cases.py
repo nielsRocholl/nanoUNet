@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from nanounet.infer.predict.io import patient_ids_from_csv
-from nanounet.infer.segtrack.case import SegTrackCase, pair_folder, stem_pid_region
+from segtrack.case import SegTrackCase, pair_folder, stem_pid_region
 
 
 def collect_cases(args) -> tuple[list[SegTrackCase], bool, list[tuple[str, str]], tuple[Path | None, str]]:
@@ -14,25 +14,25 @@ def collect_cases(args) -> tuple[list[SegTrackCase], bool, list[tuple[str, str]]
         raise SystemExit(
             "Need either folder mode (--bl-dir --fu-dir) or single case (--bl-img --bl-clicks --fu-img --fu-clicks).\n"
             "Expected one mode, not both or neither.\n"
-            "Fix: see nanounet/docs/steps/track.md"
+            "Fix: see segtrack/README.md"
         )
     if args.bl_mask and args.bl_mask_dir:
         raise SystemExit(
             "--bl-mask and --bl-mask-dir were both set.\n"
             "Expected one instance-mask input, or neither.\n"
-            "Fix: --bl-mask <file> in single mode, or --bl-mask-dir <folder> in folder mode  (see nanounet/docs/steps/track.md)"
+            "Fix: --bl-mask <file> in single mode, or --bl-mask-dir <folder> in folder mode  (see segtrack/README.md)"
         )
     if args.bl_mask and folder:
         raise SystemExit(
             "--bl-mask is single mode.\n"
             "Expected --bl-mask-dir with --bl-dir --fu-dir.\n"
-            "Fix: --bl-mask-dir /nnunet_data/Longitudinal-CT/targetsTrBL  (see nanounet/docs/steps/track.md)"
+            "Fix: --bl-mask-dir /nnunet_data/Longitudinal-CT/targetsTrBL  (see segtrack/README.md)"
         )
     if args.bl_mask_dir and not folder:
         raise SystemExit(
             "--bl-mask-dir is folder mode.\n"
             "Expected --bl-mask with --bl-img --fu-img --fu-clicks.\n"
-            "Fix: --bl-mask /nnunet_data/Longitudinal-CT/targetsTrBL/<stem>.nii.gz  (see nanounet/docs/steps/track.md)"
+            "Fix: --bl-mask /nnunet_data/Longitudinal-CT/targetsTrBL/<stem>.nii.gz  (see segtrack/README.md)"
         )
     if folder:
         cases, skipped, meta = _folder(args)
@@ -43,7 +43,7 @@ def collect_cases(args) -> tuple[list[SegTrackCase], bool, list[tuple[str, str]]
 
 def _folder(args) -> tuple[list[SegTrackCase], list[tuple[str, str]], tuple[Path | None, str]]:
     if not (args.bl_dir and args.fu_dir):
-        raise SystemExit("--bl-dir requires --fu-dir.\nExpected both folders.\nFix: see nanounet/docs/steps/track.md")
+        raise SystemExit("--bl-dir requires --fu-dir.\nExpected both folders.\nFix: see segtrack/README.md")
     if args.meta:
         raise SystemExit("--meta is for single mode.\nExpected --meta-dir in folder mode.\nFix: --meta-dir /path/to/meta")
     pids = patient_ids_from_csv(args.patients_csv) if args.patients_csv else None
@@ -75,36 +75,36 @@ def _folder(args) -> tuple[list[SegTrackCase], list[tuple[str, str]], tuple[Path
 
 def _single(args) -> tuple[list[SegTrackCase], tuple[Path | None, str]]:
     if args.meta_dir or args.patients_csv:
-        raise SystemExit("--meta-dir / --patients-csv are folder mode.\nExpected --meta for one case.\nFix: see nanounet/docs/steps/track.md")
+        raise SystemExit("--meta-dir / --patients-csv are folder mode.\nExpected --meta for one case.\nFix: see segtrack/README.md")
     types = Path(args.meta) if args.meta else None
     if types is not None and not types.is_file():
         raise SystemExit(
-            f"No types CSV at {types}.\nExpected lesion_id, lesion_type.\nFix: --meta <pid>.csv or omit it  (see nanounet/docs/steps/track.md)"
+            f"No types CSV at {types}.\nExpected lesion_id, lesion_type.\nFix: --meta <pid>.csv or omit it  (see segtrack/README.md)"
         )
     if args.bl_mask:
         if args.bl_clicks:
             raise SystemExit(
                 "--bl-clicks was set with --bl-mask.\n"
                 "Expected the baseline instance mask to supply ids; BL clicks are not used.\n"
-                "Fix: drop --bl-clicks  (see nanounet/docs/steps/track.md)"
+                "Fix: drop --bl-clicks  (see segtrack/README.md)"
             )
         if not all((args.bl_img, args.bl_mask, args.fu_img, args.fu_clicks)):
             raise SystemExit(
                 "Single mask mode needs --bl-img --bl-mask --fu-img --fu-clicks.\n"
-                "Expected four paths (no --bl-clicks).\nFix: see nanounet/docs/steps/track.md"
+                "Expected four paths (no --bl-clicks).\nFix: see segtrack/README.md"
             )
         if not Path(args.bl_mask).is_file():
             raise SystemExit(
                 f"No BL mask at {args.bl_mask}.\n"
                 "Expected a native baseline instance NIfTI or .mha (voxel = lesion_id).\n"
-                "Fix: --bl-mask /nnunet_data/Longitudinal-CT/targetsTrBL/<stem>.nii.gz  (see nanounet/docs/steps/track.md)"
+                "Fix: --bl-mask /nnunet_data/Longitudinal-CT/targetsTrBL/<stem>.nii.gz  (see segtrack/README.md)"
             )
         stem = Path(args.fu_img).name[:-7] if Path(args.fu_img).name.endswith(".nii.gz") else Path(args.fu_img).name
         cases = [SegTrackCase(stem, Path(args.bl_img), None, Path(args.fu_img), Path(args.fu_clicks), types, Path(args.bl_mask))]
     elif not all((args.bl_img, args.bl_clicks, args.fu_img, args.fu_clicks)):
         raise SystemExit(
             "Single mode needs --bl-img --bl-clicks --fu-img --fu-clicks.\n"
-            "Expected four paths.\nFix: see nanounet/docs/steps/track.md"
+            "Expected four paths.\nFix: see segtrack/README.md"
         )
     else:
         stem = Path(args.fu_img).name[:-7] if Path(args.fu_img).name.endswith(".nii.gz") else Path(args.fu_img).name

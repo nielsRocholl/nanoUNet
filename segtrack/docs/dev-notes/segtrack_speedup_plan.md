@@ -425,7 +425,7 @@ data:
 without materializing the full output. Feeds the FULL native input to grid_sample (so there is
 no missing-neighbor-at-crop-boundary risk) and only evaluates the AABB's output positions.
 grid_sample and interpolate share the align_corners=False pixel convention in PyTorch by
-design; see nanounet/docs/dev-notes/segtrack_speedup_plan.md Step B.1 for the numeric proof."""
+design; see segtrack/docs/dev-notes/segtrack_speedup_plan.md Step B.1 for the numeric proof."""
 
 from __future__ import annotations
 
@@ -612,7 +612,7 @@ directly instead. When `None` (unchanged default), `run_case` loads synchronousl
 does today — this keeps `run_case` usable standalone (tests, single-case CLI paths that don't go
 through the folder loop) without requiring a caller to prefetch.
 
-### C.2 — One-ahead prefetch in `nanounet/cli/segtrack.py`
+### C.2 — One-ahead prefetch in `segtrack/cli/run.py`
 
 In `main()`'s per-case loop, replace the plain `for i, case in enumerate(cases, 1):` body with a
 one-ahead prefetch using `ThreadPoolExecutor(max_workers=1)` (same pattern already used inside
