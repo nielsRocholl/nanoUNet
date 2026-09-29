@@ -58,7 +58,7 @@ Writes `$NANOUNET_RESULTS/segtrack/inputsTrFU/{stem}/` (folder) or `$NANOUNET_RE
 | `-o, --out` | path | `$NANOUNET_RESULTS/segtrack/...` | Parent (folder) or case dir (single) |
 | `-m, --model-dir` | path | `$NANOUNET_SEGTRACK_MODEL` env, else Dataset999 `h200_instance_1200ep` | Seg run dir (`plans.json` + ckpt) |
 | `--ckpt` | str | `last.ckpt` | Seg checkpoint name, tried as-is then `<model-dir>/`, `checkpoints/`, `finetune/` |
-| `--track-ckpt` | path | `$NANOUNET_SEGTRACK_TRACK` env, else `tracking.common.DEPLOYED_CKPT` (`v7_complete/last.ckpt`) | Matcher (EMA, hungarian, `dust_tau=0.125`). `drop_dp` ckpts skip `cog_propagated` |
+| `--track-ckpt` | path | `$NANOUNET_SEGTRACK_TRACK` env, else `lesionglue.common.DEPLOYED_CKPT` (`v7_complete/last.ckpt`) | Matcher (EMA, hungarian, `dust_tau=0.125`). `drop_dp` ckpts skip `cog_propagated` |
 | `--decode` | choice | `hungarian` | `hungarian` / `dense` / `sinkhorn` |
 | `--thresh` | float | `0.5` | Dense pair cutoff only |
 | `--device` | choice | `cuda` | `cuda` \| `cpu` \| `mps`; exits if unavailable (no silent fallback, unlike `nanounet_predict`) |

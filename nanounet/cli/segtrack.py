@@ -23,13 +23,13 @@ from nanounet.plan.plans import Plans
 
 def _require_tracking():
     try:
-        from tracking.decode import DECODE_CHOICES
-        from tracking.infer import load_matcher
+        from lesionglue.decode import DECODE_CHOICES
+        from lesionglue.infer import load_matcher
     except ImportError:
         raise SystemExit(
-            "tracking is not installed.\n"
-            "Expected the lesion-tracking package on PYTHONPATH.\n"
-            "Fix: pip install -e /lesion-tracking"
+            "lesionglue dependencies are not installed (torch-geometric).\n"
+            "Expected the lesionglue extra of this repo.\n"
+            'Fix: pip install -e ".[lesionglue]"'
         )
     return DECODE_CHOICES, load_matcher
 
@@ -43,7 +43,7 @@ def _mode(ap: argparse.ArgumentParser, choices: tuple[str, ...]) -> argparse.Nam
     ap.add_argument("-o", "--out", help="output dir: parent (folder mode) or case dir (single); default: <results-env>/segtrack/...")
     ap.add_argument("-m", "--model-dir", help="seg run dir with plans.json + checkpoint; default: SEGTRACK model env, else the built-in DEFAULT_MODEL")
     ap.add_argument("--ckpt", default="last.ckpt", help="seg checkpoint name, tried as-is then <model-dir>/, checkpoints/, finetune/")
-    ap.add_argument("--track-ckpt", help="matcher checkpoint path; default: SEGTRACK track env, else tracking.common.DEPLOYED_CKPT")
+    ap.add_argument("--track-ckpt", help="matcher checkpoint path; default: SEGTRACK track env, else lesionglue.common.DEPLOYED_CKPT")
     ap.add_argument("--decode", choices=choices, default="hungarian", help="match decode strategy: hungarian / dense / sinkhorn")
     ap.add_argument("--thresh", type=float, default=0.5, help="dense-decode pair probability cutoff only")
     ap.add_argument("--device", choices=("cuda", "cpu", "mps"), default="cuda", help="exits if unavailable (no silent fallback, unlike nanounet_predict)")
@@ -61,8 +61,8 @@ def _mode(ap: argparse.ArgumentParser, choices: tuple[str, ...]) -> argparse.Nam
 def main() -> None:
     quiet_lightning_runtime()
     choices, load_matcher = _require_tracking()
-    from tracking.common import DEPLOYED_CKPT, DEPLOYED_DUST_TAU
-    from tracking.infer import graph_cfg_from_ckpt
+    from lesionglue.common import DEPLOYED_CKPT, DEPLOYED_DUST_TAU
+    from lesionglue.infer import graph_cfg_from_ckpt
 
     args = _mode(argparse.ArgumentParser(), choices)
     cases, single, skipped, (meta_dir, meta_src) = collect_cases(args)
@@ -78,7 +78,7 @@ def main() -> None:
     if not track_ckpt.is_file():
         raise SystemExit(
             f"No checkpoint at {track_ckpt}.\n"
-            f"Expected a Lightning .ckpt from lesion_track_train.\n"
+            f"Expected a Lightning .ckpt from lesionglue_train.\n"
             f"Fix: --track-ckpt {DEPLOYED_CKPT}  (see docs/steps/track.md)"
         )
     d = args.device

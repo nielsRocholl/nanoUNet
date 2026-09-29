@@ -7,9 +7,9 @@ import torch.nn.functional as F
 from torch import nn
 from torch_geometric.data import Batch, HeteroData
 
-from tracking.decode import decode_sinkhorn_hungarian
-from tracking.matcher import MatcherOutput
-from tracking.train.sinkhorn import log_sinkhorn, superglue_marginals
+from lesionglue.decode import decode_sinkhorn_hungarian
+from lesionglue.matcher import MatcherOutput
+from lesionglue.train.sinkhorn import log_sinkhorn, superglue_marginals
 
 
 def focal_bce_with_logits(logits: torch.Tensor, target: torch.Tensor, alpha: float = 0.25, gamma: float = 2.0) -> torch.Tensor:

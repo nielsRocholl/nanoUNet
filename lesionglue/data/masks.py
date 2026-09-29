@@ -11,13 +11,13 @@ import numpy as np
 import torch
 from torch_geometric.data import HeteroData
 
-from tracking.common import LESION_TYPES
-from tracking.data.appearance import centroids, mask_stats_all
-from tracking.data.descriptor import descriptor_l0
-from tracking.data.features import pack_node
-from tracking.data.graph import GraphConfig
-from tracking.data.intra import refresh_edges
-from tracking.data.propagate import load_propagated, load_types
+from lesionglue.common import LESION_TYPES
+from lesionglue.data.appearance import centroids, mask_stats_all
+from lesionglue.data.descriptor import descriptor_l0
+from lesionglue.data.features import pack_node
+from lesionglue.data.graph import GraphConfig
+from lesionglue.data.intra import refresh_edges
+from lesionglue.data.propagate import load_propagated, load_types
 
 
 def _labels(mask: np.ndarray) -> list[int]:

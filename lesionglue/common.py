@@ -20,7 +20,7 @@ from rich.table import Table
 DATASET_ROOT = Path("/nnunet_data/Longitudinal-CT")
 CACHE_ROOT = Path("/nnunet_data/lesion_tracking/cache")
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SPLIT_PATH = REPO_ROOT / "configs" / "split.json"
+SPLIT_PATH = REPO_ROOT / "lesionglue" / "configs" / "split.json"
 HOLDOUT_CSV = DATASET_ROOT / "test_patients.csv"
 DEPLOYED_CKPT = Path("/nnunet_data/lesion_tracking/runs/v7_complete/last.ckpt")
 DEPLOYED_DUST_TAU = 0.125

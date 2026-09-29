@@ -7,8 +7,8 @@ import torch
 from torch_geometric.loader import DataLoader as PyGDataLoader
 from torchmetrics.classification import BinaryAUROC, BinaryAveragePrecision
 
-from tracking.common import CACHE_ROOT, DATASET_ROOT
-from tracking.data.dataset import LesionDataset
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT
+from lesionglue.data.dataset import LesionDataset
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

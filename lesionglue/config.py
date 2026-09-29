@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 
-from tracking.common import load_json
+from lesionglue.common import load_json
 
 CKPT_MONITOR = "val_match_score_ema"
 
@@ -58,13 +58,13 @@ def load_config(path: str | Path) -> Config:
     if cfg.intra not in ("knn", "complete"):
         raise ValueError(
             f"intra must be 'knn' or 'complete', got {cfg.intra!r}.\n"
-            f"Expected a key in configs/*.json.\n"
+            f"Expected a key in lesionglue/configs/*.json.\n"
             f'Fix: set "intra": "knn" or "intra": "complete"'
         )
     return cfg
 
 
 def dump_config(cfg: Config, path: str | Path) -> None:
-    from tracking.common import dump_json
+    from lesionglue.common import dump_json
 
     dump_json(path, asdict(cfg))

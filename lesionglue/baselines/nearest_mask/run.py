@@ -7,16 +7,16 @@ import sys
 from pathlib import Path
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from baselines.nearest_mask.baseline import PatientBaselineResult, run_patient
-from baselines.nearest_mask.io import (
+from lesionglue.baselines.nearest_mask.baseline import PatientBaselineResult, run_patient
+from lesionglue.baselines.nearest_mask.io import (
     load_split_ids,
     write_prediction_rows,
     write_summary_csv,
     write_summary_json,
 )
-from baselines.nearest_mask.metrics import summarize
+from lesionglue.baselines.nearest_mask.metrics import summarize
 
 
 def run_split(root: Path, split: str, pids: list[str], out_dir: Path, graph_compatible: bool) -> dict[str, object]:

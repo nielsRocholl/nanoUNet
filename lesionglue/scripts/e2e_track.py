@@ -13,12 +13,12 @@ from pathlib import Path
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
-from tracking.common import cprint, nano_header
-from tracking.data.instances import instances_from_nifti
-from tracking.data.meta import resolve_track_case
-from tracking.data.splits import load_tracking_split
-from tracking.infer import load_matcher, mask_has_lesions, track, write_match_csv
-import tracking.infer as infer_mod
+from lesionglue.common import cprint, nano_header
+from lesionglue.data.instances import instances_from_nifti
+from lesionglue.data.meta import resolve_track_case
+from lesionglue.data.splits import load_tracking_split
+from lesionglue.infer import load_matcher, mask_has_lesions, track, write_match_csv
+import lesionglue.infer as infer_mod
 
 
 def _convert(pred: Path, clicks: Path, out: Path) -> None:

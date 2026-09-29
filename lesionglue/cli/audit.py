@@ -2,7 +2,7 @@
 stratification by registration provenance. Read-only; trains nothing.
 
 Usage:
-    PYTHONPATH=. python3 tracking/cli/audit.py --root /nnunet_data/Longitudinal-CT \
+    PYTHONPATH=. python3 lesionglue/cli/audit.py --root /nnunet_data/Longitudinal-CT \
         --cache /nnunet_data/lesion_tracking/cache --split val --out runs/audit [--ckpt PATH]
 """
 
@@ -17,13 +17,13 @@ import pandas as pd
 import torch
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
-from tracking.common import dump_json, print0
-from tracking.data.dataset import LesionDataset
-from tracking.data.meta import LesionRow, V2Paths, load_split_json, parse_meta_csv
-from tracking.data.provenance import lesion_provenance
-from tracking.decode import decode_sinkhorn_hungarian
-from tracking.train.match_utils import split_per_graph
-from tracking.train.module import MatcherModule
+from lesionglue.common import dump_json, print0
+from lesionglue.data.dataset import LesionDataset
+from lesionglue.data.meta import LesionRow, V2Paths, load_split_json, parse_meta_csv
+from lesionglue.data.provenance import lesion_provenance
+from lesionglue.decode import decode_sinkhorn_hungarian
+from lesionglue.train.match_utils import split_per_graph
+from lesionglue.train.module import MatcherModule
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--root", default="/nnunet_data/Longitudinal-CT")

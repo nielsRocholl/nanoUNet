@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "mcp__wandb__list_entities_tool",
-      "mcp__wandb__query_wandb_entity_projects",
-      "Bash(./.venv/bin/python nanounet_seg_plots/make_seg_plots.py)"
-    ]
-  }
-}

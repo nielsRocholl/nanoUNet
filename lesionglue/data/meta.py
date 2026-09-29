@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from tracking.common import LESION_TYPES, load_json
+from lesionglue.common import LESION_TYPES, load_json
 
 _VALID_TOPO = frozenset({"UNCHANGED", "DISAPPEARED", "NEWLYAPPEARING", "MERGED", "SPLIT"})
 _ALIAS_TOPO = {"DISAPPEARING": "DISAPPEARED", "MERGING": "MERGED"}

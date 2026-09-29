@@ -14,13 +14,13 @@ from pathlib import Path
 
 import pytorch_lightning as pl
 
-from tracking.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_DUST_TAU, dump_json
-from tracking.config import load_config
-from tracking.bootstrap import match_score_from_counts
-from tracking.data.graph import graph_config
-from tracking.data.splits import fold_patient_sets
-from tracking.train.datamodule import MatcherDataModule
-from tracking.train.module import MatcherModule
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_DUST_TAU, dump_json
+from lesionglue.config import load_config
+from lesionglue.bootstrap import match_score_from_counts
+from lesionglue.data.graph import graph_config
+from lesionglue.data.splits import fold_patient_sets
+from lesionglue.train.datamodule import MatcherDataModule
+from lesionglue.train.module import MatcherModule
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

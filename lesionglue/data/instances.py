@@ -9,7 +9,7 @@ import cc3d
 import nibabel as nib
 import numpy as np
 
-from tracking.common import cprint
+from lesionglue.common import cprint
 
 
 def load_clicks(path: Path) -> dict[int, tuple[int, int, int]]:

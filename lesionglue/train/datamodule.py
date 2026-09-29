@@ -12,13 +12,13 @@ import numpy as np
 from pytorch_lightning import LightningDataModule
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
-from tracking.common import CACHE_ROOT, DATASET_ROOT, HOLDOUT_CSV
-from tracking.data.augment import drop_nodes, jitter_both
-from tracking.data.dataset import LesionDataset
-from tracking.data.features import CACHE_TAG
-from tracking.data.graph import GraphConfig
-from tracking.data.intra import refresh_edges
-from tracking.data.splits import fold_patient_sets, load_holdout, load_tracking_split
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, HOLDOUT_CSV
+from lesionglue.data.augment import drop_nodes, jitter_both
+from lesionglue.data.dataset import LesionDataset
+from lesionglue.data.features import CACHE_TAG
+from lesionglue.data.graph import GraphConfig
+from lesionglue.data.intra import refresh_edges
+from lesionglue.data.splits import fold_patient_sets, load_holdout, load_tracking_split
 
 
 class MatcherDataModule(LightningDataModule):
@@ -63,13 +63,13 @@ class MatcherDataModule(LightningDataModule):
             raise SystemExit(
                 f"{len(leak)} holdout ids in train/val: {sorted(leak)[:8]}...\n"
                 f"Expected train/val disjoint from {HOLDOUT_CSV}.\n"
-                f"Fix: python3 tracking/cli/split.py --root {self.dataset_root}"
+                f"Fix: python3 lesionglue/cli/split.py --root {self.dataset_root}"
             )
         if self.fold is None and set(map(str, sp["test"])) != holdout:
             raise SystemExit(
                 f"split.json test ({len(sp['test'])}) != {HOLDOUT_CSV} ({len(holdout)}).\n"
                 f"Expected the holdout CSV to be the only eval split.\n"
-                f"Fix: python3 tracking/cli/split.py --root {self.dataset_root}"
+                f"Fix: python3 lesionglue/cli/split.py --root {self.dataset_root}"
             )
         splits = ("train", "val")
         for spn in splits:
@@ -78,7 +78,7 @@ class MatcherDataModule(LightningDataModule):
                 raise FileNotFoundError(
                     f"No graph cache at {p}.\n"
                     f"Expected preprocess output tagged {CACHE_TAG}.\n"
-                    f"Fix: python3 tracking/cli/preprocess.py --split {spn} --jobs 16"
+                    f"Fix: python3 lesionglue/cli/preprocess.py --split {spn} --jobs 16"
                 )
 
     def setup(self, stage: str | None = None) -> None:

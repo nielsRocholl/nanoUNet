@@ -20,10 +20,10 @@ Limit: because a contributor holds at most 1/k, a k-way merge is only recoverabl
 Larger merges need relaxed column marginals (unbalanced OT or column capacity), in
 training and decode alike; that is not done here.
 
-Labels note: `tracking/data/graph.py::_positive_matrix` encodes SPLIT as a single
+Labels note: `lesionglue/data/graph.py::_positive_matrix` encodes SPLIT as a single
 (lesion_id, lesion_id) edge, so the current labels give every BL row at most one positive
 and only merges are many-to-one there. The threshold rule still emits one-to-many links
-if the model produces them, which are then scored as wrong rows by `tracking/report.py`.
+if the model produces them, which are then scored as wrong rows by `lesionglue/report.py`.
 `sinkhorn_loss` also targets only the first positive column per row; it would need to
 average over all positives (as its FU side already does) before splits are labelled that way.
 `tau` defaults to DEPLOYED_DUST_TAU, which was tuned for Hungarian, not for this rule.
@@ -39,8 +39,8 @@ from rich.prompt import Prompt
 from rich.table import Table
 from scipy.optimize import linear_sum_assignment
 
-from tracking.common import DEPLOYED_DUST_TAU, cprint
-from tracking.train.sinkhorn import log_sinkhorn, superglue_marginals
+from lesionglue.common import DEPLOYED_DUST_TAU, cprint
+from lesionglue.train.sinkhorn import log_sinkhorn, superglue_marginals
 
 DECODE_CHOICES = ("dense", "sinkhorn", "hungarian")
 DECODE_HELP = (
@@ -140,7 +140,7 @@ def resolve_decode(cli_value: str | None) -> str:
         raise SystemExit(
             "No --decode given and stdin is not a TTY.\n"
             "Expected one of: dense, sinkhorn, hungarian.\n"
-            "Fix: lesion_track ... --decode dense"
+            "Fix: lesionglue_track ... --decode dense"
         )
     t = Table(title="How should matches be decoded?", box=None, padding=(0, 2))
     t.add_column("choice", style="cyan")

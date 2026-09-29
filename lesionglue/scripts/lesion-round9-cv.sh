@@ -9,12 +9,12 @@
 #SBATCH --output=/data/oncology/experiments/universal-lesion-segmentation/logs/lesion_round9_%j.out
 #SBATCH --error=/data/oncology/experiments/universal-lesion-segmentation/logs/lesion_round9_%j.err
 #SBATCH --no-container-entrypoint
-#SBATCH --container-mounts=/data/oncology/experiments/universal-lesion-segmentation:/nnunet_data,/home/nielsrocholl/projects/git_projects/lesion-tracking:/home/nielsrocholl/projects/git_projects/lesion-tracking
+#SBATCH --container-mounts=/data/oncology/experiments/universal-lesion-segmentation:/nnunet_data,/home/nielsrocholl/projects/git_projects/nanoUNet:/home/nielsrocholl/projects/git_projects/nanoUNet
 #SBATCH --container-image="dockerdex.umcn.nl:5005/nielsrocholl/nnunet-v2-pro-sol-docker:latest"
 
 set -euo pipefail
 
-REPO=/home/nielsrocholl/projects/git_projects/lesion-tracking
+REPO=/home/nielsrocholl/projects/git_projects/nanoUNet
 cd "$REPO"
 
 export PYTHONPATH=.
@@ -23,13 +23,13 @@ export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 export RUNS=/nnunet_data/lesion_tracking/runs/round9
-export CONFIG=configs/base.json
+export CONFIG=lesionglue/configs/base.json
 export WANDB_PROJECT=lesion-tracking
 export PIP_CACHE_DIR=/root/.pip-cache
 mkdir -p "$RUNS" "$PIP_CACHE_DIR"
 
-pip3 install -r requirements.txt
+pip3 install -e ".[lesionglue]"
 python3 -c "import torch_geometric; print(f'torch_geometric {torch_geometric.__version__} OK')"
-python3 -c "import tracking.cli.train, tracking.cli.cv, tracking.report; print('imports OK')"
+python3 -c "import lesionglue.cli.train, lesionglue.cli.cv, lesionglue.report; print('imports OK')"
 
-bash scripts/round9.sh
+bash lesionglue/scripts/round9.sh

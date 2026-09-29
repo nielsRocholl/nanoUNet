@@ -1,4 +1,4 @@
-"""Cached-graph benchmark inference. Deployment: lesion_track (tracking/cli/track.py)."""
+"""Cached-graph benchmark inference. Deployment: lesionglue_track (lesionglue/cli/track.py)."""
 
 import argparse
 import csv
@@ -7,11 +7,11 @@ from pathlib import Path
 import torch
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
-from tracking.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, require_ckpt
-from tracking.data.dataset import LesionDataset
-from tracking.decode import decode_sinkhorn_hungarian
-from tracking.infer import graph_cfg_from_ckpt
-from tracking.train.module import MatcherModule
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, require_ckpt
+from lesionglue.data.dataset import LesionDataset
+from lesionglue.decode import decode_sinkhorn_hungarian
+from lesionglue.infer import graph_cfg_from_ckpt
+from lesionglue.train.module import MatcherModule
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

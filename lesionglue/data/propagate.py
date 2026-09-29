@@ -11,8 +11,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from tracking.common import LESION_TYPES
-from tracking.data.meta import parse_xyz
+from lesionglue.common import LESION_TYPES
+from lesionglue.data.meta import parse_xyz
 
 _SLIM = {"lesion_id", "z", "y", "x"}
 

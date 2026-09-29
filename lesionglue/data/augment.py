@@ -10,10 +10,10 @@ import numpy as np
 import torch
 from torch_geometric.data import HeteroData
 
-from tracking.common import PROP_SIGMA
-from tracking.data.graph import GraphConfig
-from tracking.data.intra import refresh_edges
-from tracking.data.pairs import dense_pair_index
+from lesionglue.common import PROP_SIGMA
+from lesionglue.data.graph import GraphConfig
+from lesionglue.data.intra import refresh_edges
+from lesionglue.data.pairs import dense_pair_index
 
 
 def drop_nodes(

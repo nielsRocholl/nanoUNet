@@ -1,6 +1,6 @@
 """Predict FU (and BL unless a GT instance mask is given) → linked tracking ids.
 
-Matcher defaults come from tracking.common (v7_complete, EMA, dust_tau=0.125).
+Matcher defaults come from lesionglue.common (v7_complete, EMA, dust_tau=0.125).
 Each CT is SimpleITK-read once; XYZ/RAS is reused by the matcher (no second load).
 """
 
@@ -61,11 +61,11 @@ def load_case_io(case: SegTrackCase):
 def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, dev, matcher,
              decode: str, overwrite: bool, keep_pred: bool, track_ckpt: Path, thresh: float,
              device: str, seg_kw: dict, on_step=None, preloaded: dict | None = None) -> dict:
-    from tracking.common import DEPLOYED_DUST_TAU
-    from tracking.data.instances import binary_to_instances, load_clicks
-    from tracking.data.paint import fu_track_map, paint_fu, write_empty_csv
-    from tracking.data.propagate import load_propagated
-    from tracking.infer import track, write_match_csv
+    from lesionglue.common import DEPLOYED_DUST_TAU
+    from lesionglue.data.instances import binary_to_instances, load_clicks
+    from lesionglue.data.paint import fu_track_map, paint_fu, write_empty_csv
+    from lesionglue.data.propagate import load_propagated
+    from lesionglue.infer import track, write_match_csv
 
     def step(s: str) -> None:
         if on_step:

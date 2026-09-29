@@ -5,9 +5,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from tracking.common import dump_json, nano_header, seed_all
-from tracking.config import CKPT_MONITOR, load_config
-from tracking.data.splits import aggregate_cv_folds
+from lesionglue.common import dump_json, nano_header, seed_all
+from lesionglue.config import CKPT_MONITOR, load_config
+from lesionglue.data.splits import aggregate_cv_folds
 
 
 def main() -> None:
@@ -20,7 +20,7 @@ def main() -> None:
     ap.add_argument("--wandb-project", default="lesion-tracking")
     ap.add_argument("--wandb-run-name", default="", type=str, help="suffix; fold index appended")
     args = ap.parse_args()
-    nano_header("lesion_track_cv")
+    nano_header("lesionglue_cv")
 
     cfg = load_config(args.config)
     end = cfg.n_folds if args.end_fold is None else args.end_fold

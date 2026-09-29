@@ -1,4 +1,4 @@
-"""Holdout seg + track metrics. Not wired into nanounet_predict / lesion_track.
+"""Holdout seg + track metrics. Not wired into nanounet_predict / lesionglue_track.
 
 Seg: volume Dice + per-lesion DSC / NSD / LDR (IoU>0.1) via nanounet.score.
 Track: same weighted match_score as training (0.5 unchanged, 0.25 disappeared,
@@ -15,10 +15,10 @@ from collections import defaultdict
 from pathlib import Path
 
 from nanounet.score import IOU_HIT, _agg, score_case, write
-from tracking.bootstrap import bootstrap_match_score
-from tracking.data.graph import _node_rows, _positive_matrix
-from tracking.data.meta import parse_meta_csv, resolve_track_case
-from tracking.data.splits import load_tracking_split
+from lesionglue.bootstrap import bootstrap_match_score
+from lesionglue.data.graph import _node_rows, _positive_matrix
+from lesionglue.data.meta import parse_meta_csv, resolve_track_case
+from lesionglue.data.splits import load_tracking_split
 
 
 def _stem(p: Path) -> str:

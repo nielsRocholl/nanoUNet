@@ -15,13 +15,13 @@ from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from torch_geometric.data import HeteroData, InMemoryDataset
 
-from tracking.common import DATASET_ROOT, print0
-from tracking.data import staging as stg
-from tracking.data.augment import drop_nodes, jitter_both
-from tracking.data.features import CACHE_TAG, DESC_DIM, FEAT_DIM, assert_graph_feat
-from tracking.data.graph import GraphConfig, build_hetero_data
-from tracking.data.intra import refresh_edges
-from tracking.data.splits import load_tracking_split
+from lesionglue.common import DATASET_ROOT, print0
+from lesionglue.data import staging as stg
+from lesionglue.data.augment import drop_nodes, jitter_both
+from lesionglue.data.features import CACHE_TAG, DESC_DIM, FEAT_DIM, assert_graph_feat
+from lesionglue.data.graph import GraphConfig, build_hetero_data
+from lesionglue.data.intra import refresh_edges
+from lesionglue.data.splits import load_tracking_split
 
 
 def _limit_threads() -> None:
@@ -88,9 +88,9 @@ class LesionDataset(InMemoryDataset):
         sp = load_tracking_split()
         if self.split not in sp:
             raise KeyError(
-                f"split {self.split!r} missing from tracking split.\n"
-                f"Expected keys train/val/test in {sp.keys() if isinstance(sp, dict) else 'configs/split.json'}.\n"
-                f"Fix: python3 tracking/cli/split.py --root /nnunet_data/Longitudinal-CT"
+                f"split {self.split!r} missing from the split file.\n"
+                f"Expected keys train/val/test in {sp.keys() if isinstance(sp, dict) else 'lesionglue/configs/split.json'}.\n"
+                f"Fix: python3 lesionglue/cli/split.py --root /nnunet_data/Longitudinal-CT"
             )
         pids = list(sp[self.split])
         root_s = str(self.dataset_root)

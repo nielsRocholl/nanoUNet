@@ -1,16 +1,16 @@
 # Nearest-Mask Distance Baseline
 
-This is an isolated raw-data baseline. It does not use cached PyG graphs, model checkpoints, or code under `tracking/cli`.
+This is an isolated raw-data baseline. It does not use cached PyG graphs, model checkpoints, or code under `lesionglue/cli`.
 
 For every eligible baseline lesion, it queries the nearest foreground voxel in the follow-up instance mask for the same `img_id_fu`. The predicted match is the instance label of that closest voxel. Multiple baseline lesions may choose the same follow-up lesion. The baseline predicts `-1` only when the matching follow-up mask volume has no candidate foreground instances.
 
 ## Usage
 
 ```bash
-.venv/bin/python baselines/nearest_mask/run.py \
+.venv/bin/python lesionglue/baselines/nearest_mask/run.py \
   --root "/Users/nielsrocholl/Documents/PhD DIAG - Local/Data/Datasets/Longitudinal_CT_v2" \
   --split val \
-  --out baselines/nearest_mask/outputs/val
+  --out lesionglue/baselines/nearest_mask/outputs/val
 ```
 
 Options:
@@ -42,16 +42,11 @@ Options:
 - `match_score`
 - distance summaries for correct and incorrect predictions
 
-## Tests
-
-```bash
-.venv/bin/python -m unittest discover -s baselines/nearest_mask/tests
-```
 
 Real-data smoke test:
 
 ```bash
-.venv/bin/python baselines/nearest_mask/run.py \
+.venv/bin/python lesionglue/baselines/nearest_mask/run.py \
   --root "/Users/nielsrocholl/Documents/PhD DIAG - Local/Data/Datasets/Longitudinal_CT_v2" \
   --split val \
   --limit 1 \

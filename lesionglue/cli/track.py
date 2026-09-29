@@ -16,12 +16,12 @@ from pathlib import Path
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from tracking.common import DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, cprint, config_table, nano_header, require_ckpt
-from tracking.data.instances import instances_from_nifti
-from tracking.data.meta import resolve_track_case
-from tracking.data.splits import load_holdout, load_tracking_split
-from tracking.decode import DECODE_CHOICES, DECODE_HELP
-from tracking.infer import graph_cfg_from_ckpt, load_matcher, mask_has_lesions, track, write_match_csv
+from lesionglue.common import DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, cprint, config_table, nano_header, require_ckpt
+from lesionglue.data.instances import instances_from_nifti
+from lesionglue.data.meta import resolve_track_case
+from lesionglue.data.splits import load_holdout, load_tracking_split
+from lesionglue.decode import DECODE_CHOICES, DECODE_HELP
+from lesionglue.infer import graph_cfg_from_ckpt, load_matcher, mask_has_lesions, track, write_match_csv
 
 _PROP_HELP = (
     "BL lesion_id → FU-frame centroid: meta CSV (cog_propagated), slim CSV (lesion_id,z,y,x), "
@@ -40,7 +40,7 @@ def _pids(split: str | None, patients_csv: str) -> list[str]:
     if bool(split) == bool(patients_csv):
         raise SystemExit(
             "Dataset mode needs exactly one of --split or --patients-csv.\n"
-            "Expected configs/split.json key or a CSV with a patient column.\n"
+            "Expected lesionglue/configs/split.json key or a CSV with a patient column.\n"
             "Fix: --split test   or   --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv"
         )
     if split:
@@ -80,7 +80,7 @@ def main() -> None:
     ap.add_argument("--prop-dir", default="")
     args = ap.parse_args()
 
-    nano_header("lesion_track")
+    nano_header("lesionglue_track")
     ckpt = require_ckpt(args.ckpt)
     decode = args.decode
     matcher = load_matcher(ckpt, args.device)
@@ -95,7 +95,7 @@ def main() -> None:
         raise SystemExit(
             f"Need either a single case ({geo}) or a dataset (--root).\n"
             "Expected one mode, not both or neither.\n"
-            "Fix: lesion_track --root /nnunet_data/Longitudinal-CT --split test --out /tmp/track_test"
+            "Fix: lesionglue_track --root /nnunet_data/Longitudinal-CT --split test --out /tmp/track_test"
         )
     if not root and (args.split is not None or args.patients_csv.strip()):
         raise SystemExit(
@@ -171,7 +171,7 @@ def main() -> None:
             n_ok += 1
             n_pairs += len(r.pairs)
             prog.advance(task)
-    t = Table(title="lesion_track", box=None, padding=(0, 2))
+    t = Table(title="lesionglue_track", box=None, padding=(0, 2))
     t.add_column("split", style="cyan")
     t.add_column("n", justify="right")
     t.add_row("ok", str(n_ok))

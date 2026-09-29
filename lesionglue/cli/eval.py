@@ -13,11 +13,11 @@ import pytorch_lightning as pl
 import torch
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
-from tracking.bootstrap import match_score_from_counts
-from tracking.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, cprint, dump_json, nano_header, require_ckpt
-from tracking.data.dataset import LesionDataset
-from tracking.infer import graph_cfg_from_ckpt
-from tracking.train.module import MatcherModule
+from lesionglue.bootstrap import match_score_from_counts
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, cprint, dump_json, nano_header, require_ckpt
+from lesionglue.data.dataset import LesionDataset
+from lesionglue.infer import graph_cfg_from_ckpt
+from lesionglue.train.module import MatcherModule
 
 DUST_GRID = (0.05, 0.075, 0.10, 0.125, 0.15, 0.18, 0.20, 0.22, 0.25)
 
@@ -56,7 +56,7 @@ def main() -> None:
     ap.add_argument("--no-ema", action="store_true")
     ap.add_argument("--out", default="", help="optional JSON path for counts + selected tau")
     args = ap.parse_args()
-    nano_header("lesion_track_eval")
+    nano_header("lesionglue_eval")
     ckpt = require_ckpt(args.ckpt)
 
     nw = max(0, args.num_workers)

@@ -5,10 +5,10 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from tracking.common import CACHE_ROOT, DATASET_ROOT, cprint, nano_header
-from tracking.data.dataset import LesionDataset
-from tracking.data.features import CACHE_TAG
-from tracking.data.graph import GraphConfig
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, cprint, nano_header
+from lesionglue.data.dataset import LesionDataset
+from lesionglue.data.features import CACHE_TAG
+from lesionglue.data.graph import GraphConfig
 
 SPLITS = ("train", "val", "test")
 
@@ -22,7 +22,7 @@ def main() -> None:
     ap.add_argument("--jobs", type=int, default=1, help="parallel patients (ProcessPool)")
     ap.add_argument("--resume", action="store_true")
     args = ap.parse_args()
-    nano_header("lesion_track_preprocess")
+    nano_header("lesionglue_preprocess")
 
     cache = Path(args.cache)
     cache.mkdir(parents=True, exist_ok=True)

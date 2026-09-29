@@ -1,4 +1,4 @@
-"""Write configs/split.json: train/val from official 240, test = test_patients.csv (60)."""
+"""Write lesionglue/configs/split.json: train/val from official 240, test = test_patients.csv (60)."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from pathlib import Path
 
 from rich.table import Table
 
-from tracking.common import DATASET_ROOT, HOLDOUT_CSV, SPLIT_PATH, cprint, dump_json, nano_header
-from tracking.data.splits import build_split
+from lesionglue.common import DATASET_ROOT, HOLDOUT_CSV, SPLIT_PATH, cprint, dump_json, nano_header
+from lesionglue.data.splits import build_split
 
 
 def main() -> None:
@@ -20,7 +20,7 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--val-fold", type=int, default=0)
     args = ap.parse_args()
-    nano_header("lesion_track_split")
+    nano_header("lesionglue_split")
     official = Path(args.root) / "data_split.json"
     if not official.is_file():
         raise SystemExit(

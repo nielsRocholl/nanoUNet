@@ -11,14 +11,14 @@ import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, TQDMProgressBar
 
-from tracking.common import CACHE_ROOT, DATASET_ROOT, print0, seed_all
-from tracking.config import CKPT_MONITOR, load_config
-from tracking.data.features import CACHE_TAG
-from tracking.data.graph import graph_config
-from tracking.decode import DECODE_CHOICES, DECODE_HELP
-from tracking.report import eval_baseline, eval_gnn
-from tracking.train.datamodule import MatcherDataModule
-from tracking.train.module import module_from_config
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, print0, seed_all
+from lesionglue.config import CKPT_MONITOR, load_config
+from lesionglue.data.features import CACHE_TAG
+from lesionglue.data.graph import graph_config
+from lesionglue.decode import DECODE_CHOICES, DECODE_HELP
+from lesionglue.report import eval_baseline, eval_gnn
+from lesionglue.train.datamodule import MatcherDataModule
+from lesionglue.train.module import module_from_config
 
 
 def _accelerator() -> str:

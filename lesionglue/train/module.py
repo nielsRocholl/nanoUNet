@@ -13,16 +13,16 @@ from torch.optim.swa_utils import AveragedModel
 from torch_geometric.data import Batch
 from torchmetrics.classification import BinaryAUROC, BinaryAveragePrecision
 
-from tracking.config import Config
-from tracking.matcher import Matcher, MatcherOutput, ModelConfig
-from tracking.train.match_utils import (
+from lesionglue.config import Config
+from lesionglue.matcher import Matcher, MatcherOutput, ModelConfig
+from lesionglue.train.match_utils import (
     focal_bce_with_logits,
     graph_val_counts,
     infonce_graphs,
     sinkhorn_edge_scores,
     split_per_graph,
 )
-from tracking.train.sinkhorn import sinkhorn_loss
+from lesionglue.train.sinkhorn import sinkhorn_loss
 
 PROJ_DIM = 64
 SWA_BAND = 0.01        # raw val_match_score within 1pp of the running max counts as "on the plateau"
@@ -84,7 +84,7 @@ class MatcherModule(pl.LightningModule):
             raise RuntimeError(
                 "EMA evaluation requested but this checkpoint has no ema_matcher.\n"
                 "Expected a Lightning ckpt trained with ema_decay>0.\n"
-                "Fix: lesion_track_eval --ckpt … --no-ema"
+                "Fix: lesionglue_eval --ckpt … --no-ema"
             )
         self._eval_use_ema = bool(use_ema)
 

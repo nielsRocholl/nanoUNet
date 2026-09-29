@@ -14,12 +14,12 @@ import numpy as np
 import torch
 from torch_geometric.data import Batch
 
-from tracking.common import DEPLOYED_DUST_TAU, eval_device, require_ckpt
-from tracking.data.graph import GraphConfig, _load_vol
-from tracking.data.masks import _labels, build_mask_graph
-from tracking.data.paint import fu_track_map
-from tracking.decode import DECODE_CHOICES, decode_pairs
-from tracking.train.module import MatcherModule
+from lesionglue.common import DEPLOYED_DUST_TAU, eval_device, require_ckpt
+from lesionglue.data.graph import GraphConfig, _load_vol
+from lesionglue.data.masks import _labels, build_mask_graph
+from lesionglue.data.paint import fu_track_map
+from lesionglue.decode import DECODE_CHOICES, decode_pairs
+from lesionglue.train.module import MatcherModule
 
 
 @dataclass

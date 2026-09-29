@@ -10,7 +10,7 @@ import dash_cytoscape as cyto
 import torch
 from dash import Input, Output, dcc, html
 
-from tracking.cli.qc_view import (
+from lesionglue.cli.qc_view import (
     _STYLE,
     format_detail,
     hetero_to_elements,
@@ -19,8 +19,8 @@ from tracking.cli.qc_view import (
     pick_hetero,
     tap_payload,
 )
-from tracking.common import CACHE_ROOT, DATASET_ROOT, print0
-from tracking.data.dataset import LesionDataset
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, print0
+from lesionglue.data.dataset import LesionDataset
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--case", required=True)

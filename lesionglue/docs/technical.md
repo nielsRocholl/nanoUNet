@@ -4,7 +4,7 @@ This document describes what the **implemented** code does: graph construction, 
 
 ## Deployed matcher
 
-Local checkpoint — do not download. Constants: `DEPLOYED_CKPT`, `DEPLOYED_DUST_TAU` in `tracking/common.py`.
+Local checkpoint — do not download. Constants: `DEPLOYED_CKPT`, `DEPLOYED_DUST_TAU` in `lesionglue/common.py`.
 
 | Knob | Value |
 |------|-------|
@@ -14,7 +14,7 @@ Local checkpoint — do not download. Constants: `DEPLOYED_CKPT`, `DEPLOYED_DUST
 | graph | `drop_dp=false`, `intra=complete`, `type_mask=false` |
 | holdout | cache_v7 test match **0.9701** (57 graphs) |
 
-`lesion_track` and `lesion_track_eval` use this unless `--ckpt` / `--decode` / `--sinkhorn-tau` / `--dust-tau` override. R13 extra-region retrain did not beat it (`0.9688`). `h60_r9/best.ckpt` was `0.9453`.
+`lesionglue_track` and `lesionglue_eval` use this unless `--ckpt` / `--decode` / `--sinkhorn-tau` / `--dust-tau` override. R13 extra-region retrain did not beat it (`0.9688`). `h60_r9/best.ckpt` was `0.9453`.
 
 ---
 
@@ -47,7 +47,7 @@ This is **not** a strict one-to-one assignment matrix. Many-to-one (merge) and o
 
 ---
 
-## Graph construction (`tracking/data/graph.py`)
+## Graph construction (`lesionglue/data/graph.py`)
 
 ### Node sets
 
@@ -92,7 +92,7 @@ The encoder (`matcher.NodeEncoder`) splits this tensor, applies `nn.Embedding` o
 
 ---
 
-## Model (`tracking/matcher.py`)
+## Model (`lesionglue/matcher.py`)
 
 **Architecture:**
 
@@ -110,7 +110,7 @@ The encoder (`matcher.NodeEncoder`) splits this tensor, applies `nn.Embedding` o
 
 ---
 
-## Training (`tracking/train/module.py`)
+## Training (`lesionglue/train/module.py`)
 
 **Loss:** dense pair BCE with train-split `pos_weight`, row-wise soft-target cross entropy over each baseline row plus a dustbin, and BCE for BL/FU no-match heads. Default weights: pair `1.0`, row `0.5`, no-match `0.2`. Stored in `{split}_v2_meta.pt`; `MatcherDataModule` reads **`train_v2_meta.pt`**.
 
@@ -125,13 +125,13 @@ The encoder (`matcher.NodeEncoder`) splits this tensor, applies `nn.Embedding` o
 
 ---
 
-## Caching (`tracking/data/dataset.py`)
+## Caching (`lesionglue/data/dataset.py`)
 
 `LesionDataset` subclasses `InMemoryDataset`. `process()` walks `data_split.json` for the requested split, builds a Python list of `HeteroData`, collates via PyG’s built-in `save`, and writes `processed/{split}.pt`. Preprocessing is intentionally **offline** so training I/O stays light.
 
 ---
 
-## Deployment inference (`lesion_track`)
+## Deployment inference (`lesionglue_track`)
 
 CSV-free path: CT + instance masks + (unless `drop_dp`) propagated BL centroids in the **FU voxel grid**. Graph layout matches training: L0 1387-D nodes, dense cross edges (`CROSS_DIM=27`), complete or kNN intra from ckpt hparams. EMA + hungarian + `dust_tau=0.125` unless overridden.
 
@@ -141,7 +141,7 @@ CSV-free path: CT + instance masks + (unless `drop_dp`) propagated BL centroids 
 
 ---
 
-## Inference CLI (`tracking/cli/predict.py`) — benchmark / evaluation only
+## Inference CLI (`lesionglue/cli/predict.py`) — benchmark / evaluation only
 
 Loads `MatcherModule` from checkpoint and runs forward on **`LesionDataset`** graphs (built by `preprocess.py`, which **parses CSV** for nodes, propagated centres, dense edge features, and labels). Output CSV: `bl_lesion_id`, `fu_lesion_id`, `prob`, `decoded`.
 
@@ -149,7 +149,7 @@ Loads `MatcherModule` from checkpoint and runs forward on **`LesionDataset`** gr
 
 ## Known limitations / sharp edges
 
-1. **`predict.py` is not the production path** — use `lesion_track`.
+1. **`predict.py` is not the production path** — use `lesionglue_track`.
 2. **Empty BL or FU side** skips that body-region graph (complete responders, missing `cog_propagated`).
 3. **Dropped baseline rows** without `cog_propagated`: label noise if annotations omit propagation but the lesion still exists — acceptable only if rare.
 4. **Class imbalance metrics:** AUROC can be unstable when a mini-batch has only negatives or only positives.

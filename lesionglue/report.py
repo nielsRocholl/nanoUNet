@@ -10,16 +10,16 @@ import torch
 from rich.progress import track
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
-from baselines.nearest_mask.baseline import NearestMaskIndex
-from baselines.nearest_mask.io import load_fu_mask
-from tracking.common import eval_device
-from tracking.data.dataset import LesionDataset
-from tracking.data.meta import V2Paths, parse_meta_csv
-from tracking.decode import DECODE_CHOICES, decode_pairs
-from tracking.infer import graph_cfg_from_ckpt
-from tracking.train.match_utils import split_per_graph
-from tracking.data.splits import aggregate_cv_folds, load_cv_summary
-from tracking.train.module import MatcherModule
+from lesionglue.baselines.nearest_mask.baseline import NearestMaskIndex
+from lesionglue.baselines.nearest_mask.io import load_fu_mask
+from lesionglue.common import eval_device
+from lesionglue.data.dataset import LesionDataset
+from lesionglue.data.meta import V2Paths, parse_meta_csv
+from lesionglue.decode import DECODE_CHOICES, decode_pairs
+from lesionglue.infer import graph_cfg_from_ckpt
+from lesionglue.train.match_utils import split_per_graph
+from lesionglue.data.splits import aggregate_cv_folds, load_cv_summary
+from lesionglue.train.module import MatcherModule
 
 __all__ = ["aggregate_cv_folds", "load_cv_summary", "eval_gnn", "eval_baseline"]
 

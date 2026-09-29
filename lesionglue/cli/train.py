@@ -10,11 +10,11 @@ import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
-from tracking.common import CACHE_ROOT, DATASET_ROOT, HOLDOUT_CSV, cprint, dump_json, nano_header, seed_all
-from tracking.config import CKPT_MONITOR, dump_config, load_config
-from tracking.data.graph import graph_config
-from tracking.train.datamodule import MatcherDataModule
-from tracking.train.module import module_from_config
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, HOLDOUT_CSV, cprint, dump_json, nano_header, seed_all
+from lesionglue.config import CKPT_MONITOR, dump_config, load_config
+from lesionglue.data.graph import graph_config
+from lesionglue.train.datamodule import MatcherDataModule
+from lesionglue.train.module import module_from_config
 
 
 def _accelerator() -> str:
@@ -23,7 +23,7 @@ def _accelerator() -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", required=True, help="JSON config (configs/base.json)")
+    ap.add_argument("--config", required=True, help="JSON config (lesionglue/configs/base.json)")
     ap.add_argument("--root", default=str(DATASET_ROOT))
     ap.add_argument("--cache", default=str(CACHE_ROOT))
     ap.add_argument("--out", default="lightning_logs")
@@ -35,7 +35,7 @@ def main() -> None:
     ap.add_argument("--wandb-project", default="lesion-tracking")
     ap.add_argument("--wandb-run-name", default="", type=str)
     args = ap.parse_args()
-    nano_header("lesion_track_train")
+    nano_header("lesionglue_train")
 
     cfg = load_config(args.config)
     if args.seed is not None:
@@ -123,7 +123,7 @@ def main() -> None:
             raise SystemExit(
                 f"No last.ckpt at {last} after no-val fit.\n"
                 f"Expected trainer.save_checkpoint to write the final weights.\n"
-                f"Fix: lesion_track_train --config configs/complete.json --out {out}"
+                f"Fix: lesionglue_train --config lesionglue/configs/complete.json --out {out}"
             )
         fold_metrics = {
             "fold": None, "val_disabled": True, "selector": "last", "best_ckpt": str(last),

@@ -2,7 +2,7 @@
 with a patient bootstrap CI.
 
 Layout expected: {runs}/fold_*/oof_<selector>/val_per_patient.json, one file per
-(fold, selector) pair, written by tracking/cli/oof.py. Each patient sits in the val side of
+(fold, selector) pair, written by lesionglue/cli/oof.py. Each patient sits in the val side of
 exactly one CV fold, so concatenating per-patient records across all folds gives one properly
 out-of-fold score per patient over the whole pool, per selector — see
 round12_measurement_features_data.md §3 (Stage B.2). --stratify-registration reruns the same
@@ -17,9 +17,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from tracking.common import DATASET_ROOT, dump_json, load_json
-from tracking.data.provenance import CLICKFIX_REL
-from tracking.bootstrap import bootstrap_match_score
+from lesionglue.common import DATASET_ROOT, dump_json, load_json
+from lesionglue.data.provenance import CLICKFIX_REL
+from lesionglue.bootstrap import bootstrap_match_score
 
 REG_TABLE_REL = "derivatives/registration_error_table.json"
 SUB_NAMES = ("uc", "dis", "new")

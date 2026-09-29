@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.ndimage import map_coordinates
 
-from tracking.data.features import DESC_DIM
+from lesionglue.data.features import DESC_DIM
 
 SCALES_L0_MM = (8.0, 20.0, 48.0, 128.0)
 GRID = 7

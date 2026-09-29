@@ -9,8 +9,8 @@ from pathlib import Path
 
 import numpy as np
 
-from tracking.common import HOLDOUT_CSV, SPLIT_PATH
-from tracking.data.meta import load_split_json
+from lesionglue.common import HOLDOUT_CSV, SPLIT_PATH
+from lesionglue.data.meta import load_split_json
 
 CV_METRICS = ("val_match_score_ema", "val_match_score_raw", "val_match_score_peak", "val_acc_unchanged_split", "val_acc_disappeared", "val_acc_newly_appearing")
 
@@ -57,9 +57,9 @@ def load_tracking_split(path: Path | str | None = None) -> dict:
     if not p.is_file():
         raise FileNotFoundError(
             f"No tracking split at {p}.\n"
-            f"Expected output of: python3 tracking/cli/split.py\n"
-            f"Fix: python3 tracking/cli/split.py --root /nnunet_data/Longitudinal-CT"
-            f" --holdout /nnunet_data/Longitudinal-CT/test_patients.csv --out configs/split.json"
+            f"Expected output of: python3 lesionglue/cli/split.py\n"
+            f"Fix: python3 lesionglue/cli/split.py --root /nnunet_data/Longitudinal-CT"
+            f" --holdout /nnunet_data/Longitudinal-CT/test_patients.csv --out lesionglue/configs/split.json"
         )
     return load_split_json(p)
 
