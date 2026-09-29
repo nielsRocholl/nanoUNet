@@ -62,9 +62,9 @@ def run_case(case: SegTrackCase, case_dir: Path, *, net, lm, cfg, pl, cm, dj, de
              decode: str, overwrite: bool, keep_pred: bool, track_ckpt: Path, thresh: float,
              device: str, seg_kw: dict, on_step=None, preloaded: dict | None = None) -> dict:
     from lesionglue.common import DEPLOYED_DUST_TAU
-    from lesionglue.data.instances import binary_to_instances, load_clicks
-    from lesionglue.data.paint import fu_track_map, paint_fu, write_empty_csv
-    from lesionglue.data.propagate import load_propagated
+    from lesionglue.data.instances.build import binary_to_instances, load_clicks
+    from lesionglue.data.instances.paint import fu_track_map, paint_fu, write_empty_csv
+    from lesionglue.data.source.propagate import load_propagated
     from lesionglue.infer import track, write_match_csv
 
     def step(s: str) -> None:

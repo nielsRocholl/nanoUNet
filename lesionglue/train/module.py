@@ -14,15 +14,15 @@ from torch_geometric.data import Batch
 from torchmetrics.classification import BinaryAUROC, BinaryAveragePrecision
 
 from lesionglue.config import Config
-from lesionglue.matcher import Matcher, MatcherOutput, ModelConfig
-from lesionglue.train.match_utils import (
+from lesionglue.model.matcher import Matcher, MatcherOutput, ModelConfig
+from lesionglue.train.objective import (
     focal_bce_with_logits,
     graph_val_counts,
     infonce_graphs,
     sinkhorn_edge_scores,
     split_per_graph,
 )
-from lesionglue.train.sinkhorn import sinkhorn_loss
+from lesionglue.model.sinkhorn import sinkhorn_loss
 
 PROJ_DIM = 64
 SWA_BAND = 0.01        # raw val_match_score within 1pp of the running max counts as "on the plateau"

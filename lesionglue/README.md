@@ -124,7 +124,7 @@ lesionglue_track \
 
 ## CLI reference
 
-After `pip install -e .`, commands are `lesionglue_*`. Decode defaults to hungarian (the holdout gate). `--decode dense` and `--decode sinkhorn` keep merges/splits (sinkhorn up to about `1/--sinkhorn-tau` lesions per merge; see `lesionglue/decode.py`). `lesionglue/cli/report.py --decode` scores any of the three.
+After `pip install -e .`, commands are `lesionglue_*`. Decode defaults to hungarian (the holdout gate). `--decode dense` and `--decode sinkhorn` keep merges/splits (sinkhorn up to about `1/--sinkhorn-tau` lesions per merge; see `lesionglue/model/decode.py`). `lesionglue/cli/report.py --decode` scores any of the three.
 
 ### `lesionglue_track`
 

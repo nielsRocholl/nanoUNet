@@ -47,7 +47,7 @@ This is **not** a strict one-to-one assignment matrix. Many-to-one (merge) and o
 
 ---
 
-## Graph construction (`lesionglue/data/graph.py`)
+## Graph construction (`lesionglue/data/graph/dense.py`)
 
 ### Node sets
 
@@ -92,7 +92,7 @@ The encoder (`matcher.NodeEncoder`) splits this tensor, applies `nn.Embedding` o
 
 ---
 
-## Model (`lesionglue/matcher.py`)
+## Model (`lesionglue/model/matcher.py`)
 
 **Architecture:**
 
@@ -125,7 +125,7 @@ The encoder (`matcher.NodeEncoder`) splits this tensor, applies `nn.Embedding` o
 
 ---
 
-## Caching (`lesionglue/data/dataset.py`)
+## Caching (`lesionglue/data/cache/dataset.py`)
 
 `LesionDataset` subclasses `InMemoryDataset`. `process()` walks `data_split.json` for the requested split, builds a Python list of `HeteroData`, collates via PyG’s built-in `save`, and writes `processed/{split}.pt`. Preprocessing is intentionally **offline** so training I/O stays light.
 

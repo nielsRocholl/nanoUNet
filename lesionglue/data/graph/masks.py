@@ -12,12 +12,12 @@ import torch
 from torch_geometric.data import HeteroData
 
 from lesionglue.common import LESION_TYPES
-from lesionglue.data.appearance import centroids, mask_stats_all
-from lesionglue.data.descriptor import descriptor_l0
-from lesionglue.data.features import pack_node
-from lesionglue.data.graph import GraphConfig
-from lesionglue.data.intra import refresh_edges
-from lesionglue.data.propagate import load_propagated, load_types
+from lesionglue.data.features.appearance import centroids, mask_stats_all
+from lesionglue.data.features.descriptor import descriptor_l0
+from lesionglue.data.features.layout import pack_node
+from lesionglue.data.graph.dense import GraphConfig
+from lesionglue.data.graph.intra import refresh_edges
+from lesionglue.data.source.propagate import load_propagated, load_types
 
 
 def _labels(mask: np.ndarray) -> list[int]:

@@ -14,9 +14,9 @@ from pathlib import Path
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 from lesionglue.common import cprint, nano_header
-from lesionglue.data.instances import instances_from_nifti
-from lesionglue.data.meta import resolve_track_case
-from lesionglue.data.splits import load_tracking_split
+from lesionglue.data.instances.build import instances_from_nifti
+from lesionglue.data.source.meta import resolve_track_case
+from lesionglue.data.source.splits import load_tracking_split
 from lesionglue.infer import load_matcher, mask_has_lesions, track, write_match_csv
 import lesionglue.infer as infer_mod
 

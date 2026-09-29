@@ -6,9 +6,9 @@ import argparse
 from pathlib import Path
 
 from lesionglue.common import CACHE_ROOT, DATASET_ROOT, cprint, nano_header
-from lesionglue.data.dataset import LesionDataset
-from lesionglue.data.features import CACHE_TAG
-from lesionglue.data.graph import GraphConfig
+from lesionglue.data.cache.dataset import LesionDataset
+from lesionglue.data.features.layout import CACHE_TAG
+from lesionglue.data.graph.dense import GraphConfig
 
 SPLITS = ("train", "val", "test")
 

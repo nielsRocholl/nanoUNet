@@ -10,9 +10,9 @@ from __future__ import annotations
 import torch
 from torch_geometric.data import HeteroData
 
-from lesionglue.data.features import DESC_DIM, STAT_DIM, feat_layout
-from lesionglue.data.graph import GraphConfig
-from lesionglue.data.pairs import cross_attr, dense_pair_index, reverse_cross_attr
+from lesionglue.data.features.layout import DESC_DIM, STAT_DIM, feat_layout
+from lesionglue.data.graph.dense import GraphConfig
+from lesionglue.data.graph.pairs import cross_attr, dense_pair_index, reverse_cross_attr
 
 LT_IDX = DESC_DIM + STAT_DIM
 

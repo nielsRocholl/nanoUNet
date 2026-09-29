@@ -18,11 +18,11 @@ import torch
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
 from lesionglue.common import dump_json, print0
-from lesionglue.data.dataset import LesionDataset
-from lesionglue.data.meta import LesionRow, V2Paths, load_split_json, parse_meta_csv
-from lesionglue.data.provenance import lesion_provenance
-from lesionglue.decode import decode_sinkhorn_hungarian
-from lesionglue.train.match_utils import split_per_graph
+from lesionglue.data.cache.dataset import LesionDataset
+from lesionglue.data.source.meta import LesionRow, V2Paths, load_split_json, parse_meta_csv
+from lesionglue.data.source.provenance import lesion_provenance
+from lesionglue.model.decode import decode_sinkhorn_hungarian
+from lesionglue.train.objective import split_per_graph
 from lesionglue.train.module import MatcherModule
 
 ap = argparse.ArgumentParser()

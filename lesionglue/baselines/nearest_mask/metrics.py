@@ -8,7 +8,7 @@ from statistics import mean, median
 import numpy as np
 
 from lesionglue.baselines.nearest_mask.baseline import LINKABLE_TOPOLOGIES, PredictionRow
-from lesionglue.data.meta import LesionRow
+from lesionglue.data.source.meta import LesionRow
 
 
 def _safe_div(num: int, den: int) -> float | None:

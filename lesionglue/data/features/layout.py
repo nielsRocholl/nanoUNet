@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from lesionglue.data.appearance import MaskFeats
+from lesionglue.data.features.appearance import MaskFeats
 
 DESC_DIM = 1372
 STAT_DIM = 14
@@ -17,7 +17,7 @@ def feat_layout() -> tuple[int, int, int, int, int]:
 
 
 def assert_graph_feat(g) -> None:
-    from lesionglue.data.pairs import CROSS_DIM
+    from lesionglue.data.graph.pairs import CROSS_DIM
 
     n_bl = g["bl"].num_nodes
     assert getattr(g, "feat_mode", "l0") == "l0"

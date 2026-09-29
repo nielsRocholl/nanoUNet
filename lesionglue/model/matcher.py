@@ -10,9 +10,9 @@ from torch import nn
 from torch_geometric.data import HeteroData
 from torch_geometric.nn import HeteroConv, TransformerConv
 
-from lesionglue.data.features import DESC_DIM, STAT_DIM
-from lesionglue.data.pairs import CROSS_DIM
-from lesionglue.matchability import RowMatchability, row_dust_marginals
+from lesionglue.data.features.layout import DESC_DIM, STAT_DIM
+from lesionglue.data.graph.pairs import CROSS_DIM
+from lesionglue.model.matchability import RowMatchability, row_dust_marginals
 
 
 @dataclass

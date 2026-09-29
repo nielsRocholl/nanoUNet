@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from lesionglue.train.sinkhorn import log_sinkhorn, superglue_marginals
+from lesionglue.model.sinkhorn import log_sinkhorn, superglue_marginals
 
 
 def row_dust_marginals(

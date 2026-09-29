@@ -12,7 +12,7 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
 from lesionglue.common import CACHE_ROOT, DATASET_ROOT, HOLDOUT_CSV, cprint, dump_json, nano_header, seed_all
 from lesionglue.config import CKPT_MONITOR, dump_config, load_config
-from lesionglue.data.graph import graph_config
+from lesionglue.data.graph.dense import graph_config
 from lesionglue.train.datamodule import MatcherDataModule
 from lesionglue.train.module import module_from_config
 

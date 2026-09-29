@@ -15,7 +15,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 from lesionglue.baselines.nearest_mask.io import load_fu_mask
-from lesionglue.data.meta import LesionRow, V2Paths, parse_meta_csv
+from lesionglue.data.source.meta import LesionRow, V2Paths, parse_meta_csv
 
 BASELINE_TOPOLOGIES = frozenset({"UNCHANGED", "DISAPPEARED", "MERGED", "SPLIT"})
 LINKABLE_TOPOLOGIES = frozenset({"UNCHANGED", "MERGED", "SPLIT"})

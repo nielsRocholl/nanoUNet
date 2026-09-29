@@ -13,10 +13,10 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, TQDMProg
 
 from lesionglue.common import CACHE_ROOT, DATASET_ROOT, print0, seed_all
 from lesionglue.config import CKPT_MONITOR, load_config
-from lesionglue.data.features import CACHE_TAG
-from lesionglue.data.graph import graph_config
-from lesionglue.decode import DECODE_CHOICES, DECODE_HELP
-from lesionglue.report import eval_baseline, eval_gnn
+from lesionglue.data.features.layout import CACHE_TAG
+from lesionglue.data.graph.dense import graph_config
+from lesionglue.model.decode import DECODE_CHOICES, DECODE_HELP
+from lesionglue.eval.report import eval_baseline, eval_gnn
 from lesionglue.train.datamodule import MatcherDataModule
 from lesionglue.train.module import module_from_config
 

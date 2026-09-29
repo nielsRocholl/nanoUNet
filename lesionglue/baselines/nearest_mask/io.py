@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Iterable
 import nibabel as nib
 import numpy as np
 
-from lesionglue.data.meta import load_split_json
+from lesionglue.data.source.meta import load_split_json
 
 if TYPE_CHECKING:
     from lesionglue.baselines.nearest_mask.baseline import PredictionRow

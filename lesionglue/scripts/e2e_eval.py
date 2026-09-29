@@ -15,10 +15,10 @@ from collections import defaultdict
 from pathlib import Path
 
 from nanounet.score import IOU_HIT, _agg, score_case, write
-from lesionglue.bootstrap import bootstrap_match_score
-from lesionglue.data.graph import _node_rows, _positive_matrix
-from lesionglue.data.meta import parse_meta_csv, resolve_track_case
-from lesionglue.data.splits import load_tracking_split
+from lesionglue.eval.bootstrap import bootstrap_match_score
+from lesionglue.data.graph.dense import _node_rows, _positive_matrix
+from lesionglue.data.source.meta import parse_meta_csv, resolve_track_case
+from lesionglue.data.source.splits import load_tracking_split
 
 
 def _stem(p: Path) -> str:

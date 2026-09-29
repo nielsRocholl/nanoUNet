@@ -16,12 +16,12 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from torch_geometric.data import HeteroData, InMemoryDataset
 
 from lesionglue.common import DATASET_ROOT, print0
-from lesionglue.data import staging as stg
-from lesionglue.data.augment import drop_nodes, jitter_both
-from lesionglue.data.features import CACHE_TAG, DESC_DIM, FEAT_DIM, assert_graph_feat
-from lesionglue.data.graph import GraphConfig, build_hetero_data
-from lesionglue.data.intra import refresh_edges
-from lesionglue.data.splits import load_tracking_split
+from lesionglue.data.cache import staging as stg
+from lesionglue.data.graph.augment import drop_nodes, jitter_both
+from lesionglue.data.features.layout import CACHE_TAG, DESC_DIM, FEAT_DIM, assert_graph_feat
+from lesionglue.data.graph.dense import GraphConfig, build_hetero_data
+from lesionglue.data.graph.intra import refresh_edges
+from lesionglue.data.source.splits import load_tracking_split
 
 
 def _limit_threads() -> None:

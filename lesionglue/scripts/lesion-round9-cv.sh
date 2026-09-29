@@ -30,6 +30,6 @@ mkdir -p "$RUNS" "$PIP_CACHE_DIR"
 
 pip3 install -e ".[lesionglue]"
 python3 -c "import torch_geometric; print(f'torch_geometric {torch_geometric.__version__} OK')"
-python3 -c "import lesionglue.cli.train, lesionglue.cli.cv, lesionglue.report; print('imports OK')"
+python3 -c "import lesionglue.cli.train, lesionglue.cli.cv, lesionglue.eval.report; print('imports OK')"
 
 bash lesionglue/scripts/round9.sh

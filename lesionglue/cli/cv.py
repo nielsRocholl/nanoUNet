@@ -7,7 +7,7 @@ from pathlib import Path
 
 from lesionglue.common import dump_json, nano_header, seed_all
 from lesionglue.config import CKPT_MONITOR, load_config
-from lesionglue.data.splits import aggregate_cv_folds
+from lesionglue.data.source.splits import aggregate_cv_folds
 
 
 def main() -> None:

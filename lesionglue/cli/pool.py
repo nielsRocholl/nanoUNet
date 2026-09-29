@@ -18,8 +18,8 @@ from pathlib import Path
 import pandas as pd
 
 from lesionglue.common import DATASET_ROOT, dump_json, load_json
-from lesionglue.data.provenance import CLICKFIX_REL
-from lesionglue.bootstrap import bootstrap_match_score
+from lesionglue.data.source.provenance import CLICKFIX_REL
+from lesionglue.eval.bootstrap import bootstrap_match_score
 
 REG_TABLE_REL = "derivatives/registration_error_table.json"
 SUB_NAMES = ("uc", "dis", "new")

@@ -8,7 +8,7 @@ from pathlib import Path
 from rich.table import Table
 
 from lesionglue.common import DATASET_ROOT, HOLDOUT_CSV, SPLIT_PATH, cprint, dump_json, nano_header
-from lesionglue.data.splits import build_split
+from lesionglue.data.source.splits import build_split
 
 
 def main() -> None:

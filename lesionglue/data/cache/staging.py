@@ -10,7 +10,7 @@ from pathlib import Path
 import torch
 from torch_geometric.data import HeteroData
 
-from lesionglue.data.features import CACHE_TAG
+from lesionglue.data.features.layout import CACHE_TAG
 
 
 def dir(processed_dir: Path, split: str) -> Path:

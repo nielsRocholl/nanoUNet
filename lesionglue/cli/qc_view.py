@@ -8,8 +8,8 @@ from dash import html
 from torch_geometric.data import HeteroData
 
 from lesionglue.common import LESION_TYPES
-from lesionglue.data.dataset import LesionDataset
-from lesionglue.data.features import FEAT_DIM, feat_layout
+from lesionglue.data.cache.dataset import LesionDataset
+from lesionglue.data.features.layout import FEAT_DIM, feat_layout
 
 _UI_FG = "#e6edf3"
 _UI_FG_DIM = "#b7c0ca"

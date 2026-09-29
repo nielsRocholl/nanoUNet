@@ -17,10 +17,10 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from lesionglue.common import DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, cprint, config_table, nano_header, require_ckpt
-from lesionglue.data.instances import instances_from_nifti
-from lesionglue.data.meta import resolve_track_case
-from lesionglue.data.splits import load_holdout, load_tracking_split
-from lesionglue.decode import DECODE_CHOICES, DECODE_HELP
+from lesionglue.data.instances.build import instances_from_nifti
+from lesionglue.data.source.meta import resolve_track_case
+from lesionglue.data.source.splits import load_holdout, load_tracking_split
+from lesionglue.model.decode import DECODE_CHOICES, DECODE_HELP
 from lesionglue.infer import graph_cfg_from_ckpt, load_matcher, mask_has_lesions, track, write_match_csv
 
 _PROP_HELP = (

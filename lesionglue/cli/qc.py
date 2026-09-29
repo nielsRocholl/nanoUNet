@@ -20,7 +20,7 @@ from lesionglue.cli.qc_view import (
     tap_payload,
 )
 from lesionglue.common import CACHE_ROOT, DATASET_ROOT, print0
-from lesionglue.data.dataset import LesionDataset
+from lesionglue.data.cache.dataset import LesionDataset
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--case", required=True)

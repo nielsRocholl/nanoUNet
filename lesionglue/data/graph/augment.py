@@ -11,9 +11,9 @@ import torch
 from torch_geometric.data import HeteroData
 
 from lesionglue.common import PROP_SIGMA
-from lesionglue.data.graph import GraphConfig
-from lesionglue.data.intra import refresh_edges
-from lesionglue.data.pairs import dense_pair_index
+from lesionglue.data.graph.dense import GraphConfig
+from lesionglue.data.graph.intra import refresh_edges
+from lesionglue.data.graph.pairs import dense_pair_index
 
 
 def drop_nodes(

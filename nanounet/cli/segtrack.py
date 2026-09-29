@@ -23,7 +23,7 @@ from nanounet.plan.plans import Plans
 
 def _require_tracking():
     try:
-        from lesionglue.decode import DECODE_CHOICES
+        from lesionglue.model.decode import DECODE_CHOICES
         from lesionglue.infer import load_matcher
     except ImportError:
         raise SystemExit(

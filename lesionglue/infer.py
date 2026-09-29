@@ -15,10 +15,10 @@ import torch
 from torch_geometric.data import Batch
 
 from lesionglue.common import DEPLOYED_DUST_TAU, eval_device, require_ckpt
-from lesionglue.data.graph import GraphConfig, _load_vol
-from lesionglue.data.masks import _labels, build_mask_graph
-from lesionglue.data.paint import fu_track_map
-from lesionglue.decode import DECODE_CHOICES, decode_pairs
+from lesionglue.data.graph.dense import GraphConfig, _load_vol
+from lesionglue.data.graph.masks import _labels, build_mask_graph
+from lesionglue.data.instances.paint import fu_track_map
+from lesionglue.model.decode import DECODE_CHOICES, decode_pairs
 from lesionglue.train.module import MatcherModule
 
 

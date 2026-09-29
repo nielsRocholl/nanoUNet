@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from lesionglue.common import LESION_TYPES
-from lesionglue.data.meta import parse_xyz
+from lesionglue.data.source.meta import parse_xyz
 
 _SLIM = {"lesion_id", "z", "y", "x"}
 

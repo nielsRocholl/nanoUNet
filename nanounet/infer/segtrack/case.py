@@ -133,7 +133,7 @@ def load_instance_zyx(path: Path) -> tuple[np.ndarray, dict]:
 
 def load_ct(path: Path):
     """One SimpleITK read: (C,Z,Y,X) for preprocess + XYZ/RAS for the matcher."""
-    from lesionglue.data.graph import vol_from_zyx
+    from lesionglue.data.graph.dense import vol_from_zyx
 
     data, props = SimpleITKIO().read_images((str(path),))
     return data, props, vol_from_zyx(data[0], props["sitk_stuff"])

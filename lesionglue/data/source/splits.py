@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from lesionglue.common import HOLDOUT_CSV, SPLIT_PATH
-from lesionglue.data.meta import load_split_json
+from lesionglue.data.source.meta import load_split_json
 
 CV_METRICS = ("val_match_score_ema", "val_match_score_raw", "val_match_score_peak", "val_acc_unchanged_split", "val_acc_disappeared", "val_acc_newly_appearing")
 

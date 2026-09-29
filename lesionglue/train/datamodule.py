@@ -13,12 +13,12 @@ from pytorch_lightning import LightningDataModule
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
 from lesionglue.common import CACHE_ROOT, DATASET_ROOT, HOLDOUT_CSV
-from lesionglue.data.augment import drop_nodes, jitter_both
-from lesionglue.data.dataset import LesionDataset
-from lesionglue.data.features import CACHE_TAG
-from lesionglue.data.graph import GraphConfig
-from lesionglue.data.intra import refresh_edges
-from lesionglue.data.splits import fold_patient_sets, load_holdout, load_tracking_split
+from lesionglue.data.graph.augment import drop_nodes, jitter_both
+from lesionglue.data.cache.dataset import LesionDataset
+from lesionglue.data.features.layout import CACHE_TAG
+from lesionglue.data.graph.dense import GraphConfig
+from lesionglue.data.graph.intra import refresh_edges
+from lesionglue.data.source.splits import fold_patient_sets, load_holdout, load_tracking_split
 
 
 class MatcherDataModule(LightningDataModule):

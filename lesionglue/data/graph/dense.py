@@ -15,10 +15,10 @@ import torch
 from torch_geometric.data import HeteroData
 
 from lesionglue.common import LESION_TYPES, print0
-from lesionglue.data.appearance import mask_stats_all
-from lesionglue.data.descriptor import descriptor_l0
-from lesionglue.data.features import pack_node
-from lesionglue.data.meta import LesionRow, V2Paths, parse_meta_csv
+from lesionglue.data.features.appearance import mask_stats_all
+from lesionglue.data.features.descriptor import descriptor_l0
+from lesionglue.data.features.layout import pack_node
+from lesionglue.data.source.meta import LesionRow, V2Paths, parse_meta_csv
 
 
 @dataclass
@@ -93,7 +93,7 @@ def _node_rows(rows: list[LesionRow], pid: str) -> tuple[dict[int, LesionRow], d
 
 
 def _one_region(pid: str, vp: V2Paths, rows: list[LesionRow], fu_id: int, cfg: GraphConfig) -> HeteroData | None:
-    from lesionglue.data.intra import refresh_edges
+    from lesionglue.data.graph.intra import refresh_edges
 
     bl_rep, fu_rep = _node_rows(rows, pid)
     bl_ids, fu_ids = sorted(bl_rep), sorted(fu_rep)

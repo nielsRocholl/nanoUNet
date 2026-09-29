@@ -20,10 +20,10 @@ Limit: because a contributor holds at most 1/k, a k-way merge is only recoverabl
 Larger merges need relaxed column marginals (unbalanced OT or column capacity), in
 training and decode alike; that is not done here.
 
-Labels note: `lesionglue/data/graph.py::_positive_matrix` encodes SPLIT as a single
+Labels note: `lesionglue/data/graph/dense.py::_positive_matrix` encodes SPLIT as a single
 (lesion_id, lesion_id) edge, so the current labels give every BL row at most one positive
 and only merges are many-to-one there. The threshold rule still emits one-to-many links
-if the model produces them, which are then scored as wrong rows by `lesionglue/report.py`.
+if the model produces them, which are then scored as wrong rows by `lesionglue/eval/report.py`.
 `sinkhorn_loss` also targets only the first positive column per row; it would need to
 average over all positives (as its FU side already does) before splits are labelled that way.
 `tau` defaults to DEPLOYED_DUST_TAU, which was tuned for Hungarian, not for this rule.
@@ -40,7 +40,7 @@ from rich.table import Table
 from scipy.optimize import linear_sum_assignment
 
 from lesionglue.common import DEPLOYED_DUST_TAU, cprint
-from lesionglue.train.sinkhorn import log_sinkhorn, superglue_marginals
+from lesionglue.model.sinkhorn import log_sinkhorn, superglue_marginals
 
 DECODE_CHOICES = ("dense", "sinkhorn", "hungarian")
 DECODE_HELP = (

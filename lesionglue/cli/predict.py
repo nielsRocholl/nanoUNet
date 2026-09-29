@@ -8,8 +8,8 @@ import torch
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
 from lesionglue.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, require_ckpt
-from lesionglue.data.dataset import LesionDataset
-from lesionglue.decode import decode_sinkhorn_hungarian
+from lesionglue.data.cache.dataset import LesionDataset
+from lesionglue.model.decode import decode_sinkhorn_hungarian
 from lesionglue.infer import graph_cfg_from_ckpt
 from lesionglue.train.module import MatcherModule
 

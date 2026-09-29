@@ -16,9 +16,9 @@ import pytorch_lightning as pl
 
 from lesionglue.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_DUST_TAU, dump_json
 from lesionglue.config import load_config
-from lesionglue.bootstrap import match_score_from_counts
-from lesionglue.data.graph import graph_config
-from lesionglue.data.splits import fold_patient_sets
+from lesionglue.eval.bootstrap import match_score_from_counts
+from lesionglue.data.graph.dense import graph_config
+from lesionglue.data.source.splits import fold_patient_sets
 from lesionglue.train.datamodule import MatcherDataModule
 from lesionglue.train.module import MatcherModule
 
