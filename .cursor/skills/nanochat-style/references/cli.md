@@ -1,12 +1,12 @@
 # CLI, output, errors: for humans and agents
 
-Load this when touching `nanounet/cli/`, any terminal output, or any error message. Rule IDs refer to SKILL.md.
+Load this when touching any `<project>/cli/`, any terminal output, or any error message. Rule IDs refer to SKILL.md.
 
-Two audiences, one command. **Humans** read rich output on **stderr**: the `Console(stderr=True)` in `common.py`.
+Two audiences, one command. **Humans** read rich output on **stderr**: the one `Console(stderr=True)` in `core/ui.py`, shared by every project.
 **Agents and scripts** read **stdout** and the exit code. Rich is on stderr, so stdout stays clean for machines.
 Keep it that way.
 
-## Helpers that already exist (`nanounet/common.py`): use them, don't reinvent
+## Helpers that already exist (`core/ui.py`, plus env helpers in `nanounet/common.py`): use them, don't reinvent
 
 | Helper | Use |
 |---|---|
@@ -20,7 +20,7 @@ Keep it that way.
 | `quiet_lightning_runtime()` | Silences Lightning/torch banners and warnings (U5) |
 | `raw_dir()` / `preprocessed_dir()` / `results_dir()` | Env-derived roots. They raise with a `Fix:` when the env var is unset. |
 
-If you need a new shared output helper (a summary block, a JSON emitter), add it to `common.py`, keep it
+If you need a new shared output helper (a summary block, a JSON emitter), add it to `core/ui.py`, keep it
 under 15 lines, and use it from ≥2 commands in the same change.
 
 ## Command anatomy (R13)
@@ -36,7 +36,7 @@ def main() -> None:
         for c in cases:
             ...; advance()
     cprint(f"[green]done[/green] {len(cases)} cases → {out}  ({time.perf_counter() - t0:.1f}s)")
-    cprint(f"next: nanounet_segtrack -d {args.dataset_id} ...")           # U2: literal, copy-pasteable
+    cprint(f"next: segtrack_run -m $NANOUNET_RESULTS/nanounet/<run> ...")           # U2: literal, copy-pasteable
     if args.json:                                                          # U9: last stdout line
         print(json.dumps({"status": "ok", "outputs": [out], "n_cases": len(cases), "seconds": round(time.perf_counter() - t0, 1)}))
 ```
@@ -67,7 +67,7 @@ User boundaries are CLI args, config files, files on disk, env vars, and hardwar
 raise SystemExit(
     f"No preprocessing plan at {plan_path}.\n"                                   # what is wrong (exact value, quoted)
     f"Expected output of the plan step for dataset {dataset_id}.\n"               # what was expected / where we looked
-    f"Fix: nanounet_preprocess -d {dataset_id}   (see docs/steps/preprocess.md)"  # literal command + doc
+    f"Fix: nanounet_preprocess -d {dataset_id}   (see nanounet/docs/steps/preprocess.md)"  # literal command + doc
 )
 ```
 
