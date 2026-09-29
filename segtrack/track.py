@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
-from nanounet.common import cprint
+from core.ui import cprint
 from nanounet.data.store.io import SimpleITKIO
 from nanounet.infer.export.volume import native_seg_from_logits
 from nanounet.infer.predict.case import MAX_BORDER_EXTRA, predict_case_logits

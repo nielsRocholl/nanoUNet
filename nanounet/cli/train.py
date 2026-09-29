@@ -13,16 +13,8 @@ import os
 from batchgenerators.utilities.file_and_folder_operations import join, maybe_mkdir_p
 
 from nanounet.cli.train_parser import build_train_parser, train_config_rows, validate_train_args
-from nanounet.common import (
-    cprint,
-    config_table,
-    nano_header,
-    preprocessed_dir,
-    quiet_lightning_runtime,
-    raw_dir,
-    results_dir,
-    setup_logging,
-)
+from core.ui import cprint, config_table, nano_header
+from nanounet.common import preprocessed_dir, quiet_lightning_runtime, raw_dir, results_dir, setup_logging
 from nanounet.diag import set_mem_diag
 from nanounet.runtime import assert_mem_diag_cgroup, runtime_banner
 

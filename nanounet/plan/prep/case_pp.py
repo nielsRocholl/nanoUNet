@@ -7,7 +7,7 @@ from typing import List, Tuple, Union
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import load_json as bg_load_json
 
-from nanounet.common import cprint
+from core.ui import cprint
 from nanounet.data.volume.crop import crop_to_nonzero
 from nanounet.data.store.io import reader_writer_class_from_dataset
 from nanounet.data.volume.normalization import normalization_class_from_plan_name

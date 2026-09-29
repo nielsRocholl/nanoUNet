@@ -9,7 +9,8 @@ from typing import Optional, Tuple
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import isfile, join, load_json, maybe_mkdir_p, save_json
 
-from nanounet.common import ANISO_THRESHOLD, cprint, preprocessed_dir, raw_dir
+from core.ui import cprint
+from nanounet.common import ANISO_THRESHOLD, preprocessed_dir, raw_dir
 from nanounet.data.store.io import reader_writer_class_from_dataset
 from nanounet.data.volume.normalization import normalization_class_for_channel
 from nanounet.data.volume.resampling import compute_new_shape

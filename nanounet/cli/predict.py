@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 import torch
 from batchgenerators.utilities.file_and_folder_operations import join, load_json, maybe_mkdir_p
 
-from nanounet.common import config_table, cprint, nano_header
+from core.ui import config_table, cprint, nano_header
 from nanounet.config import load_config
 from nanounet.infer.predict.case import MAX_BORDER_EXTRA, predict_case_logits
 from nanounet.infer.predict.tta import cat_status

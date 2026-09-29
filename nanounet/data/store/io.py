@@ -9,7 +9,7 @@ import numpy as np
 import pydoc
 import SimpleITK as sitk
 
-from nanounet.common import cprint
+from core.ui import cprint
 
 _SUPPORTED = (".nii.gz", ".nrrd", ".mha", ".gipl")
 

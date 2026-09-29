@@ -15,7 +15,8 @@ import numpy as np
 import torch
 from batchgenerators.utilities.file_and_folder_operations import join
 
-from nanounet.common import cprint, nano_header, nano_progress, preprocessed_dir, resolve_user_config_path
+from core.ui import cprint, nano_header, nano_progress
+from nanounet.common import preprocessed_dir, resolve_user_config_path
 from nanounet.config import load_config
 from nanounet.data.store.blosc2_dataset import Blosc2Folder
 from nanounet.data.valset.manifest import SCENARIOS, SCHEMA_VERSION, SMALL_LESION_MAX_VOX, sidecar_path, config_stamp

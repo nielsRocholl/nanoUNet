@@ -14,7 +14,8 @@ from collections import Counter
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import isfile, join
 
-from nanounet.common import cprint, nano_header, nano_progress, preprocessed_dir
+from core.ui import cprint, nano_header, nano_progress
+from nanounet.common import preprocessed_dir
 from nanounet.data.store.blosc2_dataset import Blosc2Folder, case_spatial_shape, load_case_properties
 from nanounet.plan.dataset.ids import convert_id_to_dataset_name
 from nanounet.plan.dataset.lesion_types import (

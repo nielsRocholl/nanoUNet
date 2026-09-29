@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from nanounet.common import cprint
+from core.ui import cprint
 from nanounet.diag import cgroup_scope, log_snapshot, mem_diag_enabled, purge_torch_tmp, tmp_fs_type
 
 

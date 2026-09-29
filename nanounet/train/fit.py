@@ -10,7 +10,7 @@ from batchgenerators.utilities.file_and_folder_operations import join, maybe_mkd
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from nanounet.common import cprint
+from core.ui import cprint
 from nanounet.diag import log_snapshot, mem_diag_enabled
 from nanounet.lightning_ckpt import (
     pl_ckpt_assert_epochs_match,

@@ -1,4 +1,4 @@
-"""Dataset/cache paths, Rich rank-0 UI, seed, JSON I/O.
+"""Dataset/cache paths, rank-0 gate over core.ui (DataLoader workers stay silent), seed, JSON I/O.
 
 Deployed matcher: v7_complete last.ckpt, EMA, hungarian, dust_tau=0.125.
 """
@@ -13,9 +13,8 @@ from typing import Any
 
 import numpy as np
 import torch
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
+
+from core import ui
 
 DATASET_ROOT = Path("/nnunet_data/Longitudinal-CT")
 CACHE_ROOT = Path("/nnunet_data/lesion_tracking/cache")
@@ -24,8 +23,6 @@ SPLIT_PATH = REPO_ROOT / "lesionglue" / "configs" / "split.json"
 HOLDOUT_CSV = DATASET_ROOT / "test_patients.csv"
 DEPLOYED_CKPT = Path("/nnunet_data/lesion_tracking/runs/v7_complete/last.ckpt")
 DEPLOYED_DUST_TAU = 0.125
-
-_CONSOLE = Console(stderr=True)
 
 LESION_TYPES = (
     "Adrenals",
@@ -52,7 +49,7 @@ def _rank0() -> bool:
 
 def cprint(msg: object, **kw: Any) -> None:
     if _rank0():
-        _CONSOLE.print(msg, **kw)
+        ui.cprint(msg, **kw)
 
 
 print0 = cprint
@@ -60,19 +57,12 @@ print0 = cprint
 
 def nano_header(title: str, color: str = "cyan") -> None:
     if _rank0():
-        _CONSOLE.print(Panel(f"[bold {color}]{title}[/bold {color}]", border_style=color))
+        ui.nano_header(title, color)
 
 
 def config_table(rows: list[tuple[str, object, str]], title: str = "config") -> None:
-    if not _rank0():
-        return
-    t = Table(title=title, box=None, padding=(0, 2))
-    t.add_column("argument", style="cyan")
-    t.add_column("value")
-    t.add_column("source", style="dim")
-    for name, value, source in rows:
-        t.add_row(str(name), str(value), source)
-    _CONSOLE.print(t)
+    if _rank0():
+        ui.config_table(rows, title)
 
 
 def seed_all(s: int) -> None:

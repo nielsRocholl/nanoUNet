@@ -14,7 +14,7 @@ import SimpleITK as sitk
 from rich.panel import Panel
 from scipy.ndimage import binary_erosion, distance_transform_edt
 
-from nanounet.common import cprint
+from core.ui import cprint
 
 IOU_HIT = 0.1
 NSD_TOL_MM = 1.0

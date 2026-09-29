@@ -13,7 +13,7 @@ from pathlib import Path
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
-from lesionglue.common import cprint, nano_header
+from core.ui import cprint, nano_header
 from lesionglue.data.instances.build import instances_from_nifti
 from lesionglue.data.source.meta import resolve_track_case
 from lesionglue.data.source.splits import load_tracking_split

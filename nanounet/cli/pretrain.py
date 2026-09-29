@@ -14,14 +14,8 @@ import shutil
 
 from batchgenerators.utilities.file_and_folder_operations import join, maybe_mkdir_p
 
-from nanounet.common import (
-    cprint,
-    nano_header,
-    preprocessed_dir,
-    quiet_lightning_runtime,
-    raw_dir,
-    results_dir,
-)
+from core.ui import cprint, nano_header
+from nanounet.common import preprocessed_dir, quiet_lightning_runtime, raw_dir, results_dir
 
 quiet_lightning_runtime()
 

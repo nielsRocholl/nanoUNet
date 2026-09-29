@@ -1,4 +1,4 @@
-"""NANOUNET_* path env, Rich UI (`cprint`, headers, `config_table`, progress), logging.
+"""NANOUNET_* path env, --config resolution, logging. Terminal UI lives in core/ui.py (shared by all projects).
 
 `quiet_lightning_runtime`: call once before importing pytorch_lightning — warning filters,
 rank_zero_info shim (litlogger noise), CUDA matmul precision high.
@@ -10,18 +10,8 @@ import logging
 import os
 import sys
 from pathlib import Path
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
-from typing import Any
-
-from rich.align import Align
-from rich.console import Console
-from rich.panel import Panel
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
-from rich.rule import Rule
 
 _LOG = logging.getLogger("nanounet")
-_CONSOLE = Console(stderr=True)
 
 _LIGHTNING_QUIET = False
 
@@ -109,59 +99,6 @@ def preprocessed_dir() -> str:
 
 def results_dir() -> str:
     return _env_path("NANOUNET_RESULTS")
-
-
-def cprint(msg: str, **kw: Any) -> None:
-    _CONSOLE.print(msg, **kw)
-
-
-def nano_rule() -> None:
-    _CONSOLE.print(Rule(style="dim"))
-
-
-def nano_header(title: str, color: str = "cyan") -> None:
-    _CONSOLE.print(Panel(f"[bold {color}]{title}[/bold {color}]", border_style=color))
-
-
-def nano_banner(title: str, subtitle: str, color: str = "cyan") -> None:
-    body = Align.center(f"[bold {color}]{title}[/bold {color}]\n[dim]{subtitle}[/dim]")
-    _CONSOLE.print(Panel(body, border_style=color, padding=(1, 4)))
-
-
-def console() -> Console:
-    return _CONSOLE
-
-
-def config_table(rows: list[tuple[str, Any, str]], title: str = "config") -> None:
-    """Render resolved config as a rich Table: (argument, value, source: cli/config/default)."""
-    from rich.table import Table
-
-    t = Table(title=title, box=None, padding=(0, 2))
-    t.add_column("argument", style="cyan")
-    t.add_column("value")
-    t.add_column("source", style="dim")
-    for name, value, source in rows:
-        t.add_row(str(name), str(value), source)
-    _CONSOLE.print(t)
-
-
-@contextmanager
-def nano_progress(total: int, desc: str) -> Iterator[Callable[[int], None]]:
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TextColumn("{task.completed}/{task.total}"),
-        TimeElapsedColumn(),
-        console=_CONSOLE,
-        transient=True,
-    ) as prog:
-        tid = prog.add_task(desc, total=total)
-
-        def advance(n: int = 1) -> None:
-            prog.advance(tid, n)
-
-        yield advance
 
 
 def setup_logging() -> None:

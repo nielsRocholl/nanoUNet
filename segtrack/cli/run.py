@@ -11,7 +11,8 @@ from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
-from nanounet.common import config_table, console, cprint, nano_banner, quiet_lightning_runtime
+from core.ui import config_table, console, cprint, nano_banner
+from nanounet.common import quiet_lightning_runtime
 from nanounet.config import load_config
 from nanounet.data.volume.resampling import set_resample_device
 from segtrack.cases import collect_cases

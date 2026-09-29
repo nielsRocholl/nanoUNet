@@ -11,7 +11,8 @@ from batchgenerators.utilities.file_and_folder_operations import join
 from batchgeneratorsv2.transforms.base.basic_transform import BasicTransform
 from torch.utils.data import DataLoader, IterableDataset
 
-from nanounet.common import preprocessed_dir, cprint
+from core.ui import cprint
+from nanounet.common import preprocessed_dir
 from nanounet.data.loader.prefs import DataloaderBucket, build_iter_dataloader, init_dataloader_ipc
 from nanounet.data.store.blosc2_dataset import Blosc2Folder, case_spatial_shape
 from nanounet.diag import (

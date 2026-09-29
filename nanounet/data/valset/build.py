@@ -15,7 +15,7 @@ from acvl_utils.cropping_and_padding.bounding_boxes import crop_and_pad_nd
 
 from rich.table import Table
 
-from nanounet.common import cprint
+from core.ui import cprint
 from nanounet.data.store.blosc2_dataset import case_spatial_shape, load_case_properties
 from nanounet.data.patch.error_table import draw_propagated_offset
 from nanounet.data.patch.bbox import _sample_bbox

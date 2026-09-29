@@ -15,7 +15,8 @@ from collections import Counter
 from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from rich.table import Table
 
-from nanounet.common import cprint, nano_header, preprocessed_dir, raw_dir
+from core.ui import cprint, nano_header
+from nanounet.common import preprocessed_dir, raw_dir
 from nanounet.data.store.blosc2_dataset import Blosc2Folder
 from nanounet.plan.dataset.ids import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
