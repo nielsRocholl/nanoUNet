@@ -1,0 +1,30 @@
+{
+  "split": "val",
+  "n_patients": 30,
+  "class_balance": {
+    "UNCHANGED": 200,
+    "DISAPPEARED": 97,
+    "NEWLYAPPEARING": 19,
+    "MERGED": 8
+  },
+  "n_split_native": 0,
+  "imputation": {
+    "bl_rate": 0.05864197530864197,
+    "bl_n": 324,
+    "bl_n_imputed": 19,
+    "fu_rate": 0.2950310559006211,
+    "fu_n": 322,
+    "fu_n_imputed": 95,
+    "n_sanity_bad_patients": 1
+  },
+  "volume_bl_quartiles": {
+    "0.25": 124.85245513916016,
+    "0.5": 406.1638641357422,
+    "0.75": 1649.921875
+  },
+  "volume_fu_quartiles": {
+    "0.25": 0.0,
+    "0.5": 284.3031530772705,
+    "0.75": 2524.0315132141113
+  }
+}

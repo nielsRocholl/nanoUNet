@@ -1,0 +1,32 @@
+[project]
+name = "lesion-tracking"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "nibabel>=5.0",
+    "SimpleITK>=2.2.1",
+    "scipy>=1.10",
+    "torch>=2.1",
+    "torch-geometric>=2.5",
+    "pytorch-lightning>=2.1",
+    "torchmetrics>=1.3",
+    "rich>=13.0",
+    "connected-components-3d>=3.12",
+]
+
+[project.scripts]
+lesion_track = "tracking.cli.track:main"
+lesion_track_split = "tracking.cli.split:main"
+lesion_track_preprocess = "tracking.cli.preprocess:main"
+lesion_track_train = "tracking.cli.train:main"
+lesion_track_eval = "tracking.cli.eval:main"
+
+[build-system]
+requires = ["setuptools>=67.8.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tracking*"]
