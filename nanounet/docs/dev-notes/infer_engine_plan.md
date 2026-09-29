@@ -142,15 +142,15 @@ Default TTA stays **on** (`disable_tta_default: false`) until gate G4 says other
 | `nanounet/infer/predict_patch.py` | Keep signature | Still one centered forward. Docstring: large lesions → `predict_case_logits` + expand. Radiom changes later |
 | `nanounet/cli/predict.py` | Edit | `--border-expand` **default on** (`store_false` via `--no-border-expand`). Drop `--merge`. Wire `tile_step_size` from config |
 | `nanounet/cli/predict_preprocessed.py` | Same flag defaults | Still `longi=True`; same engine |
-| `docs/steps/predict.md` | Same change | Args table, recommended command without `--border-expand` (it is default) |
-| `docs/dev-notes/radiom_embed_api.md` | Note | `predict_patch_logits` unchanged; full-case expand is `predict_case_logits` |
+| `nanounet/docs/steps/predict.md` | Same change | Args table, recommended command without `--border-expand` (it is default) |
+| `nanounet/docs/dev-notes/radiom_embed_api.md` | Note | `predict_patch_logits` unchanged; full-case expand is `predict_case_logits` |
 
 **Note (2026-09-23):** the rows above are historical — this plan's file-map items were implemented
 (`border_expand.py`/`gaussian.py` deleted, `predict_case.py`/`tta.py` rewritten). A later,
 separate longitudinal-pipeline removal has since gone further than this plan called for:
 `nanounet/infer/longi_row.py` → renamed to `nanounet/infer/inference_row.py`;
 `nanounet/infer/predict_patch.py` and `nanounet/cli/predict_preprocessed.py` were deleted outright
-(not just kept/edited as this row said); `docs/dev-notes/radiom_embed_api.md` no longer documents
+(not just kept/edited as this row said); `nanounet/docs/dev-notes/radiom_embed_api.md` no longer documents
 `predict_patch_logits` (see that file's own note).
 
 Do **not** add `infer/grid.py`. `infer/` is already over the ~6-file guideline; we delete two files.
@@ -180,7 +180,7 @@ longer applies — `nanounet_predict` (this section's command) is the only predi
 
 ## 6. Verification gates (real data, in this order)
 
-Eval set: `inputsTrFU` + `targetsTrFU`, binary GT = `(label > 0)`, clicks = sibling JSON. Probe script is temporary (`scripts/_probe_infer.py`), delete after (R16). Checkpoint: instance-1200ep `last.ckpt`; if the job is mid-run that is still the right weights. Report **n_forwards, wall s, binary Dice**.
+Eval set: `inputsTrFU` + `targetsTrFU`, binary GT = `(label > 0)`, clicks = sibling JSON. Probe script is temporary (`nanounet/scripts/_probe_infer.py`), delete after (R16). Checkpoint: instance-1200ep `last.ckpt`; if the job is mid-run that is still the right weights. Report **n_forwards, wall s, binary Dice**.
 
 | Gate | What | Pass |
 |------|------|------|
@@ -202,6 +202,6 @@ No sliding window (`tile_step_size` = grid stride). No second predictor class. N
 
 ## 8. Order
 
-1. Fused TTA (`tta.py`). 2. Grid + `predict_case.py` + prompt rule; delete `border_expand.py` / `gaussian.py` / centre fallback. 3. CLI defaults + `docs/steps/predict.md`. 4. Gates G0–G6; lock stride + TTA from numbers. 5. `wc -l` < 200; `graphify update .`
+1. Fused TTA (`tta.py`). 2. Grid + `predict_case.py` + prompt rule; delete `border_expand.py` / `gaussian.py` / centre fallback. 3. CLI defaults + `nanounet/docs/steps/predict.md`. 4. Gates G0–G6; lock stride + TTA from numbers. 5. `wc -l` < 200; `graphify update .`
 
 If `predict_case.py` blows 200: extract accumulate/merge into `roi_slices.py`, not a new file.

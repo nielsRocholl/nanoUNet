@@ -74,7 +74,7 @@ def resolve_user_config_path(path_str: str) -> str:
             raise FileNotFoundError(
                 f"Config file not found: {path_str}\n"
                 f"Looked as absolute, then under cwd and the nanoUNet repo root.\n"
-                f"Fix: pass --config configs/default.json (or an absolute path). See docs/reference/config.md"
+                f"Fix: pass --config nanounet/configs/default.json (or an absolute path). See nanounet/docs/reference/config.md"
             )
         return str(p.resolve())
     for base in (Path.cwd(), _REPO_ROOT):
@@ -84,7 +84,7 @@ def resolve_user_config_path(path_str: str) -> str:
     raise FileNotFoundError(
         f"Config file not found: {path_str}\n"
         f"Looked as absolute, then under cwd and the nanoUNet repo root.\n"
-        f"Fix: pass --config configs/default.json (or an absolute path). See docs/reference/config.md"
+        f"Fix: pass --config nanounet/configs/default.json (or an absolute path). See nanounet/docs/reference/config.md"
     )
 
 
@@ -94,7 +94,7 @@ def _env_path(name: str) -> str:
         raise EnvironmentError(
             f"Required environment variable {name} is not set.\n"
             f"nanoUNet resolves dataset paths from {name}.\n"
-            f"Fix: export {name}=/path/to/{name.replace('NANOUNET_','').lower()}   (see docs/index.md)"
+            f"Fix: export {name}=/path/to/{name.replace('NANOUNET_','').lower()}   (see nanounet/docs/index.md)"
         )
     return d
 

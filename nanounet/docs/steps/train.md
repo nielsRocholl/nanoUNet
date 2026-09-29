@@ -7,19 +7,19 @@ Default run dir: `$NANOUNET_RESULTS/nanounet/<DatasetFolder>_<plans>_f<fold>/`.
 ## Command
 
 ```bash
-nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/default.json
+nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config nanounet/configs/default.json
 ```
 
 Integrated MAE then supervised:
 
 ```bash
-nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/default.json \
+nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config nanounet/configs/default.json \
   --mae-pretrain --dl-persistent-workers
 ```
 
 Reuse an existing self-supervised checkpoint instead of rerunning MAE (`--mae-ckpt` alone, no
 `--mae-pretrain`, skips the MAE stage entirely — see
-[`scripts/slurm_nanounet_pretrain_train_999.sh`](../../scripts/slurm_nanounet_pretrain_train_999.sh)):
+[`nanounet/scripts/slurm_nanounet_pretrain_train_999.sh`](../../scripts/slurm_nanounet_pretrain_train_999.sh)):
 
 ```bash
 nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv \
@@ -34,7 +34,7 @@ nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv \
 | `-d`, `--dataset_id` | int | (required) | Dataset id (`DatasetXXX_*` under raw/preprocessed) |
 | `-f`, `--fold` | int \| `all` | `0` | Fold 0–4, or `all` for full-data (val = train, in-sample metrics) |
 | `--plans` | str | (required) | Plans basename without `.json` |
-| `--config` | str | `configs/default.json` | ROI / prompt JSON; relative path tries cwd then repo root |
+| `--config` | str | `nanounet/configs/default.json` | ROI / prompt JSON; relative path tries cwd then repo root |
 | `--val-manifest` | str | none | Fixed validation manifest from `nanounet_build_valset`; omit for legacy per-epoch random val sampling. See [valset.md](valset.md) |
 | `--val-every-n-epochs` | int | 1 | Validate every N epochs. With a fixed `--val-manifest` the per-epoch resampling noise is gone, so `2` costs ~3% of run time instead of ~18% and still gives 600 points over 1200 epochs |
 | `--epochs` | int | `1000` | Supervised epoch budget |

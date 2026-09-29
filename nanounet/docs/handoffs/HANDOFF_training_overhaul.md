@@ -1,7 +1,7 @@
 # Handoff — Single-Stage Stratified Training Overhaul
 
 Date: 2026-08-05
-Status: done — superseded by `docs/handoffs/HANDOFF_ready_to_launch.md`; kept as history.
+Status: done — superseded by `nanounet/docs/handoffs/HANDOFF_ready_to_launch.md`; kept as history.
 Branch/commit: e6740cf
 
 **Audience:** a coding agent working on the GPU cluster. You do **not** have access to the chat
@@ -34,7 +34,7 @@ writing; re-confirm before editing, but treat the *semantics* as established.
 | Segmentation targets are **binary** (foreground = 1), not instance-labelled | `nanounet/plan/labels.py:27` (`Labels`, single-task, scalar background) |
 | Instance structure is derived **offline** by `cc3d.connected_components((s > 0))` and only the centroid/seed/volume survive into `*_centroids.json` | `nanounet/prompt/centroids.py:33` |
 | Every annotated centroid that falls in the patch gets a positive click; the drop branch is dead because both configs set `click_modes.drop = 0.0` | `nanounet/data/sampling.py:47` |
-| Clicks are displaced by a registration-error model (per-axis sigma ≈ `[5.95, 6.39, 5.93]` vox, `max_vox` 34) **before** being filtered into the patch, so a displaced click can leave the patch entirely | `nanounet/data/sampling.py:41-48`, `configs/default.json` |
+| Clicks are displaced by a registration-error model (per-axis sigma ≈ `[5.95, 6.39, 5.93]` vox, `max_vox` 34) **before** being filtered into the patch, so a displaced click can leave the patch entirely | `nanounet/data/sampling.py:41-48`, `nanounet/configs/default.json` |
 | The target is the whole `seg_crop`, unmodified, and the **same** target tensor is reused for every prompt variant of a patch | `nanounet/data/sampling.py:145`, `nanounet/train/patch_render.py:98` |
 | Training cases are drawn **uniformly** — this is the line stratified sampling must replace | `nanounet/train/patch_iterable.py:120` |
 | `--only-prefix` is a **data filter**, not a layer freeze; it filters both `tr_keys` and `val_keys` | `nanounet/train/data_module.py:119` |
@@ -133,7 +133,7 @@ while false positives on lesion-free patches grew sharply.**
 → **First thing to do when you get access to the W&B runs: plot `val_fp`** (already logged,
 `lightning_module.py:168`). It settles this directly.
 
-This is not a sampling artifact: `configs/finetune_d013.json` *lowered* `fg_patch_prob` from 0.67
+This is not a sampling artifact: `nanounet/configs/finetune_d013.json` *lowered* `fg_patch_prob` from 0.67
 to 0.55 (more background in training), which should have suppressed FP. It went the other way.
 
 Mechanism: 600k steps over 537 cases ≈ 1100 steps per case, on a cohort with a high lesion prior.

@@ -1,6 +1,6 @@
 """Registration-error offset table: load-once-per-process cache, validation, and the empirical draw.
 
-Schema (see docs/reference/config.md): {frame, spacing_zyx, size_bins_mm,
+Schema (see nanounet/docs/reference/config.md): {frame, spacing_zyx, size_bins_mm,
 backends: {name: {offsets_zyx: [[dz,dy,dx], ...] per size bin]}}, excluded, provenance}. Offsets are
 in RESAMPLED voxels. Shared by nanounet/config.py (startup validation) and
 nanounet/data/patch/sampling.py (the actual draw), so the JSON is parsed exactly once per process.
@@ -24,7 +24,7 @@ _CACHE: Dict[str, dict] = {}
 
 DEFAULT_ERROR_TABLE = "/nnunet_data/Longitudinal-CT/derivatives/registration_error_table.json"
 DEFAULT_BACKENDS = ("original", "unigradicon")
-DEFAULT_SIGMA = (5.95, 6.39, 5.93)  # corrected through-plane axis, see docs/reference/config.md
+DEFAULT_SIGMA = (5.95, 6.39, 5.93)  # corrected through-plane axis, see nanounet/docs/reference/config.md
 
 
 def parse_propagated(d: dict | None) -> dict:
@@ -35,7 +35,7 @@ def parse_propagated(d: dict | None) -> dict:
         raise ValueError(
             f"propagated.mode must be 'gaussian' or 'empirical', got {mode!r}\n"
             f"Expected config sampling.propagated.mode to be one of 'gaussian' or 'empirical'.\n"
-            f"Fix: set sampling.propagated.mode to 'gaussian' or 'empirical' in the training config JSON. See docs/reference/config.md"
+            f"Fix: set sampling.propagated.mode to 'gaussian' or 'empirical' in the training config JSON. See nanounet/docs/reference/config.md"
         )
     sg = d.get("sigma_per_axis", DEFAULT_SIGMA)
     assert isinstance(sg, (list, tuple)) and len(sg) == 3
@@ -64,7 +64,7 @@ def validate_table(path: str, backends: Tuple[str, ...]) -> None:
     p = Path(path)
     fix = (
         'Fix: point propagated.error_table at a table matching the schema in '
-        'docs/reference/config.md, or set propagated.mode to "gaussian" (no table needed).'
+        'nanounet/docs/reference/config.md, or set propagated.mode to "gaussian" (no table needed).'
     )
     if not p.is_file():
         raise FileNotFoundError(

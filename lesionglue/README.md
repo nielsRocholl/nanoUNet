@@ -265,7 +265,7 @@ Dash cytoscape viewer for one cached patient graph. Prints URL via `print0`.
 
 | Doc | Role |
 |-----|------|
-| [technical.md](technical.md) | Graph construction, deployed matcher, losses, metrics |
+| [technical.md](docs/technical.md) | Graph construction, deployed matcher, losses, metrics |
 | [blueprint.md](blueprint.md) | Older design notes — background only |
 
 ---

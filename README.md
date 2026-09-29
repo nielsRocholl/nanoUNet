@@ -1,54 +1,12 @@
-# nanoUNet
+# nanoUNet monorepo
 
-Minimal prompt-aware 3D ResEnc U-Net with PyTorch Lightning and optional MAE pretraining. Layout and style follow [nanochat](https://github.com/karpathy/nanochat): small modules, no framework sprawl. The U-Net preprocessing, training, and setup pipeline draws a lot of inspiration from [nnU-Net](https://github.com/MIC-DKFZ/nnUNet).
+CT lesion research code, one project per top-level folder. Each folder is self-contained: code, `README.md`, `docs/`, `configs/`, `scripts/`.
 
-## Install
-
-```bash
-python -m pip install -e .
-```
-
-## Environment
+| project | what | start here |
+|---|---|---|
+| [`nanounet/`](nanounet/) | promptable 3D lesion segmentation (ResEnc nnU-Net, Lightning) | [`nanounet/README.md`](nanounet/README.md) |
+| [`lesionglue/`](lesionglue/) | LesionGlue: BL↔FU lesion matching with a dense PyG GNN | [`lesionglue/README.md`](lesionglue/README.md) |
 
 ```bash
-export NANOUNET_RAW="/path/to/NanoUNet_raw"
-export NANOUNET_PREPROCESSED="/path/to/NanoUNet_preprocessed"
-export NANOUNET_RESULTS="/path/to/NanoUNet_results"
-
-# Host-RAM / checkpoint staging (see docs/dev-notes/cgroup_memory.md)
-export NANOUNET_TMPDIR=/root/.cache/nanounet_tmp
+pip install -e ".[lesionglue]"
 ```
-
-Quote paths that contain spaces.
-
-## Smoke test
-
-```bash
-python -c "import sys; import nanounet.cli.preprocess, nanounet.cli.train, nanounet.cli.predict; assert 'nnunetv2' not in sys.modules; print('ok')"
-```
-
-
-
-## Documentation
-
-
-| Resource                       | Link                                                               |
-| ------------------------------ | ------------------------------------------------------------------ |
-| Pipeline overview & quickstart | [docs/index.md](docs/index.md)                                     |
-| Preprocess                     | [docs/steps/preprocess.md](docs/steps/preprocess.md)               |
-| Planning knobs                 | [docs/steps/plan.md](docs/steps/plan.md)                           |
-| MAE pretrain                   | [docs/steps/pretrain.md](docs/steps/pretrain.md)                   |
-| Supervised train               | [docs/steps/train.md](docs/steps/train.md)                         |
-| Inference                      | [docs/steps/predict.md](docs/steps/predict.md)                     |
-| Track (seg × track)            | [docs/steps/track.md](docs/steps/track.md)                         |
-| Fixed valset                   | [docs/steps/valset.md](docs/steps/valset.md)                       |
-| Lesion weights                 | [docs/steps/lesion_weights.md](docs/steps/lesion_weights.md)       |
-| Instance targets               | [docs/reference/instance_targets.md](docs/reference/instance_targets.md) |
-| Tracking ids                   | [docs/reference/track_ids.md](docs/reference/track_ids.md)         |
-| ROI / prompt config            | [docs/reference/config.md](docs/reference/config.md)               |
-| Patch size playbook            | [docs/reference/patch_size.md](docs/reference/patch_size.md)       |
-| Loss functions                 | [docs/reference/losses.md](docs/reference/losses.md)               |
-| Host RAM / cgroup OOM          | [docs/dev-notes/cgroup_memory.md](docs/dev-notes/cgroup_memory.md) |
-
-
-Entry points: `nanounet_preprocess`, `nanounet_train`, `nanounet_pretrain`, `nanounet_predict`, `nanounet_segtrack`, `nanounet_build_splits`, `nanounet_build_valset`, `nanounet_lesion_weights` (see [pyproject.toml](pyproject.toml)).

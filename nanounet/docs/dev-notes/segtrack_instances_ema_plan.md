@@ -123,7 +123,7 @@ messages that say `drop --ema` with:
 Fix: pass --no-ema in nanounet_segtrack, or omit --ema in nanounet_predict
 ```
 
-Update the `docs/steps/track.md` argument row to `--ema / --no-ema`, default `on`.
+Update the `nanounet/docs/steps/track.md` argument row to `--ema / --no-ema`, default `on`.
 
 ## 4. Verification
 

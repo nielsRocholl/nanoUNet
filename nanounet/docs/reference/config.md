@@ -1,13 +1,13 @@
 # ROI / prompt configuration
 
-Training and inference read a JSON config (default [`configs/default.json`](../../configs/default.json)) parsed by [`nanounet/config.py`](../../nanounet/config.py) into frozen dataclasses.
+Training and inference read a JSON config (default [`nanounet/configs/default.json`](../../configs/default.json)) parsed by [`nanounet/config.py`](../../config.py) into frozen dataclasses.
 
 Passed to supervised training via `nanounet_train --config <path>`. Copied to the run dir as `nano_config.json` for predict.
 
 ## Example
 
 ```bash
-nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/default.json
+nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config nanounet/configs/default.json
 ```
 
 ## Top-level sections

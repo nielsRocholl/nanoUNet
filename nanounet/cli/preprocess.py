@@ -162,7 +162,7 @@ def main() -> None:
     cprint("[bold cyan]preprocess complete[/bold cyan]")
     for a in artifacts:
         cprint(f"  [dim]-[/dim] {a}")
-    next_cmd = f"nanounet_train -d {did} -f 0 --plans {ident} --config configs/default.json"
+    next_cmd = f"nanounet_train -d {did} -f 0 --plans {ident} --config nanounet/configs/default.json"
     if not args.no_splits and args.valset_config:
         next_cmd += f" --val-manifest {join(preprocessed_dir(), convert_id_to_dataset_name(did), f'valset_{args.valset_n}.json')}"
     cprint(f"next: {next_cmd}")

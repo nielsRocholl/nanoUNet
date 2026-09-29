@@ -21,7 +21,7 @@ def load_mae_encoder(seg_net: torch.nn.Module, ckpt_path: str) -> dict:
         raise TypeError(
             f"Checkpoint '{ckpt_path}' does not contain a dict-like state_dict.\n"
             f"Expected torch.load('{ckpt_path}') to return a dict, or a dict with a 'state_dict' key mapping to a dict of tensors.\n"
-            f"Fix: pass a valid Lightning .ckpt to --mae-ckpt (from nanounet_pretrain)   (see docs/steps/pretrain.md)"
+            f"Fix: pass a valid Lightning .ckpt to --mae-ckpt (from nanounet_pretrain)   (see nanounet/docs/steps/pretrain.md)"
         )
     sd_pre = {k[4:]: v for k, v in raw.items() if k.startswith("net.") and isinstance(v, torch.Tensor)}
     sd_seg = seg_net.state_dict()
@@ -54,7 +54,7 @@ def load_full_net(seg_net: torch.nn.Module, ckpt_path: str) -> dict:
         raise TypeError(
             f"Checkpoint '{ckpt_path}' does not contain a dict-like state_dict.\n"
             f"Expected torch.load('{ckpt_path}') to return a dict, or a dict with a 'state_dict' key mapping to a dict of tensors.\n"
-            f"Fix: pass a valid Lightning .ckpt to --init-weights (from a prior nanounet_train run)   (see docs/steps/train.md)"
+            f"Fix: pass a valid Lightning .ckpt to --init-weights (from a prior nanounet_train run)   (see nanounet/docs/steps/train.md)"
         )
     sd_pre = {k[4:]: v for k, v in raw.items() if k.startswith("net.") and isinstance(v, torch.Tensor)}
     sd_seg = seg_net.state_dict()

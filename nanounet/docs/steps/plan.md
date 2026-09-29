@@ -1,6 +1,6 @@
 # Planning knobs
 
-The ResEnc planner chooses patch size, batch size, and network topology. These are set at **preprocess** time via `nanounet_preprocess`, not in [configs/default.json](../reference/config.md).
+The ResEnc planner chooses patch size, batch size, and network topology. These are set at **preprocess** time via `nanounet_preprocess`, not in [nanounet/configs/default.json](../reference/config.md).
 
 ## Command
 
@@ -24,7 +24,7 @@ nanounet_preprocess -d 001 --planner nnUNetPlannerResEncL --gpu-memory-gb 80 --p
 | `--plans-name` | str | auto | Override output plans basename; required with `--skip-plan` |
 | `--skip-plan` | flag | off | Reuse existing plans; skip planner step |
 
-Implementation: [`planner_resenc.py`](../../nanounet/plan/resenc/planner_resenc.py) may **shrink** the patch if footprint × network width exceeds VRAM, or **enlarge** if memory allows.
+Implementation: [`planner_resenc.py`](../../plan/resenc/planner_resenc.py) may **shrink** the patch if footprint × network width exceeds VRAM, or **enlarge** if memory allows.
 
 ## Inputs / outputs
 

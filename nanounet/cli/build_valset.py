@@ -39,9 +39,9 @@ MIX_ORDER = ("all_clicked", "lesion_free_decoy", "subset_clicked", "none_clicked
 def _parse_mix(s: str) -> dict[str, float]:
     parts = [float(x) for x in s.split(",")]
     if len(parts) != 4:
-        raise ValueError(f"--mix {s!r} does not have 4 comma-separated shares.\nExpected shares for {MIX_ORDER}, e.g. \"0.40,0.25,0.20,0.15\".\nFix: pass --mix with exactly 4 comma-separated shares in that order   (see docs/steps/valset.md)")
+        raise ValueError(f"--mix {s!r} does not have 4 comma-separated shares.\nExpected shares for {MIX_ORDER}, e.g. \"0.40,0.25,0.20,0.15\".\nFix: pass --mix with exactly 4 comma-separated shares in that order   (see nanounet/docs/steps/valset.md)")
     if abs(sum(parts) - 1.0) > 1e-6:
-        raise ValueError(f"--mix {s!r} shares sum to {sum(parts)}, not 1.0.\nExpected the 4 shares for {MIX_ORDER} to add up to 1.0.\nFix: adjust --mix so its 4 values sum to 1.0, e.g. \"0.40,0.25,0.20,0.15\"   (see docs/steps/valset.md)")
+        raise ValueError(f"--mix {s!r} shares sum to {sum(parts)}, not 1.0.\nExpected the 4 shares for {MIX_ORDER} to add up to 1.0.\nFix: adjust --mix so its 4 values sum to 1.0, e.g. \"0.40,0.25,0.20,0.15\"   (see nanounet/docs/steps/valset.md)")
     return dict(zip(MIX_ORDER, parts))
 
 
@@ -90,7 +90,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("-d", "--dataset_id", type=int, required=True, help="dataset id, e.g. 999")
     ap.add_argument("--plans", required=True, help="plans identifier, no .json (e.g. nnUNetResEncUNetLPlans)")
-    ap.add_argument("--config", required=True, help="ROI/prompt config JSON path (e.g. configs/default.json)")
+    ap.add_argument("--config", required=True, help="ROI/prompt config JSON path (e.g. nanounet/configs/default.json)")
     ap.add_argument("--out", required=True, help="manifest output path (.json); the .targets.npz sidecar is written next to it")
     ap.add_argument("--n-patches", type=int, default=1500, help="total validation patches across all cohorts")
     ap.add_argument("--floor", type=int, default=40, help="minimum patches guaranteed per cohort before proportional allocation of the rest")

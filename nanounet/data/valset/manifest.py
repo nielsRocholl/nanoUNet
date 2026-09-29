@@ -37,7 +37,7 @@ from nanounet.train.patches.render import concat_variant_keypoints, render_varia
 SCHEMA_VERSION = 1
 SCENARIOS = ("all_clicked", "subset_clicked", "none_clicked", "lesion_free_decoy")
 SIZE_BUCKETS = ("small", "large")
-SMALL_LESION_MAX_VOX = 500  # ~10mm diameter at the plans spacing; see docs/steps/valset.md
+SMALL_LESION_MAX_VOX = 500  # ~10mm diameter at the plans spacing; see nanounet/docs/steps/valset.md
 
 @dataclass(frozen=True)
 class ValManifest:
@@ -49,7 +49,7 @@ class ValManifest:
 
 def sidecar_path(manifest_path: str) -> str:
     if not manifest_path.endswith(".json"):
-        raise ValueError(f"manifest path must end in .json, got {manifest_path!r}\nExpected the --out path passed to nanounet_build_valset to end in .json.\nFix: pass a path ending in .json, e.g. --out valset.json. See docs/steps/valset.md")
+        raise ValueError(f"manifest path must end in .json, got {manifest_path!r}\nExpected the --out path passed to nanounet_build_valset to end in .json.\nFix: pass a path ending in .json, e.g. --out valset.json. See nanounet/docs/steps/valset.md")
     return manifest_path[: -len(".json")] + ".targets.npz"
 
 def config_stamp(cfg: RoiPromptConfig) -> dict:
@@ -67,8 +67,8 @@ def load_manifest(path: str, cfg: RoiPromptConfig) -> ValManifest:
         raise FileNotFoundError(
             f"No validation manifest at {path}.\n"
             f"Expected the output of nanounet_build_valset.\n"
-            f"Fix: nanounet_build_valset -d 999 --plans <plans> --config configs/default.json "
-            f"--out {path}   (see docs/steps/valset.md)"
+            f"Fix: nanounet_build_valset -d 999 --plans <plans> --config nanounet/configs/default.json "
+            f"--out {path}   (see nanounet/docs/steps/valset.md)"
         )
     header = load_json(path)
     if header.get("schema") != SCHEMA_VERSION:

@@ -11,7 +11,7 @@ needed is here. Read it fully before writing code.
 seeded, offline manifest of 1500 patches across 4 prompt scenarios, and report metrics per scenario
 and per source dataset.
 
-**Parent document:** `docs/handoffs/HANDOFF_training_overhaul.md`. That doc's §1 and §2 are
+**Parent document:** `nanounet/docs/handoffs/HANDOFF_training_overhaul.md`. That doc's §1 and §2 are
 authoritative for *why*; this doc is authoritative for *what to type*. Where they disagree on
 detail, this doc wins — it was written after the human resolved the open decisions.
 
@@ -113,8 +113,8 @@ Everything else goes in new files.
 | 9 | `nanounet/train/data_module.py` | edit | use the manifest when given |
 | 10 | `nanounet/cli/train_parser.py` | edit | `--val-manifest` |
 | 11 | `pyproject.toml` | edit | 2 new console scripts |
-| 12 | `docs/steps/valset.md` | **new** | step doc + argument tables |
-| 13 | `docs/steps/train.md` | edit | document `--val-manifest` |
+| 12 | `nanounet/docs/steps/valset.md` | **new** | step doc + argument tables |
+| 13 | `nanounet/docs/steps/train.md` | edit | document `--val-manifest` |
 
 Implement in this order. Items 1–2 are independently testable, 3–4 likewise, 5–9 are one wiring
 change, 10–13 finish it.
@@ -167,7 +167,7 @@ def fold_keys(splits: List[dict], fold: int | str) -> tuple[list[str], list[str]
         raise IndexError(
             f"--fold {fold} but splits_final.json holds {len(splits)} split(s) (valid: 0"
             f"{'' if len(splits) == 1 else f'-{len(splits) - 1}'}).\n"
-            f"This dataset uses a single balanced split (see docs/steps/valset.md).\n"
+            f"This dataset uses a single balanced split (see nanounet/docs/steps/valset.md).\n"
             f"Fix: pass --fold 0"
         )
     return splits[fold]["train"], splits[fold]["val"]
@@ -260,7 +260,7 @@ bits in a sidecar .npz -- that is what keeps cc3d off the validation path entire
 SCHEMA_VERSION = 1
 SCENARIOS = ("all_clicked", "subset_clicked", "none_clicked", "lesion_free_decoy")
 SIZE_BUCKETS = ("small", "large")
-SMALL_LESION_MAX_VOX = 500  # ~10mm diameter at the plans spacing; see docs/steps/valset.md
+SMALL_LESION_MAX_VOX = 500  # ~10mm diameter at the plans spacing; see nanounet/docs/steps/valset.md
 ```
 
 Manifest JSON layout (one file, UTF-8, `json.dump(..., indent=None)`):
@@ -336,8 +336,8 @@ def load_manifest(path: str) -> ValManifest:
         raise FileNotFoundError(
             f"No validation manifest at {path}.\n"
             f"Expected the output of nanounet_build_valset.\n"
-            f"Fix: nanounet_build_valset -d 999 --plans <plans> --config configs/default.json "
-            f"--out {path}   (see docs/steps/valset.md)"
+            f"Fix: nanounet_build_valset -d 999 --plans <plans> --config nanounet/configs/default.json "
+            f"--out {path}   (see nanounet/docs/steps/valset.md)"
         )
     header = load_json(path)
     if header.get("schema") != SCHEMA_VERSION:
@@ -451,7 +451,7 @@ Arguments:
 |----------|------|---------|-------------|
 | `-d, --dataset_id` | int | required | Dataset ID (e.g. 999) |
 | `--plans` | str | required | Plans identifier, no `.json` |
-| `--config` | str | required | ROI/prompt JSON (e.g. `configs/default.json`) |
+| `--config` | str | required | ROI/prompt JSON (e.g. `nanounet/configs/default.json`) |
 | `--out` | str | required | Manifest output path (`.json`) |
 | `--n-patches` | int | 1500 | Total validation patches |
 | `--floor` | int | 40 | Minimum patches per source dataset |
@@ -901,7 +901,7 @@ Reinstall with `pip install -e .` afterwards, or the console scripts will not ex
 
 ## 9. Items 12–13 — docs (D4: same change, not later)
 
-`docs/steps/valset.md`, under 200 lines, following the D2 structure: 3-line summary, copy-paste
+`nanounet/docs/steps/valset.md`, under 200 lines, following the D2 structure: 3-line summary, copy-paste
 command block, argument tables for **both** new CLIs, inputs/outputs with paths and formats, the
 manifest schema table from §4.1, the scenario table with what each one tests, and common errors
 with fixes.
@@ -914,11 +914,11 @@ nanounet_build_splits -d 999 --plans nnUNetResEncUNetLPlans_h200_smallpv --val-f
 
 ```bash
 nanounet_build_valset -d 999 --plans nnUNetResEncUNetLPlans_h200_smallpv \
-  --config configs/default.json \
+  --config nanounet/configs/default.json \
   --out /nnunet_data/NanoUNet_preprocessed/Dataset999_Merged/valset_1500.json
 ```
 
-`docs/steps/train.md` gains a `--val-manifest` row in its argument table.
+`nanounet/docs/steps/train.md` gains a `--val-manifest` row in its argument table.
 
 ---
 

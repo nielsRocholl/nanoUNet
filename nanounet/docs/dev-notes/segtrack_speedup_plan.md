@@ -425,7 +425,7 @@ data:
 without materializing the full output. Feeds the FULL native input to grid_sample (so there is
 no missing-neighbor-at-crop-boundary risk) and only evaluates the AABB's output positions.
 grid_sample and interpolate share the align_corners=False pixel convention in PyTorch by
-design; see docs/dev-notes/segtrack_speedup_plan.md Step B.1 for the numeric proof."""
+design; see nanounet/docs/dev-notes/segtrack_speedup_plan.md Step B.1 for the numeric proof."""
 
 from __future__ import annotations
 

@@ -36,7 +36,7 @@ d013-only FT 80ep (adamw 1e-5, only-prefix):
 
 Patient-level split fixed. d026 106 empty quarantined. 64 genuine zero-lesion kept (25 are d013 timepoints).
 site_balanced: d013 = 1/11 = **9.1%** (last run forced 25%).
-`configs/longrun.json` cohort keys are Dataset999 — missing d028–d031, has d010. **Will crash on 900.**
+`nanounet/configs/longrun.json` cohort keys are Dataset999 — missing d028–d031, has d010. **Will crash on 900.**
 No 900 valset, no `*_weights.json`, no 900 MAE. 999 MAE exists (250ep, recon 0.107).
 
 ## Recipe

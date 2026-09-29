@@ -143,7 +143,7 @@ modified by this workstream yet.
 
 - **`Dataset018_MSWAL`**: source `labelsTr` carries separate per-class integers (0=bg, 1=gallstone,
   2=kidney stone, 3=liver tumor, 4=kidney tumor, 5=pancreatic cancer, 6=liver cyst, 7=kidney cyst).
-  The shipped `uclp-pro` config (`configs/MSWAL/mswal.yaml`) used `labels_to_keep: [3,4,5,6,7]` —
+  The shipped `uclp-pro` config (`nanounet/configs/MSWAL/mswal.yaml`) used `labels_to_keep: [3,4,5,6,7]` —
   it dropped stones but **wrongly kept both cyst classes**. Fix: `labels_to_keep: [3,4,5]` only.
 - **`Dataset027_MCT_LTDiag`**: mixes 4 malignant subtypes (HCC, ICC, CRLM, BCLM) with **benign
   hepatic hemangioma (HH)** under one binary label. Harder problem: the HF-mirrored source

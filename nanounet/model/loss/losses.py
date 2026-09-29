@@ -116,7 +116,7 @@ def build_loss(
         raise ValueError(
             f"Unknown --loss value {loss_type!r}.\n"
             f"Supported: 'dc_ce' (default) or 'cc_dc_ce'.\n"
-            f"Fix: nanounet_train … --loss dc_ce   (see docs/reference/losses.md)"
+            f"Fix: nanounet_train … --loss dc_ce   (see nanounet/docs/reference/losses.md)"
         )
     if not enable_ds:
         return loss

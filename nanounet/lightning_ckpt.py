@@ -17,7 +17,7 @@ def pl_ckpt_epoch_and_target(path: str) -> tuple[int, int]:
         raise ValueError(
             f"{path} has no hyper_parameters['num_epochs']: not a nanoUNet Lightning checkpoint.\n"
             f"Expected a .ckpt saved by nanounet_train, passed via --resume or --mae-resume.\n"
-            f"Fix: point --resume/--mae-resume at a checkpoint under out/checkpoints or out/mae_pretrain/checkpoints   (see docs/steps/train.md)"
+            f"Fix: point --resume/--mae-resume at a checkpoint under out/checkpoints or out/mae_pretrain/checkpoints   (see nanounet/docs/steps/train.md)"
         )
     target = int(hp["num_epochs"])
     ep = d.get("epoch")
@@ -29,7 +29,7 @@ def pl_ckpt_epoch_and_target(path: str) -> tuple[int, int]:
         raise ValueError(
             f"{path} has neither a top-level 'epoch' key nor loops.fit_loop.epoch_progress.current.completed.\n"
             f"Expected the standard PyTorch Lightning 2.x checkpoint layout written by nanounet_train.\n"
-            f"Fix: point --resume/--mae-resume at an unmodified nanounet_train checkpoint   (see docs/steps/train.md)"
+            f"Fix: point --resume/--mae-resume at an unmodified nanounet_train checkpoint   (see nanounet/docs/steps/train.md)"
         ) from None
 
 

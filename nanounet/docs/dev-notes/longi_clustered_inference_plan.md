@@ -76,8 +76,8 @@ special handling — encode an empty BL heatmap over the real BL_CT crop.
 | `nanounet/infer/roi_slices.py` | Edit: delete now-unused `colocated_spatial_slices` | ~105 |
 | `nanounet/infer/predict_io.py` | Edit: joint 2-ch preprocess; geometry precheck; baseline resolver; delete `load_bl_points` | ~90 |
 | `nanounet/cli/predict.py` | Edit: `--baseline-dir`; startup validation; `is_longi`/`bl_present` wiring | ~185 (must stay <200) |
-| `docs/steps/predict.md` | Edit: args table + errors | <200 |
-| `docs/steps/longi.md` | Edit: two-stream inference section | <200 |
+| `nanounet/docs/steps/predict.md` | Edit: args table + errors | <200 |
+| `nanounet/docs/steps/longi.md` | Edit: two-stream inference section | <200 |
 
 **Verification gate (run after edits, R1):** `wc -l` each touched `.py`; every one must be `< 200`.
 If `predict_case.py` or `predict.py` exceed 200, move the block flagged "extractable" (below) into
@@ -287,7 +287,7 @@ def _assert_bl_geometry(scan: str, bl_scan: str) -> None:
             f"  FU {scan}: size={fu.GetSize()} spacing={fu.GetSpacing()}\n"
             f"  BL {bl_scan}: size={bl.GetSize()} spacing={bl.GetSpacing()}\n"
             f"Fix: register BL into the FU frame first with nanounet_register_longi "
-            f"(see docs/steps/longi.md)."
+            f"(see nanounet/docs/steps/longi.md)."
         )
 ```
 
@@ -383,7 +383,7 @@ Right after loading `net, lm` and computing `single_mode` / `cases` / `end`, add
                 + "\n  ".join(missing[:10])
                 + ("\n  ..." if len(missing) > 10 else "")
                 + f"\nExpected per FU case <cid>: {args.baseline_dir}/<cid>{end} and <cid>.json.\n"
-                  "Fix: build them with nanounet_register_longi (see docs/steps/longi.md)."
+                  "Fix: build them with nanounet_register_longi (see nanounet/docs/steps/longi.md)."
             )
 ```
 
@@ -474,13 +474,13 @@ No permanent test files. Use the scratchpad dir. Validate three things:
    `<cid>.nii.gz`/`<cid>.json`; assert one output per case and that a missing BL sibling triggers the
    §8.3 `FileNotFoundError` with the fix line.
 
-Delete all throwaway scripts/outputs afterward.
+Delete all throwaway nanounet/scripts/outputs afterward.
 
 ---
 
 ## 10. Docs (D2/D3/D4 — update in the SAME change)
 
-### 10.1 `docs/steps/predict.md`
+### 10.1 `nanounet/docs/steps/predict.md`
 - In the arguments table, replace the `--baseline-points` row and add a `--baseline-dir` row:
 
   | `--baseline-points` | str | none | BL click set JSON (**single mode**), same format as `--points`; native voxel `(x,y,z)` in the FU-registered frame |
@@ -493,7 +493,7 @@ Delete all throwaway scripts/outputs afterward.
   - `Baseline geometry does not match follow-up` → register BL→FU first.
   - `Missing baseline files for longi dataset inference` → build with `nanounet_register_longi`.
 
-### 10.2 `docs/steps/longi.md` — rewrite the "Two-stream inference" section
+### 10.2 `nanounet/docs/steps/longi.md` — rewrite the "Two-stream inference" section
 
 Replace the current section body with the joint-preprocessing story:
 
@@ -540,6 +540,6 @@ Keep all other sections of `longi.md` (register/build/clicks/finetune) unchanged
 - [ ] Data-path: extra BL read happens in the prefetch worker, not the GPU thread (G1/G3); report
       before/after cases/s for single-stream vs longi in the PR (G4), and state the ~2× encoder cost
       is the model (G5), not a regression.
-- [ ] `docs/steps/predict.md` + `docs/steps/longi.md` updated in this same change (D4), argument
+- [ ] `nanounet/docs/steps/predict.md` + `nanounet/docs/steps/longi.md` updated in this same change (D4), argument
       tables use the mandatory format (D3), commands are literal/runnable (D5).
 ```

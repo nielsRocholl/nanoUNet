@@ -5,7 +5,7 @@ Status: done — build and verification complete; launch pending on GPU time.
 Branch/commit: b590c6c
 
 **Updated 2026-08-07.** Audience: an agent or human with no access to the sessions that produced
-this. Read this file first; `docs/handoffs/HANDOFF_training_overhaul.md` is the original plan and is
+this. Read this file first; `nanounet/docs/handoffs/HANDOFF_training_overhaul.md` is the original plan and is
 now largely historical.
 
 **Status in one line:** the measurement apparatus, the objective fix, and the production recipe are
@@ -140,7 +140,7 @@ RESUME=<out>/checkpoints/last.ckpt sbatch <same script>
 
 | Setting | Value | Why |
 |---|---|---|
-| Objective | `configs/longrun.json`, `instance_targets`, `pos 0.80` | 20% of lesions deliberately unclicked; boundary clipping now contributes 0% |
+| Objective | `nanounet/configs/longrun.json`, `instance_targets`, `pos 0.80` | 20% of lesions deliberately unclicked; boundary clipping now contributes 0% |
 | Mixture | cohort weights, site-balanced | Liver was 40% (over 7 datasets), lung 20%. Now liver 22%, lung 14%, d013 9->25%, bone 2.6->6%, colon 2.1->4%. Max 2.7x |
 | Validation | fixed manifest, every 2 epochs | Noise removed at source, so half the cadence with 2.5x the patches costs ~3% not ~18% |
 | Epochs | 1200 | 600-epoch curve still rising with no knee |
@@ -197,7 +197,7 @@ excellent. If that happens, `click_modes.pos` is the lever.
 | LR probe (3 x 60 epochs) | **Skipped by the human** — `lr 0.01` retained |
 | WSD schedule | **Rejected by the human** |
 | Score raw vs EMA weights at the end | Do this when the run finishes: `Trainer.validate` on the manifest, ~140 s each |
-| `docs/handoffs/DECISIONS_autonomous_session.md` | 7 decisions taken without the human; D-A2 and D-A3 are now superseded by later measurements. Worth a read, not blocking |
+| `nanounet/docs/handoffs/DECISIONS_autonomous_session.md` | 7 decisions taken without the human; D-A2 and D-A3 are now superseded by later measurements. Worth a read, not blocking |
 
 ---
 

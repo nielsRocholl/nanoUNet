@@ -27,7 +27,7 @@ def _ema_shadow(ck: dict, ckpt_path: str, net_st: dict) -> dict:
             f"Expected Lightning callback state at callbacks/{_EMA_CB}/shadow "
             f"(written when training with --ema-decay > 0).\n"
             f"Fix: pass --no-ema in nanounet_segtrack, or omit --ema in nanounet_predict "
-            f"(or train with --ema-decay 0.999)  (see docs/steps/predict.md)"
+            f"(or train with --ema-decay 0.999)  (see nanounet/docs/steps/predict.md)"
         )
     missing = [k for k in net_st if k not in shadow]
     extra = [k for k in shadow if k not in net_st]
@@ -37,7 +37,7 @@ def _ema_shadow(ck: dict, ckpt_path: str, net_st: dict) -> dict:
             f"Expected the same {len(net_st)} tensors as state_dict keys stripped of 'net.'; "
             f"got {len(shadow)} ({len(missing)} missing, {len(extra)} extra).\n"
             f"Fix: this checkpoint's EMA is from a different architecture; use matching --ckpt, or "
-            f"pass --no-ema in nanounet_segtrack / omit --ema in nanounet_predict  (see docs/steps/predict.md)"
+            f"pass --no-ema in nanounet_segtrack / omit --ema in nanounet_predict  (see nanounet/docs/steps/predict.md)"
         )
     return shadow
 
@@ -53,7 +53,7 @@ def load_net_from_ckpt(
         raise RuntimeError(
             "no net.* keys in checkpoint\n"
             f"Expected state_dict keys prefixed with 'net.' (Lightning module wraps the network as self.net) in '{ckpt_path}'.\n"
-            f"Fix: verify '{ckpt_path}' is a nanoUNet-trained checkpoint, not a raw torch state_dict   (see docs/steps/predict.md)"
+            f"Fix: verify '{ckpt_path}' is a nanoUNet-trained checkpoint, not a raw torch state_dict   (see nanounet/docs/steps/predict.md)"
         )
     if ema:
         st = _ema_shadow(ck, ckpt_path, st)
@@ -70,5 +70,5 @@ def pick_checkpoint(model_dir: str, ckpt: str | None) -> str:
     raise SystemExit(
         f"No checkpoint '{name}' under '{model_dir}'.\n"
         f"Expected a Lightning .ckpt at checkpoints/{name} or finetune/{name}.\n"
-        f"Fix: pass --ckpt <path-or-name>.ckpt  (see docs/steps/predict.md)"
+        f"Fix: pass --ckpt <path-or-name>.ckpt  (see nanounet/docs/steps/predict.md)"
     )

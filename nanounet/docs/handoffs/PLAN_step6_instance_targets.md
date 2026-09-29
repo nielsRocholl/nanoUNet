@@ -5,8 +5,8 @@ Status: in progress — decisions settled (e.g. click dropout `pos = 0.90`), imp
 Branch/commit: 5d4961f
 
 **Audience:** a coding agent with no access to the session that produced this. Read
-`docs/handoffs/HANDOFF_training_overhaul.md` §Step 6 (the parent spec) and
-`docs/handoffs/HANDOFF_step1_done_step6_next.md` (session state, diagnosis, benchmark) first.
+`nanounet/docs/handoffs/HANDOFF_training_overhaul.md` §Step 6 (the parent spec) and
+`nanounet/docs/handoffs/HANDOFF_step1_done_step6_next.md` (session state, diagnosis, benchmark) first.
 
 **Job in one sentence:** make the training target a function of the click — foreground only for
 lesion instances that received a click — so "no click ⇒ no segmentation" is trained rather than
@@ -29,7 +29,7 @@ factories, errors that name the fix, no fallbacks for missing data.
 | S2 | Click dropout **`pos = 0.8`** (20% of in-patch annotated lesions go unclicked). | Human, this session. |
 | S3 | The consistency term is **re-scoped, not dropped**: kept set drawn once per patch, only jitter varies. | Human, this session. |
 | S4 | Instance resolution is **`cc3d` on the crop at sample time** (parent handoff option 3). | Benchmarked: 5.7 ms mean / 8.0 ms p95 = 1.2% of the 477 ms `build_patch` baseline, 0.24% of the per-patch CPU budget at 16 workers. Exact, no extra storage, no re-preprocessing. |
-| S5 | Enabled by a **config flag**, default off, so `configs/default.json` runs stay bit-identical. | Old runs must remain reproducible. |
+| S5 | Enabled by a **config flag**, default off, so `nanounet/configs/default.json` runs stay bit-identical. | Old runs must remain reproducible. |
 
 ### Two findings from reading the code that change the parent spec
 
@@ -91,9 +91,9 @@ outside the patch, the lesion stays **foreground** with no visible click. This i
 | 1 | `nanounet/data/instance_target.py` | **new** — cc3d, kept-set draw, target masking (~90 LOC) |
 | 2 | `nanounet/data/sampling.py` | edit — call it from `build_patch`, pass the kept set to variants |
 | 3 | `nanounet/config.py` | edit — `instance_targets: bool` on `SamplingConfig`, default `False` |
-| 4 | `configs/instance_conditional.json` | **new** — `pos 0.8 / drop 0.2`, `instance_targets true` |
-| 5 | `docs/steps/train.md` | edit — document the config field |
-| 6 | `docs/reference/instance_targets.md` | **new** — the rule, the mechanism, the metrics to watch |
+| 4 | `nanounet/configs/instance_conditional.json` | **new** — `pos 0.8 / drop 0.2`, `instance_targets true` |
+| 5 | `nanounet/docs/steps/train.md` | edit — document the config field |
+| 6 | `nanounet/docs/reference/instance_targets.md` | **new** — the rule, the mechanism, the metrics to watch |
 
 `patch_render.py`, `patch_iterable.py`, `lightning_module.py`, `losses.py`, `data_module.py`,
 `fit.py`, and the whole validation path are **untouched**. If you find yourself editing one, stop:
@@ -224,7 +224,7 @@ target. Getting this backwards silently corrupts both.
 **5a.** `nanounet/config.py`: add `instance_targets: bool = False` to `SamplingConfig`, loaded with
 `bool(d.get("instance_targets", False))`. Absent ⇒ current behaviour, exactly.
 
-**5b.** New `configs/instance_conditional.json` — a copy of `configs/default.json` with:
+**5b.** New `nanounet/configs/instance_conditional.json` — a copy of `nanounet/configs/default.json` with:
 
 ```json
   "sampling": {
@@ -237,7 +237,7 @@ target. Getting this backwards silently corrupts both.
 
 Everything else identical, including the `propagated` block and its absolute `error_table` path.
 
-**Do not edit `configs/default.json`.** The 600-epoch baseline must stay reproducible.
+**Do not edit `nanounet/configs/default.json`.** The 600-epoch baseline must stay reproducible.
 
 ---
 
@@ -295,7 +295,7 @@ it shows up as false negatives there while `none_clicked` looks great.
 - Do not run `cc3d` on the full volume, only on the crop.
 - Do not pass the masked target where the real seg is required: `draw_false_pos` and
   `click_inside_flags` both need the **real** `seg_crop` (4d).
-- Do not edit `configs/default.json`, the validation path, or the manifest.
+- Do not edit `nanounet/configs/default.json`, the validation path, or the manifest.
 - Do not create a permanent `tests/` folder (R16).
 - If a file or field this plan describes does not exist or differs, **stop and report what you
   found**. Both previous plans in this series had a real error caught this way.
@@ -322,4 +322,4 @@ Two things this plan got wrong:
 
 Settled at `pos = 0.90` for the long run (interpolated between the two bracketing measurements) and
 `pos = 0.80` for the probe (maximum signal for a mechanism test). Full reasoning, including why the
-two differ and what is traded away, is in `docs/handoffs/DECISIONS_autonomous_session.md` D-A2.
+two differ and what is traded away, is in `nanounet/docs/handoffs/DECISIONS_autonomous_session.md` D-A2.

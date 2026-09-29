@@ -23,7 +23,7 @@ Set environment variables (see [README](../README.md#environment)) then run:
 
 ```bash
 nanounet_preprocess -d 001 --planner nnUNetPlannerResEncL -np 8
-nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/default.json
+nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config nanounet/configs/default.json
 nanounet_predict -i /path/to/scans -o /path/to/out -m /path/to/run --ckpt last.ckpt
 nanounet_segtrack \
   --bl-dir /nnunet_data/Longitudinal-CT/inputsTrBL \
@@ -36,7 +36,7 @@ nanounet_segtrack \
 Tiny laptop smoke train:
 
 ```bash
-nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetTinyPlans --config configs/default.json \
+nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetTinyPlans --config nanounet/configs/default.json \
   --epochs 2 --iters-per-epoch 50 --accelerator cpu --precision 32-true --batch-size 1 --no-wandb
 ```
 

@@ -125,7 +125,7 @@ def build_patch(
     _ = annotated_classes_key
     raw_c = properties.get("centroids_zyx")
     if raw_c is None:
-        raise KeyError("centroids_zyx required; no seg-derived fallback (R12)\nExpected properties centroid list from the case's preprocessed sidecar.\nFix: nanounet_preprocess -d 501 --sidecars-only --plans-name nnUNetResEncUNetLPlans to regenerate the sidecar with centroids. See docs/steps/preprocess.md")
+        raise KeyError("centroids_zyx required; no seg-derived fallback (R12)\nExpected properties centroid list from the case's preprocessed sidecar.\nFix: nanounet_preprocess -d 501 --sidecars-only --plans-name nnUNetResEncUNetLPlans to regenerate the sidecar with centroids. See nanounet/docs/steps/preprocess.md")
     cts_global = [tuple(int(x) for x in c) for c in raw_c]
     raw_v = properties.get("volume_vox")
     if raw_v is None:

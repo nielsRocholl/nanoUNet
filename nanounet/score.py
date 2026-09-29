@@ -18,7 +18,7 @@ from nanounet.common import cprint
 
 IOU_HIT = 0.1
 NSD_TOL_MM = 1.0
-_DOC = "docs/steps/predict.md"
+_DOC = "nanounet/docs/steps/predict.md"
 
 def dice(gt: np.ndarray, pred: np.ndarray) -> float:
     den = float(gt.sum() + pred.sum())

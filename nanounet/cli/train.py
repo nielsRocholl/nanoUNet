@@ -58,7 +58,7 @@ def main() -> None:
             raise ValueError(
                 f"--resume {args.resume} sits in a '{ckpt_dir}' directory.\n"
                 f"Expected the checkpoint's parent directory to be named checkpoints/ or finetune/ (nanounet_train's own layout).\n"
-                f"Fix: pass --resume pointing at a checkpoint under out/checkpoints/ or out/finetune/   (see docs/steps/train.md)"
+                f"Fix: pass --resume pointing at a checkpoint under out/checkpoints/ or out/finetune/   (see nanounet/docs/steps/train.md)"
             )
     set_safe_tmpdir(results_tmp=join(out, ".tmp"))
     maybe_mkdir_p(out)
@@ -80,7 +80,7 @@ def main() -> None:
         raise ValueError(
             f"--resume {sup_resume} does not exist.\n"
             f"Expected a checkpoint file written by a previous nanounet_train run.\n"
-            f"Fix: pass an existing --resume path, or drop --resume to start a fresh run   (see docs/steps/train.md)"
+            f"Fix: pass an existing --resume path, or drop --resume to start a fresh run   (see nanounet/docs/steps/train.md)"
         )
 
     config_table(train_config_rows(args, ds, out), title="nanoUNet train")

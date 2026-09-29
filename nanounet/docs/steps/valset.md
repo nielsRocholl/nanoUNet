@@ -11,12 +11,12 @@ nanounet_build_splits -d 999 --plans nnUNetResEncUNetLPlans_h200_smallpv --val-f
 
 ```bash
 nanounet_build_valset -d 999 --plans nnUNetResEncUNetLPlans_h200_smallpv \
-  --config configs/default.json \
+  --config nanounet/configs/default.json \
   --out /nnunet_data/NanoUNet_preprocessed/Dataset999_Merged/valset_1500.json
 ```
 
 ```bash
-nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv --config configs/default.json \
+nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv --config nanounet/configs/default.json \
   --val-manifest /nnunet_data/NanoUNet_preprocessed/Dataset999_Merged/valset_1500.json
 ```
 
@@ -40,7 +40,7 @@ backed up to `splits_final.backup-<timestamp>.json`, never silently overwritten.
 |----------|------|---------|-------------|
 | `-d, --dataset_id` | int | required | Dataset ID (e.g. 999) |
 | `--plans` | str | required | Plans identifier, no `.json` |
-| `--config` | str | required | ROI/prompt JSON (e.g. `configs/default.json`) |
+| `--config` | str | required | ROI/prompt JSON (e.g. `nanounet/configs/default.json`) |
 | `--out` | str | required | Manifest output path (`.json`) |
 | `--n-patches` | int | 1500 | Total validation patches |
 | `--floor` | int | 40 | Minimum patches per source dataset |

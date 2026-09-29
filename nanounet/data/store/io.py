@@ -45,7 +45,7 @@ class SimpleITKIO:
                 raise RuntimeError(
                     f"{npy.ndim}\n"
                     f"Expected the array read from {f} to have 2, 3, or 4 dimensions after SimpleITK read.\n"
-                    f"Fix: convert {f} to a 2D/3D/4D image before nanounet_preprocess -d 501. See docs/steps/preprocess.md"
+                    f"Fix: convert {f} to a 2D/3D/4D image before nanounet_preprocess -d 501. See nanounet/docs/steps/preprocess.md"
                 )
             images.append(npy)
             sp_nn[-1] = list(np.abs(sp_nn[-1]))
@@ -54,14 +54,14 @@ class SimpleITKIO:
             raise RuntimeError(
                 f"shape mismatch {shapes} {image_fnames}\n"
                 f"Expected every channel file for one case to share the same array shape.\n"
-                f"Fix: re-export {image_fnames} so all channels match in shape, then re-run nanounet_preprocess -d 501. See docs/steps/preprocess.md"
+                f"Fix: re-export {image_fnames} so all channels match in shape, then re-run nanounet_preprocess -d 501. See nanounet/docs/steps/preprocess.md"
             )
         for i in range(1, len(spacings)):
             if not np.allclose(spacings[0], spacings[i]):
                 raise RuntimeError(
                     f"spacing mismatch {image_fnames}\n"
                     f"Expected every channel file for one case to share the same voxel spacing.\n"
-                    f"Fix: re-export {image_fnames} with matching spacing, then re-run nanounet_preprocess -d 501. See docs/steps/preprocess.md"
+                    f"Fix: re-export {image_fnames} with matching spacing, then re-run nanounet_preprocess -d 501. See nanounet/docs/steps/preprocess.md"
                 )
         props = {
             "sitk_stuff": {"spacing": spacings[0], "origin": origins[0], "direction": directions[0]},
@@ -113,7 +113,7 @@ def reader_writer_class_from_dataset(dataset_json: dict, example_file: str | Non
             raise RuntimeError(
                 f"{o}\n"
                 f"Expected dataset.json 'overwrite_image_reader_writer' to be the default sitk reader or an importable dotted path.\n"
-                f"Fix: set dataset.json 'overwrite_image_reader_writer' to the default sitk reader name, or remove the key so nanounet picks a reader from 'file_ending'. See docs/steps/preprocess.md"
+                f"Fix: set dataset.json 'overwrite_image_reader_writer' to the default sitk reader name, or remove the key so nanounet picks a reader from 'file_ending'. See nanounet/docs/steps/preprocess.md"
             )
         if verbose:
             cprint(f"[dim]Using {cls} reader/writer[/dim]")
@@ -130,7 +130,7 @@ def reader_writer_class_from_dataset(dataset_json: dict, example_file: str | Non
                     raise RuntimeError(
                         f"{example_file}\n"
                         f"Expected the reader registered for dataset.json 'file_ending' {fe!r} to read {example_file}.\n"
-                        f"Fix: re-export {example_file} to a format nanoUNet supports, or fix dataset.json 'file_ending'. See docs/steps/preprocess.md"
+                        f"Fix: re-export {example_file} to a format nanoUNet supports, or fix dataset.json 'file_ending'. See nanounet/docs/steps/preprocess.md"
                     )
             if verbose:
                 cprint(f"[dim]Using {rw} as reader/writer[/dim]")
@@ -149,5 +149,5 @@ def reader_writer_class_from_dataset(dataset_json: dict, example_file: str | Non
     raise RuntimeError(
         f"No image reader for file ending {fe!r} (example: {example_file}).\n"
         f"nanoUNet reads NIfTI (.nii.gz) and the readers registered in data/store/io.py.\n"
-        f"Fix: convert inputs to .nii.gz, or set dataset.json 'file_ending' to a supported type. See docs/steps/preprocess.md"
+        f"Fix: convert inputs to .nii.gz, or set dataset.json 'file_ending' to a supported type. See nanounet/docs/steps/preprocess.md"
     )

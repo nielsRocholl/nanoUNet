@@ -42,7 +42,7 @@ regardless of clicks — never penalised that, so the shortcut was free.
 
 ```bash
 nanounet_train -d 999 --plans nnUNetResEncUNetLPlans_h200_smallpv \
-  --config configs/instance_conditional.json \
+  --config nanounet/configs/instance_conditional.json \
   --val-manifest /nnunet_data/NanoUNet_preprocessed/Dataset999_Merged/valset_1500.json \
   --val-every-n-epochs 2 --prompts-per-patch 2 --consistency-weight 0.02
 ```
@@ -53,7 +53,7 @@ nanounet_train -d 999 --plans nnUNetResEncUNetLPlans_h200_smallpv \
 | `sampling.click_modes.pos` | float | `1.0` | Probability a lesion present in the patch keeps its click. `0.8` drops 20% of lesions, which is now also 20% of the suppression signal -- boundary clipping no longer contributes |
 | `sampling.click_modes.drop` | float | `0.0` | Must satisfy `pos + drop == 1` (validated in `config.py`) |
 
-`configs/default.json` is deliberately untouched, so the 600-epoch baseline stays reproducible.
+`nanounet/configs/default.json` is deliberately untouched, so the 600-epoch baseline stays reproducible.
 
 ## Mechanism
 
@@ -124,4 +124,4 @@ the input differs (the click channel), but the shortcut is gone.
 The failure mode to watch for is over-suppression: it shows up as false negatives on
 `val/all_clicked/val_dice` while `none_clicked` looks excellent.
 
-See `docs/handoffs/PLAN_step6_instance_targets.md` for the full specification and acceptance checks.
+See `nanounet/docs/handoffs/PLAN_step6_instance_targets.md` for the full specification and acceptance checks.

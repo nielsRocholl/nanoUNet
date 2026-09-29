@@ -142,5 +142,5 @@ def assert_mem_diag_cgroup() -> None:
         raise RuntimeError(
             "mem-diag is on but this process is in the root cgroup (0::/), which measures node-wide RAM, not this process.\n"
             "Expected a per-job cgroup, which Slurm creates automatically.\n"
-            "Fix: submit via Slurm (sbatch/srun), or set NANOUNET_ALLOW_ROOT_CGROUP=1 to measure node-wide RAM anyway   (see docs/dev-notes/cgroup_memory.md)"
+            "Fix: submit via Slurm (sbatch/srun), or set NANOUNET_ALLOW_ROOT_CGROUP=1 to measure node-wide RAM anyway   (see nanounet/docs/dev-notes/cgroup_memory.md)"
         )

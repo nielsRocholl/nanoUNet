@@ -73,18 +73,18 @@ def main() -> None:
             f"No seg model at {model_dir}.\n"
             f"Expected a nanoUNet run dir with plans.json and checkpoints/last.ckpt.\n"
             f"Fix: nanounet_segtrack -m $NANOUNET_RESULTS/nanounet/<run>   or export NANOUNET_SEGTRACK_MODEL=...\n"
-            f"(see docs/steps/track.md)"
+            f"(see nanounet/docs/steps/track.md)"
         )
     if not track_ckpt.is_file():
         raise SystemExit(
             f"No checkpoint at {track_ckpt}.\n"
             f"Expected a Lightning .ckpt from lesionglue_train.\n"
-            f"Fix: --track-ckpt {DEPLOYED_CKPT}  (see docs/steps/track.md)"
+            f"Fix: --track-ckpt {DEPLOYED_CKPT}  (see nanounet/docs/steps/track.md)"
         )
     d = args.device
     if (d == "cuda" and not torch.cuda.is_available()) or (d == "mps" and not torch.backends.mps.is_available()):
         raise SystemExit(
-            f"--device {d} is not available.\nExpected a working {d} device.\nFix: --device cpu  (see docs/steps/track.md)"
+            f"--device {d} is not available.\nExpected a working {d} device.\nFix: --device cpu  (see nanounet/docs/steps/track.md)"
         )
     matcher = load_matcher(track_ckpt, d)
     gcfg = graph_cfg_from_ckpt(matcher, int(getattr(matcher.hparams, "k_intra", 8)))
@@ -118,7 +118,7 @@ def main() -> None:
             f"{n_all} cases  ·  0 linked  ·  0 empty  ·  {n_skip} skip\n"
             f"0 pairs  ·  0m 00s\n"
             f"wrote  {parent}\n"
-            f"next   docs/steps/track.md",
+            f"next   nanounet/docs/steps/track.md",
             border_style="green",
         ))
         return
@@ -180,7 +180,7 @@ def main() -> None:
         f"{n_pairs} pairs  ·  {mins}m {secs:02d}s\n"
         f"wrote  {parent}\n"
         f"next   open fu.mha — same integer = same lesion\n"
-        f"       docs/reference/track_ids.md",
+        f"       nanounet/docs/reference/track_ids.md",
         border_style="green",
     ))
 

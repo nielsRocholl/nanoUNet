@@ -40,7 +40,7 @@ def fold_keys(splits: List[dict], fold: int | str) -> tuple[list[str], list[str]
         raise IndexError(
             f"--fold {fold} but splits_final.json holds {len(splits)} split(s) (valid: 0"
             f"{'' if len(splits) == 1 else f'-{len(splits) - 1}'}).\n"
-            f"This dataset uses a single balanced split (see docs/steps/valset.md).\n"
+            f"This dataset uses a single balanced split (see nanounet/docs/steps/valset.md).\n"
             f"Fix: pass --fold 0"
         )
     return splits[fold]["train"], splits[fold]["val"]

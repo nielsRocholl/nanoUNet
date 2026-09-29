@@ -45,9 +45,9 @@ raising `--time` past 7 days. No ablation budget.
 - Reuse the Dataset999 MAE (`.../mae_pretrain/checkpoints/last.ckpt`, 250 ep, `val_recon_loss`
   0.1070). It was trained under the old case-level split and saw other timepoints of val patients.
 - Re-preprocess, re-plan, or rebuild splits. Dataset900 is done (see below).
-- Use `configs/longrun.json` (Dataset999 cohort keys: has `d010`, missing `d026,d028–d031` —
+- Use `nanounet/configs/longrun.json` (Dataset999 cohort keys: has `d010`, missing `d026,d028–d031` —
   `CohortSampler` will raise on 900).
-- Use `configs/finetune_d013.json` (`click_modes.pos=1.0` — that is the old semantic objective).
+- Use `nanounet/configs/finetune_d013.json` (`click_modes.pos=1.0` — that is the old semantic objective).
 - Use `--only-prefix`. A 500-ep d013-only finetune specialised (`val_dice` 0.70→0.61). A short
   80-ep d013-only run (wandb `i4q2oamw`) *did* help small-tag and selectivity; the mixed-FT recipe
   in §5b keeps that benefit and the other 20 cohorts as regularisers.
@@ -254,8 +254,8 @@ Import this everywhere a `+ 2` currently means "two prompt channels". Do not lea
 - `nanounet/config.py`: delete `LargeLesionConfig`, `_load_large`, the `large_lesion` field on
   `SamplingConfig`, and `ll = _require(d, "large_lesion")` plus `_load_large(ll)` in
   `_load_sampling`. After this, a leftover JSON key is ignored (unknown keys are not read).
-- Delete the `"large_lesion"` block from `configs/default.json`, `configs/instance_conditional.json`,
-  `configs/finetune_d013.json`, `configs/longrun.json`.
+- Delete the `"large_lesion"` block from `nanounet/configs/default.json`, `nanounet/configs/instance_conditional.json`,
+  `nanounet/configs/finetune_d013.json`, `nanounet/configs/longrun.json`.
 
 ### 2.4 Verify
 
@@ -406,7 +406,7 @@ Today `ckpt_dir = "finetune" if args.init_weights else "checkpoints"`. FT resume
 
 ## 5. Configs and validation manifest
 
-### 5a. `configs/longrun900.json` — write this exact file
+### 5a. `nanounet/configs/longrun900.json` — write this exact file
 
 No `cohorts` block: `CohortSampler` then loads
 `Dataset900_Merged/cohorts.json` (already correct, d013=0.0909). Site-balanced vs the old forced
@@ -445,7 +445,7 @@ No `large_lesion`. Do not change the prompt block.
 
 `load_config` this file after §2.3 or it will still `_require("large_lesion")`.
 
-### 5b. `configs/finetune900_d013.json` — write this exact file
+### 5b. `nanounet/configs/finetune900_d013.json` — write this exact file
 
 Same as 5a plus a `cohorts` override that **names all 21 Dataset900 prefixes** (d011–d031) and
 sets d013=0.38, remainder rescaled from site-balanced. `fg_patch_prob` stays 0.67 (the old
@@ -499,7 +499,7 @@ export NANOUNET_PREPROCESSED=/nnunet_data/NanoUNet_preprocessed
 export NANOUNET_RESULTS=/nnunet_data/NanoUNet_results
 
 nanounet_build_valset -d 900 --plans nnUNetResEncUNetLPlans_h200_smallpv \
-  --config configs/longrun900.json \
+  --config nanounet/configs/longrun900.json \
   --out /nnunet_data/NanoUNet_preprocessed/Dataset900_Merged/valset_2000.json \
   --n-patches 2000 --mix 0.35,0.15,0.30,0.20 --seed 1234 --max-tries 120
 ```
@@ -545,12 +545,12 @@ Point env at NFS. Skip `rclone`. After §2–§5:
 | # | Command | Passes when |
 |---|---|---|
 | 1 | grep in §2.4 | empty |
-| 2 | `python3 -c "from nanounet.config import load_config; load_config('configs/longrun900.json'); load_config('configs/finetune900_d013.json')"` | no raise |
+| 2 | `python3 -c "from nanounet.config import load_config; load_config('nanounet/configs/longrun900.json'); load_config('nanounet/configs/finetune900_d013.json')"` | no raise |
 | 3 | `python3 -c` build_net on Dataset900 plans, print `next(net.parameters()).shape` wait — first conv: `net.encoder.stem.convs[0].conv.weight.shape[1] == 2` | 2 |
 | 4 | `draw_kept` 20k-patch sim (§3) | ~56.7/29.1/14.2, never 0 or n on n≥2 |
 | 5 | Parse the exact stage-1/2 argv (no fit): `from nanounet.cli.train_parser import build_train_parser, validate_train_args` + `parse_args([...])` | no raise; `mae_pretrain True`; `loss=='dc_ce'`; `mae_epochs==250`; `epochs==1200`; `iters_per_epoch==1000` |
 | 6 | Same for FT argv: `init_weights` set, `optimizer=='adamw'`, `epochs==80`, `only_prefix is None`, **no** `--mae-pretrain`, **no** `--longi` | no raise |
-| 7 | 1-epoch / 2-iter smoke (NFS IO is slow; that is fine): `--mae-pretrain --mae-epochs 1 --epochs 0` is illegal because supervised still runs. Instead run **two** smokes: (a) `nanounet_pretrain -d 900 --plans nnUNetResEncUNetLPlans_h200_smallpv --epochs 1 --iters-per-epoch 2 --val-iters 1 --batch-size 2 --dl-bucket s --no-wandb --out /tmp/mae_smoke` (b) `nanounet_train -d 900 --plans ... --config configs/longrun900.json --mae-ckpt <smoke last.ckpt> --epochs 1 --iters-per-epoch 2 --val-iters 1 --batch-size 2 --prompts-per-patch 2 --consistency-weight 0.02 --dl-bucket s --no-wandb --out /tmp/sup_smoke` — **without** `--val-manifest` so you do not need the 2000-patch set yet. Delete `/tmp/*_smoke` after. | both exit 0 |
+| 7 | 1-epoch / 2-iter smoke (NFS IO is slow; that is fine): `--mae-pretrain --mae-epochs 1 --epochs 0` is illegal because supervised still runs. Instead run **two** smokes: (a) `nanounet_pretrain -d 900 --plans nnUNetResEncUNetLPlans_h200_smallpv --epochs 1 --iters-per-epoch 2 --val-iters 1 --batch-size 2 --dl-bucket s --no-wandb --out /tmp/mae_smoke` (b) `nanounet_train -d 900 --plans ... --config nanounet/configs/longrun900.json --mae-ckpt <smoke last.ckpt> --epochs 1 --iters-per-epoch 2 --val-iters 1 --batch-size 2 --prompts-per-patch 2 --consistency-weight 0.02 --dl-bucket s --no-wandb --out /tmp/sup_smoke` — **without** `--val-manifest` so you do not need the 2000-patch set yet. Delete `/tmp/*_smoke` after. | both exit 0 |
 | 8 | `nanounet_lesion_weights` (§6.1) on NFS | coverage printed |
 | 9 | `nanounet_build_valset` (§5c) on NFS | 2000 patches, small n≥350, `.targets.npz` exists |
 
@@ -581,13 +581,13 @@ or `nnUNet_*` exports.
 
 Differences that matter:
 
-- Dataset **900**, config `configs/longrun900.json`.
+- Dataset **900**, config `nanounet/configs/longrun900.json`.
 - **`--include "cohorts.json"`** in rclone. 999 overrode cohorts in JSON so it did not stage this
   file. 900 has no override — `CohortSampler` reads `cohorts.json` from the preprocessed root.
   Also `--include "valset_2000*"` (json + npz).
 - Integrated `--mae-pretrain --mae-epochs 250` then 1200-ep supervised in **one** `nanounet_train`.
 - Then a second `nanounet_train` in the same job for 80-ep mixed FT (`--init-weights` from
-  `bestsel`/`best`, `--config configs/finetune900_d013.json`, separate `--out` so FT cannot clobber
+  `bestsel`/`best`, `--config nanounet/configs/finetune900_d013.json`, separate `--out` so FT cannot clobber
   supervised checkpoints).
 - No `--longi`. No Dataset999 MAE path. No `--only-prefix`.
 - `--time=7-00:00:00` (qos=vram as used on slowpoke). **Do not write 4.04 days.** Arithmetic:
@@ -648,7 +648,7 @@ resubmit re-runs rclone then `--resume`.
 nanounet_train \
   -d 900 -f 0 \
   --plans nnUNetResEncUNetLPlans_h200_smallpv \
-  --config configs/longrun900.json \
+  --config nanounet/configs/longrun900.json \
   --val-manifest "$VAL_MANIFEST" \
   --val-every-n-epochs 2 \
   --out "$OUT" \
@@ -691,7 +691,7 @@ init ckpt per §4.3. Separate out dir:
 nanounet_train \
   -d 900 -f 0 \
   --plans nnUNetResEncUNetLPlans_h200_smallpv \
-  --config configs/finetune900_d013.json \
+  --config nanounet/configs/finetune900_d013.json \
   --val-manifest "$VAL_MANIFEST" \
   --val-every-n-epochs 2 \
   --init-weights "$INIT_CKPT" \
@@ -793,7 +793,7 @@ Fully reversible; do not bake a new threshold into this training job.
 | `--longi` / DWT this job | User: not this run. |
 | Reuse Dataset999 MAE | Split leak. |
 | `require_weights: true` | Only d013 has a meta CSV. Would crash the other 20 prefixes. |
-| `configs/longrun.json` / `finetune_d013.json` | Wrong cohort keys / `pos=1.0`. |
+| `nanounet/configs/longrun.json` / `finetune_d013.json` | Wrong cohort keys / `pos=1.0`. |
 | Separate `nanounet_pretrain` job | Would copy 332 GB twice. Use integrated `--mae-pretrain`. |
 | `--mae-iters-per-epoch 250` | Would cut MAE to 62.5k steps; proven run was 250k. |
 | Assume 1200 ep fits in 4 days | 578×1200 = **8.03 days**; wandb runtime 8.0 d. qos 7 d ⇒ resume. |
@@ -811,7 +811,7 @@ Before `sbatch`:
       valset exists; can be `--epochs 1 --iters-per-epoch 2` on NFS)
 - [ ] `bestsel-*.ckpt` would be configured (inspect `fit.py` callbacks if the 1-ep val did not
       fire the monitor yet)
-- [ ] `configs/longrun900.json` and `finetune900_d013.json` load; CohortSampler against Dataset900
+- [ ] `nanounet/configs/longrun900.json` and `finetune900_d013.json` load; CohortSampler against Dataset900
       keys (the FT file names all 21)
 - [ ] `valset_2000.json` + `.targets.npz`; small n ≥ 350
 - [ ] `d013_*_weights.json` present; coverage reported

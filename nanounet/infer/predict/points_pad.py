@@ -23,7 +23,7 @@ def resolve_pts_pad(
             raise ValueError(
                 "pass points_xyz or points_zyx_unpadded, not both\n"
                 "Expected exactly one of points_xyz or points_zyx_unpadded to be set.\n"
-                "Fix: pass only one of --points (points_xyz) or the precomputed points_zyx_unpadded, not both. See docs/steps/predict.md"
+                "Fix: pass only one of --points (points_xyz) or the precomputed points_zyx_unpadded, not both. See nanounet/docs/steps/predict.md"
             )
         if not points_zyx_unpadded:
             return []

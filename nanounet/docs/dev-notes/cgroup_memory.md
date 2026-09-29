@@ -70,11 +70,11 @@ Rejected as fixes: raising `--mem`, splitting MAE into multiple jobs, job-only w
 
 | Component | What it does |
 |-----------|----------------|
-| [`nanounet/runtime.py`](../nanounet/runtime.py) | `set_safe_tmpdir()` — TMPDIR on disk, not tmpfs; prefers `$NANOUNET_TMPDIR`, `<run>/.tmp`, `$NANOUNET_RESULTS/.nanounet_tmp`; warns if under `$HOME` |
-| [`nanounet/diag/tmp_purge.py`](../nanounet/diag/tmp_purge.py) | Purges stale checkpoint temps on `/tmp` + `TMPDIR`, `/dev/shm` torch IPC (uid + age) — the permanent fix, runs every epoch unconditionally |
-| [`nanounet/diag/cgroup.py`](../nanounet/diag/cgroup.py) | `cgroup_scope`, tmpfs detection used by `set_safe_tmpdir` |
-| [`nanounet/data/blosc2_dataset.py`](../nanounet/data/blosc2_dataset.py) | `fadvise` after close; `POSIX_FADV_RANDOM` on open |
-| [`nanounet/dataloader_prefs.py`](../nanounet/dataloader_prefs.py) | `--dl-bucket` s/m/l (2/1, 4/2, 8/4 train/val when TMPDIR off tmpfs); `--dl-persistent-workers`; `file_system` IPC; `NANOUNET_DL_FORCE_NO_WORKERS=1` escape hatch |
+| [`nanounet/runtime.py`](../../runtime.py) | `set_safe_tmpdir()` — TMPDIR on disk, not tmpfs; prefers `$NANOUNET_TMPDIR`, `<run>/.tmp`, `$NANOUNET_RESULTS/.nanounet_tmp`; warns if under `$HOME` |
+| [`nanounet/diag/tmp_purge.py`](../../diag/tmp_purge.py) | Purges stale checkpoint temps on `/tmp` + `TMPDIR`, `/dev/shm` torch IPC (uid + age) — the permanent fix, runs every epoch unconditionally |
+| [`nanounet/diag/cgroup.py`](../../diag/cgroup.py) | `cgroup_scope`, tmpfs detection used by `set_safe_tmpdir` |
+| [`nanounet/data/store/blosc2_dataset.py`](../../data/store/blosc2_dataset.py) | `fadvise` after close; `POSIX_FADV_RANDOM` on open |
+| [`nanounet/data/loader/prefs.py`](../../data/loader/prefs.py) | `--dl-bucket` s/m/l (2/1, 4/2, 8/4 train/val when TMPDIR off tmpfs); `--dl-persistent-workers`; `file_system` IPC; `NANOUNET_DL_FORCE_NO_WORKERS=1` escape hatch |
 
 Each epoch: `purge_torch_tmp()` removes stale checkpoint stage files under `/tmp` (if tmpfs), `TMPDIR`, and stale `/dev/shm/torch_*` owned by your uid (belt-and-suspenders).
 

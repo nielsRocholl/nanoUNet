@@ -59,14 +59,14 @@ def _stems(folder: Path) -> dict[str, Path]:
         raise FileNotFoundError(
             f"No input folder at {folder}.\n"
             f"Expected a folder of {{stem}}{END} + sibling {{stem}}.json.\n"
-            f"Fix: --bl-dir / --fu-dir like inputsTrBL / inputsTrFU  (see docs/steps/track.md)"
+            f"Fix: --bl-dir / --fu-dir like inputsTrBL / inputsTrFU  (see nanounet/docs/steps/track.md)"
         )
     out = {p.name[: -len(END)]: p for p in sorted(folder.glob(f"*{END}"))}
     if not out:
         raise SystemExit(
             f"No {END} scans in {folder}.\n"
             f"Expected .nii.gz CTs (sibling .json per case).\n"
-            f"Fix: pass --bl-dir / --fu-dir  (see docs/steps/track.md)"
+            f"Fix: pass --bl-dir / --fu-dir  (see nanounet/docs/steps/track.md)"
         )
     return out
 
@@ -83,7 +83,7 @@ def pair_folder(
             raise SystemExit(
                 "no cases match --patients-csv.\n"
                 "Expected CSV column 'patient' matching stem prefixes.\n"
-                "Fix: --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv  (see docs/steps/track.md)"
+                "Fix: --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv  (see nanounet/docs/steps/track.md)"
             )
     skipped: list[tuple[str, str]] = [(s, "no FU scan") for s in sorted(set(bl) - set(fu))]
     skipped += [(s, "no BL scan") for s in sorted(set(fu) - set(bl))]
@@ -94,14 +94,14 @@ def pair_folder(
             f"--bl-dir has {len(bl)} stems, --fu-dir has {len(fu)} "
             f"(e.g. {', '.join(sorted(bl)[:6]) or 'none'}).\n"
             "Expected matching {stem}.nii.gz in both folders.\n"
-            "Fix: pass matching inputsTrBL and inputsTrFU  (see docs/steps/track.md)"
+            "Fix: pass matching inputsTrBL and inputsTrFU  (see nanounet/docs/steps/track.md)"
         )
     md = Path(bl_mask_dir) if bl_mask_dir else None
     if md is not None and not md.is_dir():
         raise SystemExit(
             f"No BL mask folder at {md}.\n"
             "Expected a folder of {stem}.nii.gz instance masks.\n"
-            "Fix: --bl-mask-dir /nnunet_data/Longitudinal-CT/targetsTrBL  (see docs/steps/track.md)"
+            "Fix: --bl-mask-dir /nnunet_data/Longitudinal-CT/targetsTrBL  (see nanounet/docs/steps/track.md)"
         )
     cases: list[SegTrackCase] = []
     for s in both:

@@ -26,7 +26,7 @@ def _build_class(network_class: str, arch_kwargs: dict, req: list | tuple):
         raise ImportError(
             f"Cannot import {network_class!r} (module {mod_name!r}, class {cls_name!r}).\n"
             f"Expected plans[\"configurations\"][...][\"architecture\"][\"network_class_name\"] to be an importable dotted path.\n"
-            f"Fix: fix network_class_name in the plans JSON, or regenerate with nanounet_preprocess -d 501   (see docs/steps/preprocess.md)"
+            f"Fix: fix network_class_name in the plans JSON, or regenerate with nanounet_preprocess -d 501   (see nanounet/docs/steps/preprocess.md)"
         ) from e
     return nw, kwargs
 

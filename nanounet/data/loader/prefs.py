@@ -45,7 +45,7 @@ def _bucket_workers(name: Literal["s", "m", "l", "xl"]) -> DataloaderBucket:
     raise ValueError(
         f"Unknown dataloader bucket {name!r}.\n"
         f"Expected one of: s, m, l, xl (the --dl-bucket choices of nanounet_train / nanounet_pretrain).\n"
-        f"Fix: pass --dl-bucket s|m|l|xl   (see docs/steps/train.md)"
+        f"Fix: pass --dl-bucket s|m|l|xl   (see nanounet/docs/steps/train.md)"
     )
 
 

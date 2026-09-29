@@ -72,7 +72,7 @@ def convert_id_to_dataset_name(dataset_id: int) -> str:
         raise RuntimeError(
             f"No folder found for dataset id {dataset_id} (expected prefix {prefix!r}).\n"
             f"Expected a {prefix}_<name> folder under raw, preprocessed, or results env dirs.\n"
-            f"Fix: nanounet_preprocess -d {dataset_id} --planner nnUNetPlannerResEncL   (see docs/steps/preprocess.md)"
+            f"Fix: nanounet_preprocess -d {dataset_id} --planner nnUNetPlannerResEncL   (see nanounet/docs/steps/preprocess.md)"
         )
     return u[0]
 

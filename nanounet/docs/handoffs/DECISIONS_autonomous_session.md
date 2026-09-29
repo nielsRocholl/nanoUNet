@@ -33,7 +33,7 @@ silently removing 13.69% of foreground on top of the deliberate dropout. The mem
 (`96d4242`) took that to **0.00%**, so at `pos = 0.80` the total suppression signal is now exactly
 the 20% the human asked for — and 0.90 would undershoot to ~10%.
 
-`configs/longrun.json` reverted to `pos 0.80 / drop 0.20`. The original entry is kept below for the
+`nanounet/configs/longrun.json` reverted to `pos 0.80 / drop 0.20`. The original entry is kept below for the
 measurements it records, which are still the evidence for why the fix mattered.
 
 ### Original entry (numbers still valid, conclusion no longer)
@@ -61,11 +61,11 @@ the project's rule, but they were never *designed* as a suppression signal and t
 
 ### The decision
 
-**Long run: `pos = 0.90`** (`configs/longrun.json`). Interpolating the two bracketing measurements
+**Long run: `pos = 0.90`** (`nanounet/configs/longrun.json`). Interpolating the two bracketing measurements
 gives 0.895 for a 20% total; 0.90 is that, without pretending to precision the measurement does not
 support.
 
-**Probe: `pos = 0.80`** (`configs/instance_conditional.json`, unchanged).
+**Probe: `pos = 0.80`** (`nanounet/configs/instance_conditional.json`, unchanged).
 
 **Why they differ.** The probe asks *"does instance-conditional targeting teach selectivity at
 all?"* — that is cleanest at maximum signal. If it works at 0.80 we tune down; if it barely moves
@@ -89,7 +89,7 @@ is missing. Boundary fragments are lesion *pieces* at the patch edge, and the mo
 The human asked for ~20% total, so that is what was set. **If the probe shows selectivity failing
 to move, raising `pos` back toward 0.80 is the first lever, not the last.**
 
-**Reversible.** One number in `configs/longrun.json`.
+**Reversible.** One number in `nanounet/configs/longrun.json`.
 
 **Stakes.** Medium — it changes how strongly the new behaviour is trained.
 
@@ -97,7 +97,7 @@ to move, raising `pos` back toward 0.80 is the first lever, not the last.**
 
 ## D-A3 — Cohort weights: d013 0.25, d025 0.08
 
-**Decision.** `configs/longrun.json` sets `{"d013": 0.25, "d025": 0.08}`. The remaining 0.67 spreads
+**Decision.** `nanounet/configs/longrun.json` sets `{"d013": 0.25, "d025": 0.08}`. The remaining 0.67 spreads
 over the other 15 cohorts in proportion to their case counts.
 
 **Why d013 → 0.25.** It is the deployment target (longitudinal CT) and currently 9.1% of training.
@@ -123,7 +123,7 @@ to risk memorisation rather than generalisation, and the aim is to lift a weak c
 
 ## D-A4 — The probe changes exactly one thing
 
-**Decision.** `scripts/slurm_step6_probe_h200.sh` leaves `sampling.cohorts` empty and warm-starts
+**Decision.** `nanounet/scripts/slurm_step6_probe_h200.sh` leaves `sampling.cohorts` empty and warm-starts
 from `best-epoch=570-val_dice=0.8030.ckpt` at `lr 0.003` with 5 warmup epochs, 80 epochs.
 
 **Why warm-start.** 80 epochs from MAE init would still be climbing basic Dice and would say nothing
@@ -188,7 +188,7 @@ variable. Run the probe and replace the value before launching.
 
 ## Standing constraints honoured
 
-- `configs/default.json` untouched — the 600-epoch baseline stays reproducible.
+- `nanounet/configs/default.json` untouched — the 600-epoch baseline stays reproducible.
 - No permanent `tests/` folder (R16); verification scripts written, run, reported, deleted.
 - Every file under 200 LOC except `fit.py`, which the human explicitly allowed over.
 - Explicit paths staged, never `git add -A` (that caused a mixed commit last session).

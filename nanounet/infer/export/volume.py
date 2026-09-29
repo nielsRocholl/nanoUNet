@@ -78,7 +78,7 @@ def export_prediction_from_logits(
         raise NotImplementedError(
             "save_probabilities\n"
             "Expected save_probabilities=False; nanoUNet's inference export only writes hard segmentations, not probability maps.\n"
-            "Fix: call export_prediction_from_logits with save_probabilities=False (only segmentation .nii.gz export is implemented)   (see docs/steps/predict.md)"
+            "Fix: call export_prediction_from_logits with save_probabilities=False (only segmentation .nii.gz export is implemented)   (see nanounet/docs/steps/predict.md)"
         )
     native = native_seg_from_logits(logits, props, cm, plans, tiles)
     rw = reader_writer_class_from_dataset(dataset_json, None, verbose=False)()

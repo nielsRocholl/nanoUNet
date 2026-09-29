@@ -114,7 +114,7 @@ def normalization_class_from_plan_name(scheme_name: str) -> type:
             f"{scheme_name}\n"
             f"Expected one of zscorenormalization, ctnormalization, nonormalization, "
             f"rescaleto01normalization, rgbto01normalization as plans.json 'normalization_schemes'.\n"
-            f"Fix: fix the scheme name in plans.json, or regenerate it with nanounet_preprocess -d 501. See docs/steps/preprocess.md"
+            f"Fix: fix the scheme name in plans.json, or regenerate it with nanounet_preprocess -d 501. See nanounet/docs/steps/preprocess.md"
         )
     return c
 

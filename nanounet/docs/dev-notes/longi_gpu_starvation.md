@@ -14,7 +14,7 @@ Two compounding facts:
 
 1. **The d114 slurm script regressed `--dl-bucket` from `l` (8 workers) to `m` (4 workers).**
    The d013 longi/registered scripts that hit 95% use `--dl-bucket l`
-   (`scripts/slurm_nanounet_finetune_d013_{longi,registered}.sh:112,102`). The new d114
+   (`nanounet/scripts/slurm_nanounet_finetune_d013_{longi,registered}.sh:112,102`). The new d114
    script was written with `m`. This is the primary regression.
 
 2. **Longi is dataloader-bound: the pipeline is CPU-limited, not GPU-limited.** Per-patch
@@ -41,7 +41,7 @@ Two compounding facts:
 headroom there and projects to ~95% util / ~<=1000 s/epoch — matching the d013 result.
 
 ## Fix
-`scripts/slurm_nanounet_finetune_d114_registered.sh`: `--dl-bucket l`, A100-only (dropped the
+`nanounet/scripts/slurm_nanounet_finetune_d114_registered.sh`: `--dl-bucket l`, A100-only (dropped the
 H200 batch-10 branch). Rule of thumb: **never run longi below bucket `l`.**
 
 ## Augmentation synchronization (verified — no bug)

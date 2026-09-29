@@ -54,7 +54,7 @@ def main() -> None:
         raise SystemExit(
             "--metrics-out was set without --gt-dir.\n"
             "Scoring needs instance-labeled native GT with the same stems as -i.\n"
-            "Fix: nanounet_predict ... --gt-dir <targetsTrFU> --metrics-out <stem>   (see docs/steps/predict.md)"
+            "Fix: nanounet_predict ... --gt-dir <targetsTrFU> --metrics-out <stem>   (see nanounet/docs/steps/predict.md)"
         )
 
     nano_header("nanoUNet predict", color="blue")
@@ -83,16 +83,16 @@ def main() -> None:
                 raise SystemExit(
                     f"No cases match --patients-csv {args.patients_csv!r}.\n"
                     f"Expected the CSV's 'patient' column to match an -i case id prefix (e.g. 03b90eb112_00).\n"
-                    f"Fix: check --patients-csv {args.patients_csv} for a 'patient' column matching your case ids   (see docs/steps/predict.md)"
+                    f"Fix: check --patients-csv {args.patients_csv} for a 'patient' column matching your case ids   (see nanounet/docs/steps/predict.md)"
                 )
         missing = [cid for cid, _, jp, _ in cases if not os.path.isfile(jp)]
         if missing:
-            raise SystemExit(f"missing points JSON for: {', '.join(missing)}.\nExpected sibling <case>.json next to each scan in -i.\nFix: add the JSON (empty points [] if no clicks)  (see docs/steps/predict.md)")
+            raise SystemExit(f"missing points JSON for: {', '.join(missing)}.\nExpected sibling <case>.json next to each scan in -i.\nFix: add the JSON (empty points [] if no clicks)  (see nanounet/docs/steps/predict.md)")
         out_dir = args.output
         maybe_mkdir_p(out_dir)
     else:
         if not args.points:
-            raise SystemExit("single mode requires --points\nExpected --points <case>.json next to the scan.\nFix: nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json -m <run>  (see docs/steps/predict.md)")
+            raise SystemExit("single mode requires --points\nExpected --points <case>.json next to the scan.\nFix: nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json -m <run>  (see nanounet/docs/steps/predict.md)")
         scan = args.input
         case_id = os.path.basename(scan)
         if case_id.endswith(end):

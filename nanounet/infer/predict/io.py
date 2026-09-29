@@ -18,7 +18,7 @@ def patient_ids_from_csv(path: str) -> set[str]:
         raise SystemExit(
             f"No patients CSV at '{path}'.\n"
             f"Expected a CSV with a 'patient' column of id prefixes.\n"
-            f"Fix: --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv  (see docs/steps/predict.md)"
+            f"Fix: --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv  (see nanounet/docs/steps/predict.md)"
         )
     with open(path, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
@@ -26,7 +26,7 @@ def patient_ids_from_csv(path: str) -> set[str]:
         raise SystemExit(
             f"Empty patients CSV '{path}'.\n"
             f"Expected a header plus one patient id per row.\n"
-            f"Fix: --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv  (see docs/steps/predict.md)"
+            f"Fix: --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv  (see nanounet/docs/steps/predict.md)"
         )
     col = "patient" if "patient" in rows[0] else next(iter(rows[0]))
     out = {r[col].strip() for r in rows if r[col].strip()}
@@ -34,7 +34,7 @@ def patient_ids_from_csv(path: str) -> set[str]:
         raise SystemExit(
             f"No patient ids in '{path}' (column '{col}').\n"
             f"Expected non-empty 'patient' cells matching -i stem prefixes.\n"
-            f"Fix: --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv  (see docs/steps/predict.md)"
+            f"Fix: --patients-csv /nnunet_data/Longitudinal-CT/test_patients.csv  (see nanounet/docs/steps/predict.md)"
         )
     return out
 

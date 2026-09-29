@@ -19,7 +19,7 @@ Merge with a custom split fraction and a fixed validation manifest built in the 
 
 ```bash
 nanounet_preprocess -d 11 12 13 --merged-id 900 --merged-name Merged -np 16 \
-  --val-frac 0.15 --split-seed 12345 --valset-config configs/default.json --valset-n 1500
+  --val-frac 0.15 --split-seed 12345 --valset-config nanounet/configs/default.json --valset-n 1500
 ```
 
 Tiny local model:
@@ -53,7 +53,7 @@ Regenerating sidecars overwrites files that existing checkpoints depend on. Back
 | `--skip-fingerprint` | flag | off | Skip fingerprint; use existing `dataset_fingerprint.json` |
 | `--skip-plan` | flag | off | Skip planning; requires `--plans-name` |
 | `--sidecars-only` | flag | off | Regenerate `*_centroids.json` sidecars only; requires `--plans-name`; never touches `.b2nd`, plans, or `gt_segmentations` |
-| `--val-frac` | float | `0.15` | Held-out fraction for `splits_final.json`, balanced within each source dataset (see [`nanounet_build_splits`](../../nanounet/cli/build_splits.py)) |
+| `--val-frac` | float | `0.15` | Held-out fraction for `splits_final.json`, balanced within each source dataset (see [`nanounet_build_splits`](../../cli/build_splits.py)) |
 | `--split-seed` | int | `12345` | RNG seed for the balanced train/val split |
 | `--no-splits` | flag | off | Skip writing `splits_final.json` / `cohorts.json` (e.g. re-preprocessing without disturbing an existing split) |
 | `--valset-config` | str | `None` | ROI config path; when set, also builds the fixed validation manifest via `nanounet_build_valset` |

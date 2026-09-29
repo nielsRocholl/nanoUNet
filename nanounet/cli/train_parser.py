@@ -14,7 +14,7 @@ def build_train_parser() -> argparse.ArgumentParser:
     ap.add_argument("-d", "--dataset_id", type=int, required=True, help="Dataset id, matched against Dataset<NNN>_* under raw/preprocessed/results (zero-padded to 3 digits).")
     ap.add_argument("-f", "--fold", type=parse_fold, default=0, help="Fold 0-4 or 'all'.")
     ap.add_argument("--plans", dest="plans_identifier", required=True, help="Plans identifier: basename of the plans JSON under the preprocessed dataset dir (no .json suffix).")
-    ap.add_argument("--config", dest="roi_cfg", default="configs/default.json", help="ROI/prompt config JSON; relative paths are tried under cwd then the repo root.")
+    ap.add_argument("--config", dest="roi_cfg", default="nanounet/configs/default.json", help="ROI/prompt config JSON; relative paths are tried under cwd then the repo root.")
     ap.add_argument("--val-manifest", default=None, help="fixed validation manifest from nanounet_build_valset; omit for the legacy per-epoch random val sampling")
     ap.add_argument("--epochs", type=int, default=1000, help="Supervised training epoch budget.")
     ap.add_argument("--lr", type=float, default=0.01, help="Supervised initial learning rate.")
@@ -67,7 +67,7 @@ def validate_train_args(args) -> None:
         raise ValueError(
             f"--mae-resume {args.mae_resume} was given without --mae-pretrain.\n"
             f"Expected --mae-pretrain whenever --mae-resume points at an MAE checkpoint to continue.\n"
-            f"Fix: add --mae-pretrain   (see docs/steps/train.md)"
+            f"Fix: add --mae-pretrain   (see nanounet/docs/steps/train.md)"
         )
     if args.mae_resume and args.mae_ckpt:
         raise ValueError(
@@ -80,7 +80,7 @@ def validate_train_args(args) -> None:
             raise ValueError(
                 f"--init-weights {args.init_weights} does not exist.\n"
                 f"Expected a checkpoint file to warm-start from.\n"
-                f"Fix: pass an existing --init-weights path   (see docs/steps/train.md)"
+                f"Fix: pass an existing --init-weights path   (see nanounet/docs/steps/train.md)"
             )
         if args.resume:
             raise ValueError(
