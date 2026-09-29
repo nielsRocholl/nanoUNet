@@ -68,7 +68,11 @@ class RoiPromptConfig:
 
 def _require(d: dict, key: str) -> object:
     if key not in d:
-        raise KeyError(key)
+        raise KeyError(
+            f"Missing required config key {key!r}.\n"
+            f"Expected every ROI-prompt config JSON to define it (see configs/default.json for a working example).\n"
+            f"Fix: add \"{key}\": ... to your config JSON   (see docs/reference/config.md)"
+        )
     return d[key]
 
 
@@ -81,18 +85,34 @@ def _load_prop(d: dict | None) -> PropagatedConfig:
 def _load_sampling(d: dict) -> SamplingConfig:
     fgp = float(_require(d, "fg_patch_prob"))
     if not 0.0 <= fgp <= 1.0:
-        raise ValueError("fg_patch_prob must be in [0, 1]")
+        raise ValueError(
+            f"sampling.fg_patch_prob={fgp} is outside [0, 1].\n"
+            f"Expected a probability in [0, 1] (see configs/default.json for a working example).\n"
+            f"Fix: set sampling.fg_patch_prob to a value in [0, 1]   (see docs/reference/config.md)"
+        )
     cm = _require(d, "click_modes")
     assert isinstance(cm, dict)
     p = float(cm["pos"])
     dr = float(cm["drop"])
     if p < 0 or p > 1 or dr < 0 or dr > 1:
-        raise ValueError("click_modes pos and drop must be in [0, 1]")
+        raise ValueError(
+            f"sampling.click_modes.pos={p} and/or drop={dr} are outside [0, 1].\n"
+            f"Expected both to be probabilities in [0, 1] (see configs/default.json).\n"
+            f"Fix: set sampling.click_modes.pos and .drop to values in [0, 1]   (see docs/reference/config.md)"
+        )
     if abs(p + dr - 1.0) > 1e-5:
-        raise ValueError("click_modes.pos + click_modes.drop must sum to 1")
+        raise ValueError(
+            f"sampling.click_modes.pos={p} and drop={dr} do not sum to 1.\n"
+            f"Expected sampling.click_modes.pos + .drop to sum to exactly 1 (see configs/default.json).\n"
+            f"Fix: adjust sampling.click_modes.pos/.drop so they sum to 1   (see docs/reference/config.md)"
+        )
     fp_prob = float(d.get("false_pos_probability", 1.0))
     if fp_prob < 0 or fp_prob > 1:
-        raise ValueError("false_pos_probability must be in [0, 1]")
+        raise ValueError(
+            f"sampling.false_pos_probability={fp_prob} is outside [0, 1].\n"
+            f"Expected a probability in [0, 1] (see configs/default.json).\n"
+            f"Fix: set sampling.false_pos_probability to a value in [0, 1]   (see docs/reference/config.md)"
+        )
     return SamplingConfig(
         fg_patch_prob=fgp,
         click_modes=ClickModeConfig(pos=p, drop=dr),
@@ -107,10 +127,18 @@ def _load_sampling(d: dict) -> SamplingConfig:
 def _load_prompt(d: dict) -> PromptConfig:
     enc = str(_require(d, "encoding"))
     if enc not in ("binary", "edt"):
-        raise ValueError(enc)
+        raise ValueError(
+            f"prompt.encoding={enc!r} is not a supported encoding.\n"
+            f"Expected one of: binary, edt (see configs/default.json).\n"
+            f"Fix: set prompt.encoding to \"binary\" or \"edt\"   (see docs/reference/config.md)"
+        )
     sc = float(d.get("prompt_intensity_scale", 1.0))
     if sc <= 0 or sc > 1:
-        raise ValueError("prompt_intensity_scale in (0,1]")
+        raise ValueError(
+            f"prompt.prompt_intensity_scale={sc} is outside (0, 1].\n"
+            f"Expected a value greater than 0 and at most 1 (see configs/default.json).\n"
+            f"Fix: set prompt.prompt_intensity_scale to a value in (0, 1]   (see docs/reference/config.md)"
+        )
     return PromptConfig(
         point_radius_vox=int(_require(d, "point_radius_vox")),
         encoding=cast(Literal["binary", "edt"], enc),
@@ -131,7 +159,11 @@ def _load_inf(d: dict | None) -> InferenceConfig:
 def _load_validation(d: dict | None) -> ValidationConfig:
     f = float(d.get("no_lesion_frac", 0.3)) if isinstance(d, dict) else 0.3
     if not 0.0 <= f <= 1.0:
-        raise ValueError("validation.no_lesion_frac must be in [0, 1]")
+        raise ValueError(
+            f"validation.no_lesion_frac={f} is outside [0, 1].\n"
+            f"Expected a fraction in [0, 1] (see configs/default.json).\n"
+            f"Fix: set validation.no_lesion_frac to a value in [0, 1]   (see docs/reference/config.md)"
+        )
     return ValidationConfig(no_lesion_frac=f)
 
 
@@ -139,7 +171,11 @@ def load_config(path: str | Path) -> RoiPromptConfig:
     p = Path(path)
     d = json.loads(p.read_text(encoding="utf-8"))
     if not isinstance(d, dict):
-        raise ValueError("config root must be dict")
+        raise ValueError(
+            f"Config file {p} does not parse to a JSON object (dict).\n"
+            f"Expected a top-level object, as in configs/default.json.\n"
+            f"Fix: wrap the config in a top-level JSON object   (see docs/reference/config.md)"
+        )
     pr = _require(d, "prompt")
     sa = _require(d, "sampling")
     assert isinstance(pr, dict) and isinstance(sa, dict)

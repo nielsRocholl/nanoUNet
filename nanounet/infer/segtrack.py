@@ -33,7 +33,7 @@ def segment_native(net, lm, cfg, pl, cm, dev, pack, *,
                    use_tta, border_expand=True, max_border_extra=MAX_BORDER_EXTRA, batch_size=8,
                    use_amp=True, cluster_margin_frac=0.1, inference_mode="clustered",
                    no_prompt_encode=False) -> tuple[np.ndarray, dict]:
-    pad_cpu, slicer_revert, props, points_xyz, bl_points = pack
+    pad_cpu, slicer_revert, props, points_xyz = pack
     # Keep the full torso on CPU. H2D is the patch crop inside encode_inference_row.
     # Putting pad on GPU (400MB–2GB) made max_cat collapse to 1 after canvases grew → 8× TTA serial.
     pad = pad_cpu.pin_memory() if dev.type == "cuda" else pad_cpu
@@ -44,7 +44,6 @@ def segment_native(net, lm, cfg, pl, cm, dev, pack, *,
         border_expand=border_expand, max_border_expand_extra=max_border_extra,
         batch_size=batch_size, use_amp=use_amp,
         cluster_margin_frac=cluster_margin_frac, mode=inference_mode,
-        is_longi=False, bl_present=False, bl_points_xyz=bl_points,
     )
     return native_seg_from_logits(seg, props, cm, pl, tiles), props
 

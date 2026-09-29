@@ -1,5 +1,8 @@
 # Final-run scratch (2026-09-03)
 
+Date: 2026-09-03
+Status: in progress — scratch notes.
+
 Product: promptable 3D CT lesion seg, longitudinal. d013 = melanoma, many small mets.
 Do not judge d013 on pooled/global Dice. Last Dataset999 instance run: wandb `ekkxcgi6`, FT `i4q2oamw`.
 

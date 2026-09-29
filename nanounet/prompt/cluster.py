@@ -16,7 +16,7 @@ def _margin_vox(patch_size: Tuple[int, int, int], margin_frac: float) -> Tuple[i
     )
 
 
-def bbox_fits_in_patch(
+def _bbox_fits_in_patch(
     points: List[ZYX],
     patch_size: Tuple[int, int, int],
     margin: Tuple[int, int, int],
@@ -44,7 +44,7 @@ def cluster_points_for_patch_size(
     clusters: List[List[ZYX]] = []
     for p in sorted_pts:
         for c in clusters:
-            if bbox_fits_in_patch(c + [p], patch_size, margin):
+            if _bbox_fits_in_patch(c + [p], patch_size, margin):
                 c.append(p)
                 break
         else:
@@ -63,7 +63,11 @@ def spatial_slices_covering_points(
     but the mean sits away from an extremal lesion (common on large volumes).
     """
     if not points:
-        raise ValueError("spatial_slices_covering_points requires at least one point")
+        raise ValueError(
+            "spatial_slices_covering_points requires at least one point\n"
+            "Expected a non-empty list of (z, y, x) points to cover with the patch.\n"
+            "Fix: check the caller passes clustered points before calling spatial_slices_covering_points; an empty cluster is a bug upstream."
+        )
     out: List[slice] = []
     for axis in range(3):
         ps, dim = patch_size[axis], padded_shape[axis]

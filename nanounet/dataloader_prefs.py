@@ -42,7 +42,11 @@ def _bucket_workers(name: Literal["s", "m", "l", "xl"]) -> DataloaderBucket:
         return DataloaderBucket(8, 4, 4, 2)
     elif name == "xl":
         return DataloaderBucket(16, 8, 6, 4)
-    raise ValueError(f"unknown dataloader bucket {name!r}")
+    raise ValueError(
+        f"Unknown dataloader bucket {name!r}.\n"
+        f"Expected one of: s, m, l, xl (the --dl-bucket choices of nanounet_train / nanounet_pretrain).\n"
+        f"Fix: pass --dl-bucket s|m|l|xl   (see docs/steps/train.md)"
+    )
 
 
 def dataloader_bucket(name: Literal["s", "m", "l", "xl"]) -> DataloaderBucket:
@@ -62,7 +66,7 @@ def pin_worker_threads() -> None:
         import threadpoolctl
 
         threadpoolctl.threadpool_limits(1)
-    except ImportError:
+    except ImportError:  # nanochat-style: allow E4 (threadpoolctl optional)
         pass
 
 

@@ -20,7 +20,11 @@ def resolve_pts_pad(
 ) -> list[ZYX]:
     if points_zyx_unpadded is not None:
         if points_xyz:
-            raise ValueError("pass points_xyz or points_zyx_unpadded, not both")
+            raise ValueError(
+                "pass points_xyz or points_zyx_unpadded, not both\n"
+                "Expected exactly one of points_xyz or points_zyx_unpadded to be set.\n"
+                "Fix: pass only one of --points (points_xyz) or the precomputed points_zyx_unpadded, not both. See docs/steps/predict.md"
+            )
         if not points_zyx_unpadded:
             return []
         return map_points_zyx_unpadded_to_padded(points_zyx_unpadded, slicer_revert)

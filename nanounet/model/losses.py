@@ -58,8 +58,8 @@ class DC_and_CE_loss(nn.Module):
             target_dice = torch.where(mask, target, 0)
             num_fg = mask.sum()
         else:
-            # crop_to_nonzero marks out-of-FOV voxels as -1 (nonzero_label), and the registered
-            # longi segs are instance-labeled (each lesion a distinct id 1..N) while the net is a
+            # crop_to_nonzero marks out-of-FOV voxels as -1 (nonzero_label), and some segs are
+            # instance-labeled (each lesion a distinct id 1..N) while the net is a
             # binary bg/lesion head. For a 2-class head collapse every positive id to foreground
             # (semantically correct: class_locations is already keyed by label 1); otherwise just
             # drop the -1 crop marker. Both keep the Dice one-hot scatter / CE indexing in bounds
@@ -97,10 +97,8 @@ def build_loss(
     enable_ds: bool,
     *,
     loss_type: str = "dc_ce",
-    is_ddp: bool = False,
 ) -> nn.Module:
-    assert not is_ddp
-    sd_kw = {"batch_dice": cm.batch_dice, "smooth": 1e-5, "do_bg": False, "ddp": False}
+    sd_kw = {"batch_dice": cm.batch_dice, "smooth": 1e-5, "do_bg": False}
     if loss_type == "dc_ce":
         loss = DC_and_CE_loss(
             sd_kw,

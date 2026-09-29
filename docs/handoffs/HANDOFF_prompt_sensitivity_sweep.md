@@ -1,5 +1,9 @@
 # Handoff — Prompt-Sensitivity Sweep (Tier-0 diagnostic)
 
+Date: 2026-08-05
+Status: archived (2026-09-23) — diagnostic for the longitudinal pipeline, which was removed; kept as history.
+Branch/commit: e6740cf
+
 **Audience:** a coding agent running on the compute cluster. You do **not** have access to the
 chat that produced this doc. Everything you need is here. Read it fully before writing code.
 
@@ -98,6 +102,11 @@ before relying on exact lines (code may have moved).
 | Loss | `nanounet/model/losses.py` (~L47–68) | `DC_and_CE_loss` (Soft Dice + CE). **No boundary / Hausdorff / clDice term.** |
 | Authoritative evaluator | `eval/eval_longi_fu_dice.py` | The lab's reference FU-Dice evaluator. **Reuse its data loading, click reading, coordinate handling, and Dice definition** so your numbers are comparable to the published figure. NOTE: it may be uncommitted/deleted in some working trees — if absent, restore it from git history (`git log --all -- eval/eval_longi_fu_dice.py`, then `git checkout <sha> -- eval/eval_longi_fu_dice.py`) before proceeding. |
 
+**Note (2026-09-23):** the longitudinal pipeline was removed on this branch. `eval/eval_longi_fu_dice.py`
+and the whole `eval/` directory are gone (restore from git history per the NOTE above, or from a
+pre-removal commit such as `5b66c49`). `nanounet/data/sampling_longi.py` (the actual home of the
+`fu_clicks_zyx` uniform-sampling logic referenced above, not `sampling.py`) was deleted too, so the
+"Longi click sampler" / "Input channels (longi)" rows above no longer have a live anchor at all.
 **A `graphify` knowledge graph exists at `graphify-out/graph.json`.** For every "where/how does
 X work" question, run `graphify query "<question>"` (or `graphify explain "<concept>"`,
 `graphify path "<A>" "<B>"`) **before** grepping or reading source. It returns a scoped

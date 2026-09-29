@@ -1,4 +1,5 @@
-"""MAE Lightning module: same ResEnc, masked-only L2, SGD + cosine warm-restart LR (default)."""
+"""MAE Lightning module: same ResEnc, masked-only L2, SGD + cosine warm-restart LR (default).
+bottleneck_mask lives here (was a 1-fn file) so the RNG draw site in _loss stays put."""
 
 from __future__ import annotations
 
@@ -7,6 +8,7 @@ import time
 import numpy as np
 import pytorch_lightning as pl
 import torch
+import torch.nn.functional as F
 from batchgenerators.utilities.file_and_folder_operations import load_json
 from torch import autocast
 
@@ -21,7 +23,29 @@ from nanounet.diag import (
 from nanounet.model.lr_schedule import PolyLRScheduler
 from nanounet.model.network import build_net
 from nanounet.plan.plans import Plans, determine_num_input_channels
-from nanounet.pretrain.masking import bottleneck_mask
+
+
+def bottleneck_mask(
+    patch_size: tuple[int, int, int] | list[int],
+    total_stride: tuple[int, int, int] | list[int],
+    mask_ratio: float,
+    batch_size: int,
+    device: torch.device,
+) -> torch.Tensor:
+    ps = tuple(int(x) for x in patch_size)
+    ts = tuple(int(x) for x in total_stride)
+    for p, s in zip(ps, ts):
+        assert p % s == 0, f"patch {p} not divisible by stride {s}"
+    grid = tuple(p // s for p, s in zip(ps, ts))
+    n_cells = grid[0] * grid[1] * grid[2]
+    n_masked = int(round(mask_ratio * n_cells))
+    assert 0 <= n_masked <= n_cells
+    flat = torch.zeros(batch_size, n_cells, device=device)
+    for b in range(batch_size):
+        idx = torch.randperm(n_cells, device=device)[:n_masked]
+        flat[b, idx] = 1.0
+    m = flat.view(batch_size, 1, *grid)
+    return F.interpolate(m, size=ps, mode="nearest")
 
 
 class NanoMAELM(pl.LightningModule):

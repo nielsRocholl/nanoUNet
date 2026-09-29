@@ -57,7 +57,7 @@ def select_prompt_points(
         else:
             # Kept set fixed per patch (instance_targets): a kept lesion ALWAYS gets a click -- if
             # displaced out of the patch, fall back to a point on its own tissue (inference does the
-            # same, longi_row.py:37-39) rather than drop it and train "no click => background".
+            # same, inference_row.py) rather than drop it and train "no click => background".
             kept_ = kept_clicks(displaced, kept, pslc, fallback)
         pp = list(kept_)
         if false_pos:
@@ -125,13 +125,13 @@ def build_patch(
     _ = annotated_classes_key
     raw_c = properties.get("centroids_zyx")
     if raw_c is None:
-        raise KeyError("centroids_zyx required; no seg-derived fallback (R12)")
+        raise KeyError("centroids_zyx required; no seg-derived fallback (R12)\nExpected properties centroid list from the case's preprocessed sidecar.\nFix: nanounet_preprocess -d 501 --sidecars-only --plans-name nnUNetResEncUNetLPlans to regenerate the sidecar with centroids. See docs/steps/preprocess.md")
     cts_global = [tuple(int(x) for x in c) for c in raw_c]
     raw_v = properties.get("volume_vox")
     if raw_v is None:
         raise KeyError(
             "volume_vox missing from case properties (needed to size-match the empirical "
-            "registration-error draw to each lesion). Fix: nanounet_preprocess --sidecars-only"
+            "registration-error draw to each lesion). Fix: nanounet_preprocess -d 501 --sidecars-only --plans-name nnUNetResEncUNetLPlans"
         )
     volumes_vox = [float(v) for v in raw_v]
     assert len(volumes_vox) == len(cts_global), (len(volumes_vox), len(cts_global))
@@ -142,7 +142,7 @@ def build_patch(
         raise KeyError(
             "centroid_weights missing (no <case>_weights.json sidecar) and sampling.require_weights "
             "is true: refusing uniform per-centroid sampling.\n"
-            "Fix: nanounet_lesion_weights -d <id> --plans <plans> --meta-dir <dir of <hash>.csv "
+            "Fix: nanounet_lesion_weights -d 501 --plans <plans> --meta-dir <dir of <hash>.csv "
             "lesion-type files>   -- or set require_weights to false"
         )
     weights = None
@@ -169,7 +169,7 @@ def build_patch(
         if raw_bb is None:
             raise KeyError(
                 "bboxes_zyx missing from case properties (needed to map each cc3d component in the "
-                "crop back to its parent lesion). Fix: nanounet_preprocess --sidecars-only"
+                "crop back to its parent lesion). Fix: nanounet_preprocess -d 501 --sidecars-only --plans-name nnUNetResEncUNetLPlans"
             )
         bboxes_global = [[int(v) for v in b] for b in raw_bb]
         assert len(bboxes_global) == len(cts_global), (len(bboxes_global), len(cts_global))

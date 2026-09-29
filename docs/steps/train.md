@@ -1,6 +1,6 @@
 # Supervised training
 
-Prompt-aware supervised training on one fold. Optional integrated MAE pretrain, longitudinal two-stream finetune, and MAE encoder transfer.
+Prompt-aware supervised training on one fold. Optional integrated MAE pretrain and MAE encoder transfer.
 
 Default run dir: `$NANOUNET_RESULTS/nanounet/<DatasetFolder>_<plans>_f<fold>/`.
 
@@ -54,13 +54,11 @@ nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv \
 | `--wandb-project` | str | `nanounet` | W&B project |
 | `--wandb-name` | str | auto | W&B run name |
 | `--loss`, `-loss` | choice | `dc_ce` | `dc_ce` \| `cc_dc_ce` — see [losses.md](../reference/losses.md) |
-| `--resume` | str | none | Supervised Lightning ckpt; no auto `last.ckpt` |
+| `--resume` | str | none | Supervised Lightning ckpt; must sit in a `checkpoints/` or `finetune/` dir and match `--epochs`; no auto `last.ckpt` |
 | `--init-weights` | str | none | Load full net from supervised ckpt; fresh optimizer |
 | `--only-prefix` | str | none | Train/val only case keys with prefix, e.g. `d013_` |
-| `--longi` | flag | off | Two-stream BL+FU encoder (requires `--init-weights`) |
-| `--longi-null` | flag | off | Ablation: duplicate-FU baseline (requires `--longi`) |
 | `--precision` | str | `16-mixed` | Lightning precision |
-| `--accelerator` | choice | `auto` | `auto` \| `cpu` \| `cuda` \| `gpu` \| `mps` |
+| `--accelerator` | choice | `auto` | `auto` \| `cpu` \| `cuda` \| `gpu` \| `mps`; `gpu` maps to `cuda` |
 | `--mae-ckpt` | str | none | Load encoder weights only (no integrated MAE run) |
 | `--mae-pretrain` | flag | off | Run MAE under `<run>/mae_pretrain/` then supervised |
 | `--mae-resume` | str | none | With `--mae-pretrain`: MAE ckpt; conflicts with `--mae-ckpt` |
@@ -74,6 +72,7 @@ nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv \
 | `--mae-iters-per-epoch` | int | same as train | MAE batches per epoch |
 | `--dl-bucket` | choice | `m` | DataLoader worker preset: `s` / `m` / `l` / `xl` |
 | `--dl-persistent-workers` | flag | off | Keep workers between epochs |
+| `--mem-diag` | flag | off | Log cgroup/process RAM to `OUT/mem_diag.jsonl` |
 | `--prompts-per-patch` | int | `1` | Independent click draws rendered per patch (same CT crop + augmentation); 2 enables the consistency loss below |
 | `--consistency-weight` | float | `0.0` | Lambda max for the two-prompt consistency term; `0` disables it. Requires `--prompts-per-patch >= 2` |
 | `--consistency-warmup-epochs` | int | `50` | Epochs to linearly ramp lambda from 0 to `--consistency-weight` |
@@ -159,7 +158,6 @@ Full write-up: [dev-notes/cgroup_memory.md](../dev-notes/cgroup_memory.md).
 | Error | Cause | Fix |
 |-------|-------|-----|
 | `--mae-resume requires --mae-pretrain` | MAE resume without integrated flag | Add `--mae-pretrain` or use `--mae-ckpt` |
-| `--longi requires --init-weights` | Longi without warm-start | Pass stage-2 supervised ckpt via `--init-weights` |
 | Conflicting resume flags | `--init-weights` + `--resume` / `--mae-pretrain` | Pick one init path |
 | Cgroup OOM | tmpfs TMPDIR during checkpoint save | Set `NANOUNET_TMPDIR`; see cgroup doc |
 | Missing plans / config | Preprocess or path error | Verify `--plans` basename and `--config` path |

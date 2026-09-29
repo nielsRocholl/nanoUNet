@@ -1,4 +1,4 @@
-"""NANOUNET_* path env, Rich rank-0 UI (`cprint`, headers, `config_table`, progress), logging.
+"""NANOUNET_* path env, Rich UI (`cprint`, headers, `config_table`, progress), logging.
 
 `quiet_lightning_runtime`: call once before importing pytorch_lightning — warning filters,
 rank_zero_info shim (litlogger noise), CUDA matmul precision high.
@@ -88,10 +88,6 @@ def resolve_user_config_path(path_str: str) -> str:
     )
 
 
-def _rank0() -> bool:
-    return int(os.environ.get("LOCAL_RANK", "0")) == 0
-
-
 def _env_path(name: str) -> str:
     d = os.environ.get(name)
     if not d:
@@ -116,26 +112,18 @@ def results_dir() -> str:
 
 
 def cprint(msg: str, **kw: Any) -> None:
-    if _rank0():
-        _CONSOLE.print(msg, **kw)
-
-
-print0 = cprint
+    _CONSOLE.print(msg, **kw)
 
 
 def nano_rule() -> None:
-    if _rank0():
-        _CONSOLE.print(Rule(style="dim"))
+    _CONSOLE.print(Rule(style="dim"))
 
 
 def nano_header(title: str, color: str = "cyan") -> None:
-    if _rank0():
-        _CONSOLE.print(Panel(f"[bold {color}]{title}[/bold {color}]", border_style=color))
+    _CONSOLE.print(Panel(f"[bold {color}]{title}[/bold {color}]", border_style=color))
 
 
 def nano_banner(title: str, subtitle: str, color: str = "cyan") -> None:
-    if not _rank0():
-        return
     body = Align.center(f"[bold {color}]{title}[/bold {color}]\n[dim]{subtitle}[/dim]")
     _CONSOLE.print(Panel(body, border_style=color, padding=(1, 4)))
 
@@ -146,8 +134,6 @@ def console() -> Console:
 
 def config_table(rows: list[tuple[str, Any, str]], title: str = "config") -> None:
     """Render resolved config as a rich Table: (argument, value, source: cli/config/default)."""
-    if not _rank0():
-        return
     from rich.table import Table
 
     t = Table(title=title, box=None, padding=(0, 2))
@@ -161,9 +147,6 @@ def config_table(rows: list[tuple[str, Any, str]], title: str = "config") -> Non
 
 @contextmanager
 def nano_progress(total: int, desc: str) -> Iterator[Callable[[int], None]]:
-    if not _rank0():
-        yield lambda n=1: None
-        return
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),

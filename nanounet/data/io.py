@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import traceback
-from typing import List, Sequence, Tuple, Type
+from typing import Sequence, Tuple, Type
 
 import numpy as np
 import pydoc
@@ -42,15 +42,27 @@ class SimpleITKIO:
             elif npy.ndim == 4:
                 sp_nn.append(list(spacings[-1])[::-1][1:])
             else:
-                raise RuntimeError(npy.ndim)
+                raise RuntimeError(
+                    f"{npy.ndim}\n"
+                    f"Expected the array read from {f} to have 2, 3, or 4 dimensions after SimpleITK read.\n"
+                    f"Fix: convert {f} to a 2D/3D/4D image before nanounet_preprocess -d 501. See docs/steps/preprocess.md"
+                )
             images.append(npy)
             sp_nn[-1] = list(np.abs(sp_nn[-1]))
         shapes = [i.shape for i in images]
         if not _same_shape(shapes):
-            raise RuntimeError(f"shape mismatch {shapes} {image_fnames}")
+            raise RuntimeError(
+                f"shape mismatch {shapes} {image_fnames}\n"
+                f"Expected every channel file for one case to share the same array shape.\n"
+                f"Fix: re-export {image_fnames} so all channels match in shape, then re-run nanounet_preprocess -d 501. See docs/steps/preprocess.md"
+            )
         for i in range(1, len(spacings)):
             if not np.allclose(spacings[0], spacings[i]):
-                raise RuntimeError(f"spacing mismatch {image_fnames}")
+                raise RuntimeError(
+                    f"spacing mismatch {image_fnames}\n"
+                    f"Expected every channel file for one case to share the same voxel spacing.\n"
+                    f"Fix: re-export {image_fnames} with matching spacing, then re-run nanounet_preprocess -d 501. See docs/steps/preprocess.md"
+                )
         props = {
             "sitk_stuff": {"spacing": spacings[0], "origin": origins[0], "direction": directions[0]},
             "spacing": sp_nn[0],
@@ -98,7 +110,11 @@ def reader_writer_class_from_dataset(dataset_json: dict, example_file: str | Non
         ):
             cls = SimpleITKIO
         if cls is None:
-            raise RuntimeError(o)
+            raise RuntimeError(
+                f"{o}\n"
+                f"Expected dataset.json 'overwrite_image_reader_writer' to be the default sitk reader or an importable dotted path.\n"
+                f"Fix: set dataset.json 'overwrite_image_reader_writer' to the default sitk reader name, or remove the key so nanounet picks a reader from 'file_ending'. See docs/steps/preprocess.md"
+            )
         if verbose:
             cprint(f"[dim]Using {cls} reader/writer[/dim]")
         return cls
@@ -111,7 +127,11 @@ def reader_writer_class_from_dataset(dataset_json: dict, example_file: str | Non
                 except Exception:
                     if verbose:
                         traceback.print_exc()
-                    raise RuntimeError(example_file)
+                    raise RuntimeError(
+                        f"{example_file}\n"
+                        f"Expected the reader registered for dataset.json 'file_ending' {fe!r} to read {example_file}.\n"
+                        f"Fix: re-export {example_file} to a format nanoUNet supports, or fix dataset.json 'file_ending'. See docs/steps/preprocess.md"
+                    )
             if verbose:
                 cprint(f"[dim]Using {rw} as reader/writer[/dim]")
             return rw

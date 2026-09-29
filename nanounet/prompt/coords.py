@@ -30,13 +30,26 @@ def points_to_centers_zyx(
     voxel_coordinate_frame: str = "full",
 ) -> List[Tuple[int, int, int]]:
     if voxel_coordinate_frame not in ("full", "preprocessed"):
-        raise ValueError(f"voxel_coordinate_frame must be 'full' or 'preprocessed', got {voxel_coordinate_frame!r}")
+        raise ValueError(
+            f"voxel_coordinate_frame must be 'full' or 'preprocessed', got {voxel_coordinate_frame!r}\n"
+            f"Expected the caller to pass voxel_coordinate_frame='full' (native scanner voxels) or "
+            f"'preprocessed' (already-cropped/resampled voxels).\n"
+            f"Fix: pass voxel_coordinate_frame='full' or 'preprocessed' in the points_to_centers_zyx call. See docs/steps/predict.md"
+        )
     if points_space not in ("voxel", "world"):
-        raise ValueError(f"points_space must be 'voxel' or 'world', got {points_space!r}")
+        raise ValueError(
+            f"points_space must be 'voxel' or 'world', got {points_space!r}\n"
+            f"Expected the caller to pass points_space='voxel' (native voxel ijk) or 'world' (physical mm).\n"
+            f"Fix: pass points_space='voxel' or 'world' in the points_to_centers_zyx call, or fix the points JSON. See docs/steps/predict.md"
+        )
     out: List[Tuple[int, int, int]] = []
     for pt in points:
         if len(pt) != 3:
-            raise ValueError(f"Point must have 3 coords, got {len(pt)}")
+            raise ValueError(
+                f"Point must have 3 coords, got {len(pt)}\n"
+                f"Expected each entry of 'points' to be a 3-element [x, y, z] (or z, y, x) coordinate.\n"
+                f"Fix: fix the points JSON format documented in docs/steps/predict.md, each point needs exactly 3 coords."
+            )
         if points_space == "voxel":
             z, y, x = float(pt[0]), float(pt[1]), float(pt[2])
             bbox = properties.get("bbox_used_for_cropping")
@@ -64,7 +77,11 @@ def points_to_centers_zyx(
             x_phys, y_phys, z_phys = float(pt[0]), float(pt[1]), float(pt[2])
             st = properties.get("sitk_stuff")
             if not st:
-                raise KeyError("points_space='world' requires properties['sitk_stuff']")
+                raise KeyError(
+                    "points_space='world' requires properties['sitk_stuff']\n"
+                    "Expected properties['sitk_stuff'] (spacing/origin/direction) from the case's preprocessed sidecar.\n"
+                    "Fix: nanounet_preprocess -d 501 --sidecars-only --plans-name nnUNetResEncUNetLPlans to regenerate the sidecar, or pass points_space='voxel' instead. See docs/steps/preprocess.md"
+                )
             orig, sp = st["origin"], st["spacing"]
             d = st.get("direction")
             if d is not None and len(tuple(d)) == 9:
@@ -116,9 +133,17 @@ def load_points_xyz(json_path: str) -> list[tuple[float, float, float]]:
         data = json.load(f)
     pts = data.get("points")
     if pts is None:
-        raise KeyError(f"'points' missing in {json_path}")
+        raise KeyError(
+            f"'points' missing in {json_path}\n"
+            f"Expected a top-level 'points' list (see Longitudinal_CT_v2 inputsTrFU/*.json format).\n"
+            f"Fix: fix the points JSON format documented in docs/steps/predict.md"
+        )
     if not isinstance(pts, list):
-        raise TypeError(f"'points' must be a list in {json_path}")
+        raise TypeError(
+            f"'points' must be a list in {json_path}\n"
+            f"Expected 'points' to be a JSON list of point entries.\n"
+            f"Fix: fix the points JSON format documented in docs/steps/predict.md"
+        )
     out: list[tuple[float, float, float]] = []
     for item in pts:
         p = item["point"]

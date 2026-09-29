@@ -1,10 +1,12 @@
-"""Spatial + intensity augment chains (nnUNetTrainer.get_*_transforms port, 3D only path used)."""
+"""Spatial + intensity augment chains (nnUNetTrainer.get_*_transforms port, 3D only path used)
+and get_patch_size (patch inflation for rotate_coords_3d)."""
 
 from __future__ import annotations
 
 from typing import List, Tuple, Union
 
 import numpy as np
+from batchgenerators.augmentations.utils import rotate_coords_3d
 from batchgeneratorsv2.helpers.scalar_type import RandomScalar
 from batchgeneratorsv2.transforms.base.basic_transform import BasicTransform
 from batchgeneratorsv2.transforms.intensity.brightness import MultiplicativeBrightnessTransform
@@ -41,9 +43,9 @@ def train_transforms(
     regions,
     ignore_label: int | None,
 ) -> BasicTransform:
-    # No ChannelSubsetImageTransform / intensity_channels here: build_patch* no longer renders
-    # heatmaps into the image tensor entering this chain, so "image" is CT-only (1ch supervised,
-    # 2ch longi) -- intensity aug hits every channel, which is now exactly the CT channels.
+    # No ChannelSubsetImageTransform / intensity_channels here: build_patch no longer renders
+    # heatmaps into the image tensor entering this chain, so "image" is CT-only (1ch) --
+    # intensity aug hits every channel, which is now exactly the CT channel.
     transforms = []
     if do_dummy_2d_data_aug:
         ignore_axes = (0,)
@@ -152,3 +154,23 @@ def val_transforms(
     if deep_supervision_scales is not None:
         transforms.append(DownsampleSegForDSTransform(ds_scales=deep_supervision_scales))
     return ComposeTransforms(transforms)
+
+
+def get_patch_size(final_patch_size, rot_x, rot_y, rot_z, scale_range):
+    if isinstance(rot_x, (tuple, list)):
+        rot_x = max(np.abs(rot_x))
+    if isinstance(rot_y, (tuple, list)):
+        rot_y = max(np.abs(rot_y))
+    if isinstance(rot_z, (tuple, list)):
+        rot_z = max(np.abs(rot_z))
+    rot_x = min(90 / 360 * 2.0 * np.pi, rot_x)
+    rot_y = min(90 / 360 * 2.0 * np.pi, rot_y)
+    rot_z = min(90 / 360 * 2.0 * np.pi, rot_z)
+    coords = np.array(final_patch_size)
+    assert len(coords) == 3
+    final_shape = np.copy(coords)
+    final_shape = np.max(np.vstack((np.abs(rotate_coords_3d(coords, rot_x, 0, 0)), final_shape)), 0)
+    final_shape = np.max(np.vstack((np.abs(rotate_coords_3d(coords, 0, rot_y, 0)), final_shape)), 0)
+    final_shape = np.max(np.vstack((np.abs(rotate_coords_3d(coords, 0, 0, rot_z)), final_shape)), 0)
+    final_shape /= min(scale_range)
+    return final_shape.astype(int)

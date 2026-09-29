@@ -7,7 +7,7 @@ import os
 import torch
 from batchgenerators.utilities.file_and_folder_operations import join
 
-from nanounet.model.network import build_net, build_net_longi
+from nanounet.model.network import build_net
 from nanounet.plan.labels import labels_from_dataset_json
 
 # Lightning key is Callback.state_key == __qualname__. Do not import EMACallback here.
@@ -43,19 +43,21 @@ def _ema_shadow(ck: dict, ckpt_path: str, net_st: dict) -> dict:
 
 
 def load_net_from_ckpt(
-    ckpt_path: str, cm, dj: dict, dev: torch.device, longi: bool = False, ema: bool = False,
+    ckpt_path: str, cm, dj: dict, dev: torch.device, ema: bool = False,
 ):
     lm = labels_from_dataset_json(dj)
     ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     sd = ck.get("state_dict", ck)
     st = _strip_pl_state(sd)
     if not st:
-        raise RuntimeError("no net.* keys in checkpoint")
-    is_longi = longi or any(k.startswith("dwb.") for k in st)
+        raise RuntimeError(
+            "no net.* keys in checkpoint\n"
+            f"Expected state_dict keys prefixed with 'net.' (Lightning module wraps the network as self.net) in '{ckpt_path}'.\n"
+            f"Fix: verify '{ckpt_path}' is a nanoUNet-trained checkpoint, not a raw torch state_dict   (see docs/steps/predict.md)"
+        )
     if ema:
         st = _ema_shadow(ck, ckpt_path, st)
-    build = build_net_longi if is_longi else build_net
-    net = build(cm, lm, dj, enable_deep_supervision=False)
+    net = build_net(cm, lm, dj, enable_deep_supervision=False)
     net.load_state_dict(st, strict=True)
     return net.to(dev).eval(), lm
 

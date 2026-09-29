@@ -1,5 +1,8 @@
 # Longitudinal Layer 2 + test-split — session handoff (2026-07-09)
 
+Date: 2026-07-09
+Status: archived (2026-09-23) — describes the removed longitudinal pipeline; kept as history.
+
 ## TL;DR
 
 The longitudinal (`--longi`) two-stream model now trains on **real registered union clicks** in

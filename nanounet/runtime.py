@@ -98,7 +98,7 @@ def _git_head() -> str | None:
         )
         if r.returncode == 0:
             return r.stdout.strip()[:12]
-    except (OSError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.TimeoutExpired):  # nanochat-style: allow E4 (df timeout; fs type unknown)
         pass
     return None
 
@@ -140,6 +140,7 @@ def assert_mem_diag_cgroup() -> None:
         return
     if cgroup_scope() == "root" and not os.environ.get("SLURM_JOB_ID"):
         raise RuntimeError(
-            "mem-diag on root cgroup (0::/) measures node-wide RAM, not this process. "
-            "Submit via Slurm or set NANOUNET_ALLOW_ROOT_CGROUP=1 to override."
+            "mem-diag is on but this process is in the root cgroup (0::/), which measures node-wide RAM, not this process.\n"
+            "Expected a per-job cgroup, which Slurm creates automatically.\n"
+            "Fix: submit via Slurm (sbatch/srun), or set NANOUNET_ALLOW_ROOT_CGROUP=1 to measure node-wide RAM anyway   (see docs/dev-notes/cgroup_memory.md)"
         )

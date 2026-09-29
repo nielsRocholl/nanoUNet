@@ -71,22 +71,34 @@ def _write_splits_and_cohorts(did: int, ident: str, val_frac: float, seed: int) 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("-d", "--dataset_id", type=int, nargs="+", required=True)
-    ap.add_argument("--merged-id", type=int, default=999)
-    ap.add_argument("--merged-name", default="Merged")
-    ap.add_argument("--planner", default="nnUNetPlannerResEncL")
-    ap.add_argument("-np", "--num_processes", type=int, default=8)
-    ap.add_argument("--resume", action="store_true")
-    ap.add_argument("--gpu-memory-gb", type=float, default=None)
+    ap.add_argument(
+        "-d", "--dataset_id", type=int, nargs="+", required=True,
+        help="one or more dataset ids, e.g. -d 501 or -d 1 2 3 to merge several into one",
+    )
+    ap.add_argument(
+        "--merged-id", type=int, default=999,
+        help="output dataset id when merging (only used when several -d ids are given)",
+    )
+    ap.add_argument(
+        "--merged-name", default="Merged",
+        help="name segment for the merged folder DatasetNNN_<name> (only used when several -d ids are given)",
+    )
+    ap.add_argument("--planner", default="nnUNetPlannerResEncL", help="planner preset class, e.g. nnUNetPlannerResEncTiny or nnUNetPlannerResEncL")
+    ap.add_argument("-np", "--num_processes", type=int, default=8, help="parallel worker processes for fingerprinting and preprocessing")
+    ap.add_argument("--resume", action="store_true", help="skip cases already fully preprocessed instead of wiping and redoing the 3d_fullres folder")
+    ap.add_argument(
+        "--gpu-memory-gb", type=float, default=None,
+        help="VRAM budget (GB) for the planner's patch-shrink loop; default: the planner preset's own default VRAM target",
+    )
     ap.add_argument(
         "--patch-vol",
         choices=tuple(PATCH_VOL),
         default="large",
         help="target patch volume edge (isotropic equivalent before aniso split); large=256 (nnU-Net default)",
     )
-    ap.add_argument("--plans-name", default=None)
-    ap.add_argument("--skip-fingerprint", action="store_true")
-    ap.add_argument("--skip-plan", action="store_true")
+    ap.add_argument("--plans-name", default=None, help="basename of the plans JSON (no .json); required with --skip-plan or --sidecars-only")
+    ap.add_argument("--skip-fingerprint", action="store_true", help="skip fingerprinting; reuse the existing dataset_fingerprint.json")
+    ap.add_argument("--skip-plan", action="store_true", help="skip planning; requires --plans-name for the existing plans json to use")
     ap.add_argument(
         "--sidecars-only",
         action="store_true",

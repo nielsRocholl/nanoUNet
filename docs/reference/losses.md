@@ -27,7 +27,7 @@ The paper uses **ε = 0** (no additive smoothing on the **CC** Dice) because smo
 **CLI:**
 
 ```bash
-nanounet_train -d <id> -f <fold> --plans <PlansBaseName> --loss cc_dc_ce
+nanounet_train -d 501 -f 0 --plans nnUNetResEncUNetLPlans --loss cc_dc_ce
 # same flag: -loss cc_dc_ce
 ```
 

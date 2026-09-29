@@ -263,7 +263,6 @@ if [ "$SKIP_MAIN" = 0 ]; then
       --prompts-per-patch "$PROMPTS_PER_PATCH" \
       --consistency-weight "$CONSISTENCY_WEIGHT" \
       --dl-bucket xl \
-      --devices 1 \
       --accelerator cuda \
       --precision 16-mixed \
       --wandb-name "Dataset900_f0_ssl_sup_instance_1200ep" &
@@ -360,7 +359,6 @@ run_ft() {
     --ema-decay "$EMA_DECAY" \
     --monitor val_dice \
     --dl-bucket xl \
-    --devices 1 \
     --accelerator cuda \
     --precision 16-mixed \
     --wandb-name "Dataset900_f0_mixed_d013_ft_80ep" &

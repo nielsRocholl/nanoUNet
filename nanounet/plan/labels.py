@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Tuple, Union
+from typing import List
 
 import numpy as np
 import torch
@@ -29,9 +29,17 @@ class Labels:
 
     def __init__(self, label_dict: dict):
         if "background" not in label_dict:
-            raise RuntimeError("labels need 'background' = 0")
+            raise RuntimeError(
+                f"Label dict has no 'background' key: {label_dict}.\n"
+                f"Expected dataset.json's \"labels\" to include \"background\": 0.\n"
+                f"Fix: add \"background\": 0 to dataset.json's \"labels\" dict   (see docs/steps/preprocess.md)"
+            )
         if isinstance(label_dict["background"], (tuple, list)):
-            raise RuntimeError("background must be scalar 0")
+            raise RuntimeError(
+                f"'background' is {label_dict['background']!r} (a tuple/list), not a scalar.\n"
+                f"Expected \"background\": 0 -- region labels are not supported in nanoUNet.\n"
+                f"Fix: set \"background\": 0 in dataset.json's \"labels\" dict   (see docs/steps/preprocess.md)"
+            )
         assert int(label_dict["background"]) == 0
         for _k, r in label_dict.items():
             if _k == "ignore":

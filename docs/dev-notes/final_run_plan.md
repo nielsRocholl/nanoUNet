@@ -1,6 +1,9 @@
 # nanoUNet Dataset900 final run — handoff plan
 
-**Status:** approved, not implemented. Rewritten 2026-09-03 after verifying every claim against
+Date: 2026-09-03
+Status: proposal — approved, not implemented.
+
+Rewritten 2026-09-03 after verifying every claim against
 current code, Dataset900 on disk, and the Claude Code session that produced it.
 **Audience:** an agent with no prior context. Do not re-litigate §1 or §9. Do not edit until you
 have read §0. Do not submit the SLURM job until the user says so.
@@ -257,10 +260,17 @@ Import this everywhere a `+ 2` currently means "two prompt channels". Do not lea
 ### 2.4 Verify
 
 ```bash
-python3 -c "import nanounet.train.patch_render, nanounet.infer.longi_row, nanounet.infer.predict_case, nanounet.infer.predict_patch, nanounet.config, nanounet.train.lightning_module"
+python3 -c "import nanounet.train.patch_render, nanounet.infer.inference_row, nanounet.infer.predict_case, nanounet.config, nanounet.train.lightning_module"
 grep -rn "points_neg\|heatmap_pair\|large_lesion\|n_img + 2\|n_extra_in=2\|n_stream = 1 + 2\|FU(3ch)\|_prompt_ch = \[1, 2" nanounet/ configs/ --include='*.py' --include='*.json'
 # must be empty (allow N_PROMPT_CHANNELS itself)
 ```
+
+**Note (2026-09-23):** `nanounet.infer.longi_row` was renamed to `nanounet.infer.inference_row`
+(`encode_inference_row` unchanged) and `nanounet.infer.predict_patch` was deleted outright, both as
+part of the longitudinal-pipeline removal; the import above is updated to match and drops
+`predict_patch`. Single-patch forward inference now goes through `nanounet.infer.predict_case`;
+export helpers moved to `nanounet.infer.patch_export` (`patch_logits_to_native_seg`,
+`native_seg_to_nifti_bytes`).
 
 Then a 1-step supervised smoke (§7) confirming `net` first conv `in_channels == 2`.
 
@@ -663,7 +673,6 @@ nanounet_train \
   --consistency-weight 0.02 \
   --dl-bucket xl \
   --dl-persistent-workers \
-  --devices 1 \
   --accelerator cuda \
   --precision 16-mixed \
   --wandb-name "Dataset900_f0_ssl_sup_instance_1200ep"
@@ -701,7 +710,6 @@ nanounet_train \
   --monitor val_dice \
   --dl-bucket xl \
   --dl-persistent-workers \
-  --devices 1 \
   --accelerator cuda \
   --precision 16-mixed \
   --wandb-name "Dataset900_f0_mixed_d013_ft_80ep"

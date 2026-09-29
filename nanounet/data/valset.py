@@ -31,7 +31,7 @@ from nanounet.config import RoiPromptConfig
 from nanounet.data.blosc2_dataset import Blosc2Folder
 from nanounet.data.patch_bbox import crop_patch
 from nanounet.dataloader_prefs import DataloaderBucket, build_iter_dataloader
-from nanounet.train.patch_iterable import collate_patches, worker_init
+from nanounet.data.loader_workers import collate_patches, worker_init
 from nanounet.train.patch_render import concat_variant_keypoints, render_variant, split_variant_keypoints
 
 SCHEMA_VERSION = 1
@@ -47,9 +47,9 @@ class ValManifest:
     packed: np.ndarray | None  # (n, nbytes) uint8, or None when no subset entries
     patch_size: tuple[int, int, int]
 
-def _sidecar_path(manifest_path: str) -> str:
+def sidecar_path(manifest_path: str) -> str:
     if not manifest_path.endswith(".json"):
-        raise ValueError(f"manifest path must end in .json, got {manifest_path!r}")
+        raise ValueError(f"manifest path must end in .json, got {manifest_path!r}\nExpected the --out path passed to nanounet_build_valset to end in .json.\nFix: pass a path ending in .json, e.g. --out valset.json. See docs/steps/valset.md")
     return manifest_path[: -len(".json")] + ".targets.npz"
 
 def config_stamp(cfg: RoiPromptConfig) -> dict:
@@ -82,7 +82,7 @@ def load_manifest(path: str, cfg: RoiPromptConfig) -> ValManifest:
             f"{path} has no config_stamp (built by an older nanounet_build_valset).\n"
             f"Without it a manifest built under a different sampling config loads silently, and "
             f"the val curve becomes meaningless.\n"
-            f"Fix: nanounet_build_valset -d <id> --plans <plans> --config <cfg> --out {path}"
+            f"Fix: nanounet_build_valset -d 501 --plans <plans> --config <cfg> --out {path}"
         )
     # stamp came back from load_json (tuples -> lists); round-trip live the same way so e.g.
     # PropagatedConfig.backends (a tuple) doesn't fail equality against its own manifest just
@@ -93,11 +93,11 @@ def load_manifest(path: str, cfg: RoiPromptConfig) -> ValManifest:
         diff = "\n".join(f"  {k}: manifest={stamp.get(k)!r} vs live={live.get(k)!r}" for k in keys if stamp.get(k) != live.get(k))
         raise ValueError(
             f"{path} was built under a different sampling config than the one now in use:\n{diff}\n"
-            f"Fix: nanounet_build_valset -d <id> --plans <plans> --config <cfg> --out {path}"
+            f"Fix: nanounet_build_valset -d 501 --plans <plans> --config <cfg> --out {path}"
         )
     entries = header["entries"]
     patch_size = tuple(int(x) for x in header["patch_size"])
-    npz_path = _sidecar_path(path)
+    npz_path = sidecar_path(path)
     needs_packed = any(e["subset_target_index"] >= 0 for e in entries)
     packed = None
     if needs_packed:
@@ -121,14 +121,12 @@ class ValPatchDataset(Dataset):
         roi_cfg: RoiPromptConfig,
         val_tf,
         final_patch_size,
-        longi: bool,
     ):
         self.manifest = manifest
         self.pr = roi_cfg.prompt
         self.tf = val_tf
         self.final_ps = final_patch_size
         self.patch_size = manifest.patch_size
-        self.longi = longi
         cases = sorted({e["case"] for e in manifest.entries})
         self.ds = Blosc2Folder(case_folder, identifiers=cases)
         # Shared with val_metrics.py, which reads the same cohort_weights keys off the manifest
@@ -153,12 +151,12 @@ class ValPatchDataset(Dataset):
             {"points_pos": np.asarray(e["clicks2_zyx"], np.float32).reshape(-1, 3),
              "n_false_pos": e["n_false_pos"]},
         ]
-        kp = concat_variant_keypoints(variants, self.longi)
+        kp = concat_variant_keypoints(variants)
         with torch.no_grad():
             o = self.tf(**{"image": im, "segmentation": se, "keypoints": kp})
-            split = split_variant_keypoints(o["keypoints"], variants, self.longi)
-            v1 = render_variant(o, split[0], {"null_baseline": False}, self.longi, self.final_ps, self.pr)
-            v2 = render_variant(o, split[1], {"null_baseline": False}, self.longi, self.final_ps, self.pr)
+            split = split_variant_keypoints(o["keypoints"], variants)
+            v1 = render_variant(o, split[0], self.final_ps, self.pr)
+            v2 = render_variant(o, split[1], self.final_ps, self.pr)
         item = {
             "data_variants": [v1], "data_prompt2": v2, "target": o["segmentation"],
             "click_inside": [e["click_inside"]], "scenario": SCENARIOS.index(e["scenario"]),
@@ -183,16 +181,14 @@ def build_val_dataloader(
     roi_cfg: RoiPromptConfig,
     val_tf,
     final_ps,
-    longi: bool,
     batch_size: int,
     bucket: DataloaderBucket,
     pin_memory: bool,
     persistent_workers: bool,
 ) -> DataLoader:
-    """Deterministic val loader over a fixed manifest. shuffle stays False and no sampler is
-    passed: Lightning injects a DistributedSampler under DDP, and order does not affect any
-    metric here because every bucket is pooled before reduction."""
-    ds = ValPatchDataset(manifest, case_folder, roi_cfg, val_tf, final_ps, longi)
+    """Deterministic val loader over a fixed manifest. Order does not affect any metric here
+    because every bucket is pooled before reduction."""
+    ds = ValPatchDataset(manifest, case_folder, roi_cfg, val_tf, final_ps)
     nw = bucket.nw_val
     winit = worker_init if nw else None
     return build_iter_dataloader(

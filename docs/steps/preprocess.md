@@ -34,11 +34,8 @@ Regenerate centroid sidecars only (already-preprocessed dataset, no `.b2nd`/plan
 nanounet_preprocess -d 999 --plans-name nnUNetResEncUNetLPlans --sidecars-only -np 8
 ```
 
-Regenerating sidecars overwrites files that existing checkpoints depend on. Use
-[`scripts/run_preprocess_sidecars.sh`](../../scripts/run_preprocess_sidecars.sh), which backs up the
-current `*_centroids.json` for both `Dataset999_Merged` and `Dataset114_longi` before regenerating —
-refuses to run if a backup already exists at
-`/nnunet_data/prompt_sensitivity/sidecar_backup/centroids_before.tgz`.
+Regenerating sidecars overwrites files that existing checkpoints depend on. Back up the current
+`*_centroids.json` before regenerating.
 
 ## Arguments
 
@@ -52,7 +49,7 @@ refuses to run if a backup already exists at
 | `--resume` | flag | off | Keep existing preprocess output; do not wipe `3d_fullres` folder |
 | `--gpu-memory-gb` | float | none | VRAM budget (GB) for planner patch shrink loop |
 | `--patch-vol` | choice | `large` | `small` (128) \| `medium` (192) \| `large` (256) \| `xlarge` (320) isotropic edge before aniso handling |
-| `--plans-name` | str | none | Basename of plans JSON (no `.json`) when using `--skip-plan` |
+| `--plans-name` | str | none | Basename of plans JSON (no `.json`); required with `--skip-plan` or `--sidecars-only` |
 | `--skip-fingerprint` | flag | off | Skip fingerprint; use existing `dataset_fingerprint.json` |
 | `--skip-plan` | flag | off | Skip planning; requires `--plans-name` |
 | `--sidecars-only` | flag | off | Regenerate `*_centroids.json` sidecars only; requires `--plans-name`; never touches `.b2nd`, plans, or `gt_segmentations` |
@@ -105,11 +102,10 @@ diameter to pick the lesion's size bin in the registration-error offset table, t
 stored centroid by an offset drawn from that table to simulate how a real point click drifts between
 baseline and follow-up scans.
 
-The offset table itself (`propagated.error_table` in the ROI config) is produced once by
-[`scripts/run_measure_registration_error.sh`](../../scripts/run_measure_registration_error.sh), a
-thin wrapper around `scripts/measure_registration_error.py`. It is a one-time step against
-Longitudinal-CT derivatives, not part of the per-dataset preprocess loop above — rerun only if those
-derivatives change.
+The offset table itself (`propagated.error_table` in the ROI config) is a JSON file matching the
+schema in [reference/config.md](../reference/config.md), produced once against Longitudinal-CT
+derivatives and not part of the per-dataset preprocess loop above — regenerate only if those
+derivatives change. `propagated.mode: "gaussian"` needs no table.
 
 ## Common errors
 

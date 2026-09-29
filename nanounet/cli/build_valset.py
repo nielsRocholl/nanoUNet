@@ -13,12 +13,12 @@ from collections import Counter
 
 import numpy as np
 import torch
-from batchgenerators.utilities.file_and_folder_operations import join, load_json
+from batchgenerators.utilities.file_and_folder_operations import join
 
 from nanounet.common import cprint, nano_header, nano_progress, preprocessed_dir, resolve_user_config_path
 from nanounet.config import load_config
 from nanounet.data.blosc2_dataset import Blosc2Folder
-from nanounet.data.valset import SCENARIOS, SCHEMA_VERSION, SIZE_BUCKETS, SMALL_LESION_MAX_VOX, _sidecar_path, config_stamp
+from nanounet.data.valset import SCENARIOS, SCHEMA_VERSION, SMALL_LESION_MAX_VOX, sidecar_path, config_stamp
 from nanounet.data.valset_alloc import allocate, load_cohorts, scenario_allocation
 from nanounet.data.valset_build import (
     LabelCache,
@@ -39,9 +39,9 @@ MIX_ORDER = ("all_clicked", "lesion_free_decoy", "subset_clicked", "none_clicked
 def _parse_mix(s: str) -> dict[str, float]:
     parts = [float(x) for x in s.split(",")]
     if len(parts) != 4:
-        raise ValueError(f"--mix needs 4 comma-separated shares (got {s!r}), order: {MIX_ORDER}")
+        raise ValueError(f"--mix {s!r} does not have 4 comma-separated shares.\nExpected shares for {MIX_ORDER}, e.g. \"0.40,0.25,0.20,0.15\".\nFix: pass --mix with exactly 4 comma-separated shares in that order   (see docs/steps/valset.md)")
     if abs(sum(parts) - 1.0) > 1e-6:
-        raise ValueError(f"--mix shares must sum to 1.0, got {sum(parts)} ({s!r})")
+        raise ValueError(f"--mix {s!r} shares sum to {sum(parts)}, not 1.0.\nExpected the 4 shares for {MIX_ORDER} to add up to 1.0.\nFix: adjust --mix so its 4 values sum to 1.0, e.g. \"0.40,0.25,0.20,0.15\"   (see docs/steps/valset.md)")
     return dict(zip(MIX_ORDER, parts))
 
 
@@ -88,15 +88,18 @@ def _fill_scenario(scenario, ds, case_dir, ids, want, max_tries, rngs, patch_siz
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("-d", "--dataset_id", type=int, required=True)
-    ap.add_argument("--plans", required=True)
-    ap.add_argument("--config", required=True)
-    ap.add_argument("--out", required=True)
-    ap.add_argument("--n-patches", type=int, default=1500)
-    ap.add_argument("--floor", type=int, default=40)
-    ap.add_argument("--mix", default="0.40,0.25,0.20,0.15")
-    ap.add_argument("--seed", type=int, default=1234)
-    ap.add_argument("--max-tries", type=int, default=60)
+    ap.add_argument("-d", "--dataset_id", type=int, required=True, help="dataset id, e.g. 999")
+    ap.add_argument("--plans", required=True, help="plans identifier, no .json (e.g. nnUNetResEncUNetLPlans)")
+    ap.add_argument("--config", required=True, help="ROI/prompt config JSON path (e.g. configs/default.json)")
+    ap.add_argument("--out", required=True, help="manifest output path (.json); the .targets.npz sidecar is written next to it")
+    ap.add_argument("--n-patches", type=int, default=1500, help="total validation patches across all cohorts")
+    ap.add_argument("--floor", type=int, default=40, help="minimum patches guaranteed per cohort before proportional allocation of the rest")
+    ap.add_argument(
+        "--mix", default="0.40,0.25,0.20,0.15",
+        help="4 comma-separated shares summing to 1.0, order: all_clicked,lesion_free_decoy,subset_clicked,none_clicked",
+    )
+    ap.add_argument("--seed", type=int, default=1234, help="RNG seed for case/bbox/click draws, recorded in the manifest header")
+    ap.add_argument("--max-tries", type=int, default=60, help="rejection-sampling budget per wanted patch (tries = --max-tries * patches wanted for that scenario)")
     args = ap.parse_args()
 
     ds_name = convert_id_to_dataset_name(args.dataset_id)
@@ -172,7 +175,7 @@ def main() -> None:
             f"allocation bug, not rounding."
         )
 
-    npz_path = _sidecar_path(args.out)
+    npz_path = sidecar_path(args.out)
     packed = np.stack(packed_rows) if packed_rows else np.zeros((0, int(np.prod(patch_size)) // 8), dtype=np.uint8)
     np.savez_compressed(npz_path, packed=packed, shape=np.array(patch_size))
 

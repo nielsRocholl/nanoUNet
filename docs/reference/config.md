@@ -15,7 +15,7 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/defau
 | Section | Dataclass | Purpose |
 |---------|-----------|---------|
 | `prompt` | `PromptConfig` | Point encoding for training / validation |
-| `sampling` | `SamplingConfig` | Patch sampling, click modes, large-lesion extras |
+| `sampling` | `SamplingConfig` | Patch sampling, click modes, instance targets, cohorts |
 | `inference` | `InferenceConfig` | Sliding-window step size, default TTA |
 | `validation` | `ValidationConfig` | Optional; fraction of no-lesion validation crops |
 
@@ -40,13 +40,12 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config configs/defau
 | `click_modes.pos` | float | `1.0` | Probability of jittered centroid prompt |
 | `click_modes.drop` | float | `0.0` | Probability of omitting prompt (no-click training) |
 | `false_pos_probability` | float | `0.05` | Probability of adding a false-positive decoy click |
-| `large_lesion.K` | int or `[min, max]` | `2` | Extra centroid samples for large lesions |
-| `large_lesion.K_min` | int | `1` | Minimum extra samples |
-| `large_lesion.K_max` | int | `4` | Maximum extra samples |
-| `large_lesion.max_extra` | int | `0` | Cap on additional large-lesion patches |
+| `instance_targets` | bool | `false` | Mask the train target down to clicked instances; see [instance_targets.md](instance_targets.md) |
+| `cohorts` | `{str: float}` | `{}` | Per-source-dataset sampling weights; empty means uniform case draw |
+| `require_weights` | bool | `false` | If true, a missing `<case>_weights.json` raises instead of uniform per-centroid sampling |
 | `propagated.mode` | `"gaussian"` \| `"empirical"` | `"empirical"` | How the propagated-click offset is drawn |
 | `propagated.error_table` | str | `/nnunet_data/Longitudinal-CT/derivatives/registration_error_table.json` | Path to the measured registration-error table (mode=`empirical` only) |
-| `propagated.backends` | `[str, ...]` | `["original", "unigradicon"]` | Registration backends to draw offsets from (mode=`empirical`) |
+| `propagated.backends` | `[str, ...]` | `["original", "unigradicon"]` | Backend keys in `propagated.error_table` to draw offsets from (mode=`empirical`); labels in the data table, not code nanoUNet runs |
 | `propagated.sigma_per_axis` | `[sz, sy, sx]` | `[5.95, 6.39, 5.93]` | Gaussian jitter sigmas, mode=`gaussian` (voxels) |
 | `propagated.max_vox` | float | `34.0` | Max jitter magnitude, mode=`gaussian` only (voxels) |
 
@@ -77,7 +76,7 @@ There is no separate `neg` mode — drop covers no-prompt training.
 size-matched to each lesion's equivalent-sphere diameter (`volume_vox` from the centroid sidecar).
 No magnitude clip -- the table is already outlier-filtered. At startup the table is validated to
 exist, parse, and have a non-empty offset pool for every `(size bin, backend)` pair in `backends`;
-otherwise the config load raises naming the fix: `python3 scripts/measure_registration_error.py`.
+otherwise the config load raises, pointing at `propagated.error_table` / `propagated.mode`.
 
 `mode: "gaussian"` keeps the legacy Gaussian jitter (`sigma_per_axis`, clipped to `max_vox`).
 

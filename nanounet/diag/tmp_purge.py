@@ -36,7 +36,7 @@ def _purge_ckpt_stage_files(directory: str, max_age_sec: float) -> int:
         p = os.path.join(directory, name)
         try:
             st = os.stat(p, follow_symlinks=False)
-        except OSError:
+        except OSError:  # nanochat-style: allow E4 (racy unlink/stat in /tmp)
             continue
         if not os.path.isfile(p) or st.st_uid != uid:
             continue
@@ -47,7 +47,7 @@ def _purge_ckpt_stage_files(directory: str, max_age_sec: float) -> int:
         try:
             os.unlink(p)
             n += 1
-        except OSError:
+        except OSError:  # nanochat-style: allow E4 (racy unlink in /tmp)
             pass
     return n
 
@@ -66,7 +66,7 @@ def _purge_ipc_files(directory: str, prefixes: tuple[str, ...], max_age_sec: flo
         p = os.path.join(directory, name)
         try:
             st = os.stat(p, follow_symlinks=False)
-        except OSError:
+        except OSError:  # nanochat-style: allow E4 (racy stat in /tmp)
             continue
         if st.st_uid != uid or now - st.st_mtime < max_age_sec:
             continue
@@ -76,7 +76,7 @@ def _purge_ipc_files(directory: str, prefixes: tuple[str, ...], max_age_sec: flo
             elif os.path.isdir(p):
                 os.rmdir(p)
             n += 1
-        except OSError:
+        except OSError:  # nanochat-style: allow E4 (racy unlink/rmdir in /tmp)
             pass
     return n
 

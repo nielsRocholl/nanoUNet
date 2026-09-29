@@ -1,5 +1,8 @@
 # Longi finetune GPU starvation — diagnosis + fix (2026-07-10)
 
+Date: 2026-07-10
+Status: archived (2026-09-23) — describes the removed longitudinal pipeline; kept as history.
+
 ## Symptom
 `Dataset114_registered_f0_finetune_dwb_adamw1e-5_bs6_500ep` averaged ~60% GPU util
 (~1400 s/epoch) on A100-40GB, vs 95%+ (~1000 s) for the earlier `Dataset013_registered`

@@ -21,7 +21,7 @@ import numpy as np
 import torch
 
 from nanounet.data.valset import SCENARIOS, SIZE_BUCKETS
-from nanounet.model.dice_helpers import agreement_mean, click_split_means, pooled_dice_from_rows, pooled_fg_dice
+from nanounet.model.dice_metrics import agreement_mean, click_split_means, pooled_dice_from_rows, pooled_fg_dice
 
 
 def _dice_sel(tp, fp, fn, sel):
@@ -48,26 +48,25 @@ def _weighted_mean(vals: dict, weights: dict) -> float:
 def log_val_metrics(lm) -> None:
     """Called from NanoUNetLM.on_validation_epoch_end. Reads lm._val_buf, lm._val_buf_ablated,
     lm._agreement_buf, lm._meta_buf and calls lm.log(...)."""
-    d = dict(sync_dist=True)  # each rank validates its own shard; else metrics are rank 0 only
     da, fb = (torch.cat([v[k] for v in lm._val_buf]) for k in ("dice_a", "fp_b"))
     val_dice = pooled_fg_dice(lm._val_buf)
-    lm.log("val_dice", val_dice, prog_bar=True, **d)
-    lm.log("val_dice_macro", float(da.mean()) if da.numel() else float("nan"), prog_bar=True, **d)
-    lm.log("val_fp", float(fb.mean()) if fb.numel() else 0.0, prog_bar=False, **d)
+    lm.log("val_dice", val_dice, prog_bar=True)
+    lm.log("val_dice_macro", float(da.mean()) if da.numel() else float("nan"), prog_bar=True)
+    lm.log("val_fp", float(fb.mean()) if fb.numel() else 0.0, prog_bar=False)
     for k, v in (("val_n_a", da.numel()), ("val_n_b", fb.numel())):
-        lm.log(k, float(v), reduce_fx="sum", sync_dist=True)
-    lm.log("val_loss", float(np.mean([v["loss"] for v in lm._val_buf])), prog_bar=False, **d)
+        lm.log(k, float(v))
+    lm.log("val_loss", float(np.mean([v["loss"] for v in lm._val_buf])), prog_bar=False)
     if lm._val_buf_ablated:
         val_dice_ablated = pooled_fg_dice(lm._val_buf_ablated)
-        lm.log("val_dice_prompt_ablated", val_dice_ablated, **d)
-        lm.log("val_prompt_gap", val_dice - val_dice_ablated, **d)  # METRIC 3: collapse guard
+        lm.log("val_dice_prompt_ablated", val_dice_ablated)
+        lm.log("val_prompt_gap", val_dice - val_dice_ablated)  # METRIC 3: collapse guard
     din, dout = click_split_means(lm._val_buf)
-    lm.log("val_dice_click_inside", din, **d)
-    lm.log("val_dice_click_outside", dout, **d)
-    lm.log("val_prompt_agreement", agreement_mean(lm._agreement_buf), **d)  # METRIC 1 (headline)
+    lm.log("val_dice_click_inside", din)
+    lm.log("val_dice_click_outside", dout)
+    lm.log("val_prompt_agreement", agreement_mean(lm._agreement_buf))  # METRIC 1 (headline)
 
     if not lm._meta_buf:  # training run without --val-manifest: legacy path stops here
-        lm.log("val_prompt_score", float("nan"), **d)  # ModelCheckpoint(bestsel) requires the key
+        lm.log("val_prompt_score", float("nan"))  # ModelCheckpoint(bestsel) requires the key
         return
 
     scenario = torch.cat([m["scenario"] for m in lm._meta_buf])
@@ -100,35 +99,35 @@ def log_val_metrics(lm) -> None:
     dice_all_clicked = float("nan")
     for si, s in enumerate(SCENARIOS):
         sel = scenario == si
-        lm.log(f"val/{s}/n", float(sel.sum()), reduce_fx="sum", sync_dist=True)
-        lm.log(f"val/{s}/val_pred_fg", _mean_sel(pred_fg, sel), **d)  # D10: lower is better
-        lm.log(f"val/{s}/val_prompt_agreement", _agree_sel(agree, sel), **d)
+        lm.log(f"val/{s}/n", float(sel.sum()))
+        lm.log(f"val/{s}/val_pred_fg", _mean_sel(pred_fg, sel))  # D10: lower is better
+        lm.log(f"val/{s}/val_prompt_agreement", _agree_sel(agree, sel))
         matched = sel & (draws_matched == 1)
-        lm.log(f"val/{s}/val_prompt_agreement_matched", _agree_sel(agree, matched), **d)
+        lm.log(f"val/{s}/val_prompt_agreement_matched", _agree_sel(agree, matched))
         if s in ("all_clicked", "subset_clicked"):
             dice_s = _dice_sel(tp, fp, fn, sel)
             if s == "all_clicked":
                 dice_all_clicked = dice_s
-            lm.log(f"val/{s}/val_dice", dice_s, **d)
-            lm.log(f"val/{s}/val_dice_macro", _mean_sel(dice_row, sel & has_fg), **d)
+            lm.log(f"val/{s}/val_dice", dice_s)
+            lm.log(f"val/{s}/val_dice_macro", _mean_sel(dice_row, sel & has_fg))
             dice_ab = _dice_sel(tp_a, fp_a, fn_a, sel)
-            lm.log(f"val/{s}/val_dice_prompt_ablated", dice_ab, **d)
-            lm.log(f"val/{s}/val_prompt_gap", dice_s - dice_ab, **d)
-    lm.log("val_prompt_agreement_matched", _agree_sel(agree, draws_matched == 1), **d)
+            lm.log(f"val/{s}/val_dice_prompt_ablated", dice_ab)
+            lm.log(f"val/{s}/val_prompt_gap", dice_s - dice_ab)
+    lm.log("val_prompt_agreement_matched", _agree_sel(agree, draws_matched == 1))
     # none_clicked and lesion_free_decoy hand BOTH draws an IDENTICAL input -- no lesion click to
     # displace, and the decoy is shared by construction -- so they score a trivial 1.0 and inflate
     # the flat headline (0.92 vs 0.87 on the real scenarios). click_inside == -1 marks exactly
     # those rows; this variant is the number to quote for prompt sensitivity.
-    lm.log("val_prompt_agreement_clicked", _agree_sel(agree, click_in >= 0), **d)
+    lm.log("val_prompt_agreement_clicked", _agree_sel(agree, click_in >= 0))
 
     # (d) subset diagnostic -- headline number of this step
     sub_sel = has_subset == 1
     dice_clicked = _dice_sel(tp_s, fp_s, fn_s, sub_sel)
     dice_all = _dice_sel(tp, fp, fn, sub_sel)
-    lm.log("val/subset_clicked/val_dice_vs_clicked_subset", dice_clicked, **d)
-    lm.log("val/subset_clicked/val_dice_vs_all_lesions", dice_all, **d)
-    lm.log("val/subset_clicked/val_selectivity_margin", dice_clicked - dice_all, **d)
-    lm.log("val_prompt_score", dice_all_clicked + 0.5 * (dice_clicked - dice_all), **d)
+    lm.log("val/subset_clicked/val_dice_vs_clicked_subset", dice_clicked)
+    lm.log("val/subset_clicked/val_dice_vs_all_lesions", dice_all)
+    lm.log("val/subset_clicked/val_selectivity_margin", dice_clicked - dice_all)
+    lm.log("val_prompt_score", dice_all_clicked + 0.5 * (dice_clicked - dice_all))
 
     # (e) per cohort (all_clicked rows only, D15) + (g) weighted headline
     manifest = lm.trainer.datamodule.val_manifest
@@ -138,18 +137,18 @@ def log_val_metrics(lm) -> None:
     dice_by_cohort, agree_by_cohort = {}, {}
     for ci, name in enumerate(cohort_names):
         sel = ac_sel & (cohort == ci)
-        lm.log(f"val/cohort/{name}/n", float(sel.sum()), reduce_fx="sum", sync_dist=True)
+        lm.log(f"val/cohort/{name}/n", float(sel.sum()))
         dice_by_cohort[name] = _dice_sel(tp, fp, fn, sel)
         agree_by_cohort[name] = _agree_sel(agree, sel)
-        lm.log(f"val/cohort/{name}/val_dice", dice_by_cohort[name], **d)
-        lm.log(f"val/cohort/{name}/val_prompt_agreement", agree_by_cohort[name], **d)
-    lm.log("val_dice_weighted", _weighted_mean(dice_by_cohort, cohort_weights), **d)
-    lm.log("val_prompt_agreement_weighted", _weighted_mean(agree_by_cohort, cohort_weights), **d)
+        lm.log(f"val/cohort/{name}/val_dice", dice_by_cohort[name])
+        lm.log(f"val/cohort/{name}/val_prompt_agreement", agree_by_cohort[name])
+    lm.log("val_dice_weighted", _weighted_mean(dice_by_cohort, cohort_weights))
+    lm.log("val_prompt_agreement_weighted", _weighted_mean(agree_by_cohort, cohort_weights))
 
     # (f) tags
     for name, val in (("click_inside", 1), ("click_outside", 0)):
-        lm.log(f"val/tag/{name}/val_dice", _dice_sel(tp, fp, fn, click_in == val), **d)
+        lm.log(f"val/tag/{name}/val_dice", _dice_sel(tp, fp, fn, click_in == val))
     for bi, name in enumerate(SIZE_BUCKETS):
         sel = size_bucket == bi
-        lm.log(f"val/tag/{name}/val_dice", _dice_sel(tp, fp, fn, sel), **d)
-        lm.log(f"val/tag/{name}/n", float(sel.sum()), reduce_fx="sum", sync_dist=True)
+        lm.log(f"val/tag/{name}/val_dice", _dice_sel(tp, fp, fn, sel))
+        lm.log(f"val/tag/{name}/n", float(sel.sum()))

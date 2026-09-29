@@ -14,11 +14,11 @@ from torch import autocast
 
 from nanounet.config import RoiPromptConfig, load_config, save_config
 from nanounet.diag import purge_torch_tmp
-from nanounet.model.dice_helpers import prompt_pair_dice, subset_dice_row, val_step_row
+from nanounet.model.dice_metrics import prompt_pair_dice, subset_dice_row, val_step_row
 from nanounet.model.losses import build_loss, consistency_dice_term
 from nanounet.model.lr_schedule import PolyLRScheduler, StretchedTailPolyLRScheduler
 from nanounet.model.mae_transfer import load_full_net, load_mae_encoder
-from nanounet.model.network import build_net, build_net_longi
+from nanounet.model.network import build_net
 from nanounet.plan.plans import Plans
 from nanounet.train.val_metrics import log_val_metrics
 
@@ -41,7 +41,6 @@ class NanoUNetLM(pl.LightningModule):
         optimizer: str = "sgd",
         mae_ckpt: str | None = None,
         init_weights: str | None = None,
-        longi: bool = False,
         consistency_weight: float = 0.0,
         consistency_warmup_epochs: int = 50,
         warmup_epochs: int = 0,
@@ -56,14 +55,12 @@ class NanoUNetLM(pl.LightningModule):
         self.cm = self.pm.get_configuration("3d_fullres")
         self.dj = load_json(dataset_json_path)
         self.label_manager = self.pm.get_label_manager(self.dj)
-        build = build_net_longi if longi else build_net
-        self.net = build(self.cm, self.label_manager, self.dj, enable_deep_supervision)
+        self.net = build_net(self.cm, self.label_manager, self.dj, enable_deep_supervision)
         if init_weights is not None:
             load_full_net(self.net, init_weights)
         elif mae_ckpt is not None:
             load_mae_encoder(self.net, mae_ckpt)
-        # is_ddp=False is correct, not a stub: plans set batch_dice=False, so dice is per-sample
-        self.loss = build_loss(self.cm, self.label_manager, enable_deep_supervision, loss_type=loss_type, is_ddp=False)
+        self.loss = build_loss(self.cm, self.label_manager, enable_deep_supervision, loss_type=loss_type)
         self.initial_lr = initial_lr
         self.weight_decay = weight_decay
         self.optimizer = optimizer
@@ -73,12 +70,11 @@ class NanoUNetLM(pl.LightningModule):
         self.stretched_ref = stretched_ref
         self.stretched_exp = stretched_exp
         self.enable_deep_supervision = enable_deep_supervision
-        self.longi = longi
         self.consistency_weight_max = consistency_weight
         self.consistency_warmup_epochs = consistency_warmup_epochs
         self.warmup_epochs = warmup_epochs
-        # supervised [CT, hm]; longi [FU_CT, FU_hm, BL_CT, BL_hm]. Used to zero prompts for val_prompt_gap.
-        self._prompt_ch = [1, 3] if longi else [1]
+        # Input layout [CT, hm]. Used to zero prompts for val_prompt_gap.
+        self._prompt_ch = [1]
         self._val_buf: List[Dict[str, Any]] = []
         self._val_buf_ablated: List[Dict[str, Any]] = []
         self._agreement_buf: List[torch.Tensor] = []

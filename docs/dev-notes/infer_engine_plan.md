@@ -1,6 +1,10 @@
 # Plan: replace `nanounet_predict` with a grid engine
 
-Status: implementation spec. One way. nanochat-style is a hard rule (R1 <200 LOC/file, R3 one path, G4 measure).
+Date: 2026-08-14
+Status: done — implemented (`border_expand.py`/`gaussian.py` deleted, `predict_case.py`/`tta.py`
+rewritten); see the 2026-09-23 notes in §4/§5 for later drift from a separate refactor.
+
+Originally an implementation spec. One way. nanochat-style is a hard rule (R1 <200 LOC/file, R3 one path, G4 measure).
 Serves the Dataset999 instance-conditional run: 3-ch `[CT, hm+, hm−]`, patch `[96,160,160]`, EDT r=2, scale=0.5. Longi/DWB is the same engine with a 6-ch row — do not fork.
 
 ---
@@ -141,6 +145,14 @@ Default TTA stays **on** (`disable_tta_default: false`) until gate G4 says other
 | `docs/steps/predict.md` | Same change | Args table, recommended command without `--border-expand` (it is default) |
 | `docs/dev-notes/radiom_embed_api.md` | Note | `predict_patch_logits` unchanged; full-case expand is `predict_case_logits` |
 
+**Note (2026-09-23):** the rows above are historical — this plan's file-map items were implemented
+(`border_expand.py`/`gaussian.py` deleted, `predict_case.py`/`tta.py` rewritten). A later,
+separate longitudinal-pipeline removal has since gone further than this plan called for:
+`nanounet/infer/longi_row.py` → renamed to `nanounet/infer/inference_row.py`;
+`nanounet/infer/predict_patch.py` and `nanounet/cli/predict_preprocessed.py` were deleted outright
+(not just kept/edited as this row said); `docs/dev-notes/radiom_embed_api.md` no longer documents
+`predict_patch_logits` (see that file's own note).
+
 Do **not** add `infer/grid.py`. `infer/` is already over the ~6-file guideline; we delete two files.
 
 Keep: `predictor.py`, `predict_io.py`, `export.py`, `patch_export.py`, `points_pad.py`. Preprocess stays full-volume `run_case` — one resample per case, not the bottleneck.
@@ -160,7 +172,9 @@ Expand on, clustered, max-merge, TTA from `nano_config.json`. `--no-border-expan
 
 `predict_case_logits` keeps `points_zyx_unpadded` and `on_forward(done, total)` (Radiom). `on_forward` fires once per finished tile after TTA mean, including expand tiles. Import `Callable`.
 
-This 999 ckpt is **not** longi. `nanounet_predict_preprocessed` still forces `longi=True` — do not point it at this run.
+This 999 ckpt is **not** longi. `nanounet_predict_preprocessed` used to force `longi=True`; as of
+2026-09-23 that command and the entire longitudinal pipeline have been deleted, so this caveat no
+longer applies — `nanounet_predict` (this section's command) is the only predict CLI.
 
 ---
 
