@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from nanounet.infer.predict_io import patient_ids_from_csv
-from nanounet.infer.segtrack_case import SegTrackCase, pair_folder, stem_pid_region
+from nanounet.infer.predict.io import patient_ids_from_csv
+from nanounet.infer.segtrack.case import SegTrackCase, pair_folder, stem_pid_region
 
 
 def collect_cases(args) -> tuple[list[SegTrackCase], bool, list[tuple[str, str]], tuple[Path | None, str]]:

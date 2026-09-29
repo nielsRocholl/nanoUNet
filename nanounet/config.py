@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal, Mapping, Tuple, cast
 
-from nanounet.data.error_table import parse_propagated
+from nanounet.data.patch.error_table import parse_propagated
 
 
 @dataclass(frozen=True)
@@ -32,10 +32,10 @@ class SamplingConfig:
     false_pos_probability: float
     propagated: PropagatedConfig
     instance_targets: bool = False
-    # Absent/empty => uniform case draw, exactly. See nanounet/data/cohorts.py.
+    # Absent/empty => uniform case draw, exactly. See nanounet/data/patch/cohorts.py.
     cohorts: Mapping[str, float] = field(default_factory=dict)
     # False (default): a missing <case>_weights.json falls back to uniform per-centroid sampling.
-    # True: that same absence raises instead. See nanounet/data/sampling.py.
+    # True: that same absence raises instead. See nanounet/data/patch/sampling.py.
     require_weights: bool = False
 
 

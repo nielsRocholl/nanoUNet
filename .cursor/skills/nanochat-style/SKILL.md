@@ -88,7 +88,7 @@ IDs are stable. Code comments cite them, e.g. `(R12)`. **auto** = `scripts/check
 | E4 | No swallowing. A narrow `except OSError: pass` is allowed only for best-effort side effects, with a waiver. A broad `except` is allowed only inside an R17 import-time capability probe, and it still needs the waiver. | auto |
 | E5 | User mistakes exit through `raise SystemExit(msg)`, which prints cleanly with exit code 1. No 40-frame stack. | |
 | E6 | Report **all** startup problems in one error, not one per run. Invalid choice means list the valid ones. | |
-| G1 | Data path: pinned staging, `non_blocking=True`, prefetch while the GPU runs, workers per `dataloader_prefs`. | |
+| G1 | Data path: pinned staging, `non_blocking=True`, prefetch while the GPU runs, workers per `data/loader/prefs.py`. | |
 | G2 | No CPU-GPU sync (`.item()`, `.cpu()`, `.tolist()`, prints) in the hot path, except at log steps. | auto |
 | G3 | Heavy CPU work (augmentation, blosc2 decode, resampling) runs in workers, never on the main thread. | |
 | G4 | **Measure, don't guess.** Data-path or step changes ship with a before/after `epoch_wall_time_sec`. | |

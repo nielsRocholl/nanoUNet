@@ -17,12 +17,12 @@ from nanounet.lightning_ckpt import (
     pl_ckpt_epoch_and_target,
     pl_ckpt_stage_done,
 )
-from nanounet.plan.splits import fold_seed
+from nanounet.plan.dataset.splits import fold_seed
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
 from nanounet.pretrain.module import NanoMAELM
-from nanounet.train.data_module import NanoDataModule
-from nanounet.train.ema import EMACallback
-from nanounet.train.lightning_module import NanoUNetLM
+from nanounet.train.patches.data_module import NanoDataModule
+from nanounet.train.module.ema import EMACallback
+from nanounet.train.module.lightning_module import NanoUNetLM
 
 
 def run_mae_pretrain(args, ds, pp, plans_path, dj_path, out, accel, loggers, dl_b, pm0) -> str | None:

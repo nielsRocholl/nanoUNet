@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from nanounet.dataloader_prefs import init_dataloader_ipc
+from nanounet.data.loader.prefs import init_dataloader_ipc
 from nanounet.runtime import set_safe_tmpdir
 
 set_safe_tmpdir()
@@ -30,8 +30,8 @@ quiet_lightning_runtime()
 
 from pytorch_lightning.loggers import CSVLogger, WandbLogger
 
-from nanounet.dataloader_prefs import dataloader_bucket
-from nanounet.plan.dataset_id import convert_id_to_dataset_name
+from nanounet.data.loader.prefs import dataloader_bucket
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
 from nanounet.train.fit import run_mae_pretrain, run_supervised
 

@@ -106,8 +106,8 @@ Not a CLI flag. Radiom remote interactive session calls these in-process:
 
 | Function | Module | Description |
 |----------|--------|-------------|
-| `predict_case_logits` | `nanounet.infer.predict_case` | Clustered/centered patch forward → `(logits, tiles)` |
-| `patch_logits_to_native_seg` | `nanounet.infer.patch_export` | Argmax patch → per-tile native paste |
-| `native_seg_to_nifti_bytes` | `nanounet.infer.patch_export` | Gzip NIfTI bytes from native seg + `props["sitk_stuff"]` |
+| `predict_case_logits` | `nanounet.infer.predict.case` | Clustered/centered patch forward → `(logits, tiles)` |
+| `patch_logits_to_native_seg` | `nanounet.infer.export.tiles` | Argmax patch → per-tile native paste |
+| `native_seg_to_nifti_bytes` | `nanounet.infer.export.tiles` | Gzip NIfTI bytes from native seg + `props["sitk_stuff"]` |
 
 See also [radiom_embed_api.md](../dev-notes/radiom_embed_api.md).

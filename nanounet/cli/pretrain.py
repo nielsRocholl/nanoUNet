@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from nanounet.dataloader_prefs import init_dataloader_ipc
+from nanounet.data.loader.prefs import init_dataloader_ipc
 from nanounet.runtime import set_safe_tmpdir
 
 set_safe_tmpdir()
@@ -29,13 +29,13 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
-from nanounet.dataloader_prefs import dataloader_bucket
+from nanounet.data.loader.prefs import dataloader_bucket
 from nanounet.lightning_ckpt import (
     pl_ckpt_epoch_and_target,
     pl_ckpt_stage_done,
 )
-from nanounet.plan.dataset_id import convert_id_to_dataset_name
-from nanounet.plan.splits import fold_seed, parse_fold
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name
+from nanounet.plan.dataset.splits import fold_seed, parse_fold
 from nanounet.diag import set_mem_diag
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
 from nanounet.pretrain.module import NanoMAELM

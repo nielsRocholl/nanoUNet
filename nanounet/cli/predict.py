@@ -13,12 +13,12 @@ from batchgenerators.utilities.file_and_folder_operations import join, load_json
 
 from nanounet.common import config_table, cprint, nano_header
 from nanounet.config import load_config
-from nanounet.infer.predict_case import MAX_BORDER_EXTRA, predict_case_logits
-from nanounet.infer.tta import cat_status
-from nanounet.infer.export import export_prediction_from_logits
-from nanounet.infer.predict_io import patient_ids_from_csv, preprocess_case
-from nanounet.data.resampling import set_resample_device
-from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
+from nanounet.infer.predict.case import MAX_BORDER_EXTRA, predict_case_logits
+from nanounet.infer.predict.tta import cat_status
+from nanounet.infer.export.volume import export_prediction_from_logits
+from nanounet.infer.predict.io import patient_ids_from_csv, preprocess_case
+from nanounet.data.volume.resampling import set_resample_device
+from nanounet.infer.predict.predictor import load_net_from_ckpt, pick_checkpoint
 from nanounet.plan.labels import labels_from_dataset_json
 from nanounet.plan.plans import Plans
 from nanounet.score import check_gt_dir, report, report_case, score_case, write

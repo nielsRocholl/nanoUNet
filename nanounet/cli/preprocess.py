@@ -13,15 +13,15 @@ import sys
 from batchgenerators.utilities.file_and_folder_operations import join, load_json
 
 from nanounet.common import cprint, nano_header, nano_rule, preprocessed_dir, raw_dir
-from nanounet.data.blosc2_dataset import Blosc2Folder
-from nanounet.plan.cohorts import run_cohorts
-from nanounet.plan.dataset_id import convert_id_to_dataset_name
+from nanounet.data.store.blosc2_dataset import Blosc2Folder
+from nanounet.plan.dataset.cohorts import run_cohorts
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
 from nanounet.plan.prep.fingerprint import run_fingerprint
 from nanounet.plan.prep.merge import build_merged_raw
 from nanounet.plan.resenc.planner import run_plan
 from nanounet.plan.prep.preprocess import run_preprocess
-from nanounet.plan.splits import make_balanced_split
+from nanounet.plan.dataset.splits import make_balanced_split
 
 PATCH_VOL = {"small": 128, "medium": 192, "large": 256, "xlarge": 320}
 

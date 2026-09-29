@@ -2,7 +2,7 @@
 
 Everything expensive happens HERE, once, so validation stays pure tensor work: connected
 components, the clicked-subset targets, both prompt draws, and the click-inside flags are all
-resolved and written to disk. Nothing in nanounet/data/valset.py randomises or recomputes."""
+resolved and written to disk. Nothing in nanounet/data/valset/manifest.py randomises or recomputes."""
 
 from __future__ import annotations
 
@@ -17,10 +17,10 @@ from batchgenerators.utilities.file_and_folder_operations import join
 
 from nanounet.common import cprint, nano_header, nano_progress, preprocessed_dir, resolve_user_config_path
 from nanounet.config import load_config
-from nanounet.data.blosc2_dataset import Blosc2Folder
-from nanounet.data.valset import SCENARIOS, SCHEMA_VERSION, SMALL_LESION_MAX_VOX, sidecar_path, config_stamp
-from nanounet.data.valset_alloc import allocate, load_cohorts, scenario_allocation
-from nanounet.data.valset_build import (
+from nanounet.data.store.blosc2_dataset import Blosc2Folder
+from nanounet.data.valset.manifest import SCENARIOS, SCHEMA_VERSION, SMALL_LESION_MAX_VOX, sidecar_path, config_stamp
+from nanounet.data.valset.alloc import allocate, load_cohorts, scenario_allocation
+from nanounet.data.valset.build import (
     LabelCache,
     build_subset_target,
     case_info,
@@ -28,10 +28,10 @@ from nanounet.data.valset_build import (
     try_foreground,
     try_lesion_free_decoy,
 )
-from nanounet.plan.dataset_id import convert_id_to_dataset_name
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
-from nanounet.plan.splits import cohort_of
-from nanounet.train.patch_render import click_inside_flags
+from nanounet.plan.dataset.splits import cohort_of
+from nanounet.train.patches.render import click_inside_flags
 
 MIX_ORDER = ("all_clicked", "lesion_free_decoy", "subset_clicked", "none_clicked")
 

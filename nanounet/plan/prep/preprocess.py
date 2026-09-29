@@ -12,7 +12,7 @@ from batchgenerators.utilities.file_and_folder_operations import isdir, isfile, 
 from nanounet.common import cprint, nano_progress, preprocessed_dir, raw_dir
 from nanounet.diag.cgroup import _cgroup_mem_limit_gb, _cgroup_oom_kills, _dead_worker_error
 from nanounet.plan.prep.case_pp import run_case_save
-from nanounet.plan.dataset_id import convert_id_to_dataset_name, get_filenames_of_train_images_and_targets
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name, get_filenames_of_train_images_and_targets
 from nanounet.plan.plans import Plans
 from nanounet.prompt.centroids import precompute_folder
 

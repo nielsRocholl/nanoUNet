@@ -181,4 +181,4 @@ Named prefixes take the stated probability; the remaining mass spreads over all 
 proportion to their counts. An absent or empty block reproduces the uniform draw exactly. Names are
 bare dataset prefixes (`d013`, no trailing underscore) — `--only-prefix` still uses the underscored
 form, they are different flags. Composes with the `*_weights.json` lesion weights: cohorts pick
-which case, lesion weights pick where inside it. See `nanounet/data/cohorts.py`.
+which case, lesion weights pick where inside it. See `nanounet/data/patch/cohorts.py`.

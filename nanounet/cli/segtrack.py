@@ -13,11 +13,11 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeEl
 
 from nanounet.common import config_table, console, cprint, nano_banner, quiet_lightning_runtime
 from nanounet.config import load_config
-from nanounet.data.resampling import set_resample_device
+from nanounet.data.volume.resampling import set_resample_device
 from nanounet.cli.segtrack_cases import collect_cases
-from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
-from nanounet.infer.segtrack import DEFAULT_MODEL, load_case_io, run_case
-from nanounet.infer.segtrack_case import resolve_ckpt_path, resolve_out
+from nanounet.infer.predict.predictor import load_net_from_ckpt, pick_checkpoint
+from nanounet.infer.segtrack.track import DEFAULT_MODEL, load_case_io, run_case
+from nanounet.infer.segtrack.case import resolve_ckpt_path, resolve_out
 from nanounet.plan.plans import Plans
 
 

@@ -16,10 +16,10 @@ from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from rich.table import Table
 
 from nanounet.common import cprint, nano_header, preprocessed_dir, raw_dir
-from nanounet.data.blosc2_dataset import Blosc2Folder
-from nanounet.plan.dataset_id import convert_id_to_dataset_name
+from nanounet.data.store.blosc2_dataset import Blosc2Folder
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
-from nanounet.plan.splits import cohort_of, make_balanced_split
+from nanounet.plan.dataset.splits import cohort_of, make_balanced_split
 
 
 def main() -> None:

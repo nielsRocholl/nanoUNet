@@ -98,4 +98,5 @@ subfolder, depth > 2, name repeating its folder, subfolder `__init__` without do
 ## Gate
 
 The `equiv/` harness was restored from `5b3b265^`, run untracked, and not committed. It ran with `--base 0ca3bac` and
-`renames.json` = the table above. Result: ast_guard ok, golden and CLI surface bit-identical (see the commit message).
+`renames.json` = the table above. Result: `ast_guard ok (513 = 513 defs, 0 failures) | golden 486 keys | surface 21 keys | 0 diffs`.
+The CLI surface covers --help of all 8 scripts, import side effects, and a spawn pickle probe (K10/K11).

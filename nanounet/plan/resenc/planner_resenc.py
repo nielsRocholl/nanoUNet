@@ -10,7 +10,7 @@ import numpy as np
 from dynamic_network_architectures.architectures.unet import ResidualEncoderUNet
 from dynamic_network_architectures.building_blocks.helper import convert_dim_to_conv_op, get_matching_instancenorm
 
-from nanounet.data.resampling import resample_data_or_seg_to_shape
+from nanounet.data.volume.resampling import resample_data_or_seg_to_shape
 from nanounet.model.network import estimate_conv_feature_map_size
 from nanounet.plan.resenc.planner_topology import get_pool_and_conv_props
 

@@ -6,7 +6,7 @@ import argparse
 import os
 
 from nanounet.common import resolve_user_config_path
-from nanounet.plan.splits import parse_fold
+from nanounet.plan.dataset.splits import parse_fold
 
 
 def build_train_parser() -> argparse.ArgumentParser:

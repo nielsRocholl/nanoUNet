@@ -34,18 +34,33 @@ Load this for any `.py` under `nanounet/`. Rule IDs refer to SKILL.md.
 
 ```
 nanounet/
-├── cli/        one file per console script (+ train_parser.py, segtrack_cases.py helpers)
-├── data/       blosc2 dataset, crop/resample/normalize, augment, sampling, valset, loader_workers
-├── prompt/     centroids, click coords, encoding, clustering
-├── plan/       dataset ids, plans, splits, labels; prep/ = preprocessing, resenc/ = ResEnc planner
-├── model/      network, losses (dice, cc_dice_ce), dice_metrics, lr schedule, MAE transfer
-├── train/      LightningModule, data module, fit, EMA, patch iterable/render, val metrics
-├── pretrain/   MAE pretraining (dataset, module)
-├── infer/      predictor, predict_case/io, TTA, ROI slices, export, segtrack
-├── diag/       cgroup, mem_diag (flag + JSONL), mem_probe (RSS/cgroup/GPU readers), tmp_purge
-├── common.py   console + rich helpers, env paths, logging
-├── config.py   dataclass config + load/save
-└── runtime.py  dataloader_prefs.py  lightning_ckpt.py  score.py   (flat single-concept modules)
+├── cli/            one file per console script (+ train_parser.py, segtrack_cases.py helpers); flat by rule
+├── data/
+│   ├── store/      blosc2_dataset (preprocessed cases), io (SimpleITK reader/writer)
+│   ├── volume/     crop, resampling, normalization
+│   ├── augment/    transforms (train/val chains), spatial_points (click-carrying transforms)
+│   ├── patch/      sampling (click jitter, build_patch), bbox, instance_target, error_table, cohorts
+│   ├── valset/     manifest (schema + dataset), alloc, build
+│   └── loader/     prefs (worker/prefetch presets), workers (worker_init, collate)
+├── prompt/         centroids, click coords, encoding, clustering
+├── plan/           plans, labels
+│   ├── dataset/    ids, splits, cohorts, lesion_types
+│   ├── prep/       fingerprint, case_pp, preprocess, merge
+│   └── resenc/     ResEnc planner, VRAM loop, topology
+├── model/          network, lr_schedule, mae_transfer
+│   └── loss/       losses (DC+CE, build_loss), dice, cc_dice_ce, dice_metrics
+├── train/          fit (MAE + supervised orchestration)
+│   ├── patches/    data_module, iterable, render
+│   └── module/     lightning_module, ema, val_metrics
+├── pretrain/       MAE pretraining (augment, dataset, module)
+├── infer/
+│   ├── predict/    predictor (ckpt load), io, points_pad, roi_slices, inference_row, tta, case
+│   ├── export/     volume (logits → native seg), tiles (tile paste, NIfTI bytes)
+│   └── segtrack/   track, case
+├── diag/           cgroup, mem_diag (flag + JSONL), mem_probe (RSS/cgroup/GPU readers), tmp_purge
+├── common.py       console + rich helpers, env paths, logging
+├── config.py       dataclass config + load/save
+└── runtime.py  lightning_ckpt.py  score.py   (flat single-concept modules)
 ```
 
 ## Folder layout (R20)
@@ -68,7 +83,7 @@ nanounet/
 
 ## Hard rules in detail
 
-- **R1/R2 splitting.** Split on a noun: `sampling.py` → `sampling.py` + `patch_bbox.py`. Never split into `_part2.py` or
+- **R1/R2 splitting.** Split on a noun: `patch/sampling.py` → `patch/sampling.py` + `patch/bbox.py`. Never split into `_part2.py` or
   `_impl.py`. After a split, both files still need a docstring. Re-export only if callers are many.
 - **R3 dispatch.** Use `if/elif/else`. If `kind` is user-supplied, the `else` raises an E1 message that lists the valid values.
   If `kind` is internal, `assert kind in VALID, kind` first. A class is justified only
@@ -97,7 +112,7 @@ nanounet/
 |---|---|
 | `nanounet/prompt/centroids.py` | Its docstring explains *why* `seed_zyx` exists (a centroid falls outside a concave lesion in ~12% of cases). |
 | `nanounet/cli/build_splits.py` | A complete CLI: header, validate, work, rich table, backup instead of silent overwrite, `next:` line. |
-| `nanounet/data/sampling.py` | Its docstring states the order of operations and the one shared-state subtlety. |
+| `nanounet/data/patch/sampling.py` | Its docstring states the order of operations and the one shared-state subtlety. |
 
 ## Things we will not write
 

@@ -9,7 +9,7 @@ from typing import Callable, Union
 from batchgenerators.utilities.file_and_folder_operations import load_json
 from dynamic_network_architectures.building_blocks.helper import convert_dim_to_conv_op, get_matching_instancenorm
 
-from nanounet.data.resampling import resample_data_or_seg_to_shape
+from nanounet.data.volume.resampling import resample_data_or_seg_to_shape
 from nanounet.plan.labels import Labels, labels_from_dataset_json
 
 

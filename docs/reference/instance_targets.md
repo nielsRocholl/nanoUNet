@@ -57,8 +57,8 @@ nanounet_train -d 999 --plans nnUNetResEncUNetLPlans_h200_smallpv \
 
 ## Mechanism
 
-Per training patch, in `build_patch` (`nanounet/data/sampling.py`) via
-`nanounet/data/instance_target.py`:
+Per training patch, in `build_patch` (`nanounet/data/patch/sampling.py`) via
+`nanounet/data/patch/instance_target.py`:
 
 1. `cc3d.connected_components` on the **crop** (not the volume) -> instance labels.
 2. Each component is mapped back to its **parent lesion** via the sidecar `bboxes_zyx`. A crop can
@@ -81,7 +81,7 @@ Full-volume connected components would not be affordable.
 **A kept lesion is never left unclicked, and never becomes background by accident.** Both rules
 above exist because training previously contradicted inference:
 
-- `nanounet/infer/predict_case.py` finishes a lesion that spans several patches by growing a
+- `nanounet/infer/predict/case.py` finishes a lesion that spans several patches by growing a
   face-neighbour grid wherever the prediction **touches a patch face**. That only fires if the model
   segments up to the edge. Centroid-based membership trained the opposite, suppressing **13.69% of
   all foreground voxels** (measured) and teaching "ignore anything near the patch boundary".

@@ -8,7 +8,7 @@ near full utilization. Every change must keep it that way, **with a number to sh
 
 ## Measurement protocol (G4): how to produce the number
 
-Metric: `epoch_wall_time_sec` (wandb/CSV). It is logged in `train/lightning_module.py` and `pretrain/module.py`, and covers
+Metric: `epoch_wall_time_sec` (wandb/CSV). It is logged in `train/module/lightning_module.py` and `pretrain/module.py`, and covers
 the train epoch plus its validation, from `on_train_epoch_start` to `on_validation_epoch_end`.
 
 1. Keep everything but the change fixed: same node/GPU type, `--dl-bucket`, `--batch-size`, `--iters-per-epoch`,
@@ -31,7 +31,7 @@ you must state the trade-off explicitly (G5).
 
 ## The data path (G1, G3, G6)
 
-- **Workers:** worker count and prefetch come from `dataloader_prefs.py` buckets (`--dl-bucket s|m|l|xl`). Don't hardcode
+- **Workers:** worker count and prefetch come from `data/loader/prefs.py` buckets (`--dl-bucket s|m|l|xl`). Don't hardcode
   `num_workers`. Persistent workers are opt-in (`--dl-persistent-workers`) because of worker RSS / `/dev/shm`
   pressure. Enable them only with a `--mem-diag` run showing that memory is flat.
 - **Worker work:** blosc2 decode, crop, augmentation (`batchgeneratorsv2`), resampling, and heatmap rendering. The main
@@ -44,7 +44,7 @@ you must state the trade-off explicitly (G5).
 
 - **Sync points** are `.item()`, `.cpu()`, `.tolist()`, `.numpy()`, `print(tensor)`, `if tensor:`, `torch.nonzero` (dynamic
   shape), and host-side boolean masks. None of them belong in `forward`/`training_step`/loss code. Keep metrics as tensors and let
-  `self.log(..., on_step=False, on_epoch=True)` reduce them. Known debt: `model/cc_dice_ce.py` calls `.item()` inside
+  `self.log(..., on_step=False, on_epoch=True)` reduce them. Known debt: `model/loss/cc_dice_ce.py` calls `.item()` inside
   the loss. It is on the next-touch list.
 - **Per-step host work**: no Python loops over batch elements, no per-step `dict` rebuilding of big structures, no
   per-step wandb calls outside Lightning's logger.
@@ -65,7 +65,7 @@ you must state the trade-off explicitly (G5).
 
 ## Inference (G7)
 
-- Every predict path is `@torch.inference_mode()` (not `no_grad`). That is already true in `infer/predict_case.py` and `infer/tta.py`.
+- Every predict path is `@torch.inference_mode()` (not `no_grad`). That is already true in `infer/predict/case.py` and `infer/predict/tta.py`.
 - Sliding-window: batch the tiles, keep the Gaussian importance map on the GPU, and accumulate logits on the GPU in fp16/bf16 when
   the volume fits. Move to CPU once per case, not per tile.
 - Benchmarks run one warmup pass first (cudnn autotune, allocator, and kernels), then time with `synchronize()` around

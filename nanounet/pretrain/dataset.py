@@ -12,8 +12,8 @@ from batchgeneratorsv2.transforms.base.basic_transform import BasicTransform
 from torch.utils.data import DataLoader, IterableDataset
 
 from nanounet.common import preprocessed_dir, cprint
-from nanounet.dataloader_prefs import DataloaderBucket, build_iter_dataloader, init_dataloader_ipc
-from nanounet.data.blosc2_dataset import Blosc2Folder, case_spatial_shape
+from nanounet.data.loader.prefs import DataloaderBucket, build_iter_dataloader, init_dataloader_ipc
+from nanounet.data.store.blosc2_dataset import Blosc2Folder, case_spatial_shape
 from nanounet.diag import (
     log_snapshot,
     mem_diag_enabled,
@@ -22,7 +22,7 @@ from nanounet.diag import (
     worker_diag_tick,
 )
 from nanounet.plan.plans import Plans
-from nanounet.plan.splits import fold_keys, load_splits
+from nanounet.plan.dataset.splits import fold_keys, load_splits
 from nanounet.pretrain.augment import apply_spatial_tf, train_spatial_tf
 
 

@@ -15,9 +15,9 @@ import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import isfile, join
 
 from nanounet.common import cprint, nano_header, nano_progress, preprocessed_dir
-from nanounet.data.blosc2_dataset import Blosc2Folder, case_spatial_shape, load_case_properties
-from nanounet.plan.dataset_id import convert_id_to_dataset_name
-from nanounet.plan.lesion_types import (
+from nanounet.data.store.blosc2_dataset import Blosc2Folder, case_spatial_shape, load_case_properties
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name
+from nanounet.plan.dataset.lesion_types import (
     HARD_TYPE_BOOST,
     build_case_weights,
     case_to_csv,

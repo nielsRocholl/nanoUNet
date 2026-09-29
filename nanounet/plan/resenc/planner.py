@@ -10,11 +10,11 @@ import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import isfile, join, load_json, maybe_mkdir_p, save_json
 
 from nanounet.common import ANISO_THRESHOLD, cprint, preprocessed_dir, raw_dir
-from nanounet.data.io import reader_writer_class_from_dataset
-from nanounet.data.normalization import normalization_class_for_channel
-from nanounet.data.resampling import compute_new_shape
-from nanounet.plan.dataset_id import convert_id_to_dataset_name, get_filenames_of_train_images_and_targets
-from nanounet.plan.dataset_id import recursive_fix_for_json_export
+from nanounet.data.store.io import reader_writer_class_from_dataset
+from nanounet.data.volume.normalization import normalization_class_for_channel
+from nanounet.data.volume.resampling import compute_new_shape
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name, get_filenames_of_train_images_and_targets
+from nanounet.plan.dataset.ids import recursive_fix_for_json_export
 from nanounet.plan.resenc.planner_resenc import PRESETS, resenc_3d_fullres_plan
 
 
