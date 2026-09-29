@@ -141,7 +141,7 @@ No R3/R6/R11/R14 violations anywhere. Near the R1 cap: `valset.py` 198, `samplin
 | opt-B | S10 (`worker_init`/`collate_patches` → `data/`) | **yes** | 1-4 |
 | opt-C | approved X items (+ S11 if X02/X03 approved) | no | 1-3 |
 
-Outcomes (2026-09-24, `nanochat-refactor`): PR-0 `187362c`, PR-1 `9ecb399`, PR-2 `bf3bf52`, PR-3 `8b5f2bd`, PR-4 `d9c9265`, PR-5 `6ca4287`, PR-6 `ddb350e`, PR-7 `2c4e5e6`, PR-8 `e43d160`, PR-9 `545f96f`, PR-10 `0f4d1fa`, PR-11 `ddf62a7`, opt-A `b571c1b`, opt-B `06b2246`. opt-C / S11 / X01–X06: not approved. G4 for PR-3 and opt-B is PENDING (cluster). PR-2 and PR-8 G4 optional, also PENDING. Harness removed in `5b3b265`.
+Outcomes (2026-09-24, `nanochat-refactor`): PR-0 `187362c`, PR-1 `9ecb399`, PR-2 `bf3bf52`, PR-3 `8b5f2bd`, PR-4 `d9c9265`, PR-5 `6ca4287`, PR-6 `ddb350e`, PR-7 `2c4e5e6`, PR-8 `e43d160`, PR-9 `545f96f`, PR-10 `0f4d1fa`, PR-11 `ddf62a7`, opt-A `b571c1b`, opt-B `06b2246`. opt-C / S11 / X01–X06: not approved. G4 for PR-3 and opt-B: PASS (2026-09-29, §10; sup repeat −0.5%, mae +1.2%). PR-2 and PR-8 covered by the same A/B arms (HEAD contains them). Harness removed in `5b3b265`.
 | opt-D | skill/checker edits (§9) | – | `check.py` self-run |
 
 After the series: delete `equiv/`, run `graphify update .`, then `check.py`. Expected result: 0 errors; U8/E1/E4/D3/D6 warns → ~0 (7 snake_case U8 warns remain unless L22 is approved).
@@ -250,3 +250,46 @@ Pass: |Δ| < 2% (noise band). Otherwise repeat once, then reject. The table goes
 | M-8 | `SKILL.md` E4 | explicit carve-out: broad except allowed only inside an R17 import-time capability probe, with a waiver | nanochat `flash_attention.py:45` |
 
 Outcomes: K-1..K-9 and M-1..M-8 done (`5b4e953`). K-6 and K-7 surface new warns (expected). Seven snake_case U8 warns remain (L22, not renamed).
+
+## 10. Cluster verification (2026-09-29)
+
+Setup: 1× NVIDIA H200 (143 GB, idle, driver 580.178.04), 24 CPUs, python 3.11.3, torch 2.7.1+cu118, nanounet editable from `/nanoUNet`
+(both arms import `/nanoUNet/nanounet/__init__.py`; both `nanounet_train --help` ok). Arms: A = `e043e4d` (baseline), B = `d1a5aad` (HEAD).
+Dataset 900 (`Dataset900_Merged`), fold 0, plans `nnUNetResEncUNetLPlans_h200_smallpv`, `--config configs/longrun900.json` (as `scripts/slurm_final_900_h200.sh`).
+Common flags: `--val-iters 10 --val-every-n-epochs 1 --dl-bucket l --precision 16-mixed --no-wandb`, batch size from plans, `OMP/MKL/OPENBLAS/NUMEXPR_NUM_THREADS=1`,
+`NANOUNET_TMPDIR=/root/.cache/nanounet_tmp`. sup: `--epochs 4 --iters-per-epoch 80`. mae: `--mae-pretrain --mae-epochs 4 --mae-iters-per-epoch 80 --epochs 1 --iters-per-epoch 20 --dl-persistent-workers`.
+
+Deviations from the protocol (20 min budget): 80 iters/epoch and 10 val iters instead of 250/50. No `--val-manifest`, because it forces all 200 val batches
+(which took more than 12 min from the CIFS mount). `NANOUNET_PREPROCESSED` = a local 126-case subset (4 train + 2 val per cohort, all 21 cohorts, `random.Random(0)`, files byte-copied
+from `/nnunet_data/NanoUNet_preprocessed/Dataset900_Merged`, `splits_final.json` restricted to the subset). From the CIFS mount, training was I/O-bound (0.25 it/s).
+MAE stage rows = the first 4 `epoch_wall_time_sec` rows (the MAE and sup stages both log `epoch` 0 in one CSV). GPU util = mean `sm` over the non-zero `nvidia-smi dmon` samples.
+
+sup (run order A, B):
+
+| arm    | sha     | epoch_wall_time_sec e1/e2/e3 | median | GPU util | Δ      |
+|--------|---------|------------------------------|--------|----------|--------|
+| before | e043e4d | 86.80 / 86.85 / 83.73        | 86.80  | 87%      |        |
+| after  | d1a5aad | 79.18 / 74.87 / 77.32        | 77.32  | 96%      | -10.9% |
+
+sup repeat (run order B, A, as required because |Δ| ≥ 2%):
+
+| arm    | sha     | epoch_wall_time_sec e1/e2/e3 | median | GPU util | Δ      |
+|--------|---------|------------------------------|--------|----------|--------|
+| before | e043e4d | 90.18 / 87.94 / 84.36        | 87.94  | 88%      |        |
+| after  | d1a5aad | 87.02 / 87.50 / 92.86        | 87.50  | 81%      | -0.5%  |
+
+mae (run order A, B):
+
+| arm    | sha     | epoch_wall_time_sec e1/e2/e3 | median | GPU util | Δ      |
+|--------|---------|------------------------------|--------|----------|--------|
+| before | e043e4d | 43.54 / 43.14 / 42.77        | 43.14  | 78%      |        |
+| after  | d1a5aad | 43.56 / 43.66 / 44.07        | 43.66  | 80%      | +1.2%  |
+
+Verdict: sup REPEAT → **PASS** (the first pair's −10.9% was a speed-up in the second-run arm; the repeat is −0.5%. B ran first there and was not faster, so this is run-order noise, not code).
+mae **PASS** (+1.2%). No bisect needed.
+
+Production checkpoint load: `Dataset900_Merged_nnUNetResEncUNetLPlans_h200_smallpv_f0_h200_final_ft250_fromlast/finetune/last.ckpt` (epoch/target 235/250,
+EMA shadow present), CPU load via `load_net_from_ckpt`. **IDENTICAL** JSON at both SHAs: n_keys 956 (956 `net.*` keys in ckpt);
+ema=False sha256 `38ecfc5376b8fe62afe44725152c8591c8028f3fcf5b841f6fe8074ec0f86be3`; ema=True sha256 `4999a44a1623ebdd7c46a1fdb391cee7276e1a4a6cb15b133f2308be6910e637`.
+
+GPU inference parity (optional §4 step): not run (time budget).
