@@ -26,7 +26,7 @@ Five pillars. All are **non-negotiable**:
    `# nanochat-style: allow R1 (why)`. A waiver with no reason is itself a violation.
 4. **Check.** Run `python .claude/skills/nanochat-style/scripts/check.py --changed`. Fix every `error`. Fix every
    `warn` on lines you wrote. Debt you didn't touch isn't yours, but never add to it. The checker covers
-   R1 R2 R3 R4 R6 R11 U1 U8 E1 E4 G2 D3 D4 D6. Every other rule is judgment, so apply it yourself.
+   R1 R2 R3 R4 R6 R11 R20 U1 U8 E1 E4 G2 D3 D4 D6. Every other rule is judgment, so apply it yourself.
 5. **Run the gates for your area.**
    - Data path, sampling, augmentation, loss, or the train/infer step: report throughput before/after (G4, `references/gpu.md`).
    - CLI flag, output path, or log line: update the step doc and its argument table in the same change (D4). `<cmd> --help` must read cleanly.
@@ -69,6 +69,7 @@ IDs are stable. Code comments cite them, e.g. `(R12)`. **auto** = `scripts/check
 | R17 | Hardware capability differences are detected **once at import**, with the reason logged, e.g. `COMPUTE_DTYPE, REASON = ...`. This is the only allowed "fallback". | |
 | R18 | **On-disk and ckpt names are frozen.** `EMACallback`, `self.net`, LightningModule ctor kwargs, `config.py` field names, plans.json `__name__` strings, sidecar keys, `NANOUNET_*` env names. Renaming any of them is a logic change. | |
 | R19 | **Pure-refactor protocol.** Changes are S (move, byte-identical body), C (comments, help, error text, docs), or L (anything else). L is never mixed into an S/C commit. Hot paths are move-only. A series ships with an AST guard, a golden capture, and a CLI surface diff. | | |
+| R20 | **Concept subfolders.** Max depth `nanounet/<area>/<concept>/<module>.py`. An area with >6 flat modules groups them into concept subfolders of 2–8 modules, each with a one-line `__init__` docstring. A file doesn't repeat its folder (`valset/build.py`, not `valset/valset_build.py`). `cli/` stays flat, 1:1 with console scripts. | auto |
 | U1 | One stderr `Console` (`common.py`). No raw `print`, no tqdm. | auto |
 | U2 | Every command opens with `nano_header` and closes with a summary (outputs, paths, time) plus `next: <literal command>`. | |
 | U3 | Show the resolved config via `config_table` (argument, value, source) before work starts. | |
@@ -109,6 +110,7 @@ IDs are stable. Code comments cite them, e.g. `(R12)`. **auto** = `scripts/check
 
 - A `BaseX` with subclasses, or a registry dict of classes, when there are only two cases.
 - A new file under 30 lines, or a file climbing past 180 lines without a split plan.
+- A seventh flat module in an area folder, a one-module subfolder, or `nanounet/a/b/c/`.
 - `raise ValueError("invalid input")`. Which input? What was expected? How do you fix it?
 - A `try/except` that logs and continues, or that "falls back" to recomputing missing data.
 - `.item()` or `.cpu()` inside `forward` or `training_step`, or any host-side work per step.

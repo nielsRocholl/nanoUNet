@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """nanochat-style checker: the mechanically checkable rules of SKILL.md, run after every edit.
 
-Per-file rules (R1 R2 R3 R4 R6 R11 U8 E1 E4 G2) walk nanounet/**/*.py with `ast`. Cross-file rules
-(D3 D4 D6) diff argparse flags and console scripts against docs/, which is how stale docs get
-caught. One grep-able line per finding: `path:line: RULE severity message`. `--json` appends one
+Per-file rules (R1 R2 R3 R4 R6 R11 U8 E1 E4 G2) walk nanounet/**/*.py with `ast`. R20 walks the
+folder tree. Cross-file rules (D3 D4 D6) diff argparse flags and console scripts against docs/, which
+is how stale docs get caught. One grep-able line per finding: `path:line: RULE severity message`. `--json` appends one
 machine-readable last line. Exit 1 on any `error`. Stdlib only: runs without installing nanounet.
 
 Waive a finding with a comment naming the rule and a reason, on the flagged line or the line above
@@ -40,6 +40,8 @@ CLI_STEP = {
 HOT_FUNCS = {"forward", "training_step", "compute_loss", "__getitem__", "__iter__", "__next__"}
 SYNC_ATTRS = {"item", "cpu", "tolist", "numpy"}
 FILE_RULES = {"R1", "R2", "R6"}
+FLAT_OK = {"nanounet/cli"}  # R20: one file per console script, 1:1 with pyproject [project.scripts]
+MAX_FLAT, MIN_SUB, MAX_SUB = 6, 2, 8
 
 
 def changed_files() -> set[str]:
@@ -154,6 +156,28 @@ def check_py(path: Path, add, flags: dict) -> None:
             emit(main.lineno, "K7", "warn", "main() must call nano_header, config_table, and emit `next:`")
 
 
+def check_layout(add) -> None:
+    """R20: modules live in concept subfolders, at most nanounet/<area>/<concept>/<module>.py."""
+    dirs = [PKG] + sorted(d for d in PKG.rglob("*") if d.is_dir() and "__pycache__" not in d.parts)
+    for d in dirs:
+        rel, depth = str(d.relative_to(ROOT)), len(d.relative_to(PKG).parts)
+        mods = sorted(p.stem for p in d.glob("*.py") if p.name != "__init__.py")
+        init = d / "__init__.py"
+        if depth > 2:
+            add(rel, 1, "R20", "error", f"depth {depth} below nanounet/; max is nanounet/<area>/<concept>/")
+        if depth == 2 and len(mods) < MIN_SUB:
+            add(rel, 1, "R20", "error", f"{len(mods)} module(s); a concept subfolder holds >= {MIN_SUB}, fold it into {d.parent.name}/")
+        if depth == 2 and len(mods) > MAX_SUB:
+            add(rel, 1, "R20", "warn", f"{len(mods)} modules > {MAX_SUB}; split into two concepts")
+        if depth < 2 and rel not in FLAT_OK and len(mods) > MAX_FLAT:
+            add(rel, 1, "R20", "warn", f"{len(mods)} flat modules > {MAX_FLAT}; group them into concept subfolders")
+        for m in mods:
+            if depth and (m == d.name or m.startswith(d.name + "_")):
+                add(f"{rel}/{m}.py", 1, "R20", "warn", f"name repeats its folder; {d.name}/{m}.py -> {d.name}/{m.removeprefix(d.name + '_') or '<noun>'}.py")
+        if depth and init.is_file() and not ast.get_docstring(ast.parse(init.read_text(encoding="utf-8"))):
+            add(str(init.relative_to(ROOT)), 1, "R20", "warn", "subpackage __init__.py needs a one-line docstring naming the concept")
+
+
 def _module_exists(dotted: str) -> bool:
     parts = dotted.split(".")
     base = ROOT.joinpath(*parts)
@@ -230,6 +254,7 @@ def main() -> None:
     every = [] if args.no_docs else [f for f in sorted(PKG.rglob("*.py")) if "__pycache__" not in f.parts]
     for f in sorted(set(files) | set(every)):  # unchecked files still contribute their flags to the docs diff
         check_py(f, add if f in files else lambda *a: None, flags)
+    check_layout(add)
     if not args.no_docs:
         check_docs(add, flags)
 

@@ -23,14 +23,14 @@ Load this for any `.py` under `nanounet/`. Rule IDs refer to SKILL.md.
 | Deviation | Why |
 |---|---|
 | **R1: <200 LOC hard cap** (nanochat goes to 555) | Smaller context per file for humans and agents. Forces a concept split before a file sprawls. |
-| **Grouped subfolders**, at most 2 levels (`plan/prep/`) | 90+ modules. A flat package would be unreadable. |
+| **R20: concept subfolders**, `nanounet/<area>/<concept>/` (nanochat is one flat `nanochat/`) | 90+ modules. The path should say what a file is before you open it: `data/valset/build.py`. |
 | **PyTorch Lightning** instead of a hand-rolled loop | Multi-GPU, checkpointing, and logging for free. Non-trivial custom logic goes in the LightningModule, not in callbacks (R14). |
 | **Heavy upstream reuse** (`dynamic_network_architectures`, `batchgeneratorsv2`, `acvl_utils`, `cc3d`, `blosc2`, `SimpleITK`) | Reimplementing them is bloat. |
 | **R16: temporary tests** (nanochat keeps a small permanent `tests/`) | Research velocity. Re-evaluate if a regression bites twice. |
 | **R6: no section banners** (nanochat uses them inside big files) | We split on a concept boundary instead. nanochat banners: `optim.py:17,65,182`, `tokenizer.py:28,261`. |
 | **R7: public signatures are hinted** (nanochat hints kernels and small utils only) | `gpt.py` 0/25 defs hinted, `tokenizer.py` 0/19. We hint public signatures; tensor code still prefers a shape comment. |
 
-## Package layout (keep this accurate; update it when you add a folder)
+## Package layout (keep this accurate; update it when you add or move a folder)
 
 ```
 nanounet/
@@ -48,8 +48,23 @@ nanounet/
 └── runtime.py  dataloader_prefs.py  lightning_ckpt.py  score.py   (flat single-concept modules)
 ```
 
-Keep folders to roughly 6–16 files. A homeless function goes into `common.py` or flat at package root,
-never into a new folder for one file.
+## Folder layout (R20)
+
+- **Two levels, never three.** `nanounet/<area>/<concept>/<module>.py`. An area is a pipeline stage (`data`, `train`,
+  `infer`); a concept is a noun inside it (`valset`, `patch`, `export`).
+- **Group at 7.** An area with more than 6 flat modules groups them. Its entry points (`train/fit.py`,
+  `model/network.py`) and true singletons may stay flat next to the subfolders.
+- **2–8 modules per concept subfolder.** One module is not a concept: keep it flat in the area. Nine means two concepts.
+- **The folder is part of the name.** `valset/build.py`, `predict/case.py`, `loss/dice.py`. Never `valset/valset_build.py`.
+- **Every subfolder `__init__.py` is one docstring line** naming the concept. No re-exports unless a caller count
+  justifies it (`diag/`), and no imports that run code: `cli/train.py` imports `data.loader.prefs` before torch (K1).
+- **`cli/` stays flat.** One file per console script, 1:1 with `[project.scripts]`. Helpers sit next to their command.
+- **Placing a new file:** pick the area by pipeline stage, then the concept by what it *is*. If no concept fits and
+  the area is at 6 flat modules, make the concept folder now and move its sibling in the same change.
+- **Moving a file is S (R19)**, but paths leak: `[project.scripts]`, `scripts/*.sh`, spawn/DataLoader pickles
+  (K10/K11), docs, and this layout block. Rewrite every dotted and slash path in one commit. Re-export only for
+  on-disk pickles (checkpoints store none; K4/K6 are class and kwarg names, not module paths).
+- A homeless function goes into `common.py` or flat at package root, never into a new folder for one file.
 
 ## Hard rules in detail
 
