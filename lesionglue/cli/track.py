@@ -16,6 +16,7 @@ from pathlib import Path
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
+from core.ui import console
 from lesionglue.common import DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, cprint, config_table, nano_header, require_ckpt
 from lesionglue.data.instances.build import instances_from_nifti
 from lesionglue.data.source.meta import resolve_track_case
@@ -147,7 +148,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     n_ok = n_skip = n_pairs = 0
     cols = (SpinnerColumn(style="cyan"), TextColumn("[progress.description]{task.description}"), BarColumn(), TextColumn("[dim]{task.completed}/{task.total}[/dim]"))
-    with Progress(*cols) as prog:
+    with Progress(*cols, console=console()) as prog:
         task = prog.add_task("track", total=len(pids))
         for pid in pids:
             case = resolve_track_case(
