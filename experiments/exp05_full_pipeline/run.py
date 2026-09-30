@@ -76,7 +76,7 @@ def predict_unit(pl: P.Pipeline, root: Path, pid: str, setting: str, art: Path) 
             P.write_instances(art / "masks" / f"{pid}_{setting}" / "pred_fu.mha", scans["fu"]["inst"], scans["fu"]["props"])
             if setting == "C":
                 P.write_instances(art / "masks" / f"{pid}_{setting}" / "pred_bl.mha", scans["bl"]["inst"], scans["bl"]["props"])
-        if setting == "A":  # the with-unclear row needs a graph that keeps the flagged lesions
+        if setting == "A" and load_pairs(root, [pid], include_unclear=True)[pid].unclear:  # the with-unclear row needs a graph that keeps the flagged lesions (same graph if none is flagged)
             P.save_scores(art / "scores" / f"{pid}_A_unclear.npz", P.run_setting(pl, root, pair, "A", keep_unclear=True)[0])
         rec.update(t_seg=s.t_seg, t_track=s.t_track)
     except (OSError, ValueError, KeyError, IndexError, AssertionError, RuntimeError, SystemExit) as e:  # a patient the pipeline cannot process stays as status=failed, counted as missed

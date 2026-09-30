@@ -85,7 +85,7 @@ def main() -> None:
 | 02 | `exp02_prompt_noise` | 2 | implemented (smoke ok) |
 | 03 | `exp03_matcher_alone` | 3 | not implemented |
 | 04 | `exp04_baselines` | 4 | implemented, smoke-tested (8 patients); full run needs exp03 `folds.py` on main |
-| 05 | `exp05_full_pipeline` | 5 | not implemented |
+| 05 | `exp05_full_pipeline` | 5 | implemented (smoke pending; numbers wait for the matcher retrain) |
 | 06 | `exp06_limits` | 6 | not implemented |
 | 07 | `exp07_internal_set` | 7 | not implemented |
 | 08 | `exp08_external_set` | 8 | not implemented |
@@ -228,7 +228,46 @@ Outputs: `per_patient`, `chosen_params` (per fold), `tuning_scores`, `missing` t
 
 ### exp05_full_pipeline
 
-(not implemented)
+What does it cost when the segmenter, not the annotation, supplies the lesions? The held-out 60 patients (one scan pair each, the dominant
+follow-up region) run through the deployment pipeline under three node supplies: **A** annotated lesions both sides (control), **B** annotated
+BL + FU segmented from the propagated points (the protocol setting), **C** both scans segmented (BL from the true BL points, FU from the
+propagated points; predicted nodes tied to annotation by IoU > 0.1). Matcher = `common.MATCHER_FINAL` (EMA weights), segmenter =
+`common.SEG_CKPT` (EMA), decoders `hungarian` and `sinkhorn` at the matcher checkpoint's own `dust_tau`. Every setting reports recall per class
+beside the identity ceiling, edge P/R/F1 and patient-bootstrap CIs, plus paired deltas A-B and B-C; the headline excludes `linking_unclear`
+lesions and the with-unclear row is stored beside it. Raw pair logits are kept so decoding and scoring can be redone (`--rescore`). The pipeline
+itself is `experiments/pipeline.py`, reused by exp07, exp08 and exp09.
+
+**Status: implemented; smoke ok. The numbers are not meaningful until the owner retrains the matcher on the fixed graph cache and repoints
+`MATCHER_FINAL`** (the current checkpoint never saw a merge-target node, merge recall is 0 by construction). Setting A builds its nodes with
+`lesionglue.data.graph.dense.build_hetero_data`, so it follows the graph-builder fix, but it must be re-verified once that fix is on main.
+Settings B and C build nodes from masks at inference time and do not depend on the fix.
+
+```bash
+# full run (held-out 60, settings A B C)
+python -m experiments.exp05_full_pipeline.run --tag paper_v1
+# resume a crashed run / redo only decoding and scoring (new run dir, optionally another tau)
+python -m experiments.exp05_full_pipeline.run --tag paper_v1 --resume /nnunet_data/experiments/exp05_full_pipeline/<RUN_ID>
+python -m experiments.exp05_full_pipeline.run --tag paper_v1_rescored --rescore /nnunet_data/experiments/exp05_full_pipeline/<RUN_ID>
+# smoke (3 patients, kept out of the repository), GPU jobs under the shared lock
+flock /tmp/gpu.lock python -m experiments.exp05_full_pipeline.run --limit-patients 3 --tag smoke
+```
+
+| flag | default | meaning |
+|---|---|---|
+| `--data-root` | `/nnunet_data/Longitudinal-CT` | dataset root (`inputsTrBL`, `inputsTrFU`, `targetsTrBL`, `targetsTrFU`, `meta`) |
+| `--patients-csv` | `<data root>/test_patients.csv` | CSV with a `patient` column (the held-out 60) |
+| `--patients` | none | explicit patient ids instead of the CSV (debugging, e.g. the known-bad `3988c7f88e`) |
+| `--settings` | `A B C` | node supplies to run |
+| `--matcher-ckpt` | `common.MATCHER_FINAL` | matcher checkpoint; the owner repoints the constant after the retrain |
+| `--tau` | the checkpoint's `dust_tau` | decoder cut-off; change only to rescore a sensitivity row |
+| common flags | | `--tag --out-root --resume --seed --limit-patients --device --rescore` (table above) |
+
+Outputs (run dir): `results.json` tables `per_patient` (per patient x setting x decoder x `headline|with_unclear`: `status`, `error`, node counts,
+`t_seg`, `t_track`, counts per class `ok/tot/ceil`, `tp/fp/fn`, and for the headline rows the node -> annotated-id lists and the decoded links in
+annotated-id space), `metrics` (every CI), `deltas`; `table.md` per decoder and variant. `artifacts/`: `pipeline.json`, `records/<pid>_<setting>.json`,
+`scores/<pid>_<setting>.npz` (raw scores; setting A also `_A_unclear`), `masks/<pid>_<setting>/{matches.csv, pred_fu.mha, pred_bl.mha}`.
+A patient the pipeline cannot process stays in the tables with its `status` and counts as fully missed (printed and listed in `notes`).
+Runtime: about 1 min per patient for B and about 2 min for C on one A100 plus a few minutes for A, i.e. 2-3 h for the full run; resumable.
 
 <!-- end -->
 
