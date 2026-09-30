@@ -141,6 +141,13 @@ CAVEATS    Known limits, decisions taken (e.g. linking_unclear excluded), what i
 """
 ```
 
+### Phase 0 outcome (implemented 2026-09-30, commit `db5269b`; read `experiments/common.py` and `experiments/README.md`)
+- **Canonical command** is `python -m experiments.<expNN_name>.run ...` from the repo root (works without any install). The file form `python experiments/<expNN_name>/run.py` needs `pip3 install -e . --no-deps` first, so docstring `COMMAND:` lines use the `-m` form.
+- **API as built**: `add_common_args(ap, gpu=True, rescore=False)`; validation happens **before** `start_run` (`problem(what, expected, fix)`, `missing_paths({...}, fix)`, `abort_if([...])`, E6); `start_run(exp, ap, args, inputs={name: path}, paper={...})` creates the run dir, prints header + config table, starts the log tee; `run.artifacts` (with `--rescore` it is the *source* run's `artifacts/`, read-only by convention), `run.rec` + `run.save()`, `run.write_table(name, rows)`, `run.finish(summary, tables, table_md=, definitions=, notes=, next_cmd=)`; `limited(items, args)`, `clean(obj)` (JSON-safe: numpy, Path, NaN -> null), `git_state()`, `fingerprint(path)`. `results.json` `definitions` only carries the bootstrap by default: each experiment passes its own (`iou_hit`, `nsd_tol_mm`, ...; `scoring.py` exports a `DEFINITIONS` dict for this).
+- **Smoke runs**: a tag containing `smoke` writes to the git-ignored `experiments/results/*/*smoke*/` and `INDEX_smoke.jsonl`; only full runs are mirrored/committed by the owner. `.gitignore` also ignores `experiments/**/artifacts/`. `experiments/results/` mirror files above 20 MB stay on `/nnunet_data` (`mirror_skipped` in `run.json`).
+- **Checker**: `experiments` is in `PROJECTS` (imports core, nanounet, lesionglue, segtrack); R20 needs no exemption (experiment folders are depth 1); the K8 module regex now allows digits.
+- **Parallel agents** work in separate git worktrees and push with `git fetch -q origin && git rebase origin/main && git push origin HEAD:main`; use `PYTHONPATH=$PWD` so the worktree's code (not the editable install in `/nanoUNet`) is imported, including by console scripts. `experiments/README.md` has one predefined section per experiment separated by `<!-- end -->` lines; edit only your own.
+
 ## 5. Shared scoring (`experiments/scoring.py`) - implements paper Sec. "What we measure"
 
 Pure numpy/scipy, no torch, no Lightning. Definitions (write them as the module docstring):
