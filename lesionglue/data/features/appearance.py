@@ -36,7 +36,11 @@ def label_objects(mask: np.ndarray):
 
 def _sl(objs, lid: int, shape: tuple[int, ...], pad: int = 1):
     if lid < 1 or lid > len(objs) or objs[lid - 1] is None:
-        raise ValueError(f"empty mask for lesion {lid}")
+        raise ValueError(
+            f"empty mask for lesion {lid}\n"
+            "Expected every lesion_id in the patient's meta CSV to be a label present in its mask NIfTI.\n"
+            f"Fix: make the meta CSV lesion_id column and the mask labels agree (label {lid} is missing from the mask)"
+        )
     sl = objs[lid - 1]
     if pad:
         sl = tuple(slice(max(0, s.start - pad), min(d, s.stop + pad)) for s, d in zip(sl, shape))
@@ -48,6 +52,7 @@ def mask_stats(mask: np.ndarray, lesion_id: int, spacing: np.ndarray, ct: np.nda
     sl = _sl(objs, lesion_id, mask.shape)
     bin3 = mask[sl] == lesion_id
     if not bin3.any():
+        # nanochat-style: allow E1 (internal invariant: sl comes from find_objects for this label, so it is never empty)
         raise ValueError(f"empty mask for lesion {lesion_id}")
     dz, dy, dx = spacing.astype(np.float64)
     n = int(bin3.sum())

@@ -138,7 +138,11 @@ class LesionDataset(InMemoryDataset):
 
         graphs = stg.load_all(staging, pids)
         if not graphs:
-            raise RuntimeError(f"zero graphs for split={self.split}")
+            raise RuntimeError(
+                f"zero graphs for split={self.split}\n"
+                f"Expected at least one patient with lesions in the {self.split!r} list of the split file.\n"
+                "Fix: lesionglue_split --root /nnunet_data/Longitudinal-CT   (if the split is empty; otherwise read the 'skip pid=' lines above)"
+            )
         tp = sum(int(g["bl", "cross", "fu"].edge_label.sum()) for g in graphs)
         te = sum(g["bl", "cross", "fu"].num_edges for g in graphs)
         meta = {"edges": te, "positives": tp, "feat_mode": "l0", "desc_dim": DESC_DIM, "feat_dim": FEAT_DIM}

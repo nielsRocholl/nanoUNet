@@ -55,6 +55,7 @@ class PredictionRow:
 
 
 @dataclass(frozen=True)
+# nanochat-style: allow R3 (plain result record, no behavior)
 class PatientBaselineResult:
     pid: str
     rows: list[LesionRow]
@@ -67,9 +68,17 @@ class NearestMaskIndex:
         self.mask = np.asarray(mask, dtype=np.int64)
         self.spacing = np.asarray(spacing, dtype=np.float64)
         if self.spacing.shape != (3,):
-            raise ValueError(f"spacing must have shape (3,), got {self.spacing.shape}")
+            raise ValueError(
+                f"spacing must have shape (3,), got {self.spacing.shape}\n"
+                "Expected (dz, dy, dx) voxel sizes read from the NIfTI header of the follow-up mask.\n"
+                "Fix: re-save the follow-up mask as a 3D NIfTI with three voxel sizes in its header"
+            )
         if np.any(self.spacing <= 0):
-            raise ValueError(f"spacing must be positive, got {self.spacing.tolist()}")
+            raise ValueError(
+                f"spacing must be positive, got {self.spacing.tolist()}\n"
+                "Expected strictly positive voxel sizes in the NIfTI header of the follow-up mask.\n"
+                "Fix: re-save the follow-up mask with positive voxel sizes in its NIfTI header"
+            )
 
         foreground = np.argwhere(self.mask != 0)
         self._labels = self.mask[tuple(foreground.T)].astype(np.int64, copy=False) if foreground.size else np.empty(0)

@@ -83,7 +83,11 @@ def main() -> None:
         logger = False
         if args.wandb or bool(args.wandb_run_name.strip()):
             if importlib.util.find_spec("wandb") is None:
-                raise SystemExit("wandb requested but not installed")
+                raise SystemExit(
+                    "wandb requested but not installed\n"
+                    "Expected the wandb package (listed in pyproject.toml dependencies) when --wandb or --wandb-run-name is set.\n"
+                    "Fix: pip install wandb   or drop --wandb and --wandb-run-name"
+                )
             from pytorch_lightning.loggers import WandbLogger
 
             logger = WandbLogger(project=args.wandb_project, name=(args.wandb_run_name.strip() or None))

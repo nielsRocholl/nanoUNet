@@ -110,7 +110,11 @@ class MatcherDataModule(LightningDataModule):
                     val_idx.append(off + i)
             off += len(ds)
         if not train_idx or not val_idx:
-            raise ValueError(f"fold {self.fold}: empty train or val after patient split")
+            raise ValueError(
+                f"fold {self.fold}: empty train or val after patient split\n"
+                "Expected cached train and val graphs covering the patients of every fold.\n"
+                "Fix: lesionglue_preprocess --split all"
+            )
         self.train_ds = _CvPool(
             pool, train_idx, augment=True, fu_jitter_scale=self.fu_jitter_scale,
             p_drop_fu=self.p_drop_fu, p_drop_bl=self.p_drop_bl, graph=g,

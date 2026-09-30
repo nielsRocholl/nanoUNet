@@ -53,7 +53,11 @@ def load_config(path: str | Path) -> Config:
     known = {f.name for f in fields(Config)}
     extra = set(raw) - known
     if extra:
-        raise ValueError(f"unknown config keys: {sorted(extra)}")
+        raise ValueError(
+            f"unknown config keys: {sorted(extra)}\n"
+            "Expected only the fields of lesionglue.config.Config (see lesionglue/configs/base.json).\n"
+            f"Fix: delete {sorted(extra)} from {path}"
+        )
     cfg = Config(**{k: raw[k] for k in known if k in raw})
     if cfg.intra not in ("knn", "complete"):
         raise ValueError(

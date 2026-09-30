@@ -76,13 +76,25 @@ def build_split(
     train240 = [str(x) for x in official["train"]]
     leak = set(train240) & holdout
     if leak:
-        raise SystemExit(f"{len(leak)} holdout ids in official train: {sorted(leak)[:8]}...")
+        raise SystemExit(
+            f"{len(leak)} holdout ids in official train: {sorted(leak)[:8]}...\n"
+            "Expected the holdout CSV to list only patients from the official val and test splits.\n"
+            f"Fix: remove those ids from {holdout_csv}, or from the train list of {dataset_root}/data_split.json"
+        )
     extra = (set(map(str, official["val"])) | set(map(str, official["test"]))) - holdout
     if extra:
-        raise SystemExit(f"official val/test id not in holdout csv: {sorted(extra)}")
+        raise SystemExit(
+            f"official val/test id not in holdout csv: {sorted(extra)}\n"
+            "Expected the holdout CSV to contain every official val and test patient.\n"
+            f"Fix: add {sorted(extra)} to {holdout_csv}, or remove them from val/test in {dataset_root}/data_split.json"
+        )
     missing = holdout - set(map(str, official["val"])) - set(map(str, official["test"]))
     if missing:
-        raise SystemExit(f"holdout id not in official val∪test: {sorted(missing)}")
+        raise SystemExit(
+            f"holdout id not in official val∪test: {sorted(missing)}\n"
+            "Expected every holdout CSV patient to be in the official val or test split.\n"
+            f"Fix: remove {sorted(missing)} from {holdout_csv}, or add them to val/test in {dataset_root}/data_split.json"
+        )
     fm = fold_map(train240, n_folds, seed)
     val = sorted(p for p, f in fm.items() if f == val_fold)
     train = sorted(p for p, f in fm.items() if f != val_fold)
@@ -120,6 +132,7 @@ def _mean_std(vals: list[float]) -> dict[str, float]:
 
 def aggregate_cv_folds(fold_rows: list[dict]) -> dict[str, object]:
     if not fold_rows:
+        # nanochat-style: allow E1 (internal invariant: cli/cv.py asserts start_fold < end before it calls this, so rows exist)
         raise ValueError("empty fold_rows")
     out: dict[str, object] = {"folds": fold_rows}
     for key in CV_METRICS:
@@ -132,5 +145,9 @@ def aggregate_cv_folds(fold_rows: list[dict]) -> dict[str, object]:
 def load_cv_summary(path: Path | str) -> dict[str, object]:
     p = Path(path)
     if not p.is_file():
-        raise FileNotFoundError(p)
+        raise FileNotFoundError(
+            f"{p}\n"
+            "Expected the cv_summary.json written by lesionglue_cv into its --out directory.\n"
+            f"Fix: lesionglue_cv --config lesionglue/configs/base.json --out {p.parent}"
+        )
     return json.loads(p.read_text())

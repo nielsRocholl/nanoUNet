@@ -38,7 +38,11 @@ def pick_hetero(ds: LesionDataset, pid: str) -> HeteroData:
         g = ds[i]
         if str(g.pid) == pid:
             return g
-    raise ValueError(f"pid={pid!r} not in split={ds.split} (run preprocess for this split)")
+    raise ValueError(
+        f"pid={pid!r} not in split={ds.split} (run preprocess for this split)\n"
+        f"Expected a patient id that is in the {ds.split!r} list of the split file and cached.\n"
+        f"Fix: lesionglue_preprocess --split {ds.split}   or   --split <the split that holds {pid}>"
+    )
 
 def _xy_mm(pos: torch.Tensor) -> np.ndarray:
     p = pos.detach().cpu().numpy()

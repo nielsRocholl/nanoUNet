@@ -63,7 +63,11 @@ def main() -> None:
 
     files = sorted(Path(args.runs).glob("fold_*/oof_*/val_per_patient.json"))
     if not files:
-        raise SystemExit(f"no fold_*/oof_*/val_per_patient.json under {args.runs}")
+        raise SystemExit(
+            f"no fold_*/oof_*/val_per_patient.json under {args.runs}\n"
+            "Expected one lesionglue_oof output per fold: <runs>/fold_<k>/oof_<selector>/val_per_patient.json.\n"
+            f"Fix: lesionglue_oof --ckpt <fold_<k> checkpoint> --fold <k> --config <config.json> --out {args.runs}/fold_<k>/oof_<selector>"
+        )
     nano_header(f"LesionGlue pool  {len(files)} files  {args.runs}")
     config_table(arg_rows(ap, args))
 

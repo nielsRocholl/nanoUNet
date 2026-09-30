@@ -133,7 +133,9 @@ class MatcherModule(pl.LightningModule):
         if self._swa_updates < SWA_MIN_UPDATES:
             raise RuntimeError(
                 f"swa_matcher only saw {self._swa_updates} plateau updates (need >= {SWA_MIN_UPDATES}); "
-                "a run that never plateaued is broken, not silently skippable."
+                "a run that never plateaued is broken, not silently skippable.\n"
+                f"Expected at least {SWA_MIN_UPDATES} validations with the raw score within the plateau band of its peak.\n"
+                "Fix: train longer, e.g. lesionglue_train --config <config.json> --max-steps <larger than the config value>"
             )
         path = Path(self.trainer.default_root_dir) / "swa_plateau.ckpt"
         swa_sd = self._swa[0].module.state_dict()

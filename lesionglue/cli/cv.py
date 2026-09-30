@@ -54,7 +54,11 @@ def main() -> None:
             cmd.extend(["--wandb-run-name", f"{base}_fold{fold}"])
         subprocess.run(cmd, check=True)
         if not metrics_path.is_file():
-            raise FileNotFoundError(f"missing {metrics_path} after fold {fold}")
+            raise FileNotFoundError(
+                f"missing {metrics_path} after fold {fold}\n"
+                "Expected lesionglue_train --fold to write fold_metrics.json into the fold dir; the train output above shows why it did not.\n"
+                f"Fix: lesionglue_cv --config {args.config} --out {args.out} --start-fold {fold}"
+            )
         fold_rows.append({"fold": fold, "dir": str(fold_out), **__import__("json").loads(metrics_path.read_text())})
 
     summary = aggregate_cv_folds(fold_rows)

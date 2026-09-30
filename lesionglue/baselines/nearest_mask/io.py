@@ -33,7 +33,11 @@ def load_split_ids(root: Path, split: str) -> dict[str, list[str]]:
     if split == "all":
         return {name: list(split_map[name]) for name in ("train", "val", "test") if name in split_map}
     if split not in split_map:
-        raise KeyError(f"split {split!r} not found in data_split.json")
+        raise KeyError(
+            f"split {split!r} not found in data_split.json\n"
+            f"Expected one of the keys present in data_split.json: {sorted(split_map)}.\n"
+            "Fix: --split all   or   --split <one of the keys above>"
+        )
     return {split: list(split_map[split])}
 
 

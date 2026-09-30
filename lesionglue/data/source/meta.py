@@ -17,7 +17,11 @@ def _norm_topo(raw: str) -> str:
     t = str(raw).strip()
     t = _ALIAS_TOPO.get(t, t)
     if t not in _VALID_TOPO:
-        raise ValueError(f"unknown topology_class {raw!r}")
+        raise ValueError(
+            f"unknown topology_class {raw!r}\n"
+            f"Expected one of {sorted(_VALID_TOPO)} (aliases {sorted(_ALIAS_TOPO)}).\n"
+            "Fix: correct the topology_class cell in the patient's meta CSV"
+        )
     return t
 
 
@@ -29,7 +33,11 @@ def parse_xyz(s: object) -> tuple[float, float, float] | None:
         return None
     parts = t.split()
     if len(parts) != 3:
-        raise ValueError(f"expected x y z triple, got {s!r}")
+        raise ValueError(
+            f"expected x y z triple, got {s!r}\n"
+            "Expected three space-separated numbers, or an empty cell.\n"
+            "Fix: correct the cog_* cell in the patient's meta CSV to the form 'x y z'"
+        )
     return float(parts[0]), float(parts[1]), float(parts[2])
 
 
@@ -118,7 +126,11 @@ def parse_meta_csv(path: Path) -> list[LesionRow]:
         topo = _norm_topo(r["topology_class"])
         lt = str(r["lesion_type"]).strip()
         if lt not in LESION_TYPES:
-            raise ValueError(f"unknown lesion_type {lt!r}")
+            raise ValueError(
+                f"unknown lesion_type {lt!r}\n"
+                f"Expected one of {list(LESION_TYPES)}.\n"
+                "Fix: correct the lesion_type cell in the patient's meta CSV"
+            )
         mi = r.get("merged_into")
         merged = None if pd.isna(mi) or str(mi).strip() == "" else int(mi)
         rows.append(
