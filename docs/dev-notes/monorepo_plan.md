@@ -1,7 +1,7 @@
 # Monorepo: nanoUNet as the home of every CT-lesion project
 
 Date: 2026-09-29
-Status: done on branch `monorepo`; checker 0 errors, 55 warns; open items below
+Status: done on branch `monorepo`; checker 0 errors, 7 warns (G2, GPU handoff)
 
 ## Decisions
 
@@ -59,10 +59,16 @@ Status: done on branch `monorepo`; checker 0 errors, 55 warns; open items below
 - ~~Only 5 of 14 lesionglue CLIs are console scripts~~ (`2594227`).
 - ~~Cross-project private imports in `segtrack/scripts/e2e_eval.py`~~ (`4b02001`).
 
-## Still open (55 warns + findings)
+## Closed in the second pass
 
-- E1: 17 lesionglue + 7 nanounet raises without a `Fix:` line (text-only C pass).
-- G2: `lesionglue/model/matcher.py:103-106` `.tolist()` in `_dust_graph`; `nanounet/model/loss/cc_dice_ce.py` syncs. Needs a before/after throughput number (G4) on GPU.
-- nanounet CLIs: K6 x3, K7 x7, snake_case `--dataset_id`/`--num_processes` (kept for cluster scripts).
-- `lesionglue/scripts/round9.sh` tau sweep greps `val_match_score:` from `eval.py` stdout; eval writes to stderr and prints no such key (broken already in lesion-tracking `fa78009`).
-- `lesionglue/README.md` (291 lines) now overlaps `docs/steps/`; slim it to a paper-facing overview when convenient. Broken link `blueprint.md` (pre-existing).
+| commit | kind | what |
+|---|---|---|
+| `01b55f1` + this commit | L | `round9.sh`: tau sweep reads `selected.dust_tau` from eval's `--out` JSON (was always skipped since `fa78009`); default `CFG` -> `lesionglue/configs/base.json` |
+| `835e9f8` | C | nanounet E1 Fix lines / reasoned waivers, E4 waivers (producer thread re-raises in `__iter__`; reader probe raises with Fix) |
+| lesionglue E1 commit | C | Expected + Fix on 19 lesionglue errors, 2 invariant waivers, R3 waiver on a frozen record; golden 81/81 |
+| README commit | C | lesionglue README 293 -> 101 lines; `docs/reference/{config,layout,experiments}.md`; 42-fact inventory, no loss |
+| nanounet K7 commit | L | K6 guards, config table + `next:` on all 7 nanounet commands; legacy snake flags waived (U8) |
+
+## Still open (7 warns, GPU only)
+
+- G2: `lesionglue/model/matcher.py:103-106` `.tolist()` in `_dust_graph`; `nanounet/model/loss/cc_dice_ce.py:68,86,109` (only with `--loss cc_dc_ce`). Need a before/after number on GPU (G4). Handoff: `docs/handoffs/2026-09-30_gpu_session.md`, which also runs the real-data smoke (deployed `lesionglue_eval` must reproduce 0.9701).

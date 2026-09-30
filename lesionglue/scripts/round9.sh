@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 export PYTHONPATH=.
 PY=python3
-CFG=${CONFIG:-configs/base.json}
+CFG=${CONFIG:-lesionglue/configs/base.json}
 RUNS=${RUNS:-runs/round9}
 PROJ=${WANDB_PROJECT:-lesion-tracking}
 mkdir -p "$RUNS"
