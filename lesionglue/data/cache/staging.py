@@ -1,4 +1,4 @@
-"""Per-patient preprocess staging until collated {split}_v7_native.pt is written.
+"""Per-patient preprocess staging until collated {split}_v8_native.pt is written.
 
 Each {pid}.pt is a list of region graphs (possibly empty) so --resume is exact.
 """

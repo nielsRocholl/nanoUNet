@@ -47,7 +47,7 @@ lesionglue_split --root /nnunet_data/Longitudinal-CT --holdout /nnunet_data/Long
 
 ## lesionglue_preprocess
 
-Build cached dense `v7_native` PyG graphs (L0 descriptors) for one tracking split, or all three. Reads the split JSON written by `lesionglue_split`.
+Build cached dense `v8_native` PyG graphs (L0 descriptors) for one tracking split, or all three. Reads the split JSON written by `lesionglue_split`.
 
 ### Command
 
@@ -79,9 +79,9 @@ lesionglue_preprocess --split all --keep-unclear --cache /nnunet_data/lesion_tra
 |---|---|---|
 | `lesionglue/configs/split.json` | JSON | `lesionglue_split` |
 | `/nnunet_data/Longitudinal-CT/{meta,inputsTrBL,inputsTrFU,targetsTrBL,targetsTrFU}/` | CSV, NIfTI | you |
-| `/nnunet_data/lesion_tracking/cache/processed/staging/{split}_v7_native/{patient}.pt` | PyG graphs, one file per patient | this step |
-| `/nnunet_data/lesion_tracking/cache/processed/{split}_v7_native.pt` | collated PyG dataset | this step |
-| `/nnunet_data/lesion_tracking/cache/processed/{split}_v7_native_meta.pt` | edge/positive counts, descriptor dims (`keep_unclear: true` with `--keep-unclear`) | this step |
+| `/nnunet_data/lesion_tracking/cache/processed/staging/{split}_v8_native/{patient}.pt` | PyG graphs, one file per patient | this step |
+| `/nnunet_data/lesion_tracking/cache/processed/{split}_v8_native.pt` | collated PyG dataset | this step |
+| `/nnunet_data/lesion_tracking/cache/processed/{split}_v8_native_meta.pt` | edge/positive counts, descriptor dims (`keep_unclear: true` with `--keep-unclear`) | this step |
 
 Old `*_v5_l0.pt` files in `processed/` are ignored (a warning is printed); delete them if they confuse you.
 
@@ -125,7 +125,7 @@ lesionglue_audit --root /nnunet_data/Longitudinal-CT --cache /nnunet_data/lesion
 |---|---|---|
 | `/nnunet_data/Longitudinal-CT/data_split.json` | JSON | you |
 | `/nnunet_data/Longitudinal-CT/meta/{patient}.csv` | CSV | you |
-| `/nnunet_data/lesion_tracking/cache/processed/{split}_v7_native.pt` | PyG dataset, read only with `--ckpt` | `lesionglue_preprocess` |
+| `/nnunet_data/lesion_tracking/cache/processed/{split}_v8_native.pt` | PyG dataset, read only with `--ckpt` | `lesionglue_preprocess` |
 | `runs/audit/audit_{split}.json` | JSON (class balance, imputation, quartiles, optional stratification) | this step |
 
 ### Common errors

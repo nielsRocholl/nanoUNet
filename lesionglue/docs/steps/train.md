@@ -46,7 +46,7 @@ Device: MPS when available, else Lightning `accelerator=auto`, one device. The h
 | Path | Format | Written by |
 |---|---|---|
 | `lesionglue/configs/base.json` (`--config`) | JSON | you |
-| `$CACHE/processed/train_v7_native.pt`, `val_v7_native.pt` (`--cache`; also `test_v7_native.pt` with `--pool all`) | torch graph cache | `lesionglue_preprocess` |
+| `$CACHE/processed/train_v8_native.pt`, `val_v8_native.pt` (`--cache`; also `test_v8_native.pt` with `--pool all`) | torch graph cache | `lesionglue_preprocess` |
 | `lesionglue/configs/split.json` | JSON | `lesionglue_split` |
 | `runs/base/config.json` | JSON (resolved config, after `--seed`/`--max-steps`) | this step |
 | `runs/base/best.ckpt` | Lightning ckpt, best `val_match_score_ema` (fold runs) | this step |
@@ -146,7 +146,7 @@ Runs one validation pass on CPU. Name the output dir `oof_<selector>` (`oof_best
 |---|---|---|
 | `runs/cv/fold_0/best.ckpt` (`--ckpt`) | Lightning ckpt | `lesionglue_train` |
 | `lesionglue/configs/base.json` (`--config`) | JSON | you |
-| `$CACHE/processed/*_v7_native.pt` | torch graph cache | `lesionglue_preprocess` |
+| `$CACHE/processed/*_v8_native.pt` | torch graph cache | `lesionglue_preprocess` |
 | `runs/cv/fold_0/oof_best/val_per_patient.json` | JSON (`match_score`, per-subtype acc, `per_patient` counts) | this step |
 
 ### Common errors

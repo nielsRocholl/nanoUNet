@@ -1,4 +1,4 @@
-"""Materialize cached dense v7_native PyG graphs for one tracking split."""
+"""Materialize cached dense v8_native PyG graphs for one tracking split."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def main() -> None:
                 "Fix: pass or drop --keep-unclear to match that cache, or use a new --cache dir"
             )
     if problems:
-        raise SystemExit("\n".join(problems))
+        raise SystemExit(f"{len(problems)} problem(s) with --keep-unclear and --cache\nExpected one setting per cache dir, and a dir of its own for --keep-unclear.\nFix: apply the Fix line of each problem below\n" + "\n".join(problems))
     cache.mkdir(parents=True, exist_ok=True)
     stale = list((cache / "processed").glob("*_v5_l0.pt")) if (cache / "processed").is_dir() else []
     if stale:

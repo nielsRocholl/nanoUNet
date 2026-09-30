@@ -87,8 +87,26 @@ def node_rows(rows: list[LesionRow], pid: str) -> tuple[dict[int, LesionRow], di
                 print0(f"drop BL pid={pid} lid={r.lesion_id} (no cog_propagated)")
             else:
                 bl.setdefault(r.lesion_id, r)
-        if r.topology in ft and r.cog_fu is not None:
+        # A merge target (the FU lesion a group of BL lesions merged into) is the MERGED row whose own lesion_id equals
+        # merged_into: its cog_fu, volume_fu and FU mask label are the target's (true for all 38 merge events).
+        target = r.topology == "MERGED" and r.merged_into == r.lesion_id
+        if target and r.cog_fu is not None:
+            if r.lesion_id in fu:
+                raise ValueError(
+                    f"pid={pid}: FU lesion id {r.lesion_id} is both a merge target and a {fu[r.lesion_id].topology} row\n"
+                    "Expected a merge target id (merged_into) that no other follow-up lesion uses.\n"
+                    "Fix: correct lesion_id / merged_into in the patient's meta CSV"
+                )
+            fu[r.lesion_id] = r
+        elif r.topology in ft and r.cog_fu is not None:
             fu.setdefault(r.lesion_id, r)
+    lost = sorted({r.merged_into for r in rows if r.topology == "MERGED" and r.merged_into is not None and r.merged_into not in fu})
+    if lost:
+        raise ValueError(
+            f"pid={pid}: merge target(s) {lost} have no FU node\n"
+            "Expected a MERGING row with lesion_id == merged_into and a cog_fu for every merge target.\n"
+            "Fix: add that row to the patient's meta CSV"
+        )
     return bl, fu
 
 

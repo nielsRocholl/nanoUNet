@@ -1,4 +1,4 @@
-"""LightningDataModule: cached v7_native LesionDataset + PyG DataLoader.
+"""LightningDataModule: cached v8_native LesionDataset + PyG DataLoader.
 
 No-fold fit set is train∪val caches (everyone except test_patients.csv).
 No Lightning val: holdout is scored once after training. CV folds still have a val pool.

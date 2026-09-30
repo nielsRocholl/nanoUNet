@@ -25,7 +25,7 @@ Then open `http://127.0.0.1:8050`. The layout dropdown offers `preset (mm + spre
 
 | Path | Format | Written by |
 |---|---|---|
-| `/nnunet_data/lesion_tracking/cache/processed/val_v7_native.pt` | PyG cache | `lesionglue_preprocess` |
+| `/nnunet_data/lesion_tracking/cache/processed/val_v8_native.pt` | PyG cache | `lesionglue_preprocess` |
 | `http://127.0.0.1:8050` | Dash web page (nothing is written to disk) | this step |
 
 ## Common errors

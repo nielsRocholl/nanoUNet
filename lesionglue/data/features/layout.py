@@ -1,4 +1,4 @@
-"""L0 node feature layout: pack_node, cache tag v7_native."""
+"""L0 node feature layout: pack_node, cache tag v8_native."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from lesionglue.data.features.appearance import MaskFeats
 DESC_DIM = 1372
 STAT_DIM = 14
 FEAT_DIM = DESC_DIM + STAT_DIM + 1
-CACHE_TAG = "v7_native"
+CACHE_TAG = "v8_native"
 
 
 def feat_layout() -> tuple[int, int, int, int, int]:

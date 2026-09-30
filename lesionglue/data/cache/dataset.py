@@ -1,4 +1,4 @@
-"""Cached v7_native per-split PyG InMemoryDataset from dense Longitudinal_CT_v2 graphs.
+"""Cached v8_native per-split PyG InMemoryDataset from dense Longitudinal_CT_v2 graphs.
 
 Workers pin BLAS/OpenMP to 1 thread: 16 jobs × default torch threads starves a
 cgroup and turns CIFS NIfTI reads into ~1 patient/min."""

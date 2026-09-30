@@ -52,9 +52,9 @@ This is **not** a strict one-to-one assignment matrix. Many-to-one (merge) and o
 ### Node sets
 
 - **Baseline (`bl`) nodes:** rows with `topology ∈ {UNCHANGED, DISAPPEARED, MERGED, SPLIT}` **and** non-null `cog_propagated`.
-- **Follow-up (`fu`) nodes:** rows with `topology ∈ {UNCHANGED, NEWLYAPPEARING, SPLIT}` **and** non-null `cog_fu`.
+- **Follow-up (`fu`) nodes:** rows with `topology ∈ {UNCHANGED, NEWLYAPPEARING, SPLIT}` **and** non-null `cog_fu`, plus one node per merge target.
 
-`MERGED` rows contribute a baseline node (the disappearing baseline identity) but **not** a separate follow-up node for that row — the positive edge targets `merged_into`, which must appear as a follow-up node from another row.
+Every `MERGED` row contributes a baseline node (the merged BL identity). The FU lesion the group merged into, the merge target, is the `MERGED` row whose own `lesion_id` equals `merged_into` (all 38 events; its `cog_fu`, `volume_fu` and FU mask label are the target's, shared by every contributor), and that row also becomes the FU node `merged_into`. A merge target without such a row raises an error. Before cache tag `v8_native` merge targets had no FU node, so every merged BL lesion was labelled no-match and merge recall was 0 by construction.
 
 ### Multi–body-region handling (`img_id_fu`)
 
