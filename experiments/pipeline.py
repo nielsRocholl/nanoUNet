@@ -19,7 +19,7 @@ Non-obvious choices:
 - `found_bl`/`found_fu` (what the ceiling is computed from) come from the real node lists the matcher saw, never from the annotation:
   the builder drops BL lesions without a propagated point and the degenerate case "one side has no node" is scored as all-new /
   all-disappeared instead of being skipped.
-- Lesion types and propagated BL positions come from the meta CSV (`meta_csv`, rows of the pair's FU region), exactly as segtrack does.
+- Lesion types and propagated BL positions come from the meta CSV (`Pair.meta` and `Pair.types`, rows of the pair's FU region), exactly as segtrack does.
   `load_propagated` falls back to `cog_fu` when a row has no `cog_propagated`: that affects only lesions the cache builder drops.
 - The matcher runs with its EMA weights (`use_ema=True`); tau is the checkpoint's own `dust_tau`, never tuned on scored data.
 """
@@ -80,7 +80,8 @@ class Pair:
     fu_clicks: Path  # propagated points (prompts of B and C)
     bl_mask: Path  # annotated instance masks (Lstar nodes, matching targets)
     fu_mask: Path
-    meta: Path  # `<pid>.csv`: propagated BL positions and lesion types
+    meta: Path  # propagated BL positions in the FU frame: meta CSV (rows of `region`), slim CSV `lesion_id,z,y,x` or FU-frame JSON
+    types: Path | None = None  # CSV with lesion_id, lesion_type (the meta CSV for Longitudinal-CT); None = every lesion gets type `unclear`
 
 
 @dataclass
@@ -111,7 +112,7 @@ def longitudinal_pair(root: Path, pid: str) -> Pair:
     region = dominant_region(meta)
     stem = f"{pid}_{region:02d}"
     return Pair(pid, stem, region, root / "inputsTrBL" / f"{stem}.nii.gz", root / "inputsTrFU" / f"{stem}.nii.gz", root / "inputsTrBL" / f"{stem}.json",
-                root / "inputsTrFU" / f"{stem}.json", root / "targetsTrBL" / f"{stem}.nii.gz", root / "targetsTrFU" / f"{stem}.nii.gz", meta)
+                root / "inputsTrFU" / f"{stem}.json", root / "targetsTrBL" / f"{stem}.nii.gz", root / "targetsTrFU" / f"{stem}.nii.gz", meta, meta)
 
 
 def load_pipeline(device: str, *, matcher_ckpt: Path = MATCHER_FINAL, segmenter: bool = True) -> Pipeline:
@@ -174,7 +175,7 @@ def run_masks(pl: Pipeline, pair: Pair, setting: str) -> tuple[Scores, dict]:
     t0 = time.perf_counter()
     if bl["inst"].any() and fu["inst"].any():
         r = track(pair.bl_img, pair.bl_img, pair.fu_img, pair.fu_img, pair.meta, pl.ckpt, decode="hungarian", device=pl.device, matcher=pl.matcher,
-                  sinkhorn_tau=pl.tau, use_ema=True, types_csv=pair.meta, img_id=pair.region,
+                  sinkhorn_tau=pl.tau, use_ema=True, types_csv=pair.types, img_id=pair.region,
                   volumes=(*bl["vol"], np.ascontiguousarray(bl["inst"].transpose(2, 1, 0)), *fu["vol"], np.ascontiguousarray(fu["inst"].transpose(2, 1, 0))))
         bl_ids, fu_ids, pair_l, d_bl, d_fu = r.bl_ids, r.fu_ids, r.pair, r.dust_bl, r.dust_fu
     else:  # one side is empty: the builder returns no graph; nodes are whatever each side holds, nothing can be linked
