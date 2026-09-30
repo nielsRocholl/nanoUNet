@@ -10,7 +10,7 @@ import dash_cytoscape as cyto
 import torch
 from dash import Input, Output, dcc, html
 
-from lesionglue.cli.qc_view import (
+from lesionglue.eval.qc_view import (
     _STYLE,
     format_detail,
     hetero_to_elements,

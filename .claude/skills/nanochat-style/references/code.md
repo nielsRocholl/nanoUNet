@@ -77,7 +77,7 @@ nanounet/
 └── runtime.py  lightning_ckpt.py  score.py   (flat single-concept modules)
 
 lesionglue/
-├── cli/            one file per command (+ qc_view helper); flat by rule
+├── cli/            one file per command; flat by rule
 ├── data/
 │   ├── source/     meta (CSV rows, paths), splits, provenance, propagate (BL centroid in FU frame)
 │   ├── features/   appearance (mask radiomics), descriptor (L0 HU), layout (node packing, cache tag)
@@ -86,7 +86,7 @@ lesionglue/
 │   └── instances/  build (binary FG + clicks → ids), paint (FU track ids)
 ├── model/          matcher, matchability (dustbin), sinkhorn, decode
 ├── train/          datamodule, module, objective (focal BCE, InfoNCE, val counts)
-├── eval/           report, bootstrap
+├── eval/           report, bootstrap, qc_view (Dash graph QC model)
 ├── baselines/nearest_mask/  isolated raw-data baseline
 ├── common.py       dataset/cache paths, deployed ckpt, rank-0 gate over core.ui
 ├── config.py       train config dataclass + JSON
