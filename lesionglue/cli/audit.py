@@ -2,7 +2,7 @@
 stratification by registration provenance. Read-only; trains nothing.
 
 Usage:
-    PYTHONPATH=. python3 lesionglue/cli/audit.py --root /nnunet_data/Longitudinal-CT \
+    lesionglue_audit --root /nnunet_data/Longitudinal-CT \
         --cache /nnunet_data/lesion_tracking/cache --split val --out runs/audit [--ckpt PATH]
 """
 

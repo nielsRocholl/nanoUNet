@@ -47,6 +47,14 @@ lesionglue_split = "lesionglue.cli.split:main"
 lesionglue_preprocess = "lesionglue.cli.preprocess:main"
 lesionglue_train = "lesionglue.cli.train:main"
 lesionglue_eval = "lesionglue.cli.eval:main"
+lesionglue_predict = "lesionglue.cli.predict:main"
+lesionglue_report = "lesionglue.cli.report:main"
+lesionglue_cv = "lesionglue.cli.cv:main"
+lesionglue_oof = "lesionglue.cli.oof:main"
+lesionglue_pool = "lesionglue.cli.pool:main"
+lesionglue_audit = "lesionglue.cli.audit:main"
+lesionglue_qc = "lesionglue.cli.qc:main"
+lesionglue_baseline_distance = "lesionglue.cli.baseline_distance:main"
 
 [build-system]
 requires = ["setuptools>=67.8.0"]

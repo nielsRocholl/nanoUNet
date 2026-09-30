@@ -73,7 +73,7 @@ lesionglue_eval --split test
 **Cross-validation** (optional)
 
 ```bash
-python3 lesionglue/cli/cv.py --config lesionglue/configs/base.json --out runs/cv --wandb --wandb-run-name r9_base
+lesionglue_cv --config lesionglue/configs/base.json --out runs/cv --wandb --wandb-run-name r9_base
 ```
 
 Writes `fold_*/` subdirs + `cv_summary.json` (mean±std over folds on `val_match_score_ema`).
@@ -93,7 +93,7 @@ Cluster: `lesionglue/scripts/lesion-round9-cv.sh` (SLURM; sets `RUNS` on `/nnune
 
 ```bash
 lesionglue_eval --split val
-python3 lesionglue/cli/predict.py --split val --out preds
+lesionglue_predict --split val --out preds
 ```
 
 **Deploy**
@@ -124,7 +124,7 @@ lesionglue_track \
 
 ## CLI reference
 
-After `pip install -e .`, commands are `lesionglue_*`. Decode defaults to hungarian (the holdout gate). `--decode dense` and `--decode sinkhorn` keep merges/splits (sinkhorn up to about `1/--sinkhorn-tau` lesions per merge; see `lesionglue/model/decode.py`). `lesionglue/cli/report.py --decode` scores any of the three.
+After `pip install -e .`, commands are `lesionglue_*`. Decode defaults to hungarian (the holdout gate). `--decode dense` and `--decode sinkhorn` keep merges/splits (sinkhorn up to about `1/--sinkhorn-tau` lesions per merge; see `lesionglue/model/decode.py`). `lesionglue_report --decode` scores any of the three.
 
 ### `lesionglue_track`
 

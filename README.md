@@ -34,7 +34,7 @@ The first installs `core` + `nanounet`. The `lesionglue` extra adds torch-geomet
 | project | console scripts |
 |---|---|
 | nanounet | `nanounet_preprocess`, `nanounet_train`, `nanounet_pretrain`, `nanounet_predict`, `nanounet_build_splits`, `nanounet_build_valset`, `nanounet_lesion_weights` |
-| lesionglue | `lesionglue_split`, `lesionglue_preprocess`, `lesionglue_train`, `lesionglue_eval`, `lesionglue_track` |
+| lesionglue | `lesionglue_split`, `lesionglue_preprocess`, `lesionglue_train`, `lesionglue_cv`, `lesionglue_oof`, `lesionglue_pool`, `lesionglue_eval`, `lesionglue_report`, `lesionglue_predict`, `lesionglue_track`, `lesionglue_audit`, `lesionglue_qc`, `lesionglue_baseline_distance` |
 | segtrack | `segtrack_run` |
 
 ## Rules
