@@ -89,7 +89,7 @@ def main() -> None:
         "per_patient": per_patient,
     })
     runs = out.resolve().parent.parent
-    cprint(f"next: lesionglue_pool --runs {shlex.quote(str(runs))} --out {shlex.quote(str(runs / "pool"))}", markup=False, soft_wrap=True)
+    cprint(f"next: lesionglue_pool --runs {shlex.quote(str(runs))} --out {shlex.quote(str(runs / 'pool'))}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

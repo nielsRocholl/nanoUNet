@@ -153,7 +153,7 @@ def main() -> None:
     }
     dump_json(out / "fold_metrics.json", fold_metrics)
     cprint(f"wrote {ckpt.best_model_path}")
-    cprint(f"next: lesionglue_oof --ckpt {shlex.quote(str(ckpt.best_model_path or last))} --fold {args.fold} --config {shlex.quote(str(args.config))} --out {shlex.quote(str(out / "oof_best"))}", markup=False, soft_wrap=True)
+    cprint(f"next: lesionglue_oof --ckpt {shlex.quote(str(ckpt.best_model_path or last))} --fold {args.fold} --config {shlex.quote(str(args.config))} --out {shlex.quote(str(out / 'oof_best'))}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

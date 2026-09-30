@@ -66,10 +66,10 @@ def main() -> None:
     summary["n_folds"] = end - args.start_fold
     dump_json(out_root / "cv_summary.json", summary)
     oofs = " && ".join(
-        f"lesionglue_oof --ckpt {shlex.quote(str(out_root / f"fold_{f}" / "best.ckpt"))} --fold {f} --config {shlex.quote(str(args.config))} --out {shlex.quote(str(out_root / f"fold_{f}" / "oof_best"))}"
+        f"lesionglue_oof --ckpt {shlex.quote(str(out_root / f'fold_{f}' / 'best.ckpt'))} --fold {f} --config {shlex.quote(str(args.config))} --out {shlex.quote(str(out_root / f'fold_{f}' / 'oof_best'))}"
         for f in range(args.start_fold, end)
     )
-    cprint(f"next: {oofs} && lesionglue_pool --runs {shlex.quote(str(out_root))} --out {shlex.quote(str(out_root / "pool"))}", markup=False, soft_wrap=True)
+    cprint(f"next: {oofs} && lesionglue_pool --runs {shlex.quote(str(out_root))} --out {shlex.quote(str(out_root / 'pool'))}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

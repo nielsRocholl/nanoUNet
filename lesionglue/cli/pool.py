@@ -107,7 +107,7 @@ def main() -> None:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     dump_json(out / "pool_summary.json", summary)
-    cprint(f"next: lesionglue_eval --split test --out {shlex.quote(str(out / "test_eval.json"))}", markup=False, soft_wrap=True)
+    cprint(f"next: lesionglue_eval --split test --out {shlex.quote(str(out / 'test_eval.json'))}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":
