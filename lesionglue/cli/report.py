@@ -31,26 +31,26 @@ def _cuda_gc() -> None:
         torch.cuda.empty_cache()
 
 
-ap = argparse.ArgumentParser()
-ap.add_argument("--config", required=True)
-ap.add_argument("--root", default=str(DATASET_ROOT))
-ap.add_argument("--cache", default=str(CACHE_ROOT))
-ap.add_argument("--out", required=True)
-ap.add_argument("--checkpoint", default="", type=str, help="skip training and only eval from this .ckpt")
-ap.add_argument("--no-early-stop", action="store_true")
-ap.add_argument("--no-ema", action="store_true")
-ap.add_argument("--wandb", action="store_true")
-ap.add_argument("--wandb-project", default="lesion-tracking")
-ap.add_argument("--wandb-run-name", default="", type=str)
-ap.add_argument("--eval-batch-size", type=int, default=1)
-ap.add_argument("--eval-num-workers", type=int, default=0)
-ap.add_argument("--eval-device", choices=("auto", "cuda", "cpu", "mps"), default="auto")
-ap.add_argument("--quiet", action="store_true")
-ap.add_argument("--baseline-full-mask-cache", action="store_true")
-ap.add_argument("--decode", choices=DECODE_CHOICES, default="hungarian", help=DECODE_HELP)
-ap.add_argument("--thresh", type=float, default=0.5, help="dense decode threshold")
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--config", required=True)
+    ap.add_argument("--root", default=str(DATASET_ROOT))
+    ap.add_argument("--cache", default=str(CACHE_ROOT))
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--checkpoint", default="", type=str, help="skip training and only eval from this .ckpt")
+    ap.add_argument("--no-early-stop", action="store_true")
+    ap.add_argument("--no-ema", action="store_true")
+    ap.add_argument("--wandb", action="store_true")
+    ap.add_argument("--wandb-project", default="lesion-tracking")
+    ap.add_argument("--wandb-run-name", default="", type=str)
+    ap.add_argument("--eval-batch-size", type=int, default=1)
+    ap.add_argument("--eval-num-workers", type=int, default=0)
+    ap.add_argument("--eval-device", choices=("auto", "cuda", "cpu", "mps"), default="auto")
+    ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--baseline-full-mask-cache", action="store_true")
+    ap.add_argument("--decode", choices=DECODE_CHOICES, default="hungarian", help=DECODE_HELP)
+    ap.add_argument("--thresh", type=float, default=0.5, help="dense decode threshold")
 
-if __name__ == "__main__":
     args = ap.parse_args()
     cfg = load_config(args.config)
     root, cache, out = Path(args.root), Path(args.cache), Path(args.out)
@@ -105,3 +105,7 @@ if __name__ == "__main__":
     report = {"best_checkpoint": str(best), "config": asdict(cfg), "decode": args.decode, "gnn": {"val": gnn_val, "test": gnn_test}, "baseline": {"val": bl_val, "test": bl_test}}
     (out / "report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     print0(f"wrote {out / 'report.json'}")
+
+
+if __name__ == "__main__":
+    main()
