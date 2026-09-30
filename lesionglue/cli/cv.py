@@ -9,13 +9,14 @@ from pathlib import Path
 from core.ui import arg_rows
 from lesionglue.common import config_table, cprint, dump_json, nano_header, seed_all
 from lesionglue.config import CKPT_MONITOR, load_config
-from lesionglue.data.source.splits import aggregate_cv_folds
+from lesionglue.data.source.splits import POOLS, aggregate_cv_folds
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True, help="path to the lesionglue config JSON; sets n_folds and seed, and is passed to each fold's train run")
     ap.add_argument("--out", required=True, help="CV output root; writes fold_*/ subdirs")
+    ap.add_argument("--pool", choices=POOLS, default="train-val", help="patients that form the folds: train-val = the 240 train+val patients; all = all 300 (train+val+test caches); passed to every fold's train run")
     ap.add_argument("--start-fold", type=int, default=0, help="first fold index to run (inclusive); folds with an existing fold_metrics.json are reused")
     ap.add_argument("--end-fold", type=int, default=None, help="exclusive upper bound; default n_folds")
     ap.add_argument("--wandb", action="store_true", help="log each fold's training run to Weights & Biases")
@@ -47,6 +48,7 @@ def main() -> None:
             "--config", args.config,
             "--out", str(fold_out),
             "--fold", str(fold),
+            "--pool", args.pool,
         ]
         if args.wandb:
             cmd.extend(["--wandb", "--wandb-project", args.wandb_project])
@@ -65,8 +67,9 @@ def main() -> None:
     summary["monitor"] = CKPT_MONITOR
     summary["n_folds"] = end - args.start_fold
     dump_json(out_root / "cv_summary.json", summary)
+    pool_flag = "" if args.pool == "train-val" else f" --pool {args.pool}"
     oofs = " && ".join(
-        f"lesionglue_oof --ckpt {shlex.quote(str(out_root / f'fold_{f}' / 'best.ckpt'))} --fold {f} --config {shlex.quote(str(args.config))} --out {shlex.quote(str(out_root / f'fold_{f}' / 'oof_best'))}"
+        f"lesionglue_oof --ckpt {shlex.quote(str(out_root / f'fold_{f}' / 'best.ckpt'))} --fold {f} --config {shlex.quote(str(args.config))} --out {shlex.quote(str(out_root / f'fold_{f}' / 'oof_best'))}{pool_flag}"
         for f in range(args.start_fold, end)
     )
     cprint(f"next: {oofs} && lesionglue_pool --runs {shlex.quote(str(out_root))} --out {shlex.quote(str(out_root / 'pool'))}", markup=False, soft_wrap=True)

@@ -16,6 +16,11 @@ CV_METRICS = ("val_match_score_ema", "val_match_score_raw", "val_match_score_pea
 
 CV_SPLIT_SEED = 0
 
+# Which cached splits form the CV/fit pool: the 240 train+val patients (default) or, for the paper's 5-fold
+# over every patient (experiments/exp03_matcher_alone), train+val+test = all 300.
+POOL_SPLITS = {"train-val": ("train", "val"), "all": ("train", "val", "test")}
+POOLS = tuple(POOL_SPLITS)
+
 
 def fold_map(pids: list[str], n_folds: int, seed: int = CV_SPLIT_SEED) -> dict[str, int]:
     # Patient id is the fold unit, so a patient's BL/FU graph stays in one fold.
@@ -103,10 +108,11 @@ def build_split(
     return {"train": train, "val": val, "test": test, "n_folds": n_folds, "seed": seed, "val_fold": val_fold}
 
 
-def pool_patient_ids(dataset_root: Path | str) -> list[str]:
+def pool_patient_ids(dataset_root: Path | str, pool: str = "train-val") -> list[str]:
     del dataset_root
+    assert pool in POOL_SPLITS, f"pool {pool!r}: expected one of {POOLS}"
     sp = load_tracking_split()
-    return list(sp["train"]) + list(sp["val"])
+    return [p for name in POOL_SPLITS[pool] for p in sp[name]]
 
 
 def patient_fold_map(dataset_root: Path | str, n_folds: int, seed: int = CV_SPLIT_SEED) -> dict[str, int]:
@@ -114,10 +120,11 @@ def patient_fold_map(dataset_root: Path | str, n_folds: int, seed: int = CV_SPLI
 
 
 def fold_patient_sets(
-    dataset_root: Path | str, fold: int, n_folds: int, seed: int = CV_SPLIT_SEED
+    dataset_root: Path | str, fold: int, n_folds: int, seed: int = CV_SPLIT_SEED, pool_pids: list[str] | None = None
 ) -> tuple[set[str], set[str]]:
+    # pool_pids None = the 240 train+val patients; pass pool_patient_ids(root, "all") for the 300-patient pool.
     assert fold in range(n_folds)
-    fm = patient_fold_map(dataset_root, n_folds, seed)
+    fm = patient_fold_map(dataset_root, n_folds, seed) if pool_pids is None else fold_map(pool_pids, n_folds, seed)
     val = {p for p, f in fm.items() if f == fold}
     train = {p for p, f in fm.items() if f != fold}
     assert not (train & val)
