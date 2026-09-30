@@ -117,11 +117,12 @@ class LesionRow:
     merged_into: int | None
 
 
-def parse_meta_csv(path: Path) -> list[LesionRow]:
+def parse_meta_csv(path: Path, keep_unclear: bool = False) -> list[LesionRow]:
+    # keep_unclear=False drops rows whose link the annotators flagged unsure (135 of 4638); True keeps them (lesionglue_preprocess --keep-unclear)
     df = pd.read_csv(path)
     rows: list[LesionRow] = []
     for _, r in df.iterrows():
-        if bool(r.get("linking_unclear", False)):
+        if not keep_unclear and bool(r.get("linking_unclear", False)):
             continue
         topo = _norm_topo(r["topology_class"])
         lt = str(r["lesion_type"]).strip()

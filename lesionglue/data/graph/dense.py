@@ -154,10 +154,10 @@ def _one_region(pid: str, vp: V2Paths, rows: list[LesionRow], fu_id: int, cfg: G
     return refresh_edges(data, cfg)
 
 
-def build_hetero_data(pid: str, root: Path, cfg: GraphConfig) -> list[HeteroData]:
+def build_hetero_data(pid: str, root: Path, cfg: GraphConfig, keep_unclear: bool = False) -> list[HeteroData]:
     _NII_CACHE.clear()
     vp = V2Paths(Path(root), pid)
-    rows = parse_meta_csv(vp.meta)
+    rows = parse_meta_csv(vp.meta, keep_unclear)
     if not rows:
         return []
     out: list[HeteroData] = []

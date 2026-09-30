@@ -30,9 +30,9 @@ def _limit_threads() -> None:
     torch.set_num_threads(1)
 
 
-def _build_one(pid: str, root_s: str, cfg: GraphConfig) -> tuple[str, list]:
+def _build_one(pid: str, root_s: str, cfg: GraphConfig, keep_unclear: bool) -> tuple[str, list]:
     _limit_threads()
-    return pid, build_hetero_data(pid, Path(root_s), cfg)
+    return pid, build_hetero_data(pid, Path(root_s), cfg, keep_unclear)
 
 
 class LesionDataset(InMemoryDataset):
@@ -48,6 +48,7 @@ class LesionDataset(InMemoryDataset):
         fu_jitter_scale: float = 0.3,
         p_drop_fu: float = 0.1,
         p_drop_bl: float = 0.1,
+        keep_unclear: bool = False,
     ):
         assert split in {"train", "val", "test"}
         self.split = split
@@ -56,6 +57,7 @@ class LesionDataset(InMemoryDataset):
         self.num_workers = max(1, num_workers)
         self.resume = resume
         self.augment = augment
+        self.keep_unclear = keep_unclear  # build-time only: keeps linking_unclear lesions (a separate cache dir, see lesionglue_preprocess)
         self.fu_jitter_scale = fu_jitter_scale
         self.p_drop_fu = p_drop_fu
         self.p_drop_bl = p_drop_bl
@@ -118,7 +120,7 @@ class LesionDataset(InMemoryDataset):
                 task = prog.add_task(self.split, total=len(todo), patient="")
                 for pid in todo:
                     prog.update(task, patient=str(pid))
-                    graphs = build_hetero_data(pid, self.dataset_root, cfg)
+                    graphs = build_hetero_data(pid, self.dataset_root, cfg, self.keep_unclear)
                     stg.save(staging, pid, graphs)
                     for g in graphs:
                         self._log_graph(pid, g, prog.console)
@@ -127,7 +129,7 @@ class LesionDataset(InMemoryDataset):
             with Progress(*cols) as prog:
                 task = prog.add_task(self.split, total=len(todo), patient="")
                 with ProcessPoolExecutor(max_workers=self.num_workers, initializer=_limit_threads) as ex:
-                    futs = [ex.submit(_build_one, pid, root_s, cfg) for pid in todo]
+                    futs = [ex.submit(_build_one, pid, root_s, cfg, self.keep_unclear) for pid in todo]
                     for fut in as_completed(futs):
                         pid, graphs = fut.result()
                         prog.update(task, patient=str(pid))
@@ -146,6 +148,8 @@ class LesionDataset(InMemoryDataset):
         tp = sum(int(g["bl", "cross", "fu"].edge_label.sum()) for g in graphs)
         te = sum(g["bl", "cross", "fu"].num_edges for g in graphs)
         meta = {"edges": te, "positives": tp, "feat_mode": "l0", "desc_dim": DESC_DIM, "feat_dim": FEAT_DIM}
+        if self.keep_unclear:
+            meta["keep_unclear"] = True
         torch.save(meta, Path(self.processed_dir) / f"{self.split}_{CACHE_TAG}_meta.pt")
         self.save(graphs, self.processed_paths[0])
         stg.rm(staging)
