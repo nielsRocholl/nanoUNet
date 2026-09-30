@@ -15,9 +15,9 @@ from collections import defaultdict
 from pathlib import Path
 
 from core.ui import cprint
-from nanounet.score import IOU_HIT, _agg, score_case, write
+from nanounet.score import IOU_HIT, aggregate, score_case, write
 from lesionglue.eval.bootstrap import bootstrap_match_score
-from lesionglue.data.graph.dense import _node_rows, _positive_matrix
+from lesionglue.data.graph.dense import node_rows, positive_matrix
 from lesionglue.data.source.meta import parse_meta_csv, resolve_track_case
 from lesionglue.data.source.splits import load_tracking_split
 
@@ -109,11 +109,11 @@ def main() -> None:
         if case is None or not mp.is_file():
             continue
         rows = [r for r in parse_meta_csv(case.propagated) if r.img_id_fu == _img_i(case.fu_img)]
-        bl_rep, fu_rep = _node_rows(rows, pid)
+        bl_rep, fu_rep = node_rows(rows, pid)
         bl_ids, fu_ids = sorted(bl_rep), sorted(fu_rep)
         if not bl_ids or not fu_ids:
             continue
-        Y = _positive_matrix(rows, {lid: i for i, lid in enumerate(bl_ids)}, {lid: j for j, lid in enumerate(fu_ids)})
+        Y = positive_matrix(rows, {lid: i for i, lid in enumerate(bl_ids)}, {lid: j for j, lid in enumerate(fu_ids)})
         pred = _pairs(mp)
         bn, fn = _nodes(mp.with_suffix(".json"))
         per[pid] = _counts(bl_ids, fu_ids, Y, pred, bn, fn)
@@ -141,9 +141,9 @@ def main() -> None:
                 continue
             case = resolve_track_case(root, pid)
             rows = [r for r in parse_meta_csv(case.propagated) if r.img_id_fu == _img_i(case.fu_img)]
-            bl_rep, fu_rep = _node_rows(rows, pid)
+            bl_rep, fu_rep = node_rows(rows, pid)
             bl_ids, fu_ids = sorted(bl_rep), sorted(fu_rep)
-            Y = _positive_matrix(rows, {lid: i for i, lid in enumerate(bl_ids)}, {lid: j for j, lid in enumerate(fu_ids)})
+            Y = positive_matrix(rows, {lid: i for i, lid in enumerate(bl_ids)}, {lid: j for j, lid in enumerate(fu_ids)})
             bn, fn = _nodes(op.with_suffix(".json"))
             oper[pid] = _counts(bl_ids, fu_ids, Y, _pairs(op), bn, fn)
         if oper:
@@ -152,7 +152,7 @@ def main() -> None:
     pooled = {k: sum(per[p][k] for p in per) for k in next(iter(per.values()))} if per else {}
     summary = {
         "protocol": {"ldr_iou": IOU_HIT, "match_score": "0.5 unchanged-set-equality + 0.25 disappeared + 0.25 new", "decode": "dense"},
-        "seg_fu": _agg(fu), "seg_bl": _agg(bl),
+        "seg_fu": aggregate(fu), "seg_bl": aggregate(bl),
         "track_e2e": {"n": len(per), "match_score": point, "ci95": [lo, hi], "pooled": pooled},
         "track_oracle_dense": oracle,
         "coupling": {k: {**v, "acc": (v["ok"] / v["tot"] if v["tot"] else None)} for k, v in coup.items()},

@@ -20,7 +20,7 @@ Limit: because a contributor holds at most 1/k, a k-way merge is only recoverabl
 Larger merges need relaxed column marginals (unbalanced OT or column capacity), in
 training and decode alike; that is not done here.
 
-Labels note: `lesionglue/data/graph/dense.py::_positive_matrix` encodes SPLIT as a single
+Labels note: `lesionglue/data/graph/dense.py::positive_matrix` encodes SPLIT as a single
 (lesion_id, lesion_id) edge, so the current labels give every BL row at most one positive
 and only merges are many-to-one there. The threshold rule still emits one-to-many links
 if the model produces them, which are then scored as wrong rows by `lesionglue/eval/report.py`.

@@ -64,7 +64,7 @@ def _load_vol(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return hit
 
 
-def _positive_matrix(rows: list[LesionRow], bi: dict[int, int], fj: dict[int, int]) -> torch.Tensor:
+def positive_matrix(rows: list[LesionRow], bi: dict[int, int], fj: dict[int, int]) -> torch.Tensor:
     y = torch.zeros((len(bi), len(fj)), dtype=torch.float32)
     for r in rows:
         if r.topology in ("UNCHANGED", "SPLIT") and r.cog_propagated and r.cog_fu:
@@ -76,7 +76,7 @@ def _positive_matrix(rows: list[LesionRow], bi: dict[int, int], fj: dict[int, in
     return y
 
 
-def _node_rows(rows: list[LesionRow], pid: str) -> tuple[dict[int, LesionRow], dict[int, LesionRow]]:
+def node_rows(rows: list[LesionRow], pid: str) -> tuple[dict[int, LesionRow], dict[int, LesionRow]]:
     bt = frozenset({"UNCHANGED", "DISAPPEARED", "MERGED", "SPLIT"})
     ft = frozenset({"UNCHANGED", "NEWLYAPPEARING", "SPLIT"})
     bl: dict[int, LesionRow] = {}
@@ -95,7 +95,7 @@ def _node_rows(rows: list[LesionRow], pid: str) -> tuple[dict[int, LesionRow], d
 def _one_region(pid: str, vp: V2Paths, rows: list[LesionRow], fu_id: int, cfg: GraphConfig) -> HeteroData | None:
     from lesionglue.data.graph.intra import refresh_edges
 
-    bl_rep, fu_rep = _node_rows(rows, pid)
+    bl_rep, fu_rep = node_rows(rows, pid)
     bl_ids, fu_ids = sorted(bl_rep), sorted(fu_rep)
     if not bl_ids or not fu_ids:
         print0(f"skip pid={pid} fu={fu_id}: empty bl={len(bl_ids)} fu={len(fu_ids)}")
@@ -142,7 +142,7 @@ def _one_region(pid: str, vp: V2Paths, rows: list[LesionRow], fu_id: int, cfg: G
     data["bl"].sp_bl = torch.tensor(np.stack(sbl), dtype=torch.float32)
     data["bl"].lesion_id, data["fu"].lesion_id = torch.tensor(bl_ids), torch.tensor(fu_ids)
     bi, fj = {lid: i for i, lid in enumerate(bl_ids)}, {lid: j for j, lid in enumerate(fu_ids)}
-    lab = _positive_matrix(rows, bi, fj)
+    lab = positive_matrix(rows, bi, fj)
     data["bl"].no_match_label = (~lab.bool().any(dim=1)).float()
     data["fu"].no_match_label = (~lab.bool().any(dim=0)).float()
     data["bl", "cross", "fu"].edge_label = lab.reshape(-1)
