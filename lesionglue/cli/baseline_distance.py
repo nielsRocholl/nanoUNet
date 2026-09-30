@@ -10,7 +10,8 @@ from torchmetrics.classification import BinaryAUROC, BinaryAveragePrecision
 from lesionglue.common import CACHE_ROOT, DATASET_ROOT, cprint
 from lesionglue.data.cache.dataset import LesionDataset
 
-if __name__ == "__main__":
+
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cache", default=str(CACHE_ROOT), help="cached graph root (output of lesionglue_preprocess)")
     ap.add_argument("--root", default=str(DATASET_ROOT), help="Longitudinal-CT dataset root passed to the graph dataset")
@@ -29,3 +30,7 @@ if __name__ == "__main__":
             ap_m.update(scores.cpu(), lab.cpu())
             roc.update(scores.cpu(), lab.cpu())
     cprint(f"distance_baseline split={args.split} AP={float(ap_m.compute()):.4f} AUROC={float(roc.compute()):.4f}", markup=False)
+
+
+if __name__ == "__main__":
+    main()

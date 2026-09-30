@@ -22,7 +22,8 @@ from lesionglue.data.source.splits import fold_patient_sets
 from lesionglue.train.datamodule import MatcherDataModule
 from lesionglue.train.module import MatcherModule
 
-if __name__ == "__main__":
+
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True, help="checkpoint to validate (e.g. best.ckpt, best_raw.ckpt, swa_plateau.ckpt)")
     ap.add_argument("--fold", type=int, required=True, help="CV fold whose held-out patients are scored; must be in [0, n_folds) of --config")
@@ -83,3 +84,7 @@ if __name__ == "__main__":
         "acc_newly_appearing": totals["new_ok"] / totals["new_tot"] if totals["new_tot"] else None,
         "per_patient": per_patient,
     })
+
+
+if __name__ == "__main__":
+    main()

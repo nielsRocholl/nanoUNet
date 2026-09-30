@@ -13,7 +13,8 @@ from lesionglue.model.decode import decode_sinkhorn_hungarian
 from lesionglue.infer import graph_cfg_from_ckpt
 from lesionglue.train.module import MatcherModule
 
-if __name__ == "__main__":
+
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", default=str(DEPLOYED_CKPT), help="matcher Lightning checkpoint (default: DEPLOYED_CKPT in lesionglue/common.py)")
     ap.add_argument("--cache", default=str(CACHE_ROOT), help="root of the cached lesion graphs")
@@ -71,3 +72,7 @@ if __name__ == "__main__":
                 w = csv.writer(f)
                 w.writerow(["bl_lesion_id", "fu_lesion_id", "prob", "decoded"])
                 w.writerows(rows)
+
+
+if __name__ == "__main__":
+    main()

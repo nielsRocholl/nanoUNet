@@ -51,7 +51,7 @@ def report(label: str, per_patient: dict) -> dict:
     return row
 
 
-if __name__ == "__main__":
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", required=True, help="dir containing fold_*/oof_<selector>/val_per_patient.json")
     ap.add_argument("--out", required=True, help="output directory; pool_summary.json is written here")
@@ -99,3 +99,7 @@ if __name__ == "__main__":
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     dump_json(out / "pool_summary.json", summary)
+
+
+if __name__ == "__main__":
+    main()

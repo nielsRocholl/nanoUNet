@@ -21,7 +21,9 @@ from lesionglue.cli.qc_view import (
 )
 from lesionglue.common import CACHE_ROOT, DATASET_ROOT, print0
 from lesionglue.data.cache.dataset import LesionDataset
-if __name__ == "__main__":
+
+
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--case", required=True, help="patient id to show; a trailing _NN image index is stripped")
     ap.add_argument("--split", choices=("train", "val", "test"), default="val", help="which cached split to look the patient up in")
@@ -80,3 +82,7 @@ if __name__ == "__main__":
 
     print0(f"QC graph {pid}: http://127.0.0.1:{args.port}")
     app.run(debug=False, port=args.port)
+
+
+if __name__ == "__main__":
+    main()
