@@ -15,19 +15,14 @@ import numpy as np
 import torch
 from batchgenerators.utilities.file_and_folder_operations import join
 
-from core.ui import cprint, nano_header, nano_progress
+from core.ui import arg_rows, config_table, cprint, nano_header, nano_progress
 from nanounet.common import preprocessed_dir, resolve_user_config_path
 from nanounet.config import load_config
 from nanounet.data.store.blosc2_dataset import Blosc2Folder
 from nanounet.data.valset.manifest import SCENARIOS, SCHEMA_VERSION, SMALL_LESION_MAX_VOX, sidecar_path, config_stamp
 from nanounet.data.valset.alloc import allocate, load_cohorts, scenario_allocation
 from nanounet.data.valset.build import (
-    LabelCache,
-    build_subset_target,
-    case_info,
-    report_composition,
-    try_foreground,
-    try_lesion_free_decoy,
+    LabelCache, build_subset_target, case_info, report_composition, try_foreground, try_lesion_free_decoy,
 )
 from nanounet.plan.dataset.ids import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
@@ -89,6 +84,7 @@ def _fill_scenario(scenario, ds, case_dir, ids, want, max_tries, rngs, patch_siz
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    # nanochat-style: allow U8 (legacy snake flag; cluster scripts pass it)
     ap.add_argument("-d", "--dataset_id", type=int, required=True, help="dataset id, e.g. 999")
     ap.add_argument("--plans", required=True, help="plans identifier, no .json (e.g. nnUNetResEncUNetLPlans)")
     ap.add_argument("--config", required=True, help="ROI/prompt config JSON path (e.g. nanounet/configs/default.json)")
@@ -105,6 +101,7 @@ def main() -> None:
 
     ds_name = convert_id_to_dataset_name(args.dataset_id)
     nano_header(f"nanoUNet build-valset  {ds_name}  n={args.n_patches}", color="green")
+    config_table(arg_rows(ap, args))
     pp = preprocessed_dir()
     pm = Plans(join(pp, ds_name, args.plans + ".json"))
     cm = pm.get_configuration("3d_fullres")
@@ -197,3 +194,7 @@ def main() -> None:
     cprint(f"wrote {args.out}  ({len(all_entries)} patches, {len(packed_rows)} subset targets, {size_mb:.1f} MB sidecar)")
     cprint(f"rejections: {dict(rejects)}")
     cprint(f"next: nanounet_train -d {args.dataset_id} --plans {args.plans} --val-manifest {args.out} ...")
+
+
+if __name__ == "__main__":
+    main()

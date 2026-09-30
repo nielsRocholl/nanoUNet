@@ -9,6 +9,7 @@ set_safe_tmpdir()
 init_dataloader_ipc()
 
 import os
+import shlex
 
 from batchgenerators.utilities.file_and_folder_operations import join, maybe_mkdir_p
 
@@ -86,6 +87,7 @@ def main() -> None:
         None if sup_resume or args.init_weights else mae_ckpt_arg, sup_resume,
     )
     cprint(f"[green]done — checkpoints in {join(out, ckpt_dir)}[/green]")
+    cprint(f"next: nanounet_predict -i <cases-dir> -o <pred-dir> -m {shlex.quote(out)}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shlex
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
@@ -174,6 +175,9 @@ def main() -> None:
         report(rows)
     cprint(f"[green]done — {n} case(s) → {out_dir}[/green]")
     if args.metrics_out: write(rows, args.metrics_out)
+    next_cmd = f"segtrack_run --bl-dir <bl-dir> --fu-dir <fu-dir> -m {shlex.quote(args.model_dir)}"
+    next_cmd += (f" --ckpt {shlex.quote(args.ckpt)}" if args.ckpt else "") + ("" if args.ema else " --no-ema")
+    cprint(f"next: {next_cmd}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

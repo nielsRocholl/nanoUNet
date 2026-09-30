@@ -11,6 +11,7 @@ from nanounet.plan.dataset.splits import parse_fold
 
 def build_train_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser()
+    # nanochat-style: allow U8 (legacy snake flag; cluster scripts pass it)
     ap.add_argument("-d", "--dataset_id", type=int, required=True, help="Dataset id, matched against Dataset<NNN>_* under raw/preprocessed/results (zero-padded to 3 digits).")
     ap.add_argument("-f", "--fold", type=parse_fold, default=0, help="Fold 0-4 or 'all'.")
     ap.add_argument("--plans", dest="plans_identifier", required=True, help="Plans identifier: basename of the plans JSON under the preprocessed dataset dir (no .json suffix).")

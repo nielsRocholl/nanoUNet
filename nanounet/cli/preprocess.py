@@ -12,7 +12,7 @@ import sys
 
 from batchgenerators.utilities.file_and_folder_operations import join, load_json
 
-from core.ui import cprint, nano_header, nano_rule
+from core.ui import arg_rows, config_table, cprint, nano_header, nano_rule
 from nanounet.common import preprocessed_dir, raw_dir
 from nanounet.data.store.blosc2_dataset import Blosc2Folder
 from nanounet.plan.dataset.cohorts import run_cohorts
@@ -72,6 +72,7 @@ def _write_splits_and_cohorts(did: int, ident: str, val_frac: float, seed: int) 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    # nanochat-style: allow U8 (legacy snake flag; cluster scripts pass it)
     ap.add_argument(
         "-d", "--dataset_id", type=int, nargs="+", required=True,
         help="one or more dataset ids, e.g. -d 501 or -d 1 2 3 to merge several into one",
@@ -85,6 +86,7 @@ def main() -> None:
         help="name segment for the merged folder DatasetNNN_<name> (only used when several -d ids are given)",
     )
     ap.add_argument("--planner", default="nnUNetPlannerResEncL", help="planner preset class, e.g. nnUNetPlannerResEncTiny or nnUNetPlannerResEncL")
+    # nanochat-style: allow U8 (legacy snake flag; cluster scripts pass it)
     ap.add_argument("-np", "--num_processes", type=int, default=8, help="parallel worker processes for fingerprinting and preprocessing")
     ap.add_argument("--resume", action="store_true", help="skip cases already fully preprocessed instead of wiping and redoing the 3d_fullres folder")
     ap.add_argument(
@@ -125,6 +127,7 @@ def main() -> None:
             "nanoUNet preprocess  merge "
             f"{','.join(str(i) for i in args.dataset_id)} -> Dataset{did:03d}_{args.merged_name}"
         )
+    config_table(arg_rows(ap, args))
     if args.sidecars_only:
         if not args.plans_name:
             ap.error("--sidecars-only needs --plans-name (identifies the existing plans json to read)")
