@@ -38,6 +38,17 @@ STEP_DOC = {  # D3: <project>/cli/<cmd>.py is documented in <project>/docs/steps
     "nanounet/cli/build_valset.py": "nanounet/docs/steps/valset.md",
     "nanounet/cli/build_splits.py": "nanounet/docs/steps/valset.md",
     "segtrack/cli/run.py": "segtrack/README.md",
+    "lesionglue/cli/split.py": "lesionglue/docs/steps/data.md",
+    "lesionglue/cli/preprocess.py": "lesionglue/docs/steps/data.md",
+    "lesionglue/cli/audit.py": "lesionglue/docs/steps/data.md",
+    "lesionglue/cli/train.py": "lesionglue/docs/steps/train.md",
+    "lesionglue/cli/cv.py": "lesionglue/docs/steps/train.md",
+    "lesionglue/cli/oof.py": "lesionglue/docs/steps/train.md",
+    "lesionglue/cli/pool.py": "lesionglue/docs/steps/train.md",
+    "lesionglue/cli/eval.py": "lesionglue/docs/steps/eval.md",
+    "lesionglue/cli/report.py": "lesionglue/docs/steps/eval.md",
+    "lesionglue/cli/predict.py": "lesionglue/docs/steps/eval.md",
+    "lesionglue/cli/baseline_distance.py": "lesionglue/docs/steps/eval.md",
 }
 HOT_FUNCS = {"forward", "training_step", "compute_loss", "__getitem__", "__iter__", "__next__"}
 SYNC_ATTRS = {"item", "cpu", "tolist", "numpy"}
