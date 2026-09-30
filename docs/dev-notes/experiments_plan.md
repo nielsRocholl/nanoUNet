@@ -1,7 +1,7 @@
 # Plan: `experiments/`, one folder per paper experiment, every run fully logged
 
 Date: 2026-09-30
-Status: approved plan, updated with the owner's answers the same day; implementation not started (Phase 0 first)
+Status: approved plan, updated with the owner's answers and a run schedule (Sec. 10) the same day; implementation starting with Phase 0
 
 This plan is written to be handed to Sonnet implementation agents after context compression. Everything an agent needs is in here; nothing is "as discussed".
 
@@ -257,6 +257,7 @@ Question: does it transfer to another disease? 45 patients, 161 CT, 116 consecut
 | 2c | `exp06` | 1 | 1c |
 | 3a | folder `exp04_baselines` (`qahqaie.py`, `diveroli.py` draft), then `exp09_pantrack` (`pantrack.py`) | 1 | 1a, 1c (folds) |
 | 3b | `exp07_internal_set` (`kirchhoff.py`) + thin `exp08_external_set`; validate on the held-out 60 as if it were a private set; write the Container contract in `experiments/README.md` | 1 | 2b (`pipeline.py`) |
+| 4 | (after the owner's full runs; not part of the first implementation task) `experiments/report/`: read `INDEX.jsonl`, pick the latest `ok` run per experiment (or `--run EXP=RUN_ID`), write the paper tables (`results/paper_tables.md`) and figures, plus a map from each paper placeholder (`[X]`, `[Y]`, ...) to `(exp, summary key)`. Table shapes are only fixed once real numbers exist, so it is written then. | 1 | full runs of Sec. 10 |
 
 GPU is one A100 40 GB: do not run exp01/02 inference and exp03 training at the same time. Agents must not launch multi-hour full runs; they implement, smoke-test with `--limit-patients 3`, and hand the literal full-run command back in `experiments/README.md`.
 
@@ -292,5 +293,27 @@ Per experiment folder:
 Overall:
 - `python .claude/skills/nanochat-style/scripts/check.py --changed` reports 0 errors (waivers carry reasons); paste rendered output of one triggered E1 error per new error path.
 - `scoring.py` validation (Sec. 5) passes before any experiment uses it; temporary validation scripts are then deleted (R16).
-- `experiments/README.md` lists each experiment, its literal full-run command, paper row, run-dir layout and argument tables (D3); no stale flags (D4).
+- `experiments/README.md` has a **Runbook** section (Sec. 10 order, literal commands, estimated runtimes, sanity checks) that the lead fills from the agents' reports; and it lists each experiment, its literal full-run command, paper row, run-dir layout and argument tables (D3); no stale flags (D4).
 - `graphify update .` run; final report lists rule IDs touched/waived, checker result, and per-experiment smoke wall time.
+
+## 10. Runbook (what the owner runs after the implementation; the lead copies the literal commands into `experiments/README.md` under "Runbook")
+
+Rules for every full run: one A100 40 GB and a 40 GB RAM cap, so **GPU work runs one slot at a time** (inside a slot at most 2 `nanounet_predict`-sized jobs, started ~20 s apart); CPU-only runs may overlap a GPU slot. Every run writes to `/nnunet_data/experiments/<exp>/<run_id>/` and is mirrored to `experiments/results/`: **commit and push `experiments/results/` after every full run** (the container is ephemeral). Tag full runs `--tag paper_v1`; rescoring uses `--rescore RUN_DIR`, never a new prediction pass. Estimates are the Sec. 6 table's.
+
+| Slot | Runs | Hardware | Needs first | Est. | Why here |
+|---|---|---|---|---|---|
+| 0 | exp00a, exp00b, exp00c (full runs) | CPU | none | ~30 min | fixes counts, calibration and the evaluation manifest; the Phase 1 agents already run these, so rerun only if an input changed |
+| 1 | exp03 (5 fold trainings + scoring) | GPU | slot 0 | longest (5 x 7400 steps) | its stored scores gate exp04 and exp06 |
+| 2 | exp04, exp06 | CPU | an exp03 run | ~1 h, ~2 min | CPU only, so it can overlap slot 3 |
+| 3 | exp05 (settings A, B, C), then exp07 on the held-out 60 as validation | GPU | none (`final_v8_noval/seed0/last.ckpt` exists) | ~2-3 h, ~1 h | exp07 "ours" must equal exp05 setting B; the Kirchhoff predictions must match `/nnunet_data/LongiSeg/predictions` within noise |
+| 4 | exp01 (nanounet, then the external systems from prediction folders), exp02 | GPU | exp00c manifest; ULS+ weights (owner) for its row | 1-2 h per method, 2-4 h | exp02 at s=0 is cross-checked against exp01 S1 |
+| 5 | exp09 | GPU | exp04 and exp07 code | ~1-2 h | |
+| 6 | exp07 / exp08 on the partner labs' data | GPU (the labs' machine) | the owner's container | minutes per case | outside this repo's machine |
+
+Sanity checks after each full run (read `results.json` `notes` and `summary`; a failed check means investigate, not tune):
+- exp00a: every `claims` row has `match: true`, or the mismatch is explained in `notes` (paper text to fix, Sec. 8).
+- exp03: each of the 300 patients appears in exactly one fold; per-class recall is reported for all four classes plus edge F1; the missed-patient count is printed.
+- exp05: setting A has identity ceiling 1.0 in every class; B and C list their ceilings; `3988c7f88e` is present as `status` missed.
+- exp07 on the held-out 60: ours equals exp05 setting B (same numbers, not "close").
+- exp02: s=0 Dice equals exp01 S1 Dice on the same clicks.
+- exp04: `expressible_classes` per method; chosen hyperparameters per fold are stored; no fold's parameters were tuned on that fold's patients.
