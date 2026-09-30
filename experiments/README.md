@@ -84,7 +84,7 @@ def main() -> None:
 | 01 | `exp01_segmentation` | 1 | implemented (smoke ok) |
 | 02 | `exp02_prompt_noise` | 2 | implemented (smoke ok) |
 | 03 | `exp03_matcher_alone` | 3 | not implemented |
-| 04 | `exp04_baselines` | 4 | not implemented |
+| 04 | `exp04_baselines` | 4 | implemented, smoke-tested (8 patients); full run needs exp03 `folds.py` on main |
 | 05 | `exp05_full_pipeline` | 5 | not implemented |
 | 06 | `exp06_limits` | 6 | not implemented |
 | 07 | `exp07_internal_set` | 7 | not implemented |
@@ -205,7 +205,24 @@ same `--seed`, `--backends` and `--max-lesions-per-case` (exp01 default -1, exp0
 
 ### exp04_baselines
 
-(not implemented)
+Reimplemented Di Veroli (iterative greedy overlap) and Qahqaie (unbalanced optimal transport, registration-trust term omitted) matchers, nested-tuned inside the exp03 folds and scored like our matcher (node supply Lstar, all 300 patients). Needs `experiments/exp03_matcher_alone/folds.py` (fold assignment); CPU only.
+
+| flag | meaning |
+|---|---|
+| `--data-root` | Longitudinal-CT layout root (default `/nnunet_data/Longitudinal-CT`) |
+| `--prop-fill` | propagated point for BL lesions that lack one: `none`, or `unigradicon` (default; uniGradICON `bl_click` only where its sanity check passed, the same rule as the graph builder's fill) |
+| `--workers` | processes for the per-patient input preparation (default 8) |
+| `--ours-run` | exp03 `RUN_DIR` whose `per_patient` table (columns `pid`, `decoder`, count keys of `scoring.COUNT_KEYS`) gives the paired deltas |
+| `--ours-decoder` | decoder value of those rows to compare against (default `hungarian`) |
+| `--rescore` | `RUN_DIR` of an earlier run: reuse its `artifacts/inputs/`, redo tuning and scoring (12 s for 8 patients) |
+
+Smoke: `python -m experiments.exp04_baselines.run --limit-patients 8 --tag smoke` (needs patients from at least two folds, hence 8; 1.7 min). Full run (about 15-30 min preparation plus a few minutes of scoring):
+
+```bash
+python -m experiments.exp04_baselines.run --tag paper_v1 --ours-run /nnunet_data/experiments/exp03_matcher_alone/<run_id>
+```
+
+Outputs: `per_patient`, `chosen_params` (per fold), `tuning_scores`, `missing` tables; `edges_<method>.json`; `table.md` with all four class recalls and edge F1 per method (`diveroli_tuned`, `diveroli_published_r5|r7|r10`, `qahqaie_tuned`). Not implemented: the secondary Di Veroli input (uniGradICON-warped BL masks) and the with-unclear sensitivity row.
 
 <!-- end -->
 
