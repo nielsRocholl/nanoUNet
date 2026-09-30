@@ -115,6 +115,7 @@ class LesionRow:
     img_id_fu: int
     lesion_type: str
     merged_into: int | None
+    prop_source: int = 0  # 0 = cog_propagated from the meta CSV, 1 = uniGradICON bl_click (lesionglue_preprocess --prop-fill unigradicon)
 
 
 def parse_meta_csv(path: Path, keep_unclear: bool = False) -> list[LesionRow]:

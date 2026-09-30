@@ -55,10 +55,11 @@ Build cached dense `v8_native` PyG graphs (L0 descriptors) for one tracking spli
 lesionglue_preprocess --split all --root /nnunet_data/Longitudinal-CT --cache /nnunet_data/lesion_tracking/cache --jobs 16
 ```
 
-Keep the 135 lesions the annotators flagged `linking_unclear` (default drops them) in a separate cache, for the unclear-link sensitivity row:
+Fill the 113 BL lesions that lack `cog_propagated` from the uniGradICON registration (only where its `sanity_ok` is true; the other 16 stay dropped), in a cache of its own. `--keep-unclear` keeps the 135 `linking_unclear` lesions (default drops them) for the unclear-link sensitivity row:
 
 ```bash
-lesionglue_preprocess --split all --keep-unclear --cache /nnunet_data/lesion_tracking/cache_v9_unclear --jobs 4
+lesionglue_preprocess --split all --prop-fill unigradicon --cache /nnunet_data/lesion_tracking/cache_v9 --jobs 4
+lesionglue_preprocess --split all --prop-fill unigradicon --keep-unclear --cache /nnunet_data/lesion_tracking/cache_v9_unclear --jobs 4
 ```
 
 ### Arguments
@@ -71,6 +72,7 @@ lesionglue_preprocess --split all --keep-unclear --cache /nnunet_data/lesion_tra
 | `--k-intra` | int | 8 | Neighbors per node in the intra-timepoint kNN graph |
 | `--jobs` | int | 1 | Parallel patients (ProcessPool); each worker pins BLAS/OpenMP to 1 thread |
 | `--keep-unclear` | flag | off | Keep lesions whose `linking_unclear` flag is set (the default drops those rows). Needs its own `--cache` dir, and every split of one cache dir must use the same setting |
+| `--prop-fill` | choice | `none` | `none`: a BL lesion without `cog_propagated` (129 in 25 patients) gets no node. `unigradicon`: it gets the registration's `bl_click` from `derivatives/unigrad-icon-registration/` where `sanity_ok` is true (`prop_source` 1 on that node); the rest stay dropped. Same cache-dir rule as `--keep-unclear` |
 | `--resume` | flag | off | Keep already-built patients in the staging dir and build only the missing ones, then merge all patients at the end; default rebuilds the split |
 
 ### Inputs / outputs
@@ -81,7 +83,7 @@ lesionglue_preprocess --split all --keep-unclear --cache /nnunet_data/lesion_tra
 | `/nnunet_data/Longitudinal-CT/{meta,inputsTrBL,inputsTrFU,targetsTrBL,targetsTrFU}/` | CSV, NIfTI | you |
 | `/nnunet_data/lesion_tracking/cache/processed/staging/{split}_v8_native/{patient}.pt` | PyG graphs, one file per patient | this step |
 | `/nnunet_data/lesion_tracking/cache/processed/{split}_v8_native.pt` | collated PyG dataset | this step |
-| `/nnunet_data/lesion_tracking/cache/processed/{split}_v8_native_meta.pt` | edge/positive counts, descriptor dims (`keep_unclear: true` with `--keep-unclear`) | this step |
+| `/nnunet_data/lesion_tracking/cache/processed/{split}_v8_native_meta.pt` | edge/positive counts, descriptor dims (`keep_unclear`, `prop_fill` when not default) | this step |
 
 Old `*_v5_l0.pt` files in `processed/` are ignored (a warning is printed); delete them if they confuse you.
 
@@ -91,8 +93,9 @@ Old `*_v5_l0.pt` files in `processed/` are ignored (a warning is printed); delet
 |---|---|
 | `No tracking split at` | `lesionglue_split --root /nnunet_data/Longitudinal-CT` first |
 | `split '...' missing from the split file` | Regenerate `lesionglue/configs/split.json` with `lesionglue_split` (needs keys train/val/test) |
-| `--keep-unclear would write into the default cache` | `--cache /nnunet_data/lesion_tracking/cache_v9_unclear` (a dir of its own) |
-| `was built with --keep-unclear` or `was built without --keep-unclear` | The cache dir already holds splits built the other way; match the flag to it or use a new `--cache` dir |
+| `would write into the default cache` | `--cache /nnunet_data/lesion_tracking/cache_v9` (a dir of its own for `--keep-unclear` / `--prop-fill`) |
+| `was built with keep_unclear=` or `was built with prop_fill=` | The cache dir already holds splits built with other settings; match the flag to it or use a new `--cache` dir |
+| `merge target(s) [...] have no FU node` | A MERGING row needs a row with `lesion_id == merged_into` and a `cog_fu` in `meta/{patient}.csv` |
 | `zero graphs for split=` | The split has no buildable patients; check `--root` and `lesionglue_split` output |
 | `empty mask for lesion` | A lesion id in `meta/{patient}.csv` has no voxels in its mask; fix that patient's masks or CSV |
 | `unknown topology_class` | `meta/{patient}.csv` has a topology label outside the known set; fix the CSV |

@@ -19,6 +19,7 @@ from lesionglue.data.features.appearance import mask_stats_all
 from lesionglue.data.features.descriptor import descriptor_l0
 from lesionglue.data.features.layout import pack_node
 from lesionglue.data.source.meta import LesionRow, V2Paths, parse_meta_csv
+from lesionglue.data.source.propagate import fill_propagated
 
 
 @dataclass
@@ -164,6 +165,8 @@ def _one_region(pid: str, vp: V2Paths, rows: list[LesionRow], fu_id: int, cfg: G
     data["bl"].no_match_label = (~lab.bool().any(dim=1)).float()
     data["fu"].no_match_label = (~lab.bool().any(dim=0)).float()
     data["bl", "cross", "fu"].edge_label = lab.reshape(-1)
+    data["bl"].prop_source = torch.tensor([bl_rep[lid].prop_source for lid in bl_ids], dtype=torch.long)  # 0 meta, 1 uniGradICON fill
+    data.n_bl_no_prop = sum(1 for r in rows if r.topology != "NEWLYAPPEARING" and r.cog_propagated is None)  # BL lesions left without a node
     data.pid = pid
     data.img_id_fu_used = int(fu_id)
     data.graph_id = f"{pid}_{fu_id:02d}"
@@ -172,7 +175,8 @@ def _one_region(pid: str, vp: V2Paths, rows: list[LesionRow], fu_id: int, cfg: G
     return refresh_edges(data, cfg)
 
 
-def build_hetero_data(pid: str, root: Path, cfg: GraphConfig, keep_unclear: bool = False) -> list[HeteroData]:
+def build_hetero_data(pid: str, root: Path, cfg: GraphConfig, keep_unclear: bool = False, prop_fill: str = "none") -> list[HeteroData]:
+    assert prop_fill in ("none", "unigradicon"), f"prop_fill {prop_fill!r}: expected none or unigradicon"
     _NII_CACHE.clear()
     vp = V2Paths(Path(root), pid)
     rows = parse_meta_csv(vp.meta, keep_unclear)
@@ -180,7 +184,10 @@ def build_hetero_data(pid: str, root: Path, cfg: GraphConfig, keep_unclear: bool
         return []
     out: list[HeteroData] = []
     for fu_id in sorted({r.img_id_fu for r in rows}):
-        g = _one_region(pid, vp, [r for r in rows if r.img_id_fu == fu_id], fu_id, cfg)
+        reg = [r for r in rows if r.img_id_fu == fu_id]
+        if prop_fill == "unigradicon":
+            reg, _ = fill_propagated(reg, root, pid, fu_id)
+        g = _one_region(pid, vp, reg, fu_id, cfg)
         if g is not None:
             out.append(g)
     return out

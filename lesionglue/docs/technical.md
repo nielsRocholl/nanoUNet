@@ -43,7 +43,7 @@ This is **not** a strict one-to-one assignment matrix. Many-to-one (merge) and o
 - Rows with `linking_unclear=True` are skipped.
 - **Lesion ID** in the CSV doubles as the **voxel label** in the masks.
 
-**Important implementation choice:** we **do not** fall back to `cog_bl` when `cog_propagated` is missing. Those baseline-side rows are dropped (`print0`), because mixing coordinate frames without an explicit flag violates the “no silent fallback” rule we wanted for training signal integrity.
+**Important implementation choice:** we **do not** fall back to `cog_bl` when `cog_propagated` is missing. Those baseline-side rows are dropped (`print0`), because mixing coordinate frames without an explicit flag violates the “no silent fallback” rule we wanted for training signal integrity. The explicit, opt-in alternative is `lesionglue_preprocess --prop-fill unigradicon`: a BL lesion without `cog_propagated` takes the uniGradICON registration's `bl_click` (same FU voxel frame; median 5.8 mm from `cog_propagated` where both exist) only where the registration's own `sanity_ok` is true, recorded per BL node as `prop_source` 1; the others stay dropped.
 
 ---
 

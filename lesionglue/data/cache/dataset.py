@@ -30,9 +30,9 @@ def _limit_threads() -> None:
     torch.set_num_threads(1)
 
 
-def _build_one(pid: str, root_s: str, cfg: GraphConfig, keep_unclear: bool) -> tuple[str, list]:
+def _build_one(pid: str, root_s: str, cfg: GraphConfig, keep_unclear: bool, prop_fill: str) -> tuple[str, list]:
     _limit_threads()
-    return pid, build_hetero_data(pid, Path(root_s), cfg, keep_unclear)
+    return pid, build_hetero_data(pid, Path(root_s), cfg, keep_unclear, prop_fill)
 
 
 class LesionDataset(InMemoryDataset):
@@ -49,6 +49,7 @@ class LesionDataset(InMemoryDataset):
         p_drop_fu: float = 0.1,
         p_drop_bl: float = 0.1,
         keep_unclear: bool = False,
+        prop_fill: str = "none",
     ):
         assert split in {"train", "val", "test"}
         self.split = split
@@ -58,6 +59,7 @@ class LesionDataset(InMemoryDataset):
         self.resume = resume
         self.augment = augment
         self.keep_unclear = keep_unclear  # build-time only: keeps linking_unclear lesions (a separate cache dir, see lesionglue_preprocess)
+        self.prop_fill = prop_fill  # build-time only: "unigradicon" fills missing cog_propagated from the registration
         self.fu_jitter_scale = fu_jitter_scale
         self.p_drop_fu = p_drop_fu
         self.p_drop_bl = p_drop_bl
@@ -120,7 +122,7 @@ class LesionDataset(InMemoryDataset):
                 task = prog.add_task(self.split, total=len(todo), patient="")
                 for pid in todo:
                     prog.update(task, patient=str(pid))
-                    graphs = build_hetero_data(pid, self.dataset_root, cfg, self.keep_unclear)
+                    graphs = build_hetero_data(pid, self.dataset_root, cfg, self.keep_unclear, self.prop_fill)
                     stg.save(staging, pid, graphs)
                     for g in graphs:
                         self._log_graph(pid, g, prog.console)
@@ -129,7 +131,7 @@ class LesionDataset(InMemoryDataset):
             with Progress(*cols) as prog:
                 task = prog.add_task(self.split, total=len(todo), patient="")
                 with ProcessPoolExecutor(max_workers=self.num_workers, initializer=_limit_threads) as ex:
-                    futs = [ex.submit(_build_one, pid, root_s, cfg, self.keep_unclear) for pid in todo]
+                    futs = [ex.submit(_build_one, pid, root_s, cfg, self.keep_unclear, self.prop_fill) for pid in todo]
                     for fut in as_completed(futs):
                         pid, graphs = fut.result()
                         prog.update(task, patient=str(pid))
@@ -150,6 +152,8 @@ class LesionDataset(InMemoryDataset):
         meta = {"edges": te, "positives": tp, "feat_mode": "l0", "desc_dim": DESC_DIM, "feat_dim": FEAT_DIM}
         if self.keep_unclear:
             meta["keep_unclear"] = True
+        if self.prop_fill != "none":
+            meta["prop_fill"] = self.prop_fill
         torch.save(meta, Path(self.processed_dir) / f"{self.split}_{CACHE_TAG}_meta.pt")
         self.save(graphs, self.processed_paths[0])
         stg.rm(staging)
