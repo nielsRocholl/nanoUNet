@@ -259,6 +259,7 @@ flock /tmp/gpu.lock python -m experiments.exp05_full_pipeline.run --limit-patien
 | `--patients` | none | explicit patient ids instead of the CSV (debugging, e.g. the known-bad `3988c7f88e`) |
 | `--settings` | `A B C` | node supplies to run |
 | `--matcher-ckpt` | `common.MATCHER_FINAL` | matcher checkpoint; the owner repoints the constant after the retrain |
+| `--prop-fill` | `none` | setting A only: `unigradicon` fills BL lesions without `cog_propagated` (the graph builder's opt-in fill); use it if the matcher was trained on a cache built with `--prop-fill unigradicon` |
 | `--tau` | the checkpoint's `dust_tau` | decoder cut-off; change only to rescore a sensitivity row |
 | common flags | | `--tag --out-root --resume --seed --limit-patients --device --rescore` (table above) |
 
@@ -267,7 +268,7 @@ Outputs (run dir): `results.json` tables `per_patient` (per patient x setting x 
 annotated-id space), `metrics` (every CI), `deltas`; `table.md` per decoder and variant. `artifacts/`: `pipeline.json`, `records/<pid>_<setting>.json`,
 `scores/<pid>_<setting>.npz` (raw scores; setting A also `_A_unclear`), `masks/<pid>_<setting>/{matches.csv, pred_fu.mha, pred_bl.mha}`.
 A patient the pipeline cannot process stays in the tables with its `status` and counts as fully missed (printed and listed in `notes`).
-Runtime: about 1 min per patient for B and about 2 min for C on one A100 plus a few minutes for A, i.e. 2-3 h for the full run; resumable.
+Runtime (measured on the smoke, A100 shared): about 30 s per patient for B, 35 s for C (FU about 3-8 s of segmentation, the rest is reading the CTs and building the graph), A 10-60 s (graph build), i.e. about 1.5-2 h for the 60 patients; resumable.
 
 <!-- end -->
 

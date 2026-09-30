@@ -25,7 +25,7 @@ OUTPUT     results.json tables: per_patient (per patient x setting x decoder x v
 COMMAND    python -m experiments.exp05_full_pipeline.run --tag paper_v1
 DEPENDS ON experiments/common.py, scoring.py (score_pair, load_pairs, bootstrap, paired_delta), segment.py (load_segmenter), pipeline.py (the pipeline); the
            final matcher checkpoint (owner repoints MATCHER_FINAL after the retrain) and the graph-builder fix for setting A.
-RUNTIME    About 1 min per patient and setting on one A100 (segmentation dominates): B+C about 2-3 h for 60 patients, A minutes. Resumable (--resume skips
+RUNTIME    About 30-35 s per patient for B and for C on one A100 (segmentation 3-8 s, CT reading and graph features the rest), A 10-60 s: about 1.5-2 h for 60 patients. Resumable (--resume skips
            finished patients and retries failed ones); scoring alone (--rescore) takes about a minute.
 CAVEATS    NUMBERS ARE NOT MEANINGFUL until the matcher is retrained on the fixed graph cache (graph-builder defects in the experiments plan, Sec. 2): the
            current MATCHER_FINAL never saw a merge-target node, so merge recall is 0 by construction. Setting A must be re-verified after that fix (it uses
@@ -57,7 +57,7 @@ HEAD = ("recall_unchanged", "recall_disappeared", "recall_new", "recall_merged",
 CEIL = ("ceiling_unchanged", "ceiling_disappeared", "ceiling_new", "ceiling_merged")
 
 
-def predict_unit(pl: P.Pipeline, root: Path, pid: str, setting: str, art: Path) -> dict:
+def predict_unit(pl: P.Pipeline, root: Path, pid: str, setting: str, art: Path, prop_fill: str) -> dict:
     """Run one (patient, setting), write scores/records/masks into artifacts; a failure is recorded, never dropped (plan Sec. 4, rule 3)."""
     rec_path = art / "records" / f"{pid}_{setting}.json"
     if rec_path.is_file() and json.loads(rec_path.read_text())["status"] == "ok":
@@ -69,7 +69,7 @@ def predict_unit(pl: P.Pipeline, root: Path, pid: str, setting: str, art: Path) 
         absent = [str(p) for p in (pair.bl_img, pair.fu_img, pair.fu_clicks, pair.bl_mask, pair.fu_mask, pair.meta) + ((pair.bl_clicks,) if setting == "C" else ()) if not p.is_file()]
         if absent:
             raise FileNotFoundError(f"missing input files {absent}. Expected the Longitudinal-CT layout. Fix: restore the files or drop the patient from --patients-csv")
-        s, scans = P.run_setting(pl, root, pair, setting)
+        s, scans = P.run_setting(pl, root, pair, setting, prop_fill=prop_fill)
         P.save_scores(art / "scores" / f"{pid}_{setting}.npz", s)
         P.write_links_csv(art / "masks" / f"{pid}_{setting}" / "matches.csv", s, pl.tau)
         if scans is not None:
@@ -77,7 +77,7 @@ def predict_unit(pl: P.Pipeline, root: Path, pid: str, setting: str, art: Path) 
             if setting == "C":
                 P.write_instances(art / "masks" / f"{pid}_{setting}" / "pred_bl.mha", scans["bl"]["inst"], scans["bl"]["props"])
         if setting == "A" and load_pairs(root, [pid], include_unclear=True)[pid].unclear:  # the with-unclear row needs a graph that keeps the flagged lesions (same graph if none is flagged)
-            P.save_scores(art / "scores" / f"{pid}_A_unclear.npz", P.run_setting(pl, root, pair, "A", keep_unclear=True)[0])
+            P.save_scores(art / "scores" / f"{pid}_A_unclear.npz", P.run_setting(pl, root, pair, "A", keep_unclear=True, prop_fill=prop_fill)[0])
         rec.update(t_seg=s.t_seg, t_track=s.t_track)
     except (OSError, ValueError, KeyError, IndexError, AssertionError, RuntimeError, SystemExit) as e:  # a patient the pipeline cannot process stays as status=failed, counted as missed
         rec.update(status="failed", error=f"{type(e).__name__}: {e}")
@@ -158,6 +158,7 @@ def main() -> None:
     ap.add_argument("--patients", nargs="+", default=None, help="explicit patient ids instead of --patients-csv (debugging, e.g. the known-bad 3988c7f88e)")
     ap.add_argument("--settings", nargs="+", choices=P.SETTINGS, default=list(P.SETTINGS), help="node supplies to run: A annotation, B annotated BL + segmented FU, C segmented both")
     ap.add_argument("--matcher-ckpt", type=Path, default=MATCHER_FINAL, help="matcher checkpoint (EMA weights are used); the owner repoints the default after the retrain")
+    ap.add_argument("--prop-fill", choices=("none", "unigradicon"), default="none", help="setting A only: fill a BL lesion without cog_propagated from the uniGradICON point, as the matcher's graph cache was built (see lesionglue_preprocess --prop-fill)")
     ap.add_argument("--tau", type=float, default=None, help="decoder cut-off; default: the matcher checkpoint's own dust_tau (only change it to rescore a sensitivity row)")
     args = ap.parse_args()
     rescore = args.rescore is not None
@@ -183,10 +184,10 @@ def main() -> None:
     else:
         pl = P.load_pipeline(args.device, matcher_ckpt=args.matcher_ckpt, segmenter=any(s in ("B", "C") for s in args.settings))
         tau = args.tau if args.tau is not None else pl.tau
-        (art / "pipeline.json").write_text(json.dumps({"tau": pl.tau, "matcher": str(args.matcher_ckpt), "segmenter": str(SEG_CKPT), "prompts": "BL inputsTrBL/*.json (true), FU inputsTrFU/*.json (propagated, backend original)"}))
+        (art / "pipeline.json").write_text(json.dumps({"tau": pl.tau, "matcher": str(args.matcher_ckpt), "segmenter": str(SEG_CKPT), "prop_fill": args.prop_fill, "prompts": "BL inputsTrBL/*.json (true), FU inputsTrFU/*.json (propagated, backend original)"}))
         for i, pid in enumerate(pids, 1):
             for setting in args.settings:
-                rec = predict_unit(pl, args.data_root, pid, setting, art)
+                rec = predict_unit(pl, args.data_root, pid, setting, art, args.prop_fill)
                 cprint(f"[{i}/{len(pids)}] {pid} {setting}: {rec['status']}" + (f"  seg {rec['t_seg']:.0f}s track {rec['t_track']:.1f}s" if rec["status"] == "ok" else ""))
         del pl
     settings = list(args.settings) if not rescore else [s for s in P.SETTINGS if any((art / "records").glob(f"*_{s}.json"))]
