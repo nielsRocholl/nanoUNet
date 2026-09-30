@@ -1,7 +1,7 @@
 # Monorepo: nanoUNet as the home of every CT-lesion project
 
 Date: 2026-09-29
-Status: done on branch `monorepo`; checker 0 errors, 7 warns (G2, GPU handoff)
+Status: done on branch `monorepo`; checker 0 errors, 0 warns (G2 closed on A100, 2026-09-30)
 
 ## Decisions
 
@@ -69,6 +69,41 @@ Status: done on branch `monorepo`; checker 0 errors, 7 warns (G2, GPU handoff)
 | README commit | C | lesionglue README 293 -> 101 lines; `docs/reference/{config,layout,experiments}.md`; 42-fact inventory, no loss |
 | nanounet K7 commit | L | K6 guards, config table + `next:` on all 7 nanounet commands; legacy snake flags waived (U8) |
 
-## Still open (7 warns, GPU only)
+## GPU smoke 2026-09-30 (`dlc-arceus`, A100-SXM4-40GB)
 
-- G2: `lesionglue/model/matcher.py:103-106` `.tolist()` in `_dust_graph`; `nanounet/model/loss/cc_dice_ce.py:68,86,109` (only with `--loss cc_dc_ce`). Need a before/after number on GPU (G4). Handoff: `docs/handoffs/2026-09-30_gpu_session.md`, which also runs the real-data smoke (deployed `lesionglue_eval` must reproduce 0.9701).
+Host checkout `/nanoUNet`, not the Slurm container (no `srun`/`apptainer` on this node). Python 3.11.3. cgroup `memory.max` 64 GiB. `lesionglue_eval` default cache `/nnunet_data/lesion_tracking/cache` has no `v7_native`; deployed graphs are `/nnunet_data/lesion_tracking/cache_v7`. Default eval started writing a new cache there; that staging dir was removed. Smoke eval/train used `--cache` `cache_v7`.
+
+| # | status | key number | wall |
+|---|---|---|---|
+| A1 | pass | test match **0.970133**, 57 graphs, EMA, dust_tau 0.125 | 10.9 s |
+| A2 | pass | `rows` + `selected.dust_tau` **0.20** (val, 46 graphs) | 14.6 s |
+| A3 | fail | 200 steps, then SWA saw 1 plateau update (needs 5). No ckpt, no `val_match_score` on stderr. `val_check_steps` is 250. Before `b8814fd`, import died on 3.12 f-string quotes | 66.6 s |
+| A4 | blocked | no A3 checkpoint, so no `next:` oof/pool | — |
+| A5 | pass | 57 CSVs, columns `bl_lesion_id,fu_lesion_id,pair_prob,decode,track_id`, 3 skips. First process SIGKILL (−9) at 2833 s under the 64 GiB cgroup (46 CSVs); remainder 982 s, exit 0 | 3815 s |
+| A6 | pass | header, config table, `next:`, `epoch_wall_time_sec` e0 15.02 / e1 10.97. Batch 2 and `--dl-bucket s` (script is H200 batch 12 / xl). No val manifest | 113 s |
+| A7 | fail | `last.ckpt` stem is 3 input channels; `N_PROMPT_CHANNELS=1` builds 2 (negative prompt channel removed) | 30.3 s |
+
+## G2 (closed)
+
+`_dust_graph` `.tolist()`: host counts matched GPU `bincount` on one 8-graph batch. Step time `(median t600 − median t100) / 500`, 3 repeats, fold 0.
+
+| arm | 100 s walls | 600 s walls | step_s | GPU sm mean | Δ |
+|---|---|---|---|---|---|
+| before | 40.46 / 41.20 / 42.65 | 165.75 / 172.16 / 172.24 | 0.2619 | 20% | |
+| CPU sizes | 36.52 / 36.85 / 39.04 | 164.12 / 164.39 / 165.11 | 0.2551 | 23% | −2.6% |
+
+The before 600 s spread (6.5 s) exceeds the median shift. Waived in `e3a7ff3`.
+
+`cc_dc_ce` vs `dc_ce`, Dataset900, batch 2, 4 iters/epoch, median `epoch_wall_time_sec` epochs 1–3 (epoch 0 dropped):
+
+| arm | e1 | e2 | e3 | median | Δ |
+|---|---|---|---|---|---|
+| dc_ce | 5.676 | 4.317 | 4.168 | 4.317 | |
+| cc_dc_ce | 9.800 | 7.138 | 8.650 | 8.650 | +100% |
+
+CPU CC labelling stays. Waived in `d8d10d3`. `--loss` help states this cost.
+
+## Still open
+
+- A3/A4: a 200-step fold train cannot finish; `on_train_end` requires 5 SWA plateau updates and validation is every 250 steps.
+- A7: Dataset999 `h200_instance_1200ep` checkpoint does not load (3 vs 2 input channels).
