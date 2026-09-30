@@ -9,15 +9,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 from collections import Counter
 
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import isfile, join
 
-from nanounet.common import cprint, nano_header, nano_progress, preprocessed_dir
-from nanounet.data.blosc2_dataset import Blosc2Folder, case_spatial_shape, load_case_properties
-from nanounet.plan.dataset_id import convert_id_to_dataset_name
-from nanounet.plan.lesion_types import (
+from core.ui import arg_rows, config_table, cprint, nano_header, nano_progress
+from nanounet.common import preprocessed_dir
+from nanounet.data.store.blosc2_dataset import Blosc2Folder, case_spatial_shape, load_case_properties
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name
+from nanounet.plan.dataset.lesion_types import (
     HARD_TYPE_BOOST,
     build_case_weights,
     case_to_csv,
@@ -29,6 +31,7 @@ from nanounet.plan.plans import Plans
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    # nanochat-style: allow U8 (legacy snake flag; cluster scripts pass it)
     ap.add_argument("-d", "--dataset_id", type=int, required=True, help="dataset id, e.g. 13")
     ap.add_argument("--plans", required=True, help="plans identifier, no .json (e.g. nnUNetResEncUNetLPlans)")
     ap.add_argument("--meta-dir", required=True, help="folder of <hash>.csv lesion-type files")
@@ -44,6 +47,7 @@ def main() -> None:
 
     ds = convert_id_to_dataset_name(args.dataset_id)
     nano_header(f"nanoUNet lesion-weights  {ds}  prefix {args.only_prefix}", color="green")
+    config_table(arg_rows(ap, args))
     pp = preprocessed_dir()
     plans_path = join(pp, ds, args.plans + ".json")
     pm = Plans(plans_path)
@@ -95,3 +99,8 @@ def main() -> None:
         cprint(f"  {t}: {c}")
     # Wrong axis order leaves matches far away; crash so the user re-runs with --cog-axis-order zyx.
     assert overall_med <= args.max_median_dist, "cog->preprocessed mapping looks wrong; check --cog-axis-order"
+    cprint(f"next: nanounet_train -d {args.dataset_id} -f 0 --plans {shlex.quote(args.plans)} --config nanounet/configs/default.json", markup=False, soft_wrap=True)
+
+
+if __name__ == "__main__":
+    main()

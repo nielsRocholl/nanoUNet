@@ -9,7 +9,7 @@ from typing import Callable, Union
 from batchgenerators.utilities.file_and_folder_operations import load_json
 from dynamic_network_architectures.building_blocks.helper import convert_dim_to_conv_op, get_matching_instancenorm
 
-from nanounet.data.resampling import resample_data_or_seg_to_shape
+from nanounet.data.volume.resampling import resample_data_or_seg_to_shape
 from nanounet.plan.labels import Labels, labels_from_dataset_json
 
 
@@ -18,7 +18,7 @@ def _bind_resample(cfg: dict, key: str) -> Callable:
     if isinstance(name, str) and "." in name:
         name = name.split(".")[-1]
     if name != "resample_data_or_seg_to_shape":
-        raise NotImplementedError(name)
+        raise NotImplementedError(name)  # nanochat-style: allow E1 (unsupported plan option: nnU-Net plans only ever name resample_data_or_seg_to_shape)
     return partial(resample_data_or_seg_to_shape, **dict(cfg[key + "_kwargs"]))
 
 
@@ -99,7 +99,7 @@ class Plans:
     def _resolve(self, configuration_name: str, visited: tuple[str, ...] | None = None) -> dict:
         cfgs = self.plans["configurations"]
         if configuration_name not in cfgs:
-            raise KeyError(f"Configuration {configuration_name!r} not in plans.\nExpected {configuration_name!r} to be a key under plans[\"configurations\"]; nanoUNet only writes \"3d_fullres\".\nFix: regenerate the plans with nanounet_preprocess -d 501   (see docs/steps/preprocess.md)")
+            raise KeyError(f"Configuration {configuration_name!r} not in plans.\nExpected {configuration_name!r} to be a key under plans[\"configurations\"]; nanoUNet only writes \"3d_fullres\".\nFix: regenerate the plans with nanounet_preprocess -d 501   (see nanounet/docs/steps/preprocess.md)")
         configuration = deepcopy(cfgs[configuration_name])
         if "inherits_from" not in configuration:
             return configuration
@@ -108,7 +108,7 @@ class Plans:
             visited = (configuration_name,)
         else:
             if parent in visited:
-                raise RuntimeError(f"Circular inherits_from: {parent!r} already visited in {visited}.\nExpected each configuration's \"inherits_from\" chain to terminate without repeating a name.\nFix: fix the \"inherits_from\" chain in the plans JSON (remove the cycle), or regenerate with nanounet_preprocess -d 501   (see docs/steps/preprocess.md)")
+                raise RuntimeError(f"Circular inherits_from: {parent!r} already visited in {visited}.\nExpected each configuration's \"inherits_from\" chain to terminate without repeating a name.\nFix: fix the \"inherits_from\" chain in the plans JSON (remove the cycle), or regenerate with nanounet_preprocess -d 501   (see nanounet/docs/steps/preprocess.md)")
             visited = (*visited, configuration_name)
         base = self._resolve(parent, visited)
         base.update(configuration)
@@ -149,7 +149,7 @@ def _migrate_old_architecture(configuration: dict) -> dict:
         net_cls = "dynamic_network_architectures.architectures.residual_unet.ResidualEncoderUNet"
         key_blk = "n_blocks_per_stage"
     else:
-        raise RuntimeError(f"Unknown UNet_class_name {u!r} in old-format plans.\nExpected \"PlainConvUNet\" or \"ResidualEncoderUNet\" (the only classes the migration knows how to convert).\nFix: regenerate plans in the new \"architecture\" format with nanounet_preprocess -d 501 --planner nnUNetPlannerResEncL   (see docs/steps/preprocess.md)")
+        raise RuntimeError(f"Unknown UNet_class_name {u!r} in old-format plans.\nExpected \"PlainConvUNet\" or \"ResidualEncoderUNet\" (the only classes the migration knows how to convert).\nFix: regenerate plans in the new \"architecture\" format with nanounet_preprocess -d 501 --planner nnUNetPlannerResEncL   (see nanounet/docs/steps/preprocess.md)")
     n_stg = len(configuration["n_conv_per_stage_encoder"])
     dim = len(configuration["patch_size"])
     cop = convert_dim_to_conv_op(dim)
@@ -195,5 +195,5 @@ def _migrate_old_architecture(configuration: dict) -> dict:
 def determine_num_input_channels(cm: Config3d, dataset_json: dict) -> int:
     n_mod = len(dataset_json["modality"]) if "modality" in dataset_json else len(dataset_json["channel_names"])
     if cm.previous_stage_name is not None:
-        raise NotImplementedError("cascade input channels")
+        raise NotImplementedError("cascade input channels")  # nanochat-style: allow E1 (unsupported plan option: cascade/previous_stage plans are not implemented, nanoUNet plans are single-stage)
     return n_mod

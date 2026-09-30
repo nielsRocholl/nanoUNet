@@ -12,16 +12,17 @@ import sys
 
 from batchgenerators.utilities.file_and_folder_operations import join, load_json
 
-from nanounet.common import cprint, nano_header, nano_rule, preprocessed_dir, raw_dir
-from nanounet.data.blosc2_dataset import Blosc2Folder
-from nanounet.plan.cohorts import run_cohorts
-from nanounet.plan.dataset_id import convert_id_to_dataset_name
+from core.ui import arg_rows, config_table, cprint, nano_header, nano_rule
+from nanounet.common import preprocessed_dir, raw_dir
+from nanounet.data.store.blosc2_dataset import Blosc2Folder
+from nanounet.plan.dataset.cohorts import run_cohorts
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
 from nanounet.plan.prep.fingerprint import run_fingerprint
 from nanounet.plan.prep.merge import build_merged_raw
 from nanounet.plan.resenc.planner import run_plan
 from nanounet.plan.prep.preprocess import run_preprocess
-from nanounet.plan.splits import make_balanced_split
+from nanounet.plan.dataset.splits import make_balanced_split
 
 PATCH_VOL = {"small": 128, "medium": 192, "large": 256, "xlarge": 320}
 
@@ -71,6 +72,7 @@ def _write_splits_and_cohorts(did: int, ident: str, val_frac: float, seed: int) 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    # nanochat-style: allow U8 (legacy snake flag; cluster scripts pass it)
     ap.add_argument(
         "-d", "--dataset_id", type=int, nargs="+", required=True,
         help="one or more dataset ids, e.g. -d 501 or -d 1 2 3 to merge several into one",
@@ -84,6 +86,7 @@ def main() -> None:
         help="name segment for the merged folder DatasetNNN_<name> (only used when several -d ids are given)",
     )
     ap.add_argument("--planner", default="nnUNetPlannerResEncL", help="planner preset class, e.g. nnUNetPlannerResEncTiny or nnUNetPlannerResEncL")
+    # nanochat-style: allow U8 (legacy snake flag; cluster scripts pass it)
     ap.add_argument("-np", "--num_processes", type=int, default=8, help="parallel worker processes for fingerprinting and preprocessing")
     ap.add_argument("--resume", action="store_true", help="skip cases already fully preprocessed instead of wiping and redoing the 3d_fullres folder")
     ap.add_argument(
@@ -124,6 +127,7 @@ def main() -> None:
             "nanoUNet preprocess  merge "
             f"{','.join(str(i) for i in args.dataset_id)} -> Dataset{did:03d}_{args.merged_name}"
         )
+    config_table(arg_rows(ap, args))
     if args.sidecars_only:
         if not args.plans_name:
             ap.error("--sidecars-only needs --plans-name (identifies the existing plans json to read)")
@@ -162,7 +166,7 @@ def main() -> None:
     cprint("[bold cyan]preprocess complete[/bold cyan]")
     for a in artifacts:
         cprint(f"  [dim]-[/dim] {a}")
-    next_cmd = f"nanounet_train -d {did} -f 0 --plans {ident} --config configs/default.json"
+    next_cmd = f"nanounet_train -d {did} -f 0 --plans {ident} --config nanounet/configs/default.json"
     if not args.no_splits and args.valset_config:
         next_cmd += f" --val-manifest {join(preprocessed_dir(), convert_id_to_dataset_name(did), f'valset_{args.valset_n}.json')}"
     cprint(f"next: {next_cmd}")

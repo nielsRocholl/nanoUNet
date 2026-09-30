@@ -1,21 +1,25 @@
 # Docs: small, structured, never stale
 
-Load this when editing `docs/`, `README.md`, or any change that adds, renames, or removes a CLI flag, command, output path,
+Load this when editing any `README.md` or `docs/`, or any change that adds, renames, or removes a CLI flag, command, output path,
 or log line. Rule IDs refer to SKILL.md. `scripts/check.py` enforces D3, D4, and D6 mechanically.
 
 ## Tree
 
+Per project (`nanounet/`, `lesionglue/`, `segtrack/`, ...). The root has only `README.md` (project map) and
+`docs/dev-notes/` for cross-project plans.
+
 ```
-docs/
-├── index.md       pipeline overview: mermaid flow, quickstart sequence, links into steps/   (D1)
-├── steps/         one file per pipeline stage, user-facing                                  (D2)
-│   └── preprocess, plan, valset, pretrain, train, predict, track
-├── reference/     config fields, losses, patch size, instance targets, track ids
-├── dev-notes/     plans, investigations, experiment logs: dated scratch, not user-facing  (D6)
-└── handoffs/      session handoffs and decision records: dated scratch                   (D6)
+<project>/
+├── README.md          what it is, deps, install, commands: the link a paper gives     (D1 for small projects)
+└── docs/
+    ├── index.md       mermaid flow, quickstart sequence, links into steps/              (D1)
+    ├── steps/         one file per command or pipeline stage, user-facing               (D2)
+    ├── reference/     config fields, losses, formats, id conventions
+    ├── dev-notes/     plans, investigations, experiment logs: dated scratch             (D6)
+    └── handoffs/      session handoffs and decision records: dated scratch              (D6)
 ```
 
-User docs are `index.md`, `steps/`, `reference/`, and `README.md`. The 200-line cap and the staleness checks apply to them.
+User docs are every `README.md` and each project's `docs/` minus `dev-notes/` and `handoffs/`. The staleness checks apply to all of them; the 200-line cap to all but READMEs.
 `dev-notes/` and `handoffs/` are exempt, but they must open with a date and a status line (see the log format below).
 
 ## Step doc template (D2): this exact section order
@@ -53,10 +57,10 @@ nanounet_preprocess -d 501 --planner nnUNetPlannerResEncL -np 8
 | `No preprocessing plan at` | `nanounet_preprocess -d 501` first |
 ````
 
-- **D3.** Every argparse flag in `nanounet/cli/` appears in some argument table, in backticks, with its spelling exactly as in code.
+- **D3.** Every argparse flag in `<project>/cli/<cmd>.py` appears in `<project>/docs/steps/<cmd>.md` (or its `STEP_DOC` mapping), in backticks, with its spelling exactly as in code.
   The checker matches literally, so `--val-frac` in code must be `` `--val-frac` `` in the doc.
 - **D4.** A removed or renamed flag or command is deleted from the docs *in the same change*. The checker flags any
-  backticked `--flag` in a table row that no CLI defines, and any `nanounet_*` command that isn't in `pyproject.toml`.
+  backticked `--flag` in a table row that no CLI defines, and any `<project>_*` command that isn't in `pyproject.toml`.
 - **D5.** Use real placeholders (`-d 501`, `$NANOUNET_RESULTS/...`), not `<dataset>`, whenever a literal works.
 - **Common errors** tables quote the first words of the real error message, so a user can grep for it. When you add an E1 error,
   add a row.

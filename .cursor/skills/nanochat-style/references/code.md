@@ -1,6 +1,6 @@
 # Code: structure, naming, idioms
 
-Load this for any `.py` under `nanounet/`. Rule IDs refer to SKILL.md.
+Load this for any `.py` in a project, when adding or merging a project, or when wiring two projects together. Rule IDs refer to SKILL.md.
 
 ## What nanochat actually does (verified at commit 92d63d4)
 
@@ -23,37 +23,120 @@ Load this for any `.py` under `nanounet/`. Rule IDs refer to SKILL.md.
 | Deviation | Why |
 |---|---|
 | **R1: <200 LOC hard cap** (nanochat goes to 555) | Smaller context per file for humans and agents. Forces a concept split before a file sprawls. |
-| **Grouped subfolders**, at most 2 levels (`plan/prep/`) | 90+ modules. A flat package would be unreadable. |
+| **R20: concept subfolders**, `<project>/<area>/<concept>/` (nanochat is one flat `nanochat/`) | 90+ modules per project. The path should say what a file is before you open it: `data/valset/build.py`. |
+| **R21: a monorepo of projects** (nanochat is one project) | Seg, tracking, SSL, and error-prediction work share data and chain into pipelines, but each paper must point readers at one folder. |
 | **PyTorch Lightning** instead of a hand-rolled loop | Multi-GPU, checkpointing, and logging for free. Non-trivial custom logic goes in the LightningModule, not in callbacks (R14). |
 | **Heavy upstream reuse** (`dynamic_network_architectures`, `batchgeneratorsv2`, `acvl_utils`, `cc3d`, `blosc2`, `SimpleITK`) | Reimplementing them is bloat. |
 | **R16: temporary tests** (nanochat keeps a small permanent `tests/`) | Research velocity. Re-evaluate if a regression bites twice. |
 | **R6: no section banners** (nanochat uses them inside big files) | We split on a concept boundary instead. nanochat banners: `optim.py:17,65,182`, `tokenizer.py:28,261`. |
 | **R7: public signatures are hinted** (nanochat hints kernels and small utils only) | `gpt.py` 0/25 defs hinted, `tokenizer.py` 0/19. We hint public signatures; tensor code still prefers a shape comment. |
 
-## Package layout (keep this accurate; update it when you add a folder)
+## Repo layout (keep this accurate; update it when you add or move a project or folder)
+
+```
+<repo>/
+├── README.md       project map + cross-project pipeline (the only root doc besides docs/dev-notes/)
+├── pyproject.toml  one dist, one env; per-project extras (`.[lesionglue]`); console scripts <project>_<cmd>
+├── core/           ui (the one stderr Console + header/config_table/progress). Imports no project.
+├── nanounet/       promptable 3D lesion seg                       deps: core
+├── lesionglue/     BL<->FU lesion matching GNN (LesionGlue)        deps: core
+├── segtrack/       seg both timepoints, then match (pipeline)     deps: core, nanounet, lesionglue
+└── docs/dev-notes/ cross-project plans (dated scratch)
+```
+
+Every project folder: package code + `README.md` + `docs/{index.md,steps/,reference/,dev-notes/,handoffs/}` +
+`configs/` + `scripts/` (whichever it needs). Dependencies live in `PROJECTS` in `scripts/check.py`.
 
 ```
 nanounet/
-├── cli/        one file per console script (+ train_parser.py, segtrack_cases.py helpers)
-├── data/       blosc2 dataset, crop/resample/normalize, augment, sampling, valset, loader_workers
-├── prompt/     centroids, click coords, encoding, clustering
-├── plan/       dataset ids, plans, splits, labels; prep/ = preprocessing, resenc/ = ResEnc planner
-├── model/      network, losses (dice, cc_dice_ce), dice_metrics, lr schedule, MAE transfer
-├── train/      LightningModule, data module, fit, EMA, patch iterable/render, val metrics
-├── pretrain/   MAE pretraining (dataset, module)
-├── infer/      predictor, predict_case/io, TTA, ROI slices, export, segtrack
-├── diag/       cgroup, mem_diag (flag + JSONL), mem_probe (RSS/cgroup/GPU readers), tmp_purge
-├── common.py   console + rich helpers, env paths, logging
-├── config.py   dataclass config + load/save
-└── runtime.py  dataloader_prefs.py  lightning_ckpt.py  score.py   (flat single-concept modules)
+├── cli/            one file per console script (+ train_parser.py helper); flat by rule
+├── data/
+│   ├── store/      blosc2_dataset (preprocessed cases), io (SimpleITK reader/writer)
+│   ├── volume/     crop, resampling, normalization
+│   ├── augment/    transforms (train/val chains), spatial_points (click-carrying transforms)
+│   ├── patch/      sampling (click jitter, build_patch), bbox, instance_target, error_table, cohorts
+│   ├── valset/     manifest (schema + dataset), alloc, build
+│   └── loader/     prefs (worker/prefetch presets), workers (worker_init, collate)
+├── prompt/         centroids, click coords, encoding, clustering
+├── plan/           plans, labels
+│   ├── dataset/    ids, splits, cohorts, lesion_types
+│   ├── prep/       fingerprint, case_pp, preprocess, merge
+│   └── resenc/     ResEnc planner, VRAM loop, topology
+├── model/          network, lr_schedule, mae_transfer
+│   └── loss/       losses (DC+CE, build_loss), dice, cc_dice_ce, dice_metrics
+├── train/          fit (MAE + supervised orchestration)
+│   ├── patches/    data_module, iterable, render
+│   └── module/     lightning_module, ema, val_metrics
+├── pretrain/       MAE pretraining (augment, dataset, module)
+├── infer/
+│   ├── predict/    predictor (ckpt load), io, points_pad, roi_slices, inference_row, tta, case
+│   └── export/     volume (logits → native seg), tiles (tile paste, NIfTI bytes)
+├── diag/           cgroup, mem_diag (flag + JSONL), mem_probe (RSS/cgroup/GPU readers), tmp_purge
+├── common.py       env paths, --config resolution, quiet_lightning_runtime, logging
+├── config.py       dataclass config + load/save
+└── runtime.py  lightning_ckpt.py  score.py   (flat single-concept modules)
+
+lesionglue/
+├── cli/            one file per command; flat by rule
+├── data/
+│   ├── source/     meta (CSV rows, paths), splits, provenance, propagate (BL centroid in FU frame)
+│   ├── features/   appearance (mask radiomics), descriptor (L0 HU), layout (node packing, cache tag)
+│   ├── graph/      dense (one-patient HeteroData), masks (CSV-free builder), intra, pairs, augment
+│   ├── cache/      dataset (per-split InMemoryDataset), staging
+│   └── instances/  build (binary FG + clicks → ids), paint (FU track ids)
+├── model/          matcher, matchability (dustbin), sinkhorn, decode
+├── train/          datamodule, module, objective (focal BCE, InfoNCE, val counts)
+├── eval/           report, bootstrap, qc_view (Dash graph QC model)
+├── baselines/nearest_mask/  isolated raw-data baseline
+├── common.py       dataset/cache paths, deployed ckpt, rank-0 gate over core.ui
+├── config.py       train config dataclass + JSON
+└── infer.py        deployment tracking: CT + instance masks → pairs
+
+segtrack/           track (per-case BL/FU predict + match), case, cases (pairing), cli/run.py, scripts/e2e_*
 ```
 
-Keep folders to roughly 6–16 files. A homeless function goes into `common.py` or flat at package root,
-never into a new folder for one file.
+## Folder layout (R20)
+
+- **Two levels, never three.** `<project>/<area>/<concept>/<module>.py`. An area is a pipeline stage (`data`, `train`,
+  `infer`); a concept is a noun inside it (`valset`, `patch`, `export`).
+- **Group at 7.** An area with more than 6 flat modules groups them. Its entry points (`train/fit.py`,
+  `model/network.py`) and true singletons may stay flat next to the subfolders.
+- **2–8 modules per concept subfolder.** One module is not a concept: keep it flat in the area. Nine means two concepts.
+- **The folder is part of the name.** `valset/build.py`, `predict/case.py`, `loss/dice.py`. Never `valset/valset_build.py`.
+- **Every subfolder `__init__.py` is one docstring line** naming the concept. No re-exports unless a caller count
+  justifies it (`diag/`), and no imports that run code: `cli/train.py` imports `data.loader.prefs` before torch (K1).
+- **`cli/` stays flat.** One file per console script, 1:1 with `[project.scripts]`. Helpers sit next to their command.
+- **Placing a new file:** pick the area by pipeline stage, then the concept by what it *is*. If no concept fits and
+  the area is at 6 flat modules, make the concept folder now and move its sibling in the same change.
+- **Moving a file is S (R19)**, but paths leak: `[project.scripts]`, `<project>/scripts/*.sh`, spawn/DataLoader pickles
+  (K10/K11), docs, and this layout block. Rewrite every dotted and slash path in one commit. Re-export only for
+  on-disk pickles (checkpoints store none; K4/K6 are class and kwarg names, not module paths).
+- A homeless function goes into the project's `common.py` or flat at package root, never into a new folder for one file.
+
+## Projects (R21)
+
+- **A project is what a paper points at.** `github.com/<you>/<repo>/tree/main/lesionglue` must be enough to read, install
+  (`pip install -e ".[lesionglue]"`), and run it. Its README says what it is, its deps, and its commands.
+- **Dependencies are declared and one-way.** `PROJECTS` in `scripts/check.py` is the single source; the root README
+  mirrors it. The checker errors (R21) on any other cross-project import, including lazy ones inside functions.
+- **Hook through files first.** The contract between projects is an on-disk artifact with frozen names (R18):
+  nanounet writes instance masks + click JSON, lesionglue reads them. A second project that needs a *function* of
+  another declares the edge (`epcm: {core, nanounet}`), or the composition lives in a pipeline project (`segtrack`).
+- **Import public names only.** A cross-project import of a `_private` name is a smell: promote it in the owning
+  project, in its own commit.
+- **`core/` stays tiny.** Only code every project needs and that knows no project: today the terminal UI. Domain
+  helpers (NIfTI IO, centroids) stay in the project that owns them until a second project needs them; then move them
+  to `core/` in an S commit.
+- **Adding a project** (JEPA SSL, error-predictive confidence, ...): one folder with `__init__.py` (one-line docstring),
+  `README.md`, `cli/`, `docs/`; a `PROJECTS` row; a root README row; console scripts `<project>_<cmd>`; extra
+  dependencies in `[project.optional-dependencies]`; `include` in `[tool.setuptools.packages.find]`.
+- **Merging an external repo** keeps its history: `git filter-repo --filename-callback` to prefix paths with
+  `<project>/`, then `git merge --allow-unrelated-histories`. Adoption (renames, R16 test deletion, packaging) is the
+  next commit; the layout move (R20) the one after; each with a golden capture against the source repo.
 
 ## Hard rules in detail
 
-- **R1/R2 splitting.** Split on a noun: `sampling.py` → `sampling.py` + `patch_bbox.py`. Never split into `_part2.py` or
+- **R1/R2 splitting.** Split on a noun: `patch/sampling.py` → `patch/sampling.py` + `patch/bbox.py`. Never split into `_part2.py` or
   `_impl.py`. After a split, both files still need a docstring. Re-export only if callers are many.
 - **R3 dispatch.** Use `if/elif/else`. If `kind` is user-supplied, the `else` raises an E1 message that lists the valid values.
   If `kind` is internal, `assert kind in VALID, kind` first. A class is justified only
@@ -82,7 +165,7 @@ never into a new folder for one file.
 |---|---|
 | `nanounet/prompt/centroids.py` | Its docstring explains *why* `seed_zyx` exists (a centroid falls outside a concave lesion in ~12% of cases). |
 | `nanounet/cli/build_splits.py` | A complete CLI: header, validate, work, rich table, backup instead of silent overwrite, `next:` line. |
-| `nanounet/data/sampling.py` | Its docstring states the order of operations and the one shared-state subtlety. |
+| `nanounet/data/patch/sampling.py` | Its docstring states the order of operations and the one shared-state subtlety. |
 
 ## Things we will not write
 

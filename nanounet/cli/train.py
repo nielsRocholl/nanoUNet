@@ -2,27 +2,20 @@
 
 from __future__ import annotations
 
-from nanounet.dataloader_prefs import init_dataloader_ipc
+from nanounet.data.loader.prefs import init_dataloader_ipc
 from nanounet.runtime import set_safe_tmpdir
 
 set_safe_tmpdir()
 init_dataloader_ipc()
 
 import os
+import shlex
 
 from batchgenerators.utilities.file_and_folder_operations import join, maybe_mkdir_p
 
 from nanounet.cli.train_parser import build_train_parser, train_config_rows, validate_train_args
-from nanounet.common import (
-    cprint,
-    config_table,
-    nano_header,
-    preprocessed_dir,
-    quiet_lightning_runtime,
-    raw_dir,
-    results_dir,
-    setup_logging,
-)
+from core.ui import cprint, config_table, nano_header
+from nanounet.common import preprocessed_dir, quiet_lightning_runtime, raw_dir, results_dir, setup_logging
 from nanounet.diag import set_mem_diag
 from nanounet.runtime import assert_mem_diag_cgroup, runtime_banner
 
@@ -30,8 +23,8 @@ quiet_lightning_runtime()
 
 from pytorch_lightning.loggers import CSVLogger, WandbLogger
 
-from nanounet.dataloader_prefs import dataloader_bucket
-from nanounet.plan.dataset_id import convert_id_to_dataset_name
+from nanounet.data.loader.prefs import dataloader_bucket
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
 from nanounet.train.fit import run_mae_pretrain, run_supervised
 
@@ -58,7 +51,7 @@ def main() -> None:
             raise ValueError(
                 f"--resume {args.resume} sits in a '{ckpt_dir}' directory.\n"
                 f"Expected the checkpoint's parent directory to be named checkpoints/ or finetune/ (nanounet_train's own layout).\n"
-                f"Fix: pass --resume pointing at a checkpoint under out/checkpoints/ or out/finetune/   (see docs/steps/train.md)"
+                f"Fix: pass --resume pointing at a checkpoint under out/checkpoints/ or out/finetune/   (see nanounet/docs/steps/train.md)"
             )
     set_safe_tmpdir(results_tmp=join(out, ".tmp"))
     maybe_mkdir_p(out)
@@ -80,7 +73,7 @@ def main() -> None:
         raise ValueError(
             f"--resume {sup_resume} does not exist.\n"
             f"Expected a checkpoint file written by a previous nanounet_train run.\n"
-            f"Fix: pass an existing --resume path, or drop --resume to start a fresh run   (see docs/steps/train.md)"
+            f"Fix: pass an existing --resume path, or drop --resume to start a fresh run   (see nanounet/docs/steps/train.md)"
         )
 
     config_table(train_config_rows(args, ds, out), title="nanoUNet train")
@@ -94,6 +87,7 @@ def main() -> None:
         None if sup_resume or args.init_weights else mae_ckpt_arg, sup_resume,
     )
     cprint(f"[green]done — checkpoints in {join(out, ckpt_dir)}[/green]")
+    cprint(f"next: nanounet_predict -i <cases-dir> -o <pred-dir> -m {shlex.quote(out)}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

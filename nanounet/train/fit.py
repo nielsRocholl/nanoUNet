@@ -10,19 +10,19 @@ from batchgenerators.utilities.file_and_folder_operations import join, maybe_mkd
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-from nanounet.common import cprint
+from core.ui import cprint
 from nanounet.diag import log_snapshot, mem_diag_enabled
 from nanounet.lightning_ckpt import (
     pl_ckpt_assert_epochs_match,
     pl_ckpt_epoch_and_target,
     pl_ckpt_stage_done,
 )
-from nanounet.plan.splits import fold_seed
+from nanounet.plan.dataset.splits import fold_seed
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
 from nanounet.pretrain.module import NanoMAELM
-from nanounet.train.data_module import NanoDataModule
-from nanounet.train.ema import EMACallback
-from nanounet.train.lightning_module import NanoUNetLM
+from nanounet.train.patches.data_module import NanoDataModule
+from nanounet.train.module.ema import EMACallback
+from nanounet.train.module.lightning_module import NanoUNetLM
 
 
 def run_mae_pretrain(args, ds, pp, plans_path, dj_path, out, accel, loggers, dl_b, pm0) -> str | None:
@@ -46,7 +46,7 @@ def run_mae_pretrain(args, ds, pp, plans_path, dj_path, out, accel, loggers, dl_
             raise ValueError(
                 f"--mae-resume {args.mae_resume} does not exist.\n"
                 f"Expected a Lightning checkpoint from a previous nanounet_train --mae-pretrain run.\n"
-                f"Fix: pass an existing --mae-resume path, or drop --mae-resume to start MAE fresh   (see docs/steps/train.md)"
+                f"Fix: pass an existing --mae-resume path, or drop --mae-resume to start MAE fresh   (see nanounet/docs/steps/train.md)"
             )
         pl_ckpt_assert_epochs_match(args.mae_resume, args.mae_epochs)
         ep_m, tgt_m = pl_ckpt_epoch_and_target(args.mae_resume)

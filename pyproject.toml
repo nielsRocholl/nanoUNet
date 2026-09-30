@@ -1,7 +1,7 @@
 [project]
 name = "nanounet"
 version = "0.1.0"
-description = "Standalone prompt-aware 3D ResEnc nnU-Net (Lightning); no nnunetv2 dependency"
+description = "CT lesion research monorepo: nanounet (promptable seg), lesionglue (lesion matching), and their pipelines"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
@@ -23,6 +23,16 @@ dependencies = [
     "rich>=13.0",
 ]
 
+[project.optional-dependencies]
+lesionglue = [
+    "torch-geometric>=2.5",
+    "pandas>=2.0",
+    "nibabel>=5.0",
+    "torchmetrics>=1.3",
+    "dash>=2.18",
+    "dash-cytoscape>=1.0",
+]
+
 [project.scripts]
 nanounet_preprocess = "nanounet.cli.preprocess:main"
 nanounet_train = "nanounet.cli.train:main"
@@ -31,7 +41,20 @@ nanounet_predict = "nanounet.cli.predict:main"
 nanounet_lesion_weights = "nanounet.cli.lesion_weights:main"
 nanounet_build_splits = "nanounet.cli.build_splits:main"
 nanounet_build_valset = "nanounet.cli.build_valset:main"
-nanounet_segtrack = "nanounet.cli.segtrack:main"
+segtrack_run = "segtrack.cli.run:main"
+lesionglue_track = "lesionglue.cli.track:main"
+lesionglue_split = "lesionglue.cli.split:main"
+lesionglue_preprocess = "lesionglue.cli.preprocess:main"
+lesionglue_train = "lesionglue.cli.train:main"
+lesionglue_eval = "lesionglue.cli.eval:main"
+lesionglue_predict = "lesionglue.cli.predict:main"
+lesionglue_report = "lesionglue.cli.report:main"
+lesionglue_cv = "lesionglue.cli.cv:main"
+lesionglue_oof = "lesionglue.cli.oof:main"
+lesionglue_pool = "lesionglue.cli.pool:main"
+lesionglue_audit = "lesionglue.cli.audit:main"
+lesionglue_qc = "lesionglue.cli.qc:main"
+lesionglue_baseline_distance = "lesionglue.cli.baseline_distance:main"
 
 [build-system]
 requires = ["setuptools>=67.8.0"]
@@ -39,4 +62,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["nanounet*"]
+include = ["core*", "nanounet*", "lesionglue*", "segtrack*"]

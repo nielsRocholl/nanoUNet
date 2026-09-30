@@ -15,15 +15,17 @@ from collections import Counter
 from batchgenerators.utilities.file_and_folder_operations import join, load_json
 from rich.table import Table
 
-from nanounet.common import cprint, nano_header, preprocessed_dir, raw_dir
-from nanounet.data.blosc2_dataset import Blosc2Folder
-from nanounet.plan.dataset_id import convert_id_to_dataset_name
+from core.ui import arg_rows, config_table, cprint, nano_header
+from nanounet.common import preprocessed_dir, raw_dir
+from nanounet.data.store.blosc2_dataset import Blosc2Folder
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
-from nanounet.plan.splits import cohort_of, make_balanced_split
+from nanounet.plan.dataset.splits import cohort_of, make_balanced_split
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    # nanochat-style: allow U8 (legacy snake flag; cluster scripts pass it)
     ap.add_argument("-d", "--dataset_id", type=int, required=True, help="dataset id, e.g. 999")
     ap.add_argument("--plans", required=True, help="plans identifier, no .json (e.g. nnUNetResEncUNetLPlans)")
     ap.add_argument("--val-frac", type=float, default=0.15, help="held-out fraction, applied within each source dataset")
@@ -33,6 +35,7 @@ def main() -> None:
 
     ds = convert_id_to_dataset_name(args.dataset_id)
     nano_header(f"nanoUNet build-splits  {ds}  val_frac {args.val_frac}", color="green")
+    config_table(arg_rows(ap, args))
 
     pp = preprocessed_dir()
     pm = Plans(join(pp, ds, args.plans + ".json"))
@@ -81,3 +84,7 @@ def main() -> None:
 
     cprint(f"wrote {out}  (1 split, {len(train)} train / {len(val)} val)")
     cprint(f"next: nanounet_build_valset -d {args.dataset_id} --plans {args.plans} --config <cfg>")
+
+
+if __name__ == "__main__":
+    main()

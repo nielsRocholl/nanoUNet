@@ -9,12 +9,13 @@ from typing import Optional, Tuple
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import isfile, join, load_json, maybe_mkdir_p, save_json
 
-from nanounet.common import ANISO_THRESHOLD, cprint, preprocessed_dir, raw_dir
-from nanounet.data.io import reader_writer_class_from_dataset
-from nanounet.data.normalization import normalization_class_for_channel
-from nanounet.data.resampling import compute_new_shape
-from nanounet.plan.dataset_id import convert_id_to_dataset_name, get_filenames_of_train_images_and_targets
-from nanounet.plan.dataset_id import recursive_fix_for_json_export
+from core.ui import cprint
+from nanounet.common import ANISO_THRESHOLD, preprocessed_dir, raw_dir
+from nanounet.data.store.io import reader_writer_class_from_dataset
+from nanounet.data.volume.normalization import normalization_class_for_channel
+from nanounet.data.volume.resampling import compute_new_shape
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name, get_filenames_of_train_images_and_targets
+from nanounet.plan.dataset.ids import recursive_fix_for_json_export
 from nanounet.plan.resenc.planner_resenc import PRESETS, resenc_3d_fullres_plan
 
 
@@ -101,7 +102,7 @@ def run_plan(
         raise RuntimeError(
             f"No dataset fingerprint for this dataset.\n"
             f"The plan step reads dataset_fingerprint.json produced by fingerprinting.\n"
-            f"Fix: run nanounet_preprocess -d <id> without --skip-fingerprint   (see docs/steps/preprocess.md)"
+            f"Fix: run nanounet_preprocess -d <id> without --skip-fingerprint   (see nanounet/docs/steps/preprocess.md)"
         )
     dj = load_json(join(rf, "dataset.json"))
     fp = load_json(join(pf, "dataset_fingerprint.json"))
@@ -110,7 +111,7 @@ def run_plan(
         raise RuntimeError(
             f"Unknown planner {planner_class_name!r}.\n"
             f"Choose one of: {sorted(PRESETS)}.\n"
-            f"Fix: nanounet_preprocess -d <id> --planner nnUNetPlannerResEncL   (see docs/steps/plan.md)"
+            f"Fix: nanounet_preprocess -d <id> --planner nnUNetPlannerResEncL   (see nanounet/docs/steps/plan.md)"
         )
     ident = plans_name_override or preset.plans_identifier
     if plans_name_override:
@@ -128,7 +129,7 @@ def run_plan(
         raise RuntimeError(
             f"Dataset is 2D after transpose (median shape along axis 0 is {med_t[0]}).\n"
             f"Expected a 3D volume; nanoUNet only implements the \"3d_fullres\" configuration.\n"
-            f"Fix: this dataset needs a 2D pipeline nanoUNet does not provide; verify the raw data isn't 2D slices, or use a different tool   (see docs/steps/preprocess.md)"
+            f"Fix: this dataset needs a 2D pipeline nanoUNet does not provide; verify the raw data isn't 2D slices, or use a different tool   (see nanounet/docs/steps/preprocess.md)"
         )
     approx_nvox = float(np.prod(med_t, dtype=np.float64) * dj["numTraining"])
     norm_n, norm_m = _norm_schemes(dj, fp)

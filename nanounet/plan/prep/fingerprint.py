@@ -9,10 +9,11 @@ from typing import Type
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import isfile, join, load_json, maybe_mkdir_p, save_json
 
-from nanounet.common import cprint, nano_progress, preprocessed_dir, raw_dir
-from nanounet.data.crop import crop_to_nonzero
-from nanounet.data.io import reader_writer_class_from_dataset
-from nanounet.plan.dataset_id import convert_id_to_dataset_name, get_filenames_of_train_images_and_targets
+from core.ui import cprint, nano_progress
+from nanounet.common import preprocessed_dir, raw_dir
+from nanounet.data.volume.crop import crop_to_nonzero
+from nanounet.data.store.io import reader_writer_class_from_dataset
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name, get_filenames_of_train_images_and_targets
 
 
 def _collect_fg_intensity(seg: np.ndarray, images: np.ndarray, seed: int, num_samples: int):
@@ -77,7 +78,11 @@ def run_fingerprint(dataset_id: int, num_proc: int, clean: bool = True, foregrou
             w = [j for j in pool._pool]
             while rem:
                 if not all(j.is_alive() for j in w):
-                    raise RuntimeError("worker died (OOM?)")
+                    raise RuntimeError(
+                        "worker died (OOM?)\n"
+                        f"Expected all {num_proc} fingerprint worker processes to stay alive until every case is analysed.\n"
+                        f"Fix: rerun with fewer workers: nanounet_preprocess -d {dataset_id} -np {max(1, num_proc // 2)}   (see nanounet/docs/steps/preprocess.md)"
+                    )
                 done = [i for i in rem if r[i].ready()]
                 for _ in done:
                     r[_].get()

@@ -14,11 +14,11 @@ import SimpleITK as sitk
 from rich.panel import Panel
 from scipy.ndimage import binary_erosion, distance_transform_edt
 
-from nanounet.common import cprint
+from core.ui import cprint
 
 IOU_HIT = 0.1
 NSD_TOL_MM = 1.0
-_DOC = "docs/steps/predict.md"
+_DOC = "nanounet/docs/steps/predict.md"
 
 def dice(gt: np.ndarray, pred: np.ndarray) -> float:
     den = float(gt.sum() + pred.sum())
@@ -140,7 +140,7 @@ def _dsc_cell(v) -> str:
     return s if s == "—" else (f"[red]{s}[/red]" if v < 0.10 else f"[green]{s}[/green]" if v >= 0.70 else s)
 
 
-def _agg(rows: list[dict]) -> dict:
+def aggregate(rows: list[dict]) -> dict:
     all_d = [L["dsc"] for r in rows for L in r["lesions"]]
     return {
         "n_cases": len(rows), "n_lesions": sum(r["n"] for r in rows),
@@ -162,7 +162,7 @@ def report_case(r: dict) -> None:
 
 
 def report(rows: list[dict]) -> None:
-    a = _agg(rows)
+    a = aggregate(rows)
     cprint(Panel(
         f"Dice vol     {_f(a['volume_dice_mean'])}  (median {_f(a['volume_dice_median'])})   case-mean whole-volume (not comparable to LongiSeg)\n"
         f"DSC          {_f(a['dsc_case_mean'])}  (median {_f(a['dsc_case_median'])})   case-mean per-lesion  ← vs LongiSeg verified ~0.737\n"
@@ -187,7 +187,7 @@ def write(rows: list[dict], path: str) -> None:
     stem = os.path.splitext(path)[0]
     with open(stem + ".json", "w", encoding="utf-8") as f:
         json.dump({"protocol": "longiseg_lesion_v1", "nsd_tol_mm": NSD_TOL_MM, "ldr_iou": IOU_HIT,
-                   "overall": _jsonable(_agg(rows)), "cases": _jsonable(rows)}, f, indent=2)
+                   "overall": _jsonable(aggregate(rows)), "cases": _jsonable(rows)}, f, indent=2)
     with open(stem + ".csv", "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["case_id", "lesion_id", "dsc", "nsd", "iou", "ldr", "volume_dice"])

@@ -1,9 +1,9 @@
 ---
 name: nanochat-style
-description: nanoUNet's non-negotiable engineering standard, with a checker script. nanochat-style code (<200 LOC files, flat procedural, no utils/ABC/factories), a rich CLI that is also machine-drivable (stderr for humans, JSON on stdout, clean exit codes), errors that name the fix, zero GPU starvation (measured, not assumed), docs kept in sync with code. Use whenever writing, reviewing, refactoring or planning code under nanounet/ or scripts/; adding or changing a CLI command, flag, output line or error message; touching dataloaders, sampling, augmentation, losses, the training step or inference (throughput matters); editing docs/; or when the user says nanochat, nanoUNet style, "clean up", "make it production quality" or asks for a code-quality review.
+description: The non-negotiable engineering standard for the nanoUNet monorepo (projects nanounet, lesionglue, segtrack, core, and future ones), with a checker script. nanochat-style code (<200 LOC files, flat procedural, no utils/ABC/factories), a rich CLI that is also machine-drivable (stderr for humans, JSON on stdout, clean exit codes), errors that name the fix, zero GPU starvation (measured, not assumed), docs kept in sync with code. Use whenever writing, reviewing, refactoring or planning code in any project folder (nanounet/, lesionglue/, segtrack/, core/) or its scripts/; adding or merging a project; adding or changing a CLI command, flag, output line or error message; touching dataloaders, sampling, augmentation, losses, the training step or inference (throughput matters); editing any README or docs/; or when the user says nanochat, nanoUNet style, "clean up", "make it production quality" or asks for a code-quality review.
 ---
 
-# nanochat-style: the nanoUNet standard
+# nanochat-style: the nanoUNet monorepo standard
 
 Write like an engineer who hand-wrote conv kernels before frameworks existed and ran a latency-bound
 trading desk. That means three things. Use the smallest code that is correct. Use the fastest path, and prove it is fastest with a
@@ -20,13 +20,13 @@ Five pillars. All are **non-negotiable**:
 ## Workflow: run this on every change
 
 1. **Orient.** Run `graphify query "<concept>"` (per CLAUDE.md), then read the module docstring of each file you will touch.
-   Grep `nanounet/common.py` before writing any helper. It probably exists already.
+   Grep `core/ui.py` and the project's `common.py` before writing any helper. It probably exists already.
 2. **Load only the references for the area you touch** (see the map below). Don't load them all.
 3. **Write.** Follow the rule index. If you break a rule deliberately, waive it inline with a reason:
    `# nanochat-style: allow R1 (why)`. A waiver with no reason is itself a violation.
 4. **Check.** Run `python .claude/skills/nanochat-style/scripts/check.py --changed`. Fix every `error`. Fix every
    `warn` on lines you wrote. Debt you didn't touch isn't yours, but never add to it. The checker covers
-   R1 R2 R3 R4 R6 R11 U1 U8 E1 E4 G2 D3 D4 D6. Every other rule is judgment, so apply it yourself.
+   R1 R2 R3 R4 R6 R11 R20 R21 U1 U8 E1 E4 G2 D3 D4 D6. Every other rule is judgment, so apply it yourself.
 5. **Run the gates for your area.**
    - Data path, sampling, augmentation, loss, or the train/infer step: report throughput before/after (G4, `references/gpu.md`).
    - CLI flag, output path, or log line: update the step doc and its argument table in the same change (D4). `<cmd> --help` must read cleanly.
@@ -38,10 +38,10 @@ Five pillars. All are **non-negotiable**:
 
 | You are touching | Read |
 |---|---|
-| Any `.py` under `nanounet/` (structure, naming, classes, asserts) | `references/code.md` |
-| `nanounet/cli/`, terminal output, error messages, exit codes, `--json` | `references/cli.md` |
+| Any `.py` in a project, a new project, or a cross-project hook (structure, naming, R20/R21) | `references/code.md` |
+| `<project>/cli/`, terminal output, error messages, exit codes, `--json` | `references/cli.md` |
 | Dataloaders, sampling, augmentation, losses, `lightning_module`, `infer/`, anything per-step | `references/gpu.md` |
-| `docs/`, README, dev-notes, experiment logs | `references/docs.md` |
+| `<project>/docs/`, READMEs, dev-notes, experiment logs | `references/docs.md` |
 | "Does nanochat really do X?", or justifying and challenging a rule | `references/nanochat.md` |
 
 ## Rule index
@@ -51,7 +51,7 @@ IDs are stable. Code comments cite them, e.g. `(R12)`. **auto** = `scripts/check
 | ID | Rule | |
 |---|---|---|
 | R1 | **<200 LOC per file.** Split on a concept boundary. This is stricter than nanochat, by choice. | auto |
-| R2 | No file under ~30 LOC hosting one function. Inline it into a sibling or `common.py`. | auto |
+| R2 | No file under ~30 LOC hosting one function. Inline it into a sibling or the project's `common.py`. | auto |
 | R3 | No ABCs, factories, registries, plugins, mixins. Two cases means `if cfg.x == "a": ... else: ...` | auto |
 | R4 | No `utils`/`helpers` names. Use real nouns: `geometry.py`, `centroids.py`. | auto |
 | R5 | Guard invariants with `assert cond, f"actual {x} vs expected {y}"`. Raise only at user boundaries (E1). | |
@@ -69,7 +69,9 @@ IDs are stable. Code comments cite them, e.g. `(R12)`. **auto** = `scripts/check
 | R17 | Hardware capability differences are detected **once at import**, with the reason logged, e.g. `COMPUTE_DTYPE, REASON = ...`. This is the only allowed "fallback". | |
 | R18 | **On-disk and ckpt names are frozen.** `EMACallback`, `self.net`, LightningModule ctor kwargs, `config.py` field names, plans.json `__name__` strings, sidecar keys, `NANOUNET_*` env names. Renaming any of them is a logic change. | |
 | R19 | **Pure-refactor protocol.** Changes are S (move, byte-identical body), C (comments, help, error text, docs), or L (anything else). L is never mixed into an S/C commit. Hot paths are move-only. A series ships with an AST guard, a golden capture, and a CLI surface diff. | | |
-| U1 | One stderr `Console` (`common.py`). No raw `print`, no tqdm. | auto |
+| R20 | **Concept subfolders.** Max depth `<project>/<area>/<concept>/<module>.py`. An area with >6 flat modules groups them into concept subfolders of 2–8 modules, each with a one-line `__init__` docstring. A file doesn't repeat its folder (`valset/build.py`, not `valset/valset_build.py`). `cli/` stays flat, 1:1 with console scripts. | auto |
+| R21 | **Project boundaries.** One top-level package per project (a paper-sized unit you can link a reader to), self-contained: code, `README.md`, `docs/`, `configs/`, `scripts/`. A project imports only `core` and the projects it declares in `PROJECTS` (check.py); edges are one-way. Projects hook up through files on disk (NIfTI, CSV, JSON sidecars; names frozen per R18) or through a pipeline project (`segtrack` → nanounet + lesionglue). `core/` is project-agnostic and imports no project. Console scripts are `<project>_<cmd>`. | auto |
+| U1 | One stderr `Console` (`core/ui.py`), shared by every project. No raw `print`, no tqdm. | auto |
 | U2 | Every command opens with `nano_header` and closes with a summary (outputs, paths, time) plus `next: <literal command>`. | |
 | U3 | Show the resolved config via `config_table` (argument, value, source) before work starts. | |
 | U4 | Anything taking more than ~2 s gets `nano_progress`. Never nest bars. | |
@@ -87,28 +89,30 @@ IDs are stable. Code comments cite them, e.g. `(R12)`. **auto** = `scripts/check
 | E4 | No swallowing. A narrow `except OSError: pass` is allowed only for best-effort side effects, with a waiver. A broad `except` is allowed only inside an R17 import-time capability probe, and it still needs the waiver. | auto |
 | E5 | User mistakes exit through `raise SystemExit(msg)`, which prints cleanly with exit code 1. No 40-frame stack. | |
 | E6 | Report **all** startup problems in one error, not one per run. Invalid choice means list the valid ones. | |
-| G1 | Data path: pinned staging, `non_blocking=True`, prefetch while the GPU runs, workers per `dataloader_prefs`. | |
+| G1 | Data path: pinned staging, `non_blocking=True`, prefetch while the GPU runs, workers per `nanounet/data/loader/prefs.py`. | |
 | G2 | No CPU-GPU sync (`.item()`, `.cpu()`, `.tolist()`, prints) in the hot path, except at log steps. | auto |
 | G3 | Heavy CPU work (augmentation, blosc2 decode, resampling) runs in workers, never on the main thread. | |
 | G4 | **Measure, don't guess.** Data-path or step changes ship with a before/after `epoch_wall_time_sec`. | |
 | G5 | Any step-time regression must be justified in writing. Otherwise it is rejected. | |
 | G6 | Know the killers: too few workers, no pinning, per-step host logging, sync metrics, `.cuda()` in `__getitem__`. | |
 | G7 | Inference runs under `@torch.inference_mode()`. Benchmarks warm up before timing. Use `synchronize()` only around timers. | |
-| D1 | `docs/index.md` holds the mermaid pipeline, the quickstart, and links into `steps/`. | |
+| D1 | `<project>/docs/index.md` (or its README) holds the project's mermaid pipeline, quickstart, and links into `steps/`. The root README holds the project map and the cross-project pipeline. | |
 | D2 | A step doc contains, in order: summary, command block, argument table, inputs/outputs, common errors with fixes. | |
 | D3 | Every CLI flag appears in a docs argument table (exact format in `references/docs.md`). | auto |
 | D4 | User docs are under 200 lines, runnable, and **never stale**: no dead commands or flags. Update in the same change. | auto |
 | D5 | Doc commands are literal and runnable (`-d 501`). No pseudo-syntax. | |
 | D6 | Every console script is documented. `dev-notes/` and `handoffs/` are dated scratch, exempt from the 200-line cap. | auto |
-| K6 | A `nanounet/cli/*.py` module with `main` and no `__main__` guard. | auto |
-| K7 | `main()` calls `nano_header` and `config_table`, and emits `next:`. | auto |
-| K8 | A `nanounet.<module>` path in user docs or `scripts/*.sh` must be a real module. | auto |
-| K9 | `docs/dev-notes/` and `docs/handoffs/` open with `Date:` and `Status:`. | auto |
+| K6 | A `<project>/cli/*.py` module with `main` and no `__main__` guard. | auto |
+| K7 | `main()` calls `nano_header` (or `nano_banner`) and `config_table`, and emits `next:`. | auto |
+| K8 | A `<project>.<module>` path in user docs or `<project>/scripts/*.sh` must be a real module. | auto |
+| K9 | `dev-notes/` and `handoffs/` (root or per project) open with `Date:` and `Status:`. | auto |
 
 ## Red flags: stop and rewrite
 
 - A `BaseX` with subclasses, or a registry dict of classes, when there are only two cases.
 - A new file under 30 lines, or a file climbing past 180 lines without a split plan.
+- A seventh flat module in an area folder, a one-module subfolder, or `<project>/a/b/c/`.
+- `from nanounet...` inside `lesionglue/` (or any import of an undeclared project), or `core/` importing a project.
 - `raise ValueError("invalid input")`. Which input? What was expected? How do you fix it?
 - A `try/except` that logs and continues, or that "falls back" to recomputing missing data.
 - `.item()` or `.cpu()` inside `forward` or `training_step`, or any host-side work per step.

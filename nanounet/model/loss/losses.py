@@ -1,0 +1,128 @@
+"""DC+CE and CC-DiceCE building blocks: RobustCrossEntropyLoss, DeepSupervisionWrapper, build_loss.
+
+Also `consistency_dice_term`: the two-prompt consistency penalty used when
+--prompts-per-patch >= 2 (see lightning_module.py). Computed on the FINEST resolution only (deep
+supervision scales are ignored) because a per-voxel divergence over the whole (mostly background)
+patch would be dominated by trivially-agreeing background voxels; soft Dice on the foreground
+channel focuses the penalty on the region that actually varies with the click.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import torch
+import torch.nn as nn
+from torch import Tensor
+
+from nanounet.model.loss.dice import MemoryEfficientSoftDiceLoss, softmax_helper_dim1
+from nanounet.plan.labels import Labels
+from nanounet.plan.plans import Config3d
+
+
+class RobustCrossEntropyLoss(nn.CrossEntropyLoss):
+    def forward(self, input: Tensor, target: Tensor) -> Tensor:
+        if target.ndim == input.ndim:
+            assert target.shape[1] == 1
+            target = target[:, 0]
+        return super().forward(input, target.long())
+
+
+class DeepSupervisionWrapper(nn.Module):
+    def __init__(self, loss, weight_factors: tuple):
+        super().__init__()
+        assert any(x != 0 for x in weight_factors)
+        self.weight_factors = weight_factors
+        self.loss = loss
+
+    def forward(self, *args):
+        assert all(isinstance(i, (tuple, list)) for i in args)
+        w = self.weight_factors
+        return sum(w[i] * self.loss(*inputs) for i, inputs in enumerate(zip(*args)) if w[i] != 0.0)
+
+
+class DC_and_CE_loss(nn.Module):
+    def __init__(self, soft_dice_kwargs, ce_kwargs, weight_ce=1, weight_dice=1, ignore_label=None, dice_class=MemoryEfficientSoftDiceLoss):
+        super().__init__()
+        if ignore_label is not None:
+            ce_kwargs = {**ce_kwargs, "ignore_index": ignore_label}
+        self.weight_dice = weight_dice
+        self.weight_ce = weight_ce
+        self.ignore_label = ignore_label
+        self.ce = RobustCrossEntropyLoss(**ce_kwargs)
+        self.dc = dice_class(apply_nonlin=softmax_helper_dim1, **soft_dice_kwargs)
+
+    def forward(self, net_output: torch.Tensor, target: torch.Tensor):
+        if self.ignore_label is not None:
+            assert target.shape[1] == 1
+            mask = target != self.ignore_label
+            target_dice = torch.where(mask, target, 0)
+            num_fg = mask.sum()
+        else:
+            # crop_to_nonzero marks out-of-FOV voxels as -1 (nonzero_label), and some segs are
+            # instance-labeled (each lesion a distinct id 1..N) while the net is a
+            # binary bg/lesion head. For a 2-class head collapse every positive id to foreground
+            # (semantically correct: class_locations is already keyed by label 1); otherwise just
+            # drop the -1 crop marker. Both keep the Dice one-hot scatter / CE indexing in bounds
+            # and are a no-op for data already stored as {0,1}.
+            if net_output.shape[1] == 2:
+                target = (target > 0).to(target.dtype)
+            else:
+                target = target.clamp_min(0)
+            target_dice = target
+            mask = None
+        dc_loss = self.dc(net_output, target_dice, loss_mask=mask) if self.weight_dice != 0 else 0
+        ce_loss = self.ce(net_output, target[:, 0]) if self.weight_ce != 0 and (self.ignore_label is None or num_fg > 0) else 0
+        return self.weight_ce * ce_loss + self.weight_dice * dc_loss
+
+
+def consistency_dice_term(net_output, pair_id: torch.Tensor) -> torch.Tensor:
+    """1 - soft Dice between the two foreground-probability maps of each pair, at the finest
+    scale. Both branches keep gradient (no stop-gradient teacher). `pair_id` must group rows in
+    twos (exactly two rows share each id) -- collate_patches guarantees this."""
+    finest = net_output[0] if isinstance(net_output, (list, tuple)) else net_output
+    fg = torch.softmax(finest, dim=1)[:, 1:2].float()
+    order = torch.argsort(pair_id)
+    _, counts = torch.unique(pair_id, return_counts=True)
+    assert torch.all(counts == 2), "consistency_dice_term: every pair_id must have exactly 2 rows"
+    a, b = fg[order][0::2], fg[order][1::2]
+    axes = tuple(range(2, a.ndim))
+    intersect = (a * b).sum(dim=axes)
+    denom = (a.sum(dim=axes) + b.sum(dim=axes)).clamp_min(1e-8)
+    return (1.0 - 2 * intersect / denom).mean()
+
+
+def build_loss(
+    cm: Config3d,
+    lm: Labels,
+    enable_ds: bool,
+    *,
+    loss_type: str = "dc_ce",
+) -> nn.Module:
+    sd_kw = {"batch_dice": cm.batch_dice, "smooth": 1e-5, "do_bg": False}
+    if loss_type == "dc_ce":
+        loss = DC_and_CE_loss(
+            sd_kw,
+            {},
+            weight_ce=1,
+            weight_dice=1,
+            ignore_label=lm.ignore_label,
+            dice_class=MemoryEfficientSoftDiceLoss,
+        )
+    elif loss_type == "cc_dc_ce":
+        from nanounet.model.loss.cc_dice_ce import CC_DC_and_CE_loss
+
+        loss = CC_DC_and_CE_loss({**sd_kw, "smooth": 0.0}, {}, ignore_label=lm.ignore_label, lam=1.0)
+    else:
+        raise ValueError(
+            f"Unknown --loss value {loss_type!r}.\n"
+            f"Supported: 'dc_ce' (default) or 'cc_dc_ce'.\n"
+            f"Fix: nanounet_train … --loss dc_ce   (see nanounet/docs/reference/losses.md)"
+        )
+    if not enable_ds:
+        return loss
+    pool = cm.pool_op_kernel_sizes
+    scales = list(list(i) for i in 1 / np.cumprod(np.vstack(pool), axis=0))[:-1]
+    w = np.array([1 / (2**i) for i in range(len(scales))])
+    w[-1] = 0
+    w = tuple(w / w.sum())
+    return DeepSupervisionWrapper(loss, w)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shlex
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
@@ -11,14 +12,14 @@ from concurrent.futures import ThreadPoolExecutor
 import torch
 from batchgenerators.utilities.file_and_folder_operations import join, load_json, maybe_mkdir_p
 
-from nanounet.common import config_table, cprint, nano_header
+from core.ui import config_table, cprint, nano_header
 from nanounet.config import load_config
-from nanounet.infer.predict_case import MAX_BORDER_EXTRA, predict_case_logits
-from nanounet.infer.tta import cat_status
-from nanounet.infer.export import export_prediction_from_logits
-from nanounet.infer.predict_io import patient_ids_from_csv, preprocess_case
-from nanounet.data.resampling import set_resample_device
-from nanounet.infer.predictor import load_net_from_ckpt, pick_checkpoint
+from nanounet.infer.predict.case import MAX_BORDER_EXTRA, predict_case_logits
+from nanounet.infer.predict.tta import cat_status
+from nanounet.infer.export.volume import export_prediction_from_logits
+from nanounet.infer.predict.io import patient_ids_from_csv, preprocess_case
+from nanounet.data.volume.resampling import set_resample_device
+from nanounet.infer.predict.predictor import load_net_from_ckpt, pick_checkpoint
 from nanounet.plan.labels import labels_from_dataset_json
 from nanounet.plan.plans import Plans
 from nanounet.score import check_gt_dir, report, report_case, score_case, write
@@ -54,7 +55,7 @@ def main() -> None:
         raise SystemExit(
             "--metrics-out was set without --gt-dir.\n"
             "Scoring needs instance-labeled native GT with the same stems as -i.\n"
-            "Fix: nanounet_predict ... --gt-dir <targetsTrFU> --metrics-out <stem>   (see docs/steps/predict.md)"
+            "Fix: nanounet_predict ... --gt-dir <targetsTrFU> --metrics-out <stem>   (see nanounet/docs/steps/predict.md)"
         )
 
     nano_header("nanoUNet predict", color="blue")
@@ -83,16 +84,16 @@ def main() -> None:
                 raise SystemExit(
                     f"No cases match --patients-csv {args.patients_csv!r}.\n"
                     f"Expected the CSV's 'patient' column to match an -i case id prefix (e.g. 03b90eb112_00).\n"
-                    f"Fix: check --patients-csv {args.patients_csv} for a 'patient' column matching your case ids   (see docs/steps/predict.md)"
+                    f"Fix: check --patients-csv {args.patients_csv} for a 'patient' column matching your case ids   (see nanounet/docs/steps/predict.md)"
                 )
         missing = [cid for cid, _, jp, _ in cases if not os.path.isfile(jp)]
         if missing:
-            raise SystemExit(f"missing points JSON for: {', '.join(missing)}.\nExpected sibling <case>.json next to each scan in -i.\nFix: add the JSON (empty points [] if no clicks)  (see docs/steps/predict.md)")
+            raise SystemExit(f"missing points JSON for: {', '.join(missing)}.\nExpected sibling <case>.json next to each scan in -i.\nFix: add the JSON (empty points [] if no clicks)  (see nanounet/docs/steps/predict.md)")
         out_dir = args.output
         maybe_mkdir_p(out_dir)
     else:
         if not args.points:
-            raise SystemExit("single mode requires --points\nExpected --points <case>.json next to the scan.\nFix: nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json -m <run>  (see docs/steps/predict.md)")
+            raise SystemExit("single mode requires --points\nExpected --points <case>.json next to the scan.\nFix: nanounet_predict -i case.nii.gz -o seg.nii.gz --points case.json -m <run>  (see nanounet/docs/steps/predict.md)")
         scan = args.input
         case_id = os.path.basename(scan)
         if case_id.endswith(end):
@@ -174,6 +175,9 @@ def main() -> None:
         report(rows)
     cprint(f"[green]done — {n} case(s) → {out_dir}[/green]")
     if args.metrics_out: write(rows, args.metrics_out)
+    next_cmd = f"segtrack_run --bl-dir <bl-dir> --fu-dir <fu-dir> -m {shlex.quote(args.model_dir)}"
+    next_cmd += (f" --ckpt {shlex.quote(args.ckpt)}" if args.ckpt else "") + ("" if args.ema else " --no-ema")
+    cprint(f"next: {next_cmd}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

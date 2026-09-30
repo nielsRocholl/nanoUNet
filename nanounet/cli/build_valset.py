@@ -2,7 +2,7 @@
 
 Everything expensive happens HERE, once, so validation stays pure tensor work: connected
 components, the clicked-subset targets, both prompt draws, and the click-inside flags are all
-resolved and written to disk. Nothing in nanounet/data/valset.py randomises or recomputes."""
+resolved and written to disk. Nothing in nanounet/data/valset/manifest.py randomises or recomputes."""
 
 from __future__ import annotations
 
@@ -15,23 +15,19 @@ import numpy as np
 import torch
 from batchgenerators.utilities.file_and_folder_operations import join
 
-from nanounet.common import cprint, nano_header, nano_progress, preprocessed_dir, resolve_user_config_path
+from core.ui import arg_rows, config_table, cprint, nano_header, nano_progress
+from nanounet.common import preprocessed_dir, resolve_user_config_path
 from nanounet.config import load_config
-from nanounet.data.blosc2_dataset import Blosc2Folder
-from nanounet.data.valset import SCENARIOS, SCHEMA_VERSION, SMALL_LESION_MAX_VOX, sidecar_path, config_stamp
-from nanounet.data.valset_alloc import allocate, load_cohorts, scenario_allocation
-from nanounet.data.valset_build import (
-    LabelCache,
-    build_subset_target,
-    case_info,
-    report_composition,
-    try_foreground,
-    try_lesion_free_decoy,
+from nanounet.data.store.blosc2_dataset import Blosc2Folder
+from nanounet.data.valset.manifest import SCENARIOS, SCHEMA_VERSION, SMALL_LESION_MAX_VOX, sidecar_path, config_stamp
+from nanounet.data.valset.alloc import allocate, load_cohorts, scenario_allocation
+from nanounet.data.valset.build import (
+    LabelCache, build_subset_target, case_info, report_composition, try_foreground, try_lesion_free_decoy,
 )
-from nanounet.plan.dataset_id import convert_id_to_dataset_name
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
-from nanounet.plan.splits import cohort_of
-from nanounet.train.patch_render import click_inside_flags
+from nanounet.plan.dataset.splits import cohort_of
+from nanounet.train.patches.render import click_inside_flags
 
 MIX_ORDER = ("all_clicked", "lesion_free_decoy", "subset_clicked", "none_clicked")
 
@@ -39,9 +35,9 @@ MIX_ORDER = ("all_clicked", "lesion_free_decoy", "subset_clicked", "none_clicked
 def _parse_mix(s: str) -> dict[str, float]:
     parts = [float(x) for x in s.split(",")]
     if len(parts) != 4:
-        raise ValueError(f"--mix {s!r} does not have 4 comma-separated shares.\nExpected shares for {MIX_ORDER}, e.g. \"0.40,0.25,0.20,0.15\".\nFix: pass --mix with exactly 4 comma-separated shares in that order   (see docs/steps/valset.md)")
+        raise ValueError(f"--mix {s!r} does not have 4 comma-separated shares.\nExpected shares for {MIX_ORDER}, e.g. \"0.40,0.25,0.20,0.15\".\nFix: pass --mix with exactly 4 comma-separated shares in that order   (see nanounet/docs/steps/valset.md)")
     if abs(sum(parts) - 1.0) > 1e-6:
-        raise ValueError(f"--mix {s!r} shares sum to {sum(parts)}, not 1.0.\nExpected the 4 shares for {MIX_ORDER} to add up to 1.0.\nFix: adjust --mix so its 4 values sum to 1.0, e.g. \"0.40,0.25,0.20,0.15\"   (see docs/steps/valset.md)")
+        raise ValueError(f"--mix {s!r} shares sum to {sum(parts)}, not 1.0.\nExpected the 4 shares for {MIX_ORDER} to add up to 1.0.\nFix: adjust --mix so its 4 values sum to 1.0, e.g. \"0.40,0.25,0.20,0.15\"   (see nanounet/docs/steps/valset.md)")
     return dict(zip(MIX_ORDER, parts))
 
 
@@ -88,9 +84,10 @@ def _fill_scenario(scenario, ds, case_dir, ids, want, max_tries, rngs, patch_siz
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    # nanochat-style: allow U8 (legacy snake flag; cluster scripts pass it)
     ap.add_argument("-d", "--dataset_id", type=int, required=True, help="dataset id, e.g. 999")
     ap.add_argument("--plans", required=True, help="plans identifier, no .json (e.g. nnUNetResEncUNetLPlans)")
-    ap.add_argument("--config", required=True, help="ROI/prompt config JSON path (e.g. configs/default.json)")
+    ap.add_argument("--config", required=True, help="ROI/prompt config JSON path (e.g. nanounet/configs/default.json)")
     ap.add_argument("--out", required=True, help="manifest output path (.json); the .targets.npz sidecar is written next to it")
     ap.add_argument("--n-patches", type=int, default=1500, help="total validation patches across all cohorts")
     ap.add_argument("--floor", type=int, default=40, help="minimum patches guaranteed per cohort before proportional allocation of the rest")
@@ -104,6 +101,7 @@ def main() -> None:
 
     ds_name = convert_id_to_dataset_name(args.dataset_id)
     nano_header(f"nanoUNet build-valset  {ds_name}  n={args.n_patches}", color="green")
+    config_table(arg_rows(ap, args))
     pp = preprocessed_dir()
     pm = Plans(join(pp, ds_name, args.plans + ".json"))
     cm = pm.get_configuration("3d_fullres")
@@ -196,3 +194,7 @@ def main() -> None:
     cprint(f"wrote {args.out}  ({len(all_entries)} patches, {len(packed_rows)} subset targets, {size_mb:.1f} MB sidecar)")
     cprint(f"rejections: {dict(rejects)}")
     cprint(f"next: nanounet_train -d {args.dataset_id} --plans {args.plans} --val-manifest {args.out} ...")
+
+
+if __name__ == "__main__":
+    main()

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from nanounet.dataloader_prefs import init_dataloader_ipc
+from nanounet.data.loader.prefs import init_dataloader_ipc
 from nanounet.runtime import set_safe_tmpdir
 
 set_safe_tmpdir()
@@ -10,18 +10,13 @@ init_dataloader_ipc()
 
 import argparse
 import os
+import shlex
 import shutil
 
 from batchgenerators.utilities.file_and_folder_operations import join, maybe_mkdir_p
 
-from nanounet.common import (
-    cprint,
-    nano_header,
-    preprocessed_dir,
-    quiet_lightning_runtime,
-    raw_dir,
-    results_dir,
-)
+from core.ui import arg_rows, config_table, cprint, nano_header
+from nanounet.common import preprocessed_dir, quiet_lightning_runtime, raw_dir, results_dir
 
 quiet_lightning_runtime()
 
@@ -29,13 +24,13 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
-from nanounet.dataloader_prefs import dataloader_bucket
+from nanounet.data.loader.prefs import dataloader_bucket
 from nanounet.lightning_ckpt import (
     pl_ckpt_epoch_and_target,
     pl_ckpt_stage_done,
 )
-from nanounet.plan.dataset_id import convert_id_to_dataset_name
-from nanounet.plan.splits import fold_seed, parse_fold
+from nanounet.plan.dataset.ids import convert_id_to_dataset_name
+from nanounet.plan.dataset.splits import fold_seed, parse_fold
 from nanounet.diag import set_mem_diag
 from nanounet.pretrain.dataset import build_pretrain_dataloaders
 from nanounet.pretrain.module import NanoMAELM
@@ -44,6 +39,7 @@ from nanounet.runtime import assert_mem_diag_cgroup, runtime_banner
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    # nanochat-style: allow U8 (legacy snake flag; cluster scripts pass it)
     ap.add_argument("-d", "--dataset_id", type=int, required=True, help="Dataset id, matched against Dataset<NNN>_* under raw/preprocessed/results (zero-padded to 3 digits).")
     ap.add_argument(
         "-f",
@@ -102,6 +98,7 @@ def main() -> None:
     dl_b = dataloader_bucket(args.dl_bucket)
     ds = convert_id_to_dataset_name(args.dataset_id)
     nano_header(f"nanoUNet pretrain MAE  {ds}  fold {args.fold}", color="cyan")
+    config_table(arg_rows(ap, args))
     pp = preprocessed_dir()
     rw = raw_dir()
     plans_path = join(pp, ds, args.plans_identifier + ".json")
@@ -115,17 +112,22 @@ def main() -> None:
     shutil.copyfile(plans_path, join(out, "plans.json"))
     shutil.copyfile(dj_path, join(out, "dataset.json"))
 
+    next_cmd = (
+        f"nanounet_train -d {args.dataset_id} -f {args.fold} --plans {shlex.quote(args.plans_identifier)} "
+        f"--mae-ckpt {shlex.quote(join(out, 'checkpoints', 'last.ckpt'))}"
+    )
     ckpt = args.resume
     if ckpt:
         if not os.path.isfile(ckpt):
             raise ValueError(
                 f"--resume {ckpt} does not exist.\n"
                 f"Expected a Lightning checkpoint written by a previous nanounet_pretrain run.\n"
-                f"Fix: pass an existing --resume path, or drop --resume to start a fresh MAE run   (see docs/steps/pretrain.md)"
+                f"Fix: pass an existing --resume path, or drop --resume to start a fresh MAE run   (see nanounet/docs/steps/pretrain.md)"
             )
         ep0, tgt0 = pl_ckpt_epoch_and_target(ckpt)
         if pl_ckpt_stage_done(ep0, tgt0):
             cprint("[dim]MAE pretrain already reached num_epochs; nothing to do.[/dim]")
+            cprint(f"next: {next_cmd}", markup=False, soft_wrap=True)
             return
 
     from nanounet.plan.plans import Plans
@@ -183,6 +185,7 @@ def main() -> None:
     )
     cprint(f"[dim]MAE pretrain out {out}[/dim]")
     tr.fit(lm, train_dataloaders=tr_dl, val_dataloaders=va_dl, ckpt_path=ckpt)
+    cprint(f"next: {next_cmd}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":
