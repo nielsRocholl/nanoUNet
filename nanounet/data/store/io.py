@@ -143,7 +143,7 @@ def reader_writer_class_from_dataset(dataset_json: dict, example_file: str | Non
             if verbose:
                 cprint(f"[dim]Using {rw} as reader/writer[/dim]")
             return rw
-        except Exception:
+        except Exception:  # nanochat-style: allow E4 (reader probe: a failed candidate is not a result; if none reads, the RuntimeError with Fix below is raised, traceback shown with verbose)
             if verbose:
                 traceback.print_exc()
     raise RuntimeError(

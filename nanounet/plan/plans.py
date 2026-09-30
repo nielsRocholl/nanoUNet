@@ -18,7 +18,7 @@ def _bind_resample(cfg: dict, key: str) -> Callable:
     if isinstance(name, str) and "." in name:
         name = name.split(".")[-1]
     if name != "resample_data_or_seg_to_shape":
-        raise NotImplementedError(name)
+        raise NotImplementedError(name)  # nanochat-style: allow E1 (unsupported plan option: nnU-Net plans only ever name resample_data_or_seg_to_shape)
     return partial(resample_data_or_seg_to_shape, **dict(cfg[key + "_kwargs"]))
 
 
@@ -195,5 +195,5 @@ def _migrate_old_architecture(configuration: dict) -> dict:
 def determine_num_input_channels(cm: Config3d, dataset_json: dict) -> int:
     n_mod = len(dataset_json["modality"]) if "modality" in dataset_json else len(dataset_json["channel_names"])
     if cm.previous_stage_name is not None:
-        raise NotImplementedError("cascade input channels")
+        raise NotImplementedError("cascade input channels")  # nanochat-style: allow E1 (unsupported plan option: cascade/previous_stage plans are not implemented, nanoUNet plans are single-stage)
     return n_mod

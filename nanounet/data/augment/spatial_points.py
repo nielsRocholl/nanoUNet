@@ -29,6 +29,7 @@ from batchgeneratorsv2.transforms.spatial.spatial import SpatialTransform
 
 def _invert_spatial(points: np.ndarray, patch_size, params: dict) -> np.ndarray:
     if params["elastic_offsets"] is not None:
+        # nanochat-style: allow E1 (unreachable internal invariant: train_transforms sets p_elastic_deform=0, no user option reaches it)
         raise NotImplementedError(
             "spatial_points: point tracking does not support elastic deformation "
             "(get_parameters returned elastic_offsets is not None). train_transforms sets "
@@ -56,6 +57,7 @@ class SpatialPointsTransform(SpatialTransform):
 
     def _apply_to_keypoints(self, keypoints: torch.Tensor, **params) -> torch.Tensor:
         if len(self.patch_size) != 3:
+            # nanochat-style: allow E1 (unsupported dummy-2D augmentation branch picked by patch aspect ratio, not a user option; message names the workaround)
             raise NotImplementedError(
                 "spatial_points: do_dummy_2d_data_aug (2D SpatialTransform over a folded z-axis) "
                 "is not supported by point tracking. This patch's aspect ratio triggered the "

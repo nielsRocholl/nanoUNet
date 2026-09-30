@@ -114,7 +114,7 @@ class PatchIterable(IterableDataset):
                     n = self.prompts_per_patch
                     raw = build_patch(*common, self.annotated_key, self.force_zero_prompt, rng, n, extra_rng=extra_rng)
                 q.put(raw)
-        except Exception as e:
+        except Exception as e:  # nanochat-style: allow E4 (not swallowed: forwarded via the queue and re-raised by __iter__ on the consumer side)
             q.put(e)
         finally:
             q.put(None)

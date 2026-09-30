@@ -78,7 +78,11 @@ def run_fingerprint(dataset_id: int, num_proc: int, clean: bool = True, foregrou
             w = [j for j in pool._pool]
             while rem:
                 if not all(j.is_alive() for j in w):
-                    raise RuntimeError("worker died (OOM?)")
+                    raise RuntimeError(
+                        "worker died (OOM?)\n"
+                        f"Expected all {num_proc} fingerprint worker processes to stay alive until every case is analysed.\n"
+                        f"Fix: rerun with fewer workers: nanounet_preprocess -d {dataset_id} -np {max(1, num_proc // 2)}   (see nanounet/docs/steps/preprocess.md)"
+                    )
                 done = [i for i in rem if r[i].ready()]
                 for _ in done:
                     r[_].get()

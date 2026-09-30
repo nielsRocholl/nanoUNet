@@ -45,7 +45,11 @@ class Labels:
             if _k == "ignore":
                 continue
             if isinstance(r, (tuple, list)) and len(r) > 1:
-                raise NotImplementedError("region labels not supported in nanoUNet")
+                raise NotImplementedError(
+                    f"region labels not supported in nanoUNet\n"
+                    f"Expected every value in dataset.json's \"labels\" dict to be a single integer, got {_k!r}: {r!r}.\n"
+                    f"Fix: replace the region list for {_k!r} with one integer label in dataset.json's \"labels\" dict   (see nanounet/docs/steps/preprocess.md)"
+                )
         self.label_dict = label_dict
         ig = label_dict.get("ignore")
         self._ignore_label: int | None = int(ig) if ig is not None else None

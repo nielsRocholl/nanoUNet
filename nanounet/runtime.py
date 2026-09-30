@@ -76,7 +76,11 @@ def set_safe_tmpdir(*, results_tmp: str | None = None) -> str:
             chosen = str(Path(c).resolve())
             break
     if not chosen:
-        raise OSError("no writable non-tmpfs TMPDIR candidate (set NANOUNET_TMPDIR)")
+        raise OSError(
+            "no writable non-tmpfs TMPDIR candidate (set NANOUNET_TMPDIR)\n"
+            "Expected a writable directory on local disk (not tmpfs) so DataLoader workers and checkpoint staging can use it.\n"
+            "Fix: export NANOUNET_TMPDIR=/path/on/local/disk   (see nanounet/docs/dev-notes/cgroup_memory.md)"
+        )
     for k in ("TMPDIR", "TMP", "TEMP"):
         os.environ[k] = chosen
     tempfile.tempdir = chosen
