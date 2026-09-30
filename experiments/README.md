@@ -86,7 +86,7 @@ def main() -> None:
 | 03 | `exp03_matcher_alone` | 3 | not implemented |
 | 04 | `exp04_baselines` | 4 | implemented, smoke-tested (8 patients); full run needs exp03 `folds.py` on main |
 | 05 | `exp05_full_pipeline` | 5 | implemented (smoke pending; numbers wait for the matcher retrain) |
-| 06 | `exp06_limits` | 6 | not implemented |
+| 06 | `exp06_limits` | 6 | implemented, smoke-tested on a synthetic merge; full run needs an exp03 run |
 | 07 | `exp07_internal_set` | 7 | not implemented |
 | 08 | `exp08_external_set` | 8 | not implemented |
 | 09 | `exp09_pantrack` | 9 | not implemented |
@@ -273,7 +273,18 @@ Runtime: about 1 min per patient for B and about 2 min for C on one A100 plus a 
 
 ### exp06_limits
 
-(not implemented)
+What the formulation can express but the data cannot score: split audit (no annotated splits), merge structure (38 events, group sizes), merge recall per contributing lesion under `hungarian` and `sinkhorn` (overall and by group size, patient bootstrap), the analytical limit `k <= 1/tau`, and an expressibility table. Reads the stored raw scores of an exp03 run (`artifacts/scores/<pid>.npz`); no inference, CPU, seconds.
+
+| flag | meaning |
+|---|---|
+| `--data-root` | Longitudinal-CT layout root (default `/nnunet_data/Longitudinal-CT`) |
+| `--from-run` | exp03 `RUN_DIR` whose stored scores are decoded again (required) |
+
+```bash
+python -m experiments.exp06_limits.run --tag paper_v1 --from-run /nnunet_data/experiments/exp03_matcher_alone/<run_id>
+```
+
+Smoke: any exp03 run dir works (`--tag smoke`); a synthetic k = 3 merge gave hungarian 1/3 and sinkhorn 3/3 as expected. Merge recall is only meaningful for scores produced on a cache built with the fixed graph builder (plan Sec. 2).
 
 <!-- end -->
 
