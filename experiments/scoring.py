@@ -30,6 +30,11 @@ Edge P/R/F1. The decoded links `pred_links` are a set of (annotated BL id, annot
 endpoint < 0 in `pred_links` means an extra node, `pairs_to_links` numbers them -1, -2, ...), fn = |true minus pred| (an edge whose
 lesion has no node is a fn). Precision = tp/(tp+fp), recall = tp/(tp+fn), F1 = 2tp/(2tp+fp+fn). Never accuracy over candidate pairs.
 
+Graph builder gap (checked 2026-09-30, `lesionglue.data.graph.dense.node_rows`): a BL lesion without `cog_propagated` gets no node (127
+of 4396 headline lesions: 41 unchanged, 27 disappeared, 59 merged) and a merged FU lesion never gets a node (merge targets are MERGING
+rows, which `node_rows` does not turn into FU nodes), so on the current caches the "Lstar" ceiling is 0.983 unchanged, 0.978 disappeared,
+1.0 new and 0.0 merged, and `_add_graph` credits a merged lesion for "no link". That is why `found_*` must come from the real node lists.
+
 Reporting rule. Never quote one class alone (a matcher that links nothing scores 1.0 on disappeared): `bootstrap`/`pooled` always give
 all four classes, `recall_macro` and the edge metrics; an undefined ratio (no lesion of that class) is NaN, never 0.
 
