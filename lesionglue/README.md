@@ -155,7 +155,7 @@ CSV-free inference from CT and instance masks. Geo checkpoints also need propaga
 | `--pairs-out` | path | `""` | optional full N×M dump (single) |
 | `--bl-clicks` `--fu-clicks` | path | unset | instance JSON; treat that side's mask as binary FG |
 
-Output columns: `bl_lesion_id, fu_lesion_id, pair_prob, decode`.
+Output columns: `bl_lesion_id, fu_lesion_id, pair_prob, decode, track_id`.
 
 ### `preprocess.py`
 

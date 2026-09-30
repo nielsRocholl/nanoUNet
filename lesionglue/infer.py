@@ -117,8 +117,8 @@ def track(
     if gcfg.type_mask and types_csv is None and default_lesion_type == "unclear":
         raise SystemExit(
             "type_mask checkpoint needs lesion types, got default_lesion_type='unclear' and no types CSV.\n"
-            "Expected --meta / --types-csv or a real --default-lesion-type.\n"
-            "Fix: --meta /nnunet_data/Longitudinal-CT/meta/<pid>.csv"
+            "Expected --types-csv or a real --default-lesion-type.\n"
+            "Fix: --types-csv /nnunet_data/Longitudinal-CT/meta/<pid>.csv"
         )
     if gcfg.drop_dp:
         if propagated is not None:

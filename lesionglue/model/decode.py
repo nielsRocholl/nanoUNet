@@ -46,7 +46,7 @@ DECODE_CHOICES = ("dense", "sinkhorn", "hungarian")
 DECODE_HELP = (
     "how to turn pair logits into matches: dense (keep all pairs above --thresh; merges and splits stay), "
     "sinkhorn (keep every pair whose Sinkhorn row mass clears --sinkhorn-tau; merges and splits stay "
-    "up to about 1/tau lesions), hungarian (strict 1-to-1; merges and splits drop). Omit to choose interactively."
+    "up to about 1/tau lesions), hungarian (strict 1-to-1; merges and splits drop)."
 )
 
 
