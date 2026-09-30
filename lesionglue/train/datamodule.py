@@ -3,6 +3,7 @@
 No-fold fit set is train∪val caches (everyone except test_patients.csv).
 No Lightning val: holdout is scored once after training. CV folds still have a val pool.
 pool="all" adds the test cache: the fit set and the CV folds then cover all 300 patients (the holdout is part of the pool).
+no_val=True with a fold keeps that fold out of the fit set but builds no val set (selection-free CV: nothing is chosen on it).
 """
 
 from __future__ import annotations
@@ -38,6 +39,7 @@ class MatcherDataModule(LightningDataModule):
         n_folds: int = 5,
         cv_seed: int = 0,
         pool: str = "train-val",
+        no_val: bool = False,
     ):
         super().__init__()
         self.cache_root = Path(cache_root)
@@ -54,6 +56,8 @@ class MatcherDataModule(LightningDataModule):
         self.cv_seed = cv_seed
         assert pool in POOLS, f"pool {pool!r}: expected one of {POOLS}"
         self.pool = pool
+        self.no_val = no_val  # fold k is held out of the fit set but never validated (selection-free CV)
+        self.n_held_out = 0
         if fold is not None:
             assert fold in range(n_folds)
             assert n_folds >= 2
@@ -125,7 +129,8 @@ class MatcherDataModule(LightningDataModule):
             pool, train_idx, augment=True, fu_jitter_scale=self.fu_jitter_scale,
             p_drop_fu=self.p_drop_fu, p_drop_bl=self.p_drop_bl, graph=g,
         )
-        self.val_ds = _CvPool(pool, val_idx, graph=g)
+        self.n_held_out = len(val_idx)
+        self.val_ds = None if self.no_val else _CvPool(pool, val_idx, graph=g)
 
     def train_dataloader(self):
         nw = self.num_workers

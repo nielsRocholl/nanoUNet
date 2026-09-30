@@ -14,10 +14,11 @@ Config fields (`max_steps`, `n_folds`, `cv_seed`, `ema_decay`, `intra`, ...) are
 lesionglue_train --config lesionglue/configs/base.json --out runs/base --fold 0
 ```
 
-Final fit on train+val, no validation:
+Final fit on the pool, no validation; then one selection-free fold of the 5-fold over all 300 patients (fold 0 is held out of the fit but never validated, nothing is chosen on it, `last.ckpt` only):
 
 ```bash
 lesionglue_train --config lesionglue/configs/complete.json --out runs/final_seed0 --seed 0
+lesionglue_train --config lesionglue/configs/complete.json --out runs/cv5/fold0 --pool all --fold 0 --no-val
 ```
 
 ### Arguments
@@ -30,9 +31,10 @@ lesionglue_train --config lesionglue/configs/complete.json --out runs/final_seed
 | `--out` | str | `lightning_logs` | Run dir for checkpoints, `config.json`, `fold_metrics.json`. Refuses to run if it already holds `*.ckpt` |
 | `--pool` | choice | `train-val` | `train-val`: the 240 train+val patients; `all`: train+val+test caches, all 300 patients (the holdout is then inside the pool) |
 | `--fold` | int | none | CV fold in `[0, n_folds)` held out for validation. Omitted: no-val fit on the whole pool, saves `last.ckpt` only |
+| `--no-val` | flag | off | With `--fold`: no validation loop, no EarlyStopping, no selection; fit for `max_steps`, save `last.ckpt` and `fold_metrics.json` (`val_disabled: true`, `n_held_out`). Implied without `--fold` |
 | `--seed` | int | none | Override the config seed; none uses the seed from `--config` |
 | `--max-steps` | int | none | Override `max_steps` (optimizer steps); none uses the config value |
-| `--no-early-stop` | flag | off | Disable EarlyStopping on `val_match_score_ema` (only applies with `--fold`) |
+| `--no-early-stop` | flag | off | Disable EarlyStopping on `val_match_score_ema` (only applies with `--fold` and without `--no-val`) |
 | `--wandb` | flag | off | Log to Weights & Biases (needs the `wandb` package; also on when `--wandb-run-name` is set) |
 | `--wandb-project` | str | `lesion-tracking` | W&B project name |
 | `--wandb-run-name` | str | `""` | W&B run name; a non-blank value also turns on W&B logging |
@@ -153,8 +155,7 @@ Runs one validation pass on CPU. Name the output dir `oof_<selector>` (`oof_best
 |---|---|
 | `EMA evaluation requested but this checkpoint has no ema_matcher.` | Add `--no-ema` |
 | `AssertionError` (no text, from `assert args.fold in range(cfg.n_folds)`) | `--fold` must be in `[0, n_folds)` of `--config` |
-| `fold N val loader leaked non-fold patients` | `--config` (`n_folds`, `cv_seed`) differs from the training run; use the config the checkpoint was trained with |
-| `evaluated patient set != fold N val loader` | Same cause; rerun with the matching `--config` and `--fold` |
+| `fold N val loader leaked non-fold patients` or `evaluated patient set != fold N val loader` | `--config` (`n_folds`, `cv_seed`) or `--pool` differs from the training run; use the ones the checkpoint was trained with |
 | `fold N: empty train or val after patient split` | `--fold` has no cached patients; check `--cache` and `--root` |
 | `No graph cache at` | `lesionglue_preprocess --split train`, then `--split val` |
 
