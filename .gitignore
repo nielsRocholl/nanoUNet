@@ -84,3 +84,8 @@ arXiv*
 # lesionglue
 lesionglue/baselines/nearest_mask/outputs/
 preds/runs/
+
+# experiments: light run mirrors are tracked; heavy artifacts and smoke runs never
+experiments/**/artifacts/
+experiments/results/*/*smoke*/
+experiments/results/INDEX_smoke.jsonl
