@@ -103,7 +103,7 @@ IDs are stable. Code comments cite them, e.g. `(R12)`. **auto** = `scripts/check
 | D5 | Doc commands are literal and runnable (`-d 501`). No pseudo-syntax. | |
 | D6 | Every console script is documented. `dev-notes/` and `handoffs/` are dated scratch, exempt from the 200-line cap. | auto |
 | K6 | A `<project>/cli/*.py` module with `main` and no `__main__` guard. | auto |
-| K7 | `main()` calls `nano_header` and `config_table`, and emits `next:`. | auto |
+| K7 | `main()` calls `nano_header` (or `nano_banner`) and `config_table`, and emits `next:`. | auto |
 | K8 | A `<project>.<module>` path in user docs or `<project>/scripts/*.sh` must be a real module. | auto |
 | K9 | `dev-notes/` and `handoffs/` (root or per project) open with `Date:` and `Status:`. | auto |
 

@@ -159,8 +159,8 @@ def check_py(path: Path, add, flags: dict) -> None:
             emit(1, "K6", "warn", "main() but no `if __name__ == \"__main__\"` guard")
         main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
         calls = {n.func.id for n in ast.walk(main) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
-        if "nano_header" not in calls or "config_table" not in calls or "next:" not in ast.unparse(main):
-            emit(main.lineno, "K7", "warn", "main() must call nano_header, config_table, and emit `next:`")
+        if not calls & {"nano_header", "nano_banner"} or "config_table" not in calls or "next:" not in ast.unparse(main):
+            emit(main.lineno, "K7", "warn", "main() must call nano_header (or nano_banner), config_table, and emit `next:`")
 
 
 def check_layout(add) -> None:
