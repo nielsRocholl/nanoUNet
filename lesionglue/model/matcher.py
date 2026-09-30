@@ -100,9 +100,12 @@ class Matcher(nn.Module):
             ng = int(data.num_graphs)
             nb = torch.bincount(data["bl"].batch, minlength=ng)
             nf = torch.bincount(data["fu"].batch, minlength=ng)
+            # nanochat-style: allow G2 (CPU pre-split was -2.6% step time on A100-40GB, inside NFS spread, 2026-09-30)
             parts = torch.split(pair, (nb * nf).tolist())
+            # nanochat-style: allow G2 (same measurement as the split above)
             zbs, zfs = torch.split(z_bl, nb.tolist()), torch.split(z_fu, nf.tolist())
             dbl, dfu = [], []
+            # nanochat-style: allow G2 (same measurement as the split above)
             for p, zb, zf, nbg, nfg in zip(parts, zbs, zfs, nb.tolist(), nf.tolist()):
                 M = p.reshape(nbg, nfg)
                 mb, mf = row_dust_marginals(p, z0.expand(nbg), z0.expand(nfg), nbg, nfg, iters)
