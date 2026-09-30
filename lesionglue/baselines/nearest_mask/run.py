@@ -17,12 +17,13 @@ from lesionglue.baselines.nearest_mask.io import (
     write_summary_json,
 )
 from lesionglue.baselines.nearest_mask.metrics import summarize
+from lesionglue.common import cprint
 
 
 def run_split(root: Path, split: str, pids: list[str], out_dir: Path, graph_compatible: bool) -> dict[str, object]:
     results: list[PatientBaselineResult] = []
     for idx, pid in enumerate(pids, start=1):
-        print(f"[{split}] {idx}/{len(pids)} {pid}", flush=True)
+        cprint(f"[{split}] {idx}/{len(pids)} {pid}", markup=False)
         results.append(run_patient(root, pid, graph_compatible=graph_compatible))
 
     predictions = [pred for result in results for pred in result.predictions]

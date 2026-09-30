@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from lesionglue.common import DATASET_ROOT, dump_json, load_json
+from lesionglue.common import DATASET_ROOT, cprint, dump_json, load_json
 from lesionglue.data.source.provenance import CLICKFIX_REL
 from lesionglue.eval.bootstrap import bootstrap_match_score
 
@@ -37,17 +37,17 @@ def flagged_patients(root: Path) -> set[str]:
 
 def report(label: str, per_patient: dict) -> dict:
     if not per_patient:
-        print(f"{label}: n_patients=0, skipping")
+        cprint(f"{label}: n_patients=0, skipping", markup=False)
         return {"n_patients": 0}
     point, lo, hi = bootstrap_match_score(per_patient)
     row = {"n_patients": len(per_patient), "match_score": point, "ci95": [lo, hi]}
-    print(f"{label}: n_patients={len(per_patient)}  match_score={point:.4f}  95% CI=[{lo:.4f}, {hi:.4f}]")
+    cprint(f"{label}: n_patients={len(per_patient)}  match_score={point:.4f}  95% CI=[{lo:.4f}, {hi:.4f}]", markup=False)
     for name in SUB_NAMES:
         ok = sum(p[f"{name}_ok"] for p in per_patient.values())
         tot = sum(p[f"{name}_tot"] for p in per_patient.values())
         acc = ok / tot if tot else float("nan")
         row[f"acc_{name}"] = acc
-        print(f"    {name}: {ok}/{tot} = {acc:.4f}")
+        cprint(f"    {name}: {ok}/{tot} = {acc:.4f}", markup=False)
     return row
 
 
@@ -81,16 +81,16 @@ if __name__ == "__main__":
             seen[pid] = f
             pool[pid] = counts
 
-    print(f"pooled {len(files)} files -> selectors: {sorted(by_selector)}")
+    cprint(f"pooled {len(files)} files -> selectors: {sorted(by_selector)}", markup=False)
     summary: dict[str, dict] = {}
     for selector, pool in sorted(by_selector.items()):
-        print(f"\n=== selector: {selector} ===")
+        cprint(f"\n=== selector: {selector} ===", markup=False)
         summary[selector] = {"all": report("all", pool)}
 
     if args.stratify_registration:
         flagged = flagged_patients(Path(args.root))
         for selector, pool in sorted(by_selector.items()):
-            print(f"\n=== selector: {selector}, stratified by registration quality ===")
+            cprint(f"\n=== selector: {selector}, stratified by registration quality ===", markup=False)
             flagged_pool = {p: c for p, c in pool.items() if p in flagged}
             clean_pool = {p: c for p, c in pool.items() if p not in flagged}
             summary[selector]["flagged"] = report("flagged", flagged_pool)

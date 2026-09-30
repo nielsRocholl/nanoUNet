@@ -7,7 +7,7 @@ import torch
 from torch_geometric.loader import DataLoader as PyGDataLoader
 from torchmetrics.classification import BinaryAUROC, BinaryAveragePrecision
 
-from lesionglue.common import CACHE_ROOT, DATASET_ROOT
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, cprint
 from lesionglue.data.cache.dataset import LesionDataset
 
 if __name__ == "__main__":
@@ -28,4 +28,4 @@ if __name__ == "__main__":
             lab = batch["bl", "cross", "fu"].edge_label.int()
             ap_m.update(scores.cpu(), lab.cpu())
             roc.update(scores.cpu(), lab.cpu())
-    print(f"distance_baseline split={args.split} AP={float(ap_m.compute()):.4f} AUROC={float(roc.compute()):.4f}")
+    cprint(f"distance_baseline split={args.split} AP={float(ap_m.compute()):.4f} AUROC={float(roc.compute()):.4f}", markup=False)

@@ -14,6 +14,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
+from core.ui import cprint
 from nanounet.score import IOU_HIT, _agg, score_case, write
 from lesionglue.eval.bootstrap import bootstrap_match_score
 from lesionglue.data.graph.dense import _node_rows, _positive_matrix
@@ -157,7 +158,7 @@ def main() -> None:
         "coupling": {k: {**v, "acc": (v["ok"] / v["tot"] if v["tot"] else None)} for k, v in coup.items()},
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=2))
-    print(json.dumps(summary, indent=2))
+    cprint(json.dumps(summary, indent=2), markup=False)
 
 
 if __name__ == "__main__":
