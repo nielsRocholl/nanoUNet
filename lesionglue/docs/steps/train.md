@@ -101,7 +101,7 @@ Each fold is a `lesionglue_train --fold N` subprocess, run sequentially.
 | `lesionglue/configs/base.json` (`--config`) | JSON | you |
 | `runs/cv/fold_0/` ... `fold_4/` (`best.ckpt`, `last.ckpt`, ...) | run dirs, as in `lesionglue_train` | `lesionglue_train` |
 | `runs/cv/fold_N/fold_metrics.json` | JSON | `lesionglue_train` |
-| `runs/cv/cv_summary.json` | JSON (aggregate over folds, `monitor`, `n_folds`) | this step |
+| `runs/cv/cv_summary.json` | JSON (mean±std over folds on `val_match_score_ema`, `monitor`, `n_folds`) | this step |
 
 ### Common errors
 

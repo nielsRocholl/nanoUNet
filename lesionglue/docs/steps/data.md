@@ -63,8 +63,8 @@ lesionglue_preprocess --split all --root /nnunet_data/Longitudinal-CT --cache /n
 | `--cache` | path | `/nnunet_data/lesion_tracking/cache` | Output root for the cached graphs (written under `processed/`) |
 | `--split` | choice | required | `train`, `val`, `test`, or `all` (builds train, val and test) |
 | `--k-intra` | int | 8 | Neighbors per node in the intra-timepoint kNN graph |
-| `--jobs` | int | 1 | Parallel patients (ProcessPool) |
-| `--resume` | flag | off | Keep already-built patients in the staging dir and build only the missing ones; default rebuilds the split |
+| `--jobs` | int | 1 | Parallel patients (ProcessPool); each worker pins BLAS/OpenMP to 1 thread |
+| `--resume` | flag | off | Keep already-built patients in the staging dir and build only the missing ones, then merge all patients at the end; default rebuilds the split |
 
 ### Inputs / outputs
 

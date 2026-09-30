@@ -40,3 +40,12 @@ Optional: `lesionglue_cv --config lesionglue/configs/base.json --out runs/cv` fo
 | `lesionglue_eval`, `lesionglue_report`, `lesionglue_predict`, `lesionglue_baseline_distance` | Evaluation | [eval.md](steps/eval.md) |
 | `lesionglue_track` | Deployment | [track.md](steps/track.md) |
 | `lesionglue_qc` | Graph viewer | [qc.md](steps/qc.md) |
+
+## Reference
+
+| Doc | Content |
+|---|---|
+| [technical.md](technical.md) | Graph construction, features, model, losses, metrics, known limitations |
+| [reference/config.md](reference/config.md) | Config JSON keys, config-driven vs CLI-only flags |
+| [reference/layout.md](reference/layout.md) | Dataset and cache layout, training vs deployment, code layout, common failures |
+| [reference/experiments.md](reference/experiments.md) | Deployed matcher history, encoding cost, round 9 script |

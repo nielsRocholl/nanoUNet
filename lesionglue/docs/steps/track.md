@@ -46,7 +46,7 @@ Decode modes (`--decode`):
 | `--bl-mask` | path | `""` | Single case: baseline lesion instance mask NIfTI (binary FG with `--bl-clicks`) |
 | `--fu-img` | path | `""` | Single case: follow-up CT NIfTI |
 | `--fu-mask` | path | `""` | Single case: follow-up lesion instance mask NIfTI (binary FG with `--fu-clicks`) |
-| `--propagated` | path | `""` | BL lesion_id to FU-frame centroid: meta CSV, slim CSV (`lesion_id,z,y,x`) or nanoUNet JSON in the FU frame. Required unless the ckpt was trained with `drop_dp` |
+| `--propagated` | path | `""` | BL lesion_id to FU-frame centroid: meta CSV, slim CSV (`lesion_id,z,y,x`) or nanoUNet JSON in the FU frame (not `inputsTrBL/*.json`, those are BL-native). Required unless the ckpt was trained with `drop_dp` |
 | `--ckpt` | path | `DEPLOYED_CKPT` | Matcher Lightning checkpoint |
 | `--out` | path | required | Single case: match CSV to write; dataset mode: dir for one `<pid>.csv` per patient |
 | `--decode` | choice | `hungarian` | `dense`, `sinkhorn` or `hungarian` (table above) |

@@ -180,4 +180,6 @@ Loads `MatcherModule` from checkpoint and runs forward on **`LesionDataset`** gr
 | `train/module.py` | Loss, metrics, optimizer config |
 | `cli/*.py` | Procedural entrypoints |
 
-This matches the running code; if `blueprint.md` disagrees on Sinkhorn or feature recipes, trust the implementation and this file.
+This matches the running code. Older design notes are gone; where any note disagrees on Sinkhorn or feature recipes, trust the implementation and this file.
+
+Deployed-matcher history, encoding cost and the round 9 script: [reference/experiments.md](reference/experiments.md). Config keys: [reference/config.md](reference/config.md). Dataset, cache and code layout: [reference/layout.md](reference/layout.md).
