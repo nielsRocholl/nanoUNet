@@ -12,10 +12,10 @@ from lesionglue.data.cache.dataset import LesionDataset
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--cache", default=str(CACHE_ROOT))
-    ap.add_argument("--root", default=str(DATASET_ROOT))
-    ap.add_argument("--split", default="val", choices=["val", "test"])
-    ap.add_argument("--batch-size", type=int, default=8)
+    ap.add_argument("--cache", default=str(CACHE_ROOT), help="cached graph root (output of lesionglue_preprocess)")
+    ap.add_argument("--root", default=str(DATASET_ROOT), help="Longitudinal-CT dataset root passed to the graph dataset")
+    ap.add_argument("--split", default="val", choices=["val", "test"], help="which cached split to score")
+    ap.add_argument("--batch-size", type=int, default=8, help="graphs per batch while scoring")
     args = ap.parse_args()
     ds = LesionDataset(root=args.cache, split=args.split, dataset_root=Path(args.root))
     loader = PyGDataLoader(ds, batch_size=args.batch_size, shuffle=False)

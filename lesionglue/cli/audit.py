@@ -28,12 +28,12 @@ from lesionglue.train.module import MatcherModule
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root", default="/nnunet_data/Longitudinal-CT")
-    ap.add_argument("--cache", default="/nnunet_data/lesion_tracking/cache")
-    ap.add_argument("--split", choices=("train", "val", "test"), default="val")
-    ap.add_argument("--out", default="runs/audit")
+    ap.add_argument("--root", default="/nnunet_data/Longitudinal-CT", help="Longitudinal-CT dataset root (data_split.json, meta/, inputsTrBL/, ...)")
+    ap.add_argument("--cache", default="/nnunet_data/lesion_tracking/cache", help="cached lesion-graph dir; only read with --ckpt (error stratification)")
+    ap.add_argument("--split", choices=("train", "val", "test"), default="val", help="which data_split.json split to audit")
+    ap.add_argument("--out", default="runs/audit", help="output dir for audit_<split>.json (created if missing)")
     ap.add_argument("--ckpt", default=None, help="if given, run section 4 (error stratification)")
-    ap.add_argument("--no-ema", action="store_true")
+    ap.add_argument("--no-ema", action="store_true", help="with --ckpt: score the raw weights instead of the EMA weights")
     args = ap.parse_args()
 
     root = Path(args.root)

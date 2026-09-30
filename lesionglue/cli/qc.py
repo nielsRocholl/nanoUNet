@@ -23,11 +23,11 @@ from lesionglue.common import CACHE_ROOT, DATASET_ROOT, print0
 from lesionglue.data.cache.dataset import LesionDataset
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--case", required=True)
-    ap.add_argument("--split", choices=("train", "val", "test"), default="val")
-    ap.add_argument("--cache", default=str(CACHE_ROOT))
-    ap.add_argument("--root", default=str(DATASET_ROOT))
-    ap.add_argument("--port", type=int, default=8050)
+    ap.add_argument("--case", required=True, help="patient id to show; a trailing _NN image index is stripped")
+    ap.add_argument("--split", choices=("train", "val", "test"), default="val", help="which cached split to look the patient up in")
+    ap.add_argument("--cache", default=str(CACHE_ROOT), help="cached graph root (output of lesionglue_preprocess)")
+    ap.add_argument("--root", default=str(DATASET_ROOT), help="Longitudinal-CT dataset root passed to the graph dataset")
+    ap.add_argument("--port", type=int, default=8050, help="local port for the Dash server on 127.0.0.1")
     args = ap.parse_args()
     pid = normalize_case(args.case)
     ds = LesionDataset(root=Path(args.cache), split=args.split, dataset_root=Path(args.root))

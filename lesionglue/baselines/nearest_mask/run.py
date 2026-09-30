@@ -39,7 +39,7 @@ def run_split(root: Path, split: str, pids: list[str], out_dir: Path, graph_comp
 def main() -> None:
     parser = argparse.ArgumentParser(description="Nearest follow-up mask baseline for Longitudinal_CT_v2.")
     parser.add_argument("--root", required=True, help="Longitudinal_CT_v2 root")
-    parser.add_argument("--split", default="val", choices=("train", "val", "test", "all"))
+    parser.add_argument("--split", default="val", choices=("train", "val", "test", "all"), help="split from data_split.json to run; 'all' runs train, val and test into per-split subdirs of --out")
     parser.add_argument("--out", required=True, help="Output directory")
     parser.add_argument("--limit", type=int, default=0, help="Optional per-split patient limit for smoke tests")
     parser.add_argument(

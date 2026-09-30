@@ -87,12 +87,12 @@ def _counts(bl_ids, fu_ids, Y, pred: dict[int, set[int]], bl_nodes: set[int], fu
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root", default="/nnunet_data/Longitudinal-CT")
-    ap.add_argument("--preds-bl", required=True)
-    ap.add_argument("--preds-fu", required=True)
-    ap.add_argument("--matches", required=True)
-    ap.add_argument("--oracle-matches", default="")
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--root", default="/nnunet_data/Longitudinal-CT", help="Longitudinal-CT root holding targetsTrBL/FU (GT), inputsTrBL/FU (clicks) and meta/")
+    ap.add_argument("--preds-bl", required=True, help="folder of baseline-timepoint predicted masks (*.nii.gz), scored against targetsTrBL")
+    ap.add_argument("--preds-fu", required=True, help="folder of follow-up-timepoint predicted masks (*.nii.gz), scored against targetsTrFU")
+    ap.add_argument("--matches", required=True, help="folder of per-patient <pid>.csv/.json tracking outputs from e2e_track")
+    ap.add_argument("--oracle-matches", default="", help="matches folder from a GT-instance (--skip-convert) run; default empty skips the oracle comparison")
+    ap.add_argument("--out", required=True, help="output dir; writes seg_bl, seg_fu and summary.json")
     args = ap.parse_args()
     root, out = Path(args.root), Path(args.out)
     out.mkdir(parents=True, exist_ok=True)

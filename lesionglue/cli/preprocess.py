@@ -15,12 +15,12 @@ SPLITS = ("train", "val", "test")
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root", default=str(DATASET_ROOT))
-    ap.add_argument("--cache", default=str(CACHE_ROOT))
-    ap.add_argument("--split", choices=[*SPLITS, "all"], required=True)
-    ap.add_argument("--k-intra", type=int, default=8)
+    ap.add_argument("--root", default=str(DATASET_ROOT), help="Longitudinal-CT dataset root holding the raw cases")
+    ap.add_argument("--cache", default=str(CACHE_ROOT), help="output root for the cached graphs (written under processed/)")
+    ap.add_argument("--split", choices=[*SPLITS, "all"], required=True, help="which tracking split to build, or all for train, val and test")
+    ap.add_argument("--k-intra", type=int, default=8, help="neighbors per node in the intra-timepoint kNN graph")
     ap.add_argument("--jobs", type=int, default=1, help="parallel patients (ProcessPool)")
-    ap.add_argument("--resume", action="store_true")
+    ap.add_argument("--resume", action="store_true", help="keep already-built patients in the staging dir and build only the missing ones; default rebuilds the split")
     args = ap.parse_args()
     nano_header("lesionglue_preprocess")
 

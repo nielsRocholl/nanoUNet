@@ -24,14 +24,14 @@ from lesionglue.train.module import MatcherModule
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ckpt", required=True)
-    ap.add_argument("--fold", type=int, required=True)
-    ap.add_argument("--config", required=True)
-    ap.add_argument("--root", default=str(DATASET_ROOT))
-    ap.add_argument("--cache", default=str(CACHE_ROOT))
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--ckpt", required=True, help="checkpoint to validate (e.g. best.ckpt, best_raw.ckpt, swa_plateau.ckpt)")
+    ap.add_argument("--fold", type=int, required=True, help="CV fold whose held-out patients are scored; must be in [0, n_folds) of --config")
+    ap.add_argument("--config", required=True, help="JSON config the checkpoint was trained with (gives n_folds, cv_seed, graph settings)")
+    ap.add_argument("--root", default=str(DATASET_ROOT), help="dataset root directory passed to the datamodule and fold split")
+    ap.add_argument("--cache", default=str(CACHE_ROOT), help="root of the cached lesion graphs")
+    ap.add_argument("--out", required=True, help="output directory; val_per_patient.json is written here")
     ap.add_argument("--dust-tau", type=float, default=DEPLOYED_DUST_TAU, help="override checkpoint decode threshold")
-    ap.add_argument("--no-ema", action="store_true")
+    ap.add_argument("--no-ema", action="store_true", help="score the raw training weights instead of the EMA weights")
     args = ap.parse_args()
 
     cfg = load_config(args.config)

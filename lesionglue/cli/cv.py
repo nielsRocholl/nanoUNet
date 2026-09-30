@@ -12,12 +12,12 @@ from lesionglue.data.source.splits import aggregate_cv_folds
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", required=True)
+    ap.add_argument("--config", required=True, help="path to the lesionglue config JSON; sets n_folds and seed, and is passed to each fold's train run")
     ap.add_argument("--out", required=True, help="CV output root; writes fold_*/ subdirs")
-    ap.add_argument("--start-fold", type=int, default=0)
+    ap.add_argument("--start-fold", type=int, default=0, help="first fold index to run (inclusive); folds with an existing fold_metrics.json are reused")
     ap.add_argument("--end-fold", type=int, default=None, help="exclusive upper bound; default n_folds")
-    ap.add_argument("--wandb", action="store_true")
-    ap.add_argument("--wandb-project", default="lesion-tracking")
+    ap.add_argument("--wandb", action="store_true", help="log each fold's training run to Weights & Biases")
+    ap.add_argument("--wandb-project", default="lesion-tracking", help="W&B project name (used only with --wandb)")
     ap.add_argument("--wandb-run-name", default="", type=str, help="suffix; fold index appended")
     args = ap.parse_args()
     nano_header("lesionglue_cv")

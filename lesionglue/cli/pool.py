@@ -54,9 +54,9 @@ def report(label: str, per_patient: dict) -> dict:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", required=True, help="dir containing fold_*/oof_<selector>/val_per_patient.json")
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--out", required=True, help="output directory; pool_summary.json is written here")
     ap.add_argument("--root", default=str(DATASET_ROOT), help="dataset root, for --stratify-registration")
-    ap.add_argument("--stratify-registration", action="store_true")
+    ap.add_argument("--stratify-registration", action="store_true", help="also report pooled scores split into registration-flagged vs clean patients (reads --root)")
     args = ap.parse_args()
 
     files = sorted(Path(args.runs).glob("fold_*/oof_*/val_per_patient.json"))
