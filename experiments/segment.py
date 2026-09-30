@@ -159,20 +159,25 @@ def size_bin(diam_mm: float) -> tuple[int, str]:
     return idx, (f">{lo:g}" if hi >= 1e8 else f"{lo:g}-{hi:g}")
 
 
-def read_lesions(label_path: str | Path, values: list[int], spacing_zyx: tuple[float, float, float]) -> tuple[np.ndarray, list[dict]]:
-    """Native GT instances (cc3d-26 of the lesion label values) and one dict per lesion: id, seed_zyx (argmax EDT in mm),
-    volume, equivalent-sphere size in mm and its size bin, bbox. Every seed lies inside its own component (asserted)."""
+def read_instances(label_path: str | Path, values: list[int]) -> np.ndarray:
+    """Native GT instances: cc3d (connectivity GT_CONNECTIVITY) of the voxels whose label is in `values`; ids are 1..n."""
     arr = read_labels(label_path)
-    inst, n = cc3d.connected_components(np.isin(arr, values).astype(np.uint8), connectivity=GT_CONNECTIVITY, return_N=True)
+    return cc3d.connected_components(np.isin(arr, values).astype(np.uint8), connectivity=GT_CONNECTIVITY)
+
+
+def read_lesions(label_path: str | Path, values: list[int], spacing_zyx: tuple[float, float, float]) -> tuple[np.ndarray, list[dict]]:
+    """Instances plus one dict per lesion: id, seed_zyx (argmax EDT in mm), volume, equivalent-sphere size in mm and its size bin,
+    bbox. Every seed lies inside its own component (asserted)."""
+    inst = read_instances(label_path, values)
     stats = cc3d.statistics(inst, no_slice_conversion=False)
     boxes, counts, vox_mm3, lesions = stats["bounding_boxes"], stats["voxel_counts"], float(np.prod(spacing_zyx)), []
-    for i in range(1, n + 1):
+    for i in range(1, int(inst.max()) + 1):
         sl = boxes[i]
         edt = distance_transform_edt(np.pad(inst[sl] == i, 1), sampling=spacing_zyx)[1:-1, 1:-1, 1:-1]
         seed = np.unravel_index(int(np.argmax(edt)), edt.shape)
         seed = [int(seed[d]) + sl[d].start for d in range(3)]
         assert inst[tuple(seed)] == i, f"{label_path}: seed {seed} of component {i} is not inside it"
-        diam = 2.0 * (3.0 * int(counts[i]) * vox_mm3 / (4.0 * np.pi)) ** (1.0 / 3.0)
+        diam = float(2.0 * (3.0 * int(counts[i]) * vox_mm3 / (4.0 * np.pi)) ** (1.0 / 3.0))
         lesions.append({"id": i, "seed_zyx": seed, "volume_vox": int(counts[i]), "volume_mm3": int(counts[i]) * vox_mm3, "size_mm": diam,
                         "size_bin": size_bin(diam)[1], "bbox": [int(v) for s_ in sl for v in (s_.start, s_.stop)]})
     return inst, lesions
@@ -234,13 +239,32 @@ def decoy_click(ct_zyx: np.ndarray, inst: np.ndarray, lesions: list[dict], spaci
     raise AssertionError("unreachable: abort_if exits")
 
 
+def build_lesion_cache(case: dict, seed: int, cap: int) -> tuple[dict, np.ndarray, dict]:
+    """Everything a case's prompts and scoring need, computed once and stored as artifacts/lesions/<case>.json: scan geometry, every GT
+    lesion (seed, size, bin, bbox), the `used` ids (at most `cap`, seeded), the S2 `subset`, and the S4 `decoy` click (only for cases that
+    support S4). Returns the CT too (already read) so the caller need not read it again."""
+    data, props = read_ct(case["image"])
+    sp = tuple(float(v) for v in props["spacing"])
+    inst, lesions = read_lesions(case["label"], case["lesion_label_values"], sp) if case["label"] is not None else (None, [])
+    used = cap_lesions([l["id"] for l in lesions], cap, rng_for(seed, case["case_id"], "cap"))
+    subset = pick_subset(used, rng_for(seed, case["case_id"], "subset")) if len(used) >= 2 else None
+    want_decoy = "S4" in scenarios_for(case, len(used))
+    decoy = decoy_click(data[0], inst, lesions, sp, rng_for(seed, case["case_id"], "decoy")) if want_decoy else None
+    cache = {"case_id": case["case_id"], "params": {"seed": seed, "max_lesions_per_case": cap}, "spacing_zyx": list(sp), "shape_zyx": [int(v) for v in data.shape[1:]],
+             "lesions": lesions, "used": used, "subset": subset, "decoy": list(decoy) if decoy is not None else None}
+    return cache, data, props
+
+
+def write_json(path: Path, obj: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name("part_" + path.name)
+    tmp.write_text(json.dumps(obj))
+    os.replace(tmp, path)
+
+
 def write_clicks(path: Path, clicks: list[tuple[str, tuple[int, int, int]]]) -> None:
     """Click JSON in the pipeline's format, native voxels [x, y, z]: {"points": [{"name", "point"}]}; [] = no click."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    body = {"points": [{"name": str(n), "point": [int(x), int(y), int(z)]} for n, (z, y, x) in clicks]}
-    tmp = path.with_name("part_" + path.name)
-    tmp.write_text(json.dumps(body))
-    os.replace(tmp, path)
+    write_json(path, {"points": [{"name": str(n), "point": [int(x), int(y), int(z)]} for n, (z, y, x) in clicks]})
 
 
 def read_clicks(path: Path) -> list[tuple[str, tuple[int, int, int]]]:
@@ -273,11 +297,11 @@ def score_lesions(pred: np.ndarray, inst: np.ndarray, lesions: list[dict], spaci
     return out
 
 
-def fg_stats(pred: np.ndarray, inst: np.ndarray, target: list[dict] | None = None) -> dict:
+def fg_stats(pred: np.ndarray, inst: np.ndarray | None, target: list[dict] | None = None) -> dict:
     """Whole-volume foreground facts: predicted voxels total / inside any GT lesion / outside all GT, and (with `target`, the
     prompted lesions) the foreground Dice against their union and against the union of all GT (the S2 selectivity margin)."""
     n = int(pred.sum())
-    in_gt = int((pred & (inst > 0)).sum()) if n else 0
+    in_gt = int((pred & (inst > 0)).sum()) if n and inst is not None else 0  # inst None = healthy scan, no GT
     out = {"fg_vox": n, "fg_vox_in_gt": in_gt, "fg_vox_outside_gt": n - in_gt, "any_fg": float(n > 0), "any_fg_outside_gt": float(n - in_gt > 0)}
     if target is not None:
         union = np.zeros(pred.shape, dtype=bool)
@@ -305,17 +329,46 @@ def manifest_problems(m: dict, path: Path, tiers: tuple[str, ...] = TIERS) -> li
     return out or ([] if m.get("cases") else [problem(f"{path} holds no cases", "a non-empty cases list", fix)])
 
 
-def policy_cases(cases: list[dict], methods: list[str], policy: str) -> list[dict]:
-    """Cases each method may be scored on: `common` = clean for all three systems (the headline set, same for every method),
-    `own` = clean for the method's own system; returns the union over `methods`, in manifest order."""
-    if policy == "common":
-        return [c for c in cases if all(c["overlap"][k] == "clean" for k in OVERLAP_KEYS)]
-    keys = {METHOD_OVERLAP_KEY[m] for m in methods}
-    return [c for c in cases if any(c["overlap"][k] == "clean" for k in keys)]
-
-
 def method_ok(case: dict, method: str, policy: str) -> bool:
+    """May `method` be scored on this case? `common` = clean for all three systems (the headline set, identical for every method),
+    `own` = clean for the method's own system (an extra row per method)."""
     return all(case["overlap"][k] == "clean" for k in OVERLAP_KEYS) if policy == "common" else case["overlap"][METHOD_OVERLAP_KEY[method]] == "clean"
+
+
+def filter_cases(manifest: dict, tiers: list[str], sources: list[str] | None, max_per_source: int) -> tuple[list[dict], list[str]]:
+    """Manifest cases of the wanted tiers and sources, at most `max_per_source` per source (manifest order, which is already seeded)."""
+    known = sorted({c["source"] for c in manifest["cases"]})
+    bad = [s for s in (sources or []) if s not in known]
+    problems = [problem(f"--sources names {bad}, which the manifest does not have", f"names from {known}", "rerun with --sources <name> ...")] if bad else []
+    kept, seen = [], {}
+    for c in manifest["cases"]:
+        if c["tier"] in tiers and (sources is None or c["source"] in sources) and (max_per_source < 0 or seen.get(c["source"], 0) < max_per_source):
+            kept.append(c)
+            seen[c["source"]] = seen.get(c["source"], 0) + 1
+    return kept, problems
+
+
+def case_problems(cases: list[dict]) -> tuple[list[str], dict[str, tuple[int, int, int]]]:
+    """Missing image/label files and image/label grids that differ (headers only), as E1 problems, plus every image's (z, y, x) size."""
+    missing, mismatch, sizes = [], [], {}
+    for c in cases:
+        absent = [f"{k}: {c[k]}" for k in ("image", "label") if c[k] is not None and not Path(c[k]).is_file()]
+        if absent:
+            missing.append(f"{c['case_id']} ({'; '.join(absent)})")
+            continue
+        got = []
+        for f in (c["image"], c["label"]):
+            if f is not None:
+                rd = sitk.ImageFileReader()
+                rd.SetFileName(str(f))
+                rd.ReadImageInformation()
+                got.append(tuple(int(v) for v in rd.GetSize()[::-1]))
+        sizes[c["case_id"]] = got[0]
+        if len(set(got)) > 1:
+            mismatch.append(f"{c['case_id']} image {got[0]} vs label {got[1]}")
+    fix = "regenerate the manifest (python -m experiments.exp00c_seg_eval_manifest.run) or mount /nnunet_data"
+    out = [problem(f"{len(missing)} manifest case(s) with missing files, e.g. {'; '.join(missing[:3])}", "every image and label path to exist", fix)] if missing else []
+    return out + ([problem(f"{len(mismatch)} case(s) whose label grid differs from the image, e.g. {'; '.join(mismatch[:3])}", "label and image with the same (z, y, x) size", fix)] if mismatch else []), sizes
 
 
 def scenarios_for(case: dict, n_lesions: int) -> tuple[str, ...]:
