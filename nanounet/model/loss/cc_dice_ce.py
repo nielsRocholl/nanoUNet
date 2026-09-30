@@ -65,6 +65,7 @@ class CC_DC_and_CE_loss(nn.Module):
         ce_cnt_bt = torch.zeros((), device=dev, dtype=torch.float32)
 
         for b in range(B):
+            # nanochat-style: allow G2 (CPU cc3d is inherent; cc_dc_ce +100% epoch time vs dc_ce on A100-40GB, batch 2, 4 iters, median e1-e3, 2026-09-30)
             t_np = tgt0[b].detach().cpu().numpy().astype(np.int64)
             if self.ignore_label is not None:
                 valid = t_np != self.ignore_label
@@ -83,6 +84,7 @@ class CC_DC_and_CE_loss(nn.Module):
                 if self.ignore_label is not None:
                     ign = (tgt0[b : b + 1] == self.ignore_label).float().unsqueeze(0)
                     R = R * (1.0 - ign)
+                # nanochat-style: allow G2 (same cc_dc_ce measurement as the .cpu() above)
                 if float(R.sum().item()) == 0.0:
                     continue
                 tp, fp, fn, _ = get_tp_fp_fn_tn(probs[b : b + 1], g, axes=axes_sp, mask=R)
@@ -106,6 +108,7 @@ class CC_DC_and_CE_loss(nn.Module):
                     ce_terms.append(ce_m.sum() / cnt)
 
         if self.batch_dice:
+            # nanochat-style: allow G2 (same cc_dc_ce measurement as the .cpu() above)
             if ce_cnt_bt.item() == 0.0 and TP.item() == 0.0:
                 return out.sum() * 0.0
             d_cc = (2 * TP + self.smooth_cc) / (TP + FN + TP + FP + self.smooth_cc).clamp_min(1e-8)

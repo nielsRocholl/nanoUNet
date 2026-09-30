@@ -122,7 +122,7 @@ Implementation notes:
 
 ## Loss throughput
 
-Use `--loss dc_ce` for normal long supervised training. `--loss cc_dc_ce` runs CPU connected components plus SciPy Euclidean-distance Voronoi inside the training loss and can make epochs roughly **4× slower** on A100/H200 nodes. Treat CC-DiceCE as an opt-in experiment or short fine-tuning objective. Details: [reference/losses.md](../reference/losses.md).
+Use `--loss dc_ce` for normal long supervised training. `--loss cc_dc_ce` runs CPU connected components plus SciPy Euclidean-distance Voronoi inside the training loss. Dataset900 smoke on A100-40GB, 2026-09-30: median epoch 1–3 wall time 4.32 s (`dc_ce`) vs 8.65 s (`cc_dc_ce`), +100%, at batch 2 and 4 iters/epoch. An earlier Dataset999 check saw about 4×. Treat CC-DiceCE as an opt-in experiment. Details: [reference/losses.md](../reference/losses.md).
 
 ## Host RAM / cgroup OOM
 

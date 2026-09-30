@@ -4,7 +4,7 @@ nanoUNet defaults to standard nnU-Net **Dice + cross-entropy (DC+CE)** with opti
 
 ## Throughput warning
 
-Use **`--loss dc_ce`** for normal long supervised training. `--loss cc_dc_ce` is much slower because it runs CPU connected components and SciPy Euclidean-distance Voronoi in the synchronous training loss. On the Dataset999 supervised A/B check, switching from `cc_dc_ce` to `dc_ce` removed the severe GPU starvation and cut epoch time by roughly 4x.
+Use **`--loss dc_ce`** for normal long supervised training. `--loss cc_dc_ce` is much slower because it runs CPU connected components and SciPy Euclidean-distance Voronoi in the synchronous training loss. On the Dataset999 supervised A/B check, switching from `cc_dc_ce` to `dc_ce` removed the severe GPU starvation and cut epoch time by roughly 4x. A Dataset900 smoke on A100-40GB (batch 2, 4 iters/epoch, median `epoch_wall_time_sec` of epochs 1–3, 2026-09-30) was 4.32 s (`dc_ce`) vs 8.65 s (`cc_dc_ce`), +100%.
 
 Treat CC-DiceCE as an opt-in experiment or a short fine-tuning objective, not the default for 2000-epoch runs, unless its quality gain clearly pays for the wall-clock cost.
 
