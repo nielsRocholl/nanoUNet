@@ -40,8 +40,9 @@ from torch_geometric.data import Batch
 from experiments.common import MATCHER_FINAL, abort_if, problem
 from experiments.scoring import PairCase, match_nodes, pairs_to_links, score_pair
 from experiments.segment import Segmenter, load_segmenter
-from lesionglue.data.graph.dense import build_hetero_data
+from lesionglue.data.graph.dense import build_hetero_data, node_rows
 from lesionglue.data.instances.build import binary_to_instances, load_clicks
+from lesionglue.data.source.meta import V2Paths, parse_meta_csv
 from lesionglue.data.source.propagate import load_propagated
 from lesionglue.infer import graph_cfg_from_ckpt, load_matcher, track
 from lesionglue.model.decode import decode_pairs
@@ -155,9 +156,11 @@ def _raw(out, n_bl: int, n_fu: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]
 def run_graph(pl: Pipeline, root: Path, pair: Pair, *, keep_unclear: bool = False) -> Scores:
     """Setting A: annotated nodes from the dataset's own graph builder (the FU region of `pair`), matcher on them, raw scores."""
     graphs = [g for g in build_hetero_data(pair.pid, root, graph_cfg_from_ckpt(pl.matcher, 8), keep_unclear) if int(g.img_id_fu_used) == pair.region]
-    if not graphs:  # the builder makes no graph when one side has no node: everything is then unmatched by construction
-        none = np.zeros(0, dtype=np.int64)
-        return Scores(none, none, np.zeros((0, 0), np.float32), np.zeros(0, np.float32), np.zeros(0, np.float32), none, none)
+    if not graphs:  # the builder makes no graph when one side has no node: nothing can be linked, but the nodes of the other side exist (all new / all disappeared)
+        rows = [r for r in parse_meta_csv(V2Paths(Path(root), pair.pid).meta, keep_unclear) if r.img_id_fu == pair.region]
+        bl, fu = node_rows(rows, pair.pid)
+        bl_ids, fu_ids = np.array(sorted(bl), dtype=np.int64), np.array(sorted(fu), dtype=np.int64)
+        return Scores(bl_ids, fu_ids, np.zeros((len(bl_ids), len(fu_ids)), np.float32), np.zeros(len(bl_ids), np.float32), np.zeros(len(fu_ids), np.float32), bl_ids.copy(), fu_ids.copy())
     data, t0 = graphs[0], time.perf_counter()
     bl_ids, fu_ids = data["bl"].lesion_id.cpu().numpy(), data["fu"].lesion_id.cpu().numpy()
     with torch.no_grad():
