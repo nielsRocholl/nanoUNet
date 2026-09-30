@@ -315,7 +315,7 @@ def fg_stats(pred: np.ndarray, inst: np.ndarray | None, target: list[dict] | Non
 
 def manifest_problems(m: dict, path: Path, tiers: tuple[str, ...] = TIERS) -> list[str]:
     """Every schema violation of the eval manifest, as E1 problems (the schema is in the experiments plan, Interfaces block)."""
-    fix = "python -m experiments.exp00c_seg_eval_manifest.run (agent B's manifest) or pass --manifest <file with schema seg-eval-manifest/1>"
+    fix = "python -m experiments.exp00c_seg_eval_manifest.run, or pass --manifest <file with schema seg-eval-manifest/1>"
     if m.get("schema") != MANIFEST_SCHEMA:
         return [problem(f"{path} has schema {m.get('schema')!r}", f"schema {MANIFEST_SCHEMA!r}", fix)]
     out = []

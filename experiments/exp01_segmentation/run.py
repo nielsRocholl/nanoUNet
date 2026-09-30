@@ -23,6 +23,8 @@ METHOD     1. Per case, once: GT instances in the native grid; a seed per lesion
 OUTPUT     results.json tables: per_lesion (method, tier, cohort, organ, case, lesion_id, size_mm, size_bin, scenario, dice, nsd, hit, click offset ...),
            per_case, summary_table (every CI incl. by cohort / organ / size bin), cases. artifacts/: lesions, prompts, preds. Run dir in the log.
 COMMAND    python -m experiments.exp01_segmentation.run --tag paper_v1
+           then, after the owner ran ULS+ and nnInteractive on <run dir>/artifacts/prompts (placeholder paths below):
+           python -m experiments.exp01_segmentation.run --tag paper_v1_ext --rescore <run dir> --external uls_plus=/path/to/uls_plus_predictions nninteractive=/path/to/nninteractive_predictions
 DEPENDS ON experiments/common.py, experiments/segment.py, experiments/scoring.py (bootstrap_stat, paired_delta_stat), the exp00c manifest; exp02 reuses
            the same clicks (same --seed, --backends, --max-lesions-per-case) for its s=1 replicate 0 and cross-checks against this run's S1.
 RUNTIME    About 20-40 s per case on one A100 (4 passes), i.e. 1-2 h at the default caps; the external systems take their own time. Resumable per pass.
@@ -361,7 +363,7 @@ def main() -> None:
     art = run.artifacts
     caches = {c["case_id"]: json.loads(lesion_file(art, c["case_id"]).read_text()) for c in cases} if args.rescore is not None else emit(cases, args, art)
     if args.emit_prompts_only:
-        rows = [{"case": c["case_id"], "tier": c["tier"], "annotation": c["annotation"], "n_lesions": len(caches[c["case_id"]]["lesions"]), "n_used": len(caches[c["case_id"]]["used"]),
+        rows = [{"case": c["case_id"], "image": c["image"], "tier": c["tier"], "annotation": c["annotation"], "n_lesions": len(caches[c["case_id"]]["lesions"]), "n_used": len(caches[c["case_id"]]["used"]),
                  "scenarios": S.scenarios_for(c, len(caches[c["case_id"]]["used"]))} for c in cases]
         run.finish({"cases": len(rows), "prompts_dir": str(art / "prompts")}, {"cases": rows}, notes=["prompts only: no inference, no scoring"],
                    next_cmd=f"run ULS+ / nnInteractive on {art}/prompts/<scenario>/<case>.json into <dir>/<scenario>/<case>.nii.gz, then rescore with --external")
@@ -384,7 +386,7 @@ def main() -> None:
     notes += [f"{r['method']} {r['case']}: {r['status']}" for r in crows if r["status"] != "ok"]
     notes += ["S3 for nanoUNet is a tile with no click (a call with an empty click list does nothing); external systems get an empty click list",
               f"click offsets drawn from backends {args.backends}; --max-lesions-per-case {args.max_lesions_per_case} (-1 = all): a cap leaves the other lesions unclicked in S1"]
-    run.finish(summary, {"per_lesion": lrows, "per_case": crows, "summary_table": table, "cases": [{k: c[k] for k in ("case_id", "patient_id", "tier", "source", "cancer_type", "annotation", "overlap")} for c in cases]},
+    run.finish(summary, {"per_lesion": lrows, "per_case": crows, "summary_table": table, "cases": [{k: c[k] for k in ("case_id", "patient_id", "tier", "source", "cancer_type", "annotation", "image", "overlap")} for c in cases]},
                table_md=markdown(summary), definitions=definitions, notes=notes,
                next_cmd=f"python -m experiments.exp02_prompt_noise.run --tag paper_v1 --crosscheck-run {run.dir}")
 

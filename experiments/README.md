@@ -81,8 +81,8 @@ def main() -> None:
 | 00a | `exp00a_data_audit` | data section | not implemented |
 | 00b | `exp00b_calibration` | calibration | not implemented |
 | 00c | `exp00c_seg_eval_manifest` | evaluation data for rows 1 and 2 | not implemented |
-| 01 | `exp01_segmentation` | 1 | not implemented |
-| 02 | `exp02_prompt_noise` | 2 | not implemented |
+| 01 | `exp01_segmentation` | 1 | implemented (smoke ok) |
+| 02 | `exp02_prompt_noise` | 2 | implemented (smoke ok) |
 | 03 | `exp03_matcher_alone` | 3 | not implemented |
 | 04 | `exp04_baselines` | 4 | not implemented |
 | 05 | `exp05_full_pipeline` | 5 | not implemented |
@@ -116,13 +116,84 @@ Each experiment owns one section below (arguments, literal full-run command, out
 
 ### exp01_segmentation
 
-(not implemented)
+Does the segmenter answer the point rather than the image? Four scenarios per scan (S1 all lesions clicked, S2 a strict subset, S3 no click,
+S4 a decoy click on empty tissue) plus the prompt drop (S1 with the prompt channels zeroed), scored per lesion (Dice, NSD at 1 mm, detection at
+IoU > 0.1) with patient-level bootstrap CIs. Cases come from the exp00c manifest; nanoUNet runs here, ULS+ and nnInteractive are run by the owner
+on the click files this run writes and are scored from their prediction folders. Shared code: `experiments/segment.py`.
+
+```bash
+# 1. nanoUNet, all scenarios (also writes the click files the other systems need)
+python -m experiments.exp01_segmentation.run --tag paper_v1
+# 2. after ULS+ / nnInteractive were run on <run dir>/artifacts/prompts: score them too (placeholder paths)
+python -m experiments.exp01_segmentation.run --tag paper_v1_ext --rescore /nnunet_data/experiments/exp01_segmentation/<RUN_ID> --external uls_plus=/path/to/uls_plus_predictions nninteractive=/path/to/nninteractive_predictions
+# prompts only, no GPU, no scoring (the same files as in step 1)
+python -m experiments.exp01_segmentation.run --tag paper_v1_prompts --emit-prompts-only
+```
+
+| flag | default | meaning |
+|---|---|---|
+| `--manifest` | `experiments/exp00c_seg_eval_manifest/seg_eval_v1.json` | eval manifest (schema `seg-eval-manifest/1`) |
+| `--tier` | all three | `seen-cohort`, `outside`, `healthy` |
+| `--sources` | all | keep only these manifest source names |
+| `--max-cases-per-source` | -1 | first N cases of every source in manifest order; -1 = all |
+| `--max-lesions-per-case` | -1 | click at most N lesions per case (seeded subset); -1 = all |
+| `--methods` | `nanounet` | methods run here; empty (`--methods`) scores only `--external` folders |
+| `--external` | none | `NAME=DIR` prediction folders, NAME = `nninteractive` or `uls_plus`; repeatable |
+| `--overlap-policy` | `common` | `common`: every method on the cases clean for all three systems (headline); `own`: each method on its own clean set |
+| `--backends` | both | registration-error table backends the click offsets are drawn from (`original`, `unigradicon`) |
+| `--emit-prompts-only` | off | write lesion caches and click files to `artifacts/`, then stop |
+| `--rescore` | none | `RUN_DIR` whose `artifacts/` (caches, clicks, nanoUNet masks) are rescored; needed to add `--external` folders later |
+| `--tag`, `--out-root`, `--resume`, `--seed`, `--limit-patients`, `--device` | | common flags (table above) |
+
+**Click files for the external systems.** One file per case and scenario: `<run dir>/artifacts/prompts/<scenario>/<case_id>.json` with
+`<scenario>` in `S1`, `S2`, `S3`, `S4`. Format: `{"points": [{"name": "<lesion id or decoy>", "point": [x, y, z]}]}`, `[x, y, z]` = 0-based voxel
+index of that case's image (NIfTI/SimpleITK index order, native grid). S1 = one click per lesion, S2 = the clicked subset (only cases with >= 2
+lesions), S4 = one decoy click, S3 = `{"points": []}` (no click). The image of a case is the `image` column of `cases.csv` of the run
+(`case_id` = file stem of the prediction). Clicks are identical for every system (seeded per case).
+
+**Prediction folders.** `DIR/<scenario>/<case_id>.nii.gz` for every case the system is scored on and every scenario that case has a click
+file for (`S1`, `S2`, `S3`, `S4`; no `S1_noprompt`). Binary mask, non-zero = lesion foreground, same grid (size) as the case image; a system
+that emits nothing without a click writes an empty mask for `S3`. Missing or misplaced files stop the run at startup with the list.
+
+Outputs (`results.json` tables): `per_lesion` (`method, tier, cohort, organ, patient, case, lesion_id, size_mm, size_bin, scenario, clicked,
+offset_mm, click_hit, iou, hit, dice, nsd`), `per_case` (case means, S3/S4 foreground voxels and any-FG flag, S2 leak and selectivity margin),
+`summary_table` (every CI by `all`, cohort, organ and size bin), `cases`; `artifacts/`: `lesions/`, `prompts/`, `preds/nanounet/<scenario>/`.
+Runtime: about 20-40 s per case on one A100 (4 passes), 1-2 h at about 300 cases; resumable per pass (`--resume`), scoring alone with `--rescore`.
+Notes that matter: S3 for nanoUNet is a tile with no click in it (S1 tiles with zeroed prompt), because a call with an empty click list does
+nothing; ULS+ saw the held-out Longitudinal-CT cases, so under `--overlap-policy common` those cases are excluded for every method.
 
 <!-- end -->
 
 ### exp02_prompt_noise
 
-(not implemented)
+What does registration error cost the segmenter, and at which click offset does a lesion stop being found? For every lesion and replicate one
+offset is drawn from the empirical registration-error table and scaled by s; all lesions of a scan are clicked at once and segmented in one pass
+per (s, replicate). Dice and detection are reported against the scale and against the effective offset in mm, per lesion-size bin, with
+patient-level bootstrap CIs. Replicate 0 at s = 1 uses exactly exp01's S1 clicks, which `--crosscheck-run` verifies.
+
+```bash
+python -m experiments.exp02_prompt_noise.run --tag paper_v1 --crosscheck-run /nnunet_data/experiments/exp01_segmentation/<RUN_ID>
+```
+
+| flag | default | meaning |
+|---|---|---|
+| `--manifest` | `experiments/exp00c_seg_eval_manifest/seg_eval_v1.json` | eval manifest (schema `seg-eval-manifest/1`) |
+| `--tier` | `seen-cohort outside` | tiers to run (scans without lesions are skipped) |
+| `--sources` | all | keep only these manifest source names |
+| `--max-cases-per-source` | 10 | first N cases of every source in manifest order; -1 = all |
+| `--max-lesions-per-case` | 8 | click at most N lesions per case (seeded subset); -1 = all |
+| `--scales` | `0 0.25 0.5 0.75 1.0 1.5` | offset scales s (0 = true seed, 1 = the full empirical draw, 1.5 = stress point) |
+| `--replicates` | 3 | independent offset draws per lesion (scale 0 runs once) |
+| `--overlap-policy` | `common` | `common`: cases clean for all three systems; `own`: cases clean for nanoUNet |
+| `--backends` | both | registration-error table backends the offsets are drawn from |
+| `--crosscheck-run` | none | exp01 `RUN_DIR` (same manifest, `--seed`, `--backends`, `--max-lesions-per-case`) to cross-check against its S1 |
+| `--rescore` | none | `RUN_DIR` of an exp02 run whose masks are rescored (no GPU) |
+| `--tag`, `--out-root`, `--resume`, `--seed`, `--limit-patients`, `--device` | | common flags (table above) |
+
+Outputs: `per_lesion` (one row per lesion, replicate and scale: `scale, replicate, offset_vox_zyx, offset_mm_zyx, offset_mm, offset_bin, size_mm,
+size_bin, cohort, click_hit, dice, nsd, hit`), `by_scale`, `by_offset_mm`, `cases`; `artifacts/`: `lesions/`, `prompts/s<s>_r<r>/`, `preds/s<s>_r<r>/`.
+Runtime: 16 passes per case (1 + 5 x 3), 40-90 s per case, 2-4 h at the default caps; resumable per pass. For the same clicks as exp01 use the
+same `--seed`, `--backends` and `--max-lesions-per-case` (exp01 default -1, exp02 default 8: pass `--max-lesions-per-case -1` for an exact cross-check).
 
 <!-- end -->
 
