@@ -10,11 +10,13 @@ here. pool.py consumes the output to build pooled out-of-fold estimates across f
 from __future__ import annotations
 
 import argparse
+import shlex
 from pathlib import Path
 
 import pytorch_lightning as pl
 
-from lesionglue.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_DUST_TAU, dump_json
+from core.ui import arg_rows
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_DUST_TAU, config_table, cprint, dump_json, nano_header
 from lesionglue.config import load_config
 from lesionglue.eval.bootstrap import match_score_from_counts
 from lesionglue.data.graph.dense import graph_config
@@ -34,6 +36,8 @@ def main() -> None:
     ap.add_argument("--dust-tau", type=float, default=DEPLOYED_DUST_TAU, help="override checkpoint decode threshold")
     ap.add_argument("--no-ema", action="store_true", help="score the raw training weights instead of the EMA weights")
     args = ap.parse_args()
+    nano_header(f"LesionGlue oof  fold {args.fold}  {Path(args.ckpt).name}")
+    config_table(arg_rows(ap, args))
 
     cfg = load_config(args.config)
     assert args.fold in range(cfg.n_folds)
@@ -84,6 +88,8 @@ def main() -> None:
         "acc_newly_appearing": totals["new_ok"] / totals["new_tot"] if totals["new_tot"] else None,
         "per_patient": per_patient,
     })
+    runs = out.resolve().parent.parent
+    cprint(f"next: lesionglue_pool --runs {shlex.quote(str(runs))} --out {shlex.quote(str(runs / "pool"))}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

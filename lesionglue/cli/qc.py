@@ -19,7 +19,8 @@ from lesionglue.eval.qc_view import (
     pick_hetero,
     tap_payload,
 )
-from lesionglue.common import CACHE_ROOT, DATASET_ROOT, print0
+from core.ui import arg_rows
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, config_table, nano_header, print0
 from lesionglue.data.cache.dataset import LesionDataset
 
 
@@ -31,6 +32,8 @@ def main() -> None:
     ap.add_argument("--root", default=str(DATASET_ROOT), help="Longitudinal-CT dataset root passed to the graph dataset")
     ap.add_argument("--port", type=int, default=8050, help="local port for the Dash server on 127.0.0.1")
     args = ap.parse_args()
+    nano_header(f"LesionGlue qc  {args.case}  {args.split}")
+    config_table(arg_rows(ap, args))
     pid = normalize_case(args.case)
     ds = LesionDataset(root=Path(args.cache), split=args.split, dataset_root=Path(args.root))
     hetero = pick_hetero(ds, pid)
@@ -80,7 +83,7 @@ def main() -> None:
             return format_detail(n, None, pid, img_fu)
         return format_detail(None, None, pid, img_fu)
 
-    print0(f"QC graph {pid}: http://127.0.0.1:{args.port}")
+    print0(f"QC graph {pid}\nnext: open http://127.0.0.1:{args.port}", markup=False, soft_wrap=True)
     app.run(debug=False, port=args.port)
 
 

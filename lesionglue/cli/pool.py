@@ -13,11 +13,13 @@ pooled estimate on the flagged/clean split, which IS the reformulated Gate A (ro
 from __future__ import annotations
 
 import argparse
+import shlex
 from pathlib import Path
 
 import pandas as pd
 
-from lesionglue.common import DATASET_ROOT, cprint, dump_json, load_json
+from core.ui import arg_rows
+from lesionglue.common import DATASET_ROOT, config_table, cprint, dump_json, load_json, nano_header
 from lesionglue.data.source.provenance import CLICKFIX_REL
 from lesionglue.eval.bootstrap import bootstrap_match_score
 
@@ -62,6 +64,8 @@ def main() -> None:
     files = sorted(Path(args.runs).glob("fold_*/oof_*/val_per_patient.json"))
     if not files:
         raise SystemExit(f"no fold_*/oof_*/val_per_patient.json under {args.runs}")
+    nano_header(f"LesionGlue pool  {len(files)} files  {args.runs}")
+    config_table(arg_rows(ap, args))
 
     by_selector: dict[str, dict[str, dict]] = {}
     seen_by_selector: dict[str, dict[str, Path]] = {}
@@ -99,6 +103,7 @@ def main() -> None:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     dump_json(out / "pool_summary.json", summary)
+    cprint(f"next: lesionglue_eval --split test --out {shlex.quote(str(out / "test_eval.json"))}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 from pathlib import Path
 
-from lesionglue.common import CACHE_ROOT, DATASET_ROOT, cprint, nano_header
+from core.ui import arg_rows
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, config_table, cprint, nano_header
 from lesionglue.data.cache.dataset import LesionDataset
 from lesionglue.data.features.layout import CACHE_TAG
 from lesionglue.data.graph.dense import GraphConfig
@@ -23,6 +25,7 @@ def main() -> None:
     ap.add_argument("--resume", action="store_true", help="keep already-built patients in the staging dir and build only the missing ones; default rebuilds the split")
     args = ap.parse_args()
     nano_header("lesionglue_preprocess")
+    config_table(arg_rows(ap, args))
 
     cache = Path(args.cache)
     cache.mkdir(parents=True, exist_ok=True)
@@ -45,6 +48,7 @@ def main() -> None:
     if len(splits) > 1:
         parts = ", ".join(f"{s}={counts[s]}" for s in splits)
         cprint(f"done -> {cache}: {parts}")
+    cprint(f"next: lesionglue_train --config lesionglue/configs/base.json --cache {shlex.quote(str(cache))} --out runs/base", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import shlex
 import tempfile
 from pathlib import Path
 
@@ -141,6 +142,7 @@ def main() -> None:
                         w.writerow([int(lid), int(fid), float(r.pair_prob[i, j])])
         cprint(f"n_bl={len(r.bl_ids)} n_fu={len(r.fu_ids)} n_pairs={len(r.pairs)} decode={r.decode}")
         cprint(f"wrote {out}")
+        cprint(f"next: head -n 20 {shlex.quote(str(out))}", markup=False, soft_wrap=True)
         return
 
     pids = _pids(args.split, args.patients_csv.strip())
@@ -180,6 +182,7 @@ def main() -> None:
     t.add_row("pairs", str(n_pairs))
     cprint(t)
     cprint(f"wrote {out_dir}")
+    cprint(f"next: ls {shlex.quote(str(out_dir))}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

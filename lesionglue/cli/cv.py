@@ -1,11 +1,13 @@
 """Patient-level k-fold CV: train each fold, aggregate best EMA val_match_score."""
 
 import argparse
+import shlex
 import subprocess
 import sys
 from pathlib import Path
 
-from lesionglue.common import dump_json, nano_header, seed_all
+from core.ui import arg_rows
+from lesionglue.common import config_table, cprint, dump_json, nano_header, seed_all
 from lesionglue.config import CKPT_MONITOR, load_config
 from lesionglue.data.source.splits import aggregate_cv_folds
 
@@ -21,6 +23,7 @@ def main() -> None:
     ap.add_argument("--wandb-run-name", default="", type=str, help="suffix; fold index appended")
     args = ap.parse_args()
     nano_header("lesionglue_cv")
+    config_table(arg_rows(ap, args))
 
     cfg = load_config(args.config)
     end = cfg.n_folds if args.end_fold is None else args.end_fold
@@ -58,6 +61,11 @@ def main() -> None:
     summary["monitor"] = CKPT_MONITOR
     summary["n_folds"] = end - args.start_fold
     dump_json(out_root / "cv_summary.json", summary)
+    oofs = " && ".join(
+        f"lesionglue_oof --ckpt {shlex.quote(str(out_root / f"fold_{f}" / "best.ckpt"))} --fold {f} --config {shlex.quote(str(args.config))} --out {shlex.quote(str(out_root / f"fold_{f}" / "oof_best"))}"
+        for f in range(args.start_fold, end)
+    )
+    cprint(f"next: {oofs} && lesionglue_pool --runs {shlex.quote(str(out_root))} --out {shlex.quote(str(out_root / "pool"))}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

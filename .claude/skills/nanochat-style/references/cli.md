@@ -13,6 +13,7 @@ Keep it that way.
 | `nano_header(title, color="cyan")` | Opening panel: command, dataset, key mode (U2) |
 | `nano_banner(title, subtitle)` | Big centred panel. Only for long-running entry points (train/pretrain). |
 | `config_table(rows, title="config")` | `rows = [(arg, value, "cli"/"config"/"default"), ...]` (U3) |
+| `arg_rows(ap, args)` | Rows for every parsed flag, source `cli`/`default`, for commands with no config file (U3) |
 | `nano_progress(total, desc)` | Context manager yielding `advance(n)`. Transient, and degrades cleanly without a TTY (U4). |
 | `cprint(msg)` | Every other line. Rich markup is allowed: `[green]`, `[bold]`, `[dim]`. |
 | `nano_rule()` | Dim separator between phases |

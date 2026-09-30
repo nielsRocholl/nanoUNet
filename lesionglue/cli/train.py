@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 import importlib.util
 from pathlib import Path
 
@@ -10,7 +11,8 @@ import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
-from lesionglue.common import CACHE_ROOT, DATASET_ROOT, HOLDOUT_CSV, cprint, dump_json, nano_header, seed_all
+from core.ui import arg_rows
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, HOLDOUT_CSV, config_table, cprint, dump_json, nano_header, seed_all
 from lesionglue.config import CKPT_MONITOR, dump_config, load_config
 from lesionglue.data.graph.dense import graph_config
 from lesionglue.train.datamodule import MatcherDataModule
@@ -36,6 +38,7 @@ def main() -> None:
     ap.add_argument("--wandb-run-name", default="", type=str, help="W&B run name; a non-blank value also turns on W&B logging, empty = W&B auto-names")
     args = ap.parse_args()
     nano_header("lesionglue_train")
+    config_table(arg_rows(ap, args))
 
     cfg = load_config(args.config)
     if args.seed is not None:
@@ -132,6 +135,7 @@ def main() -> None:
         }
         dump_json(out / "fold_metrics.json", fold_metrics)
         cprint(f"wrote {last}")
+        cprint(f"next: lesionglue_eval --ckpt {shlex.quote(str(last))} --split test", markup=False, soft_wrap=True)
         return
     fold_metrics = {
         "fold": args.fold,
@@ -149,6 +153,7 @@ def main() -> None:
     }
     dump_json(out / "fold_metrics.json", fold_metrics)
     cprint(f"wrote {ckpt.best_model_path}")
+    cprint(f"next: lesionglue_oof --ckpt {shlex.quote(str(ckpt.best_model_path or last))} --fold {args.fold} --config {shlex.quote(str(args.config))} --out {shlex.quote(str(out / "oof_best"))}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

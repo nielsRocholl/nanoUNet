@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 from pathlib import Path
 
 import numpy as np
@@ -17,7 +18,8 @@ import pandas as pd
 import torch
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
-from lesionglue.common import dump_json, print0
+from core.ui import arg_rows
+from lesionglue.common import config_table, dump_json, nano_header, print0
 from lesionglue.data.cache.dataset import LesionDataset
 from lesionglue.data.source.meta import LesionRow, V2Paths, load_split_json, parse_meta_csv
 from lesionglue.data.source.provenance import lesion_provenance
@@ -36,6 +38,8 @@ def main() -> None:
     ap.add_argument("--no-ema", action="store_true", help="with --ckpt: score the raw weights instead of the EMA weights")
     args = ap.parse_args()
 
+    nano_header(f"LesionGlue audit  {args.split}{'  + error stratification' if args.ckpt is not None else ''}")
+    config_table(arg_rows(ap, args))
     root = Path(args.root)
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -148,6 +152,7 @@ def main() -> None:
 
     dump_json(out_dir / f"audit_{args.split}.json", report)
     print0(f"wrote {out_dir / f'audit_{args.split}.json'}")
+    print0(f"next: lesionglue_train --config lesionglue/configs/base.json --root {shlex.quote(args.root)} --cache {shlex.quote(args.cache)}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

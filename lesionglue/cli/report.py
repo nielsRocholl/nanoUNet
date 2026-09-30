@@ -4,6 +4,7 @@ import argparse
 import gc
 import importlib.util
 import json
+import shlex
 from dataclasses import asdict
 from pathlib import Path
 
@@ -11,7 +12,8 @@ import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, TQDMProgressBar
 
-from lesionglue.common import CACHE_ROOT, DATASET_ROOT, print0, seed_all
+from core.ui import arg_rows
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, config_table, nano_header, print0, seed_all
 from lesionglue.config import CKPT_MONITOR, load_config
 from lesionglue.data.features.layout import CACHE_TAG
 from lesionglue.data.graph.dense import graph_config
@@ -56,6 +58,8 @@ def main() -> None:
     root, cache, out = Path(args.root), Path(args.cache), Path(args.out)
     for split in ("train", "val", "test"):
         assert (cache / "processed" / f"{split}_{CACHE_TAG}.pt").is_file(), f"missing cached {split} graphs"
+    nano_header(f"LesionGlue report  {'eval only' if args.checkpoint.strip() else 'train + eval'}  {out}")
+    config_table(arg_rows(ap, args))
     out.mkdir(parents=True, exist_ok=True)
     seed_all(cfg.seed)
 
@@ -105,6 +109,7 @@ def main() -> None:
     report = {"best_checkpoint": str(best), "config": asdict(cfg), "decode": args.decode, "gnn": {"val": gnn_val, "test": gnn_test}, "baseline": {"val": bl_val, "test": bl_test}}
     (out / "report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     print0(f"wrote {out / 'report.json'}")
+    print0(f"next: open {shlex.quote(str(out / 'report.json'))}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

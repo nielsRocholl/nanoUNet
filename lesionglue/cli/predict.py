@@ -2,12 +2,14 @@
 
 import argparse
 import csv
+import shlex
 from pathlib import Path
 
 import torch
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
-from lesionglue.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, require_ckpt
+from core.ui import arg_rows
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, config_table, cprint, nano_header, require_ckpt
 from lesionglue.data.cache.dataset import LesionDataset
 from lesionglue.model.decode import decode_sinkhorn_hungarian
 from lesionglue.infer import graph_cfg_from_ckpt
@@ -29,6 +31,8 @@ def main() -> None:
     ap.add_argument("--strict", action="store_true", help="set decoded from a 1-to-1 Sinkhorn + Hungarian assignment instead of prob >= --thresh")
     args = ap.parse_args()
 
+    nano_header(f"LesionGlue predict  {args.split}  {'strict' if args.strict else 'thresh ' + str(args.thresh)}")
+    config_table(arg_rows(ap, args))
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     mod = MatcherModule.load_from_checkpoint(str(require_ckpt(args.ckpt)), map_location="cpu")
@@ -72,6 +76,7 @@ def main() -> None:
                 w = csv.writer(f)
                 w.writerow(["bl_lesion_id", "fu_lesion_id", "prob", "decoded"])
                 w.writerows(rows)
+    cprint(f"next: lesionglue_eval --ckpt {shlex.quote(args.ckpt)} --split {args.split} --cache {shlex.quote(args.cache)} --root {shlex.quote(args.root)}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

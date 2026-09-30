@@ -7,14 +7,16 @@ set_eval_weights. --dust-tau may be repeated; one validate pass per tau.
 from __future__ import annotations
 
 import argparse
+import shlex
 from pathlib import Path
 
 import pytorch_lightning as pl
 import torch
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
+from core.ui import arg_rows
 from lesionglue.eval.bootstrap import match_score_from_counts
-from lesionglue.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, cprint, dump_json, nano_header, require_ckpt
+from lesionglue.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_CKPT, DEPLOYED_DUST_TAU, config_table, cprint, dump_json, nano_header, require_ckpt
 from lesionglue.data.cache.dataset import LesionDataset
 from lesionglue.infer import graph_cfg_from_ckpt
 from lesionglue.train.module import MatcherModule
@@ -57,6 +59,7 @@ def main() -> None:
     ap.add_argument("--out", default="", help="optional JSON path for counts + selected tau")
     args = ap.parse_args()
     nano_header("lesionglue_eval")
+    config_table(arg_rows(ap, args))
     ckpt = require_ckpt(args.ckpt)
 
     nw = max(0, args.num_workers)
@@ -98,6 +101,7 @@ def main() -> None:
         cprint(f"wrote {args.out.strip()} selected_tau={chosen['dust_tau']:.3f}")
     else:
         cprint(f"selected_tau={chosen['dust_tau']:.3f} match={chosen['match_score']:.6f}")
+    cprint(f"next: lesionglue_track --root {shlex.quote(str(args.root))} --split {args.split} --ckpt {shlex.quote(str(ckpt))} --out runs/track_{args.split}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":

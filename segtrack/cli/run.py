@@ -119,7 +119,7 @@ def main() -> None:
             f"{n_all} cases  ·  0 linked  ·  0 empty  ·  {n_skip} skip\n"
             f"0 pairs  ·  0m 00s\n"
             f"wrote  {parent}\n"
-            f"next   segtrack/README.md",
+            f"next:  segtrack/README.md",
             border_style="green",
         ))
         return
@@ -180,7 +180,7 @@ def main() -> None:
         f"{n_all} cases  ·  {n_ok} linked  ·  {n_empty} empty  ·  {n_skip} skip\n"
         f"{n_pairs} pairs  ·  {mins}m {secs:02d}s\n"
         f"wrote  {parent}\n"
-        f"next   open fu.mha — same integer = same lesion\n"
+        f"next:  open fu.mha — same integer = same lesion\n"
         f"       segtrack/docs/track_ids.md",
         border_style="green",
     ))

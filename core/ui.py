@@ -6,6 +6,7 @@ nanounet then lesionglue) interleaves on one stream. Nothing here knows about a 
 
 from __future__ import annotations
 
+from argparse import ArgumentParser, Namespace
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any
@@ -51,6 +52,11 @@ def config_table(rows: list[tuple[str, Any, str]], title: str = "config") -> Non
     for name, value, source in rows:
         t.add_row(str(name), str(value), source)
     _CONSOLE.print(t)
+
+
+def arg_rows(ap: ArgumentParser, args: Namespace) -> list[tuple[str, Any, str]]:
+    """config_table rows for every parsed flag; source is "default" when the value equals the parser default."""
+    return [(k.replace("_", "-"), v, "default" if v == ap.get_default(k) else "cli") for k, v in vars(args).items()]
 
 
 @contextmanager

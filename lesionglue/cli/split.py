@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 from pathlib import Path
 
 from rich.table import Table
 
-from lesionglue.common import DATASET_ROOT, HOLDOUT_CSV, SPLIT_PATH, cprint, dump_json, nano_header
+from core.ui import arg_rows
+from lesionglue.common import DATASET_ROOT, HOLDOUT_CSV, SPLIT_PATH, config_table, cprint, dump_json, nano_header
 from lesionglue.data.source.splits import build_split
 
 
@@ -21,6 +23,7 @@ def main() -> None:
     ap.add_argument("--val-fold", type=int, default=0, help="fold index (0-based) used as val; the other folds form train")
     args = ap.parse_args()
     nano_header("lesionglue_split")
+    config_table(arg_rows(ap, args))
     official = Path(args.root) / "data_split.json"
     if not official.is_file():
         raise SystemExit(
@@ -41,6 +44,7 @@ def main() -> None:
     t.add_row("test", str(len(sp["test"])), str(args.holdout))
     cprint(t)
     cprint(f"wrote {out}")
+    cprint(f"next: lesionglue_preprocess --split all --root {shlex.quote(str(args.root))}", markup=False, soft_wrap=True)
 
 
 if __name__ == "__main__":
