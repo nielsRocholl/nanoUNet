@@ -19,7 +19,7 @@ nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config nanounet/conf
 
 Reuse an existing self-supervised checkpoint instead of rerunning MAE (`--mae-ckpt` alone, no
 `--mae-pretrain`, skips the MAE stage entirely — see
-[`nanounet/scripts/slurm_nanounet_pretrain_train_999.sh`](../../scripts/slurm_nanounet_pretrain_train_999.sh)):
+`slurm_nanounet_pretrain_train_999.sh`, since removed):
 
 ```bash
 nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv \

@@ -39,15 +39,10 @@ fi
 CKPT="$FOUT/best.ckpt"
 
 echo "=== dust_tau sweep on val ==="
-best_tau=0.20; best_score=-1
-for tau in 0.10 0.15 0.18 0.20 0.22 0.25 0.30 0.35; do
-  score=$($PY lesionglue/cli/eval.py --ckpt "$CKPT" --split val --dust-tau "$tau" --num-workers 0 \
-          | awk -F': ' '/^val_match_score:/{print $2}')
-  [ -z "$score" ] && { echo "tau=$tau -> no score (skip)"; continue; }
-  echo "tau=$tau val_match_score=$score"
-  awk "BEGIN{exit !($score>$best_score)}" && { best_score=$score; best_tau=$tau; }
-done
-echo "best dust_tau=$best_tau (val_match_score=$best_score)"
+$PY lesionglue/cli/eval.py --ckpt "$CKPT" --split val --num-workers 0 --out "$RUNS/tau_sweep_val.json" \
+  --dust-tau 0.10 --dust-tau 0.15 --dust-tau 0.18 --dust-tau 0.20 --dust-tau 0.22 --dust-tau 0.25 --dust-tau 0.30 --dust-tau 0.35
+best_tau=$($PY -c "import json,sys; print(json.load(open(sys.argv[1]))['selected']['dust_tau'])" "$RUNS/tau_sweep_val.json")
+echo "best dust_tau=$best_tau"
 
 echo "=== TEST GATE (once) dust_tau=$best_tau ==="
 $PY lesionglue/cli/eval.py --ckpt "$CKPT" --split test --dust-tau "$best_tau" --num-workers 0
