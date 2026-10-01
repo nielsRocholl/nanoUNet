@@ -78,18 +78,18 @@ def main() -> None:
 
 | id | folder | paper row | status |
 |---|---|---|---|
-| 00a | `exp00a_data_audit` | data section | not implemented |
-| 00b | `exp00b_calibration` | calibration | not implemented |
-| 00c | `exp00c_seg_eval_manifest` | evaluation data for rows 1 and 2 | not implemented |
-| 01 | `exp01_segmentation` | 1 | implemented (smoke ok) |
+| 00a | `exp00a_data_audit` | data section | implemented, full run paper_v1 on the old cache (rerun after the v9 cache) |
+| 00b | `exp00b_calibration` | calibration | implemented, full run paper_v1 |
+| 00c | `exp00c_seg_eval_manifest` | evaluation data for rows 1 and 2 | implemented, full run paper_v1 (`seg_eval_v1.json`) |
+| 01 | `exp01_segmentation` | 1 | implemented (smoke ok); full run needs the owner's ULS+ and nnInteractive prediction folders for the external rows |
 | 02 | `exp02_prompt_noise` | 2 | implemented (smoke ok) |
-| 03 | `exp03_matcher_alone` | 3 | not implemented |
-| 04 | `exp04_baselines` | 4 | implemented, smoke-tested (8 patients); full run needs exp03 `folds.py` on main |
-| 05 | `exp05_full_pipeline` | 5 | implemented (smoke pending; numbers wait for the matcher retrain) |
+| 03 | `exp03_matcher_alone` | 3 | implemented (20-step smoke ok); full run on `cache_v9_merge` |
+| 04 | `exp04_baselines` | 4 | implemented, smoke-tested (8 patients); full run needs an exp03 run |
+| 05 | `exp05_full_pipeline` | 5 | implemented (smoke ok); numbers wait for the matcher retrain |
 | 06 | `exp06_limits` | 6 | implemented, smoke-tested on a synthetic merge; full run needs an exp03 run |
-| 07 | `exp07_internal_set` | 7 | not implemented |
-| 08 | `exp08_external_set` | 8 | not implemented |
-| 09 | `exp09_pantrack` | 9 | not implemented |
+| 07 | `exp07_internal_set` | 7 | implemented (smoke ok); numbers wait for the matcher retrain |
+| 08 | `exp08_external_set` | 8 | implemented (thin wrapper of exp07, no smoke yet) |
+| 09 | `exp09_pantrack` | 9 | implemented (smoke ok); numbers wait for the matcher retrain |
 
 Each experiment owns one section below (arguments, literal full-run command, outputs). Edit only your own section; the
 `<!-- end -->` lines keep neighbouring edits from colliding in git.
@@ -98,19 +98,55 @@ Each experiment owns one section below (arguments, literal full-run command, out
 
 ### exp00a_data_audit
 
-(not implemented)
+Checks every number the paper states about its data (300 patients, 4530 lesions, merge events, held-out 60, the 21 cohorts and the volume counts, prompt-encoding statistics, PanTrack) against the files, plus the `linking_unclear` reconciliation, the patients missing from the graph cache and the known-bad patient. Mismatches are reported, never fixed. CPU only.
+
+| flag | default | meaning |
+|---|---|---|
+| `--data-root` | `/nnunet_data/Longitudinal-CT` | Longitudinal-CT root (`meta/`, `inputsTr*`, `data_split.json`, `derivatives/`) |
+| `--holdout-csv` | `<data-root>/test_patients.csv` | the held-out 60 |
+| `--corpus-dir` | `.../NanoUNet_preprocessed/Dataset900_Merged` | cohorts, splits, `*_centroids.json` sidecars of the merged corpus |
+| `--raw-dir` | `/nnunet_data/NanoUNet_raw` | only listed, to count the cohort folders |
+| `--pantrack-dir` | `/nnunet_data/raw/PanTrack` | PanTrack JSON files and labels |
+| `--graph-split` | `lesionglue/configs/split.json` | split the graph caches were built from |
+| `--graph-cache-dir` | `.../cache_v9_merge/processed` | only the tiny `*_meta.pt` files are opened |
+| `--graph-cache-tag` | `v8_native` | cache tag in the file names |
+| `--workers` | 8 | threads for sidecar reads and PanTrack label scans |
+
+Full run: `python -m experiments.exp00a_data_audit.run --tag paper_v1` (about 2 min). Outputs: `claims` (`{claim, paper_value, measured_value, match, source}`), `unclear_reconciliation`, `graph_cache`, `graph_missing`, `empty_sets`, `no_cog_propagated`, `special_patients`, `per_patient`, `merge_events`, `cohorts`, `prompt_variants`, `pantrack_scans`, `pantrack_pairs`; `table.md` lists the claims as OK/MISMATCH.
 
 <!-- end -->
 
 ### exp00b_calibration
 
-(not implemented)
+Verifies and documents the shipped registration-error table (never rewrites it): recomputes the residuals of both backends, compares `n_per_bin` and every offset triple with the table, and counts the rows that come from the held-out 60. CPU only.
+
+| flag | default | meaning |
+|---|---|---|
+| `--data-root` | `/nnunet_data/Longitudinal-CT` | Longitudinal-CT root (`meta/`, `inputsTrFU/`, `derivatives/`) |
+| `--table` | `<data-root>/derivatives/registration_error_table.json` | table to verify |
+| `--holdout-csv` | `<data-root>/test_patients.csv` | the held-out 60 |
+| `--segmenter-plan` | `.../Dataset900_Merged/nnUNetResEncUNetLPlans_h200_smallpv.json` | only for the frame check (spacing) |
+| `--workers` | 16 | threads for the FU header reads |
+
+Full run: `python -m experiments.exp00b_calibration.run --tag paper_v1` (about 15 s). Outputs: `reproduction` (per backend and size bin), `per_bin` (median/p90/p95/max mm, per-axis SD), `overall`, `leakage`, `frame_check`, `per_lesion`.
 
 <!-- end -->
 
 ### exp00c_seg_eval_manifest
 
-(not implemented)
+Pins the single-timepoint evaluation set for exp01/exp02 in `experiments/exp00c_seg_eval_manifest/seg_eval_v1.json` (schema `seg-eval-manifest/1`): seen-cohort (held-out 60 + validation cases), outside (capped, seeded, patient-disjoint subsets of the clean PancancerCTSeg sources, header-checked against our training volumes) and healthy scans. The source matrix is the data `SOURCES` in `run.py`. CPU only.
+
+| flag | default | meaning |
+|---|---|---|
+| `--cap` | 30 | patients per outside source (seeded, one scan per patient) |
+| `--val-per-cohort` | 5 | validation cases per training cohort in the seen-cohort tier (0 = none) |
+| `--include-luna25` | off | also draw from LUNA25 (pseudo-label masks, detection only) |
+| `--manifest-out` | `experiments/exp00c_seg_eval_manifest/seg_eval_v1.json` | where a full run writes the manifest (a smoke run writes into its run dir) |
+| `--header-cache` | `$NANOUNET_TMPDIR/exp00c_headers.json` | local scratch cache of NIfTI header reads |
+| `--corpus-dir` | `.../NanoUNet_preprocessed/Dataset900_Merged` | our training volumes (`dataset.json`, `splits_final.json`, `gt_segmentations/`) |
+| `--workers` | 16 | threads for header reads |
+
+Full run: `python -m experiments.exp00c_seg_eval_manifest.run --tag paper_v1` (a few minutes; the first run fills the header cache). Outputs: the manifest, plus `sources`, `cases`, `dropped`, `coverage`, `candidates_per_source` in `results.json`.
 
 <!-- end -->
 
@@ -199,7 +235,26 @@ same `--seed`, `--backends` and `--max-lesions-per-case` (exp01 default -1, exp0
 
 ### exp03_matcher_alone
 
-(not implemented)
+Given the annotated lesions of both scans (nothing to miss), which pairs are the same lesion? This is the ceiling of the identity task: every later experiment's drop (segmenter-supplied lesions, other datasets) is measured from here.
+
+| flag | default | meaning |
+|---|---|---|
+| `--data-root` | /nnunet_data/Longitudinal-CT | Longitudinal-CT layout root (meta/, targetsTrBL/FU/) |
+| `--cache` | required | graph cache root built with the fixed builder (must hold train, val and test caches of the current CACHE_TAG) |
+| `--config` | lesionglue/configs/complete.json | lesionglue training config (fixed max_steps recipe) |
+| `--max-steps` | -1 | override the config's max_steps; -1 = use the config (smoke runs use a few steps) |
+| `--parallel-folds` | 1 | trainings run at the same time (one fits the GPU well; five saturate it) |
+| `--skip-training` | off | only score folds whose last.ckpt already exists in this run (with --resume) |
+
+```bash
+python -m experiments.exp03_matcher_alone.run --tag paper_v1 --cache /nnunet_data/lesion_tracking/cache_v9_merge
+```
+
+Runtime: 5 trainings of 7400 steps (about 30 min each alone on one A100; `--parallel-folds` runs several at once) plus seconds of scoring.
+
+Depends on: experiments.common, experiments.scoring, folds.py (this folder), the lesionglue console entry `lesionglue.cli.train`.
+
+Caveats: Numbers are only valid on a cache built with the fixed graph builder (merge-target nodes; plan Sec. 2) — the tag in the cache name must be the current lesionglue CACHE_TAG. The with-unclear sensitivity row is not produced by this version. Training uses the owner's recipe seed unless --seed is given; the fold split seed is fixed at 0.
 
 <!-- end -->
 
@@ -291,30 +346,125 @@ Smoke: any exp03 run dir works (`--tag smoke`); a synthetic k = 3 merge gave hun
 
 ### exp07_internal_set
 
-(not implemented)
+Does the system generalise to unseen patients of the same centre? Masks (Dice, NSD, detection) and lesion identity (recall per class, edge F1) for our pipeline against the prompted longitudinal segmenter of Kirchhoff et al. (LongiSeg), both driven by the same propagated points on the same scan pairs. exp08 runs the very same protocol on a new centre (site tag only).
+
+| flag | default | meaning |
+|---|---|---|
+| `--data-root` | /nnunet_data/Longitudinal-CT | dataset root in the Longitudinal-CT layout (inputsTrBL/FU, targetsTrBL/FU, meta) |
+| `--patients-csv` | none | CSV with a `patient` column (default: <data root>/test_patients.csv) |
+| `--patients` | none | explicit patient ids instead of --patients-csv (debugging; ids then appear in command.txt) |
+| `--methods` | ['ours', 'kirchhoff'] | systems to run: ours (nanoUNet + LesionGlue) and/or kirchhoff (LongiSeg) |
+| `--seg-ckpt` | /nnunet_data/NanoUNet_results/nanounet/Dataset900_Merged_nnUNetResEncUNetLPlans_h200_smallpv_f0_h200_final_ft250_fromlast/finetune/bestsel-epoch=153-val_prompt_score=0.7261.ckpt | our segmenter checkpoint <model dir>/finetune/<file>.ckpt (EMA weights; plans.json etc. are read from <model dir>) |
+| `--matcher-ckpt` | /nnunet_data/lesion_tracking/runs/final_v8_noval/seed0/last.ckpt | our matcher checkpoint (EMA weights); the owner repoints the default after the retrain |
+| `--longiseg-model` | /nnunet_data/LongiSeg/_model | LongiSeg model folder (plans.json, dataset.json, fold_0..fold_4); research-only weights |
+| `--anonymize`, `--no-anonymize` | True | replace patient ids by a salted hash in every output (files, tables, log); coordinates are never stored |
+| `--salt` | none | salt of the patient hash (default: random, kept in artifacts/salt.txt so --resume and --rescore reproduce the ids) |
+| `--validate-only` | off | check layout, models and environment, report every problem with its Fix, run nothing |
+| `--tau` | none | decoder cut-off; default: the matcher checkpoint's own dust_tau (only change it to rescore a sensitivity row) |
+
+```bash
+python -m experiments.exp07_internal_set.run --tag paper_v1
+```
+
+Runtime: About 1 min per patient for ours (segmentation dominates) plus about 2.2 s per lesion and ~15 s model loading for Kirchhoff: one to two hours for 60 patients on one A100. Resumable (--resume skips finished units and retries failed ones); --rescore takes a minute.
+
+Depends on: experiments/common.py, scoring.py, segment.py (via pipeline.py), pipeline.py; kirchhoff.py (this folder); the LongiSeg source and model; the matcher and segmenter checkpoints. exp08 and exp09 import this folder.
+
+Caveats: NUMBERS ARE NOT MEANINGFUL until the matcher is retrained on the fixed graph cache (experiments plan Sec. 2) and `MATCHER_FINAL` is repointed: the current checkpoint never saw a merge-target node, merge recall is 0 by construction. A patient either method cannot process stays as status failed and counts as fully missed in identity (its mask lesions are unknown and absent from the mask table). The LongiSeg model is research-only (Longitudinal-CT, KiTS23, LiTS, PanTS licences). `predict_case` needs a CUDA device. Kirchhoff's `new` class is null by construction, its macro recall averages the three defined classes.
 
 <!-- end -->
 
 ### exp08_external_set
 
-(not implemented)
+Does the system generalise to a new centre it has never seen? The same masks (Dice, NSD, detection) and identity (recall per class, edge F1) protocol as exp07, our pipeline against Kirchhoff et al. (LongiSeg), on scan pairs from a partner lab.
+
+| flag | default | meaning |
+|---|---|---|
+| `--data-root` | /nnunet_data/Longitudinal-CT | dataset root in the Longitudinal-CT layout (inputsTrBL/FU, targetsTrBL/FU, meta) |
+| `--patients-csv` | none | CSV with a `patient` column (default: <data root>/test_patients.csv) |
+| `--patients` | none | explicit patient ids instead of --patients-csv (debugging; ids then appear in command.txt) |
+| `--methods` | ['ours', 'kirchhoff'] | systems to run: ours (nanoUNet + LesionGlue) and/or kirchhoff (LongiSeg) |
+| `--seg-ckpt` | /nnunet_data/NanoUNet_results/nanounet/Dataset900_Merged_nnUNetResEncUNetLPlans_h200_smallpv_f0_h200_final_ft250_fromlast/finetune/bestsel-epoch=153-val_prompt_score=0.7261.ckpt | our segmenter checkpoint <model dir>/finetune/<file>.ckpt (EMA weights; plans.json etc. are read from <model dir>) |
+| `--matcher-ckpt` | /nnunet_data/lesion_tracking/runs/final_v8_noval/seed0/last.ckpt | our matcher checkpoint (EMA weights); the owner repoints the default after the retrain |
+| `--longiseg-model` | /nnunet_data/LongiSeg/_model | LongiSeg model folder (plans.json, dataset.json, fold_0..fold_4); research-only weights |
+| `--anonymize`, `--no-anonymize` | True | replace patient ids by a salted hash in every output (files, tables, log); coordinates are never stored |
+| `--salt` | none | salt of the patient hash (default: random, kept in artifacts/salt.txt so --resume and --rescore reproduce the ids) |
+| `--validate-only` | off | check layout, models and environment, report every problem with its Fix, run nothing |
+| `--tau` | none | decoder cut-off; default: the matcher checkpoint's own dust_tau (only change it to rescore a sensitivity row) |
+
+```bash
+python -m experiments.exp08_external_set.run --data-root /data/site_b --patients-csv /data/site_b/test_patients.csv --tag site_b
+```
+
+Runtime: Same as exp07: about 1-2 h for 60 patients on one A100; resumable; --rescore takes a minute.
+
+Depends on: experiments/exp07_internal_set/run.py (the protocol), kirchhoff.py (same folder), and everything exp07 depends on.
+
+Caveats: Same as exp07: numbers are not meaningful until the matcher is retrained on the fixed graph cache and `MATCHER_FINAL` is repointed; the LongiSeg weights are research-only. Nothing here is tuned on the external data.
 
 <!-- end -->
 
 ### exp09_pantrack
 
-(not implemented)
+Does the identity matcher transfer to a disease and a scan protocol it never saw? PanTrack is pancreatic cancer with hepatic metastases (portal-venous CT, one centre); our pipeline is scored at Lstar and Lhat beside Di Veroli, Qahqaie and (when available) Kirchhoff.
+
+| flag | default | meaning |
+|---|---|---|
+| `--data-root` | /nnunet_data/raw/PanTrack | PanTrack root (images/, labels/, totalseg/, patients.json, tracking.json, organ_annotations.json) |
+| `--patients` | none | explicit PanTrack patient ids (e.g. PanTrack_001) instead of all 45 (smoke runs) |
+| `--settings` | ['A', 'C'] | ours: A = Lstar, C = Lhat (both scans segmented), B = annotated BL + segmented FU; none = baselines only |
+| `--matcher-ckpt` | /nnunet_data/lesion_tracking/runs/final_v8_noval/seed0/last.ckpt | matcher checkpoint (EMA weights); the owner repoints the default after the retrain |
+| `--tau` | none | decoder cut-off; default: the matcher checkpoint's own dust_tau |
+| `--baselines-run` | none | exp04 RUN_DIR whose chosen_params give the Di Veroli / Qahqaie hyperparameters (default: Di Veroli published d=1 p=0.10 r=7, no Qahqaie) |
+| `--workers` | 3 | processes for the scan statistics and the baseline inputs (each holds two CTs in memory) |
+
+```bash
+python -m experiments.exp09_pantrack.run --tag paper_v1 --baselines-run /nnunet_data/experiments/exp04_baselines/<run_id>
+```
+
+Runtime: Validation and baselines are CPU (reading 161 labels + TotalSeg masks and 322 CT reads: about 10-15 min with 4 workers). Ours: a few minutes per pair and setting on one A100 (scans are up to 972 slices); 116 pairs with B and C take hours: resumable with --resume, rescore with --rescore.
+
+Depends on: experiments/common.py, scoring.py, pipeline.py, segment.py, exp04_baselines/{diveroli,qahqaie}.py, pantrack.py; an exp04 run for the tuned baseline parameters (optional); exp07 kirchhoff.py (not yet).
+
+Caveats: NUMBERS ARE NOT MEANINGFUL until MATCHER_FINAL is repointed to the model retrained on the fixed graph cache (graph-builder defects, plan Sec. 2). Liver annotations are partial by design: an unannotated detected lesion is a false positive for every method, depressing precision and the ceiling. The vocabulary has no pancreas, so pancreatic lesions enter as `Others`, a type the matcher saw rarely. Lesions new in FU cannot be prompted (no propagated point exists for them), so under B and C they are never found. Di Veroli's dilation is in voxels on an anisotropic grid (0.4 mm slices). Patient 3988c7f88e is a Longitudinal-CT case and does not occur here.
 
 <!-- end -->
 
 ## Runbook
 
-(the lead fills this from the agents' reports: the run order of the plan's Sec. 10 with the literal commands and estimated runtimes)
+Order of the full runs (plan Sec. 10). Every run is tagged `paper_v1`; after each one, `git add experiments/results && git commit && git push` (the container is ephemeral). A failed
+sanity check means investigate, not tune. GPU work runs one slot at a time on a 40 GB card (on a larger card two slots may overlap; keep at most 2 `nanounet_predict`-sized jobs
+inside a slot and stagger their starts by about 20 s, the host RAM cap is what bites first).
+
+```bash
+cd /nanoUNet
+export NANOUNET_RAW=/nnunet_data/NanoUNet_raw NANOUNET_PREPROCESSED=/nnunet_data/NanoUNet_preprocessed NANOUNET_RESULTS=/nnunet_data/NanoUNet_results NANOUNET_TMPDIR=/tmp/nanounet_tmp
+```
+
+| slot | what | command | est. | sanity check |
+|---|---|---|---|---|
+| 0 | exp00a, b, c (CPU, done once; rerun exp00a after the v9 cache) | `python -m experiments.exp00a_data_audit.run --tag paper_v1` (also `exp00b_calibration`, `exp00c_seg_eval_manifest`) | minutes | every `claims` row `match: true` or explained in `notes` |
+| 0b | rebuild the graph cache, retrain the final matcher, repoint `MATCHER_FINAL` in `experiments/common.py` | `lesionglue_preprocess --split all --root /nnunet_data/Longitudinal-CT --cache /nnunet_data/lesion_tracking/cache_v9_merge --prop-fill unigradicon --jobs 16`, then `lesionglue_train --config lesionglue/configs/complete.json --root /nnunet_data/Longitudinal-CT --cache /nnunet_data/lesion_tracking/cache_v9_merge --out /nnunet_data/lesion_tracking/runs/final_v9_noval/seed0 --seed 0` | ~10 min + ~30 min | training prints `fit=250 val=0` |
+| 1 | exp03 (5 fold trainings + scoring) | `python -m experiments.exp03_matcher_alone.run --tag paper_v1 --cache /nnunet_data/lesion_tracking/cache_v9_merge` | 5 x ~30 min (`--parallel-folds` to overlap) | every patient in exactly one fold; four class recalls and edge F1 present; missed-patient count printed |
+| 2 | exp04 and exp06 (CPU, may overlap slot 3) | `python -m experiments.exp04_baselines.run --tag paper_v1 --ours-run /nnunet_data/experiments/exp03_matcher_alone/<run_id>`; `python -m experiments.exp06_limits.run --tag paper_v1 --from-run /nnunet_data/experiments/exp03_matcher_alone/<run_id>` | ~1 h; seconds | `expressible_classes` per method; chosen hyperparameters stored per fold, none tuned on its own fold |
+| 3 | exp05 (settings A, B, C), then exp07 on the held-out 60 as validation | `python -m experiments.exp05_full_pipeline.run --tag paper_v1`; `python -m experiments.exp07_internal_set.run --tag paper_v1` | ~2 h; ~1-2 h | setting A identity ceiling 1.0 in every class; patient `3988c7f88e` present as `status` missed; exp07 "ours" equals exp05 setting B (same numbers) |
+| 4 | exp01 (nanoUNet, then the external systems from the owner's prediction folders), exp02 | commands in the exp01 and exp02 sections | 1-2 h; 2-4 h | exp02 at s=0 equals exp01 S1 on the same clicks |
+| 5 | exp09 | `python -m experiments.exp09_pantrack.run --tag paper_v1 --baselines-run /nnunet_data/experiments/exp04_baselines/<run_id>` | hours (resumable) | validation table has no errors; Kirchhoff column empty by design |
+| 6 | exp07 / exp08 at the partner labs | see the container contract below | minutes per case | outside this machine |
 
 <!-- end -->
 
 ## Container contract (private-set experiments 07 and 08)
 
-(written by the exp07/exp08 agent: flags and paths, the single Python environment, GPU need, licence note)
+What the owner's container must provide so that `python -m experiments.exp07_internal_set.run` (new centre: `exp08_external_set`) runs with no network and nothing else installed:
+
+- **Python environment:** this repo (`pip install -e . --no-deps`) with its normal dependencies, plus `difference_weighting` 0.1.0 (`pip3 install --no-deps git+https://github.com/MIC-DKFZ/Longitudinal-Difference-Weighting.git`) and the LongiSeg source on `PYTHONPATH` (default `/nnunet_data/LongiSeg`). LongiSeg runs in the same process and the same environment (checked: it reproduces its own environment's prediction to 1 voxel of 22,764 on torch 2.7.1). One environment, no second venv.
+- **Models (read-only):** matcher `--matcher-ckpt` (default `common.MATCHER_FINAL`), segmenter `--seg-ckpt` (default `common.SEG_CKPT`, EMA), LongiSeg `--longiseg-model`. All paths are flags; nothing is written outside `--out-root`.
+- **Data:** a folder in the Longitudinal-CT layout (`inputsTrBL|FU/<pid>_<idx>.nii.gz` + `.json`, `targetsTrBL|FU/`, `meta/<pid>.csv`) and a patient list CSV with a `patient` column (`--data-root`, `--patients-csv`). The FU points in `inputsTrFU/*.json` must be PROPAGATED points made with the propagation the public dataset shipped with; the code never registers.
+- **GPU:** one CUDA device (LongiSeg `predict_case` needs CUDA); about 1-2 h for 60 patients on an A100-class card.
+- **Privacy:** `--anonymize` (default on) replaces patient ids by a salted hash in every file, table and log line and keeps no coordinates; the id map and the salt stay in `artifacts/` at the lab. Only `results.json` / `table.md` come back.
+- **First command in the container:** `python -m experiments.exp07_internal_set.run --validate-only --data-root ... --patients-csv ...` checks layout, models and environment and lists every problem with a `Fix:` line.
+- **Licence:** the LongiSeg weights are research-only (Longitudinal-CT, KiTS23, LiTS, PanTS licences).
+- **Validation before it travels:** run exp07 on the held-out 60 (the default) and check that "ours" equals exp05 setting B.
 
 <!-- end -->

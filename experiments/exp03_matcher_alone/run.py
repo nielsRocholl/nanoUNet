@@ -19,7 +19,7 @@ METHOD     1. For each fold k train the selection-free recipe of the deployed mo
 OUTPUT     results.json tables: per_patient (patient x decoder x tau: fold, status, node counts, class counts), per_fold, tau_sensitivity;
            summary: per decoder recall per class + macro, ceilings, matcher error, edge P/R/F1 with CIs. artifacts/folds/fold<k>/ (checkpoints,
            train logs), artifacts/scores/<pid>.npz.
-COMMAND    python -m experiments.exp03_matcher_alone.run --tag paper_v1 --cache /nnunet_data/lesion_tracking/<rebuilt cache dir>
+COMMAND    python -m experiments.exp03_matcher_alone.run --tag paper_v1 --cache /nnunet_data/lesion_tracking/cache_v9_merge
 DEPENDS ON experiments.common, experiments.scoring, folds.py (this folder), the lesionglue console entry `lesionglue.cli.train`.
 RUNTIME    5 trainings of 7400 steps (about 30 min each alone on one A100; `--parallel-folds` runs several at once) plus seconds of scoring.
 CAVEATS    Numbers are only valid on a cache built with the fixed graph builder (merge-target nodes; plan Sec. 2) — the tag in the cache name
