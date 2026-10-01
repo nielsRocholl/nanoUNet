@@ -8,14 +8,16 @@ DATA       Same manifest, tiers (seen-cohort, outside; scans without lesions are
            at once (deployment); partial annotations are fine (only S1-type clicks), pseudo / spheres labels score detection only.
 METHOD     1. Per lesion and replicate r, ONE offset is drawn from the empirical registration-error table (size-bin matched, backends --backends) and
               only scaled afterwards: click(s) = seed + s * offset (table voxels -> mm -> native voxels, rounded), so the curves over s are nested.
-              Replicate 0 at s = 1 is exactly exp01's S1 clicks (same --seed, --backends, --max-lesions-per-case).
+              Replicate 0 at s = exp01's --click-noise-scale (default 0: the seed itself) is exactly exp01's S1 clicks (same --seed, --backends,
+              --max-lesions-per-case).
            2. One pass per (s, r) over the whole scan with nanoUNet (EMA, clustered tiles, one preprocessing per scan); s = 0 (true seed) has one
               replicate only. Masks go to artifacts/preds/s<s>_r<r>/, clicks to artifacts/prompts/s<s>_r<r>/.
            3. Score per lesion (Dice, NSD@1 mm, hit = IoU > 0.1) and store for every (lesion, replicate, s): the effective click offset (native voxels,
               mm vector, magnitude), size mm / bin, cohort, click_hit (click inside its own lesion), Dice, hit. Summaries: by scale and by offset
               magnitude (mm bins), each per size bin, patient-level bootstrap CIs over lesion-level values.
-           4. Cross-check (--crosscheck-run EXP01_RUN_DIR): exp02 at s = 1, replicate 0 must equal exp01's S1 Dice lesion by lesion (same clicks); s = 0
-              versus that S1 is the cost of the noise itself. Both go to `notes` and `summary.crosscheck`.
+           4. Cross-check (--crosscheck-run EXP01_RUN_DIR): exp02 at s = exp01's click-noise scale (read from its results.json), replicate 0, must equal
+              exp01's S1 Dice lesion by lesion (identical click files); when that scale is not 1, exp01's S1 minus exp02's s = 1 replicate 0 is the cost
+              of the noise itself. Both go to `notes` and `summary.crosscheck`.
 OUTPUT     results.json tables: per_lesion (every (lesion, replicate, s) value), by_scale, by_offset_mm; artifacts/: lesions, prompts, preds.
 COMMAND    python -m experiments.exp02_prompt_noise.run --tag paper_v1 --crosscheck-run /nnunet_data/experiments/exp01_segmentation/<RUN_ID>
 DEPENDS ON experiments/common.py, segment.py, scoring.py; helpers of experiments/exp01_segmentation/run.py (lesion cache, CI); an exp01 run for --crosscheck-run.
@@ -194,24 +196,27 @@ def curve_rows(rows: list[dict]) -> tuple[list[dict], list[dict]]:
 
 
 def crosscheck(rows: list[dict], args: argparse.Namespace, art: Path) -> tuple[dict, list[str]]:
-    """exp02 (s=1, replicate 0) against exp01's S1 on the same clicks, and s=0 against it (the noise cost)."""
+    """exp02 at exp01's click-noise scale (replicate 0) against exp01's S1 on the same clicks; the noise cost is exp01's S1 minus exp02's s=1."""
     if args.crosscheck_run is None:
-        return {"done": False}, ["cross-check against exp01 NOT run (no --crosscheck-run): s=0 vs S1 and s=1 replicate 0 vs S1 are unverified"]
+        return {"done": False}, ["cross-check against exp01 NOT run (no --crosscheck-run): exp02 at exp01's scale vs its S1 is unverified"]
     res = json.loads((args.crosscheck_run / "results.json").read_text())
+    ref = float(res["definitions"].get("click_noise", {}).get("scale", 1.0))  # runs before the flag existed were noisy at s = 1
+    abort_if([problem(f"exp01 run {args.crosscheck_run.name} used click-noise scale {ref:g}, which is not in --scales {args.scales}", "exp02 scales that include exp01's scale (0 by default)", f"rerun with --scales 0 {ref:g} ...")] if ref not in args.scales else [])
     s1 = {(r["case"], r["lesion_id"]): r for r in res["tables"]["per_lesion"] if r["method"] == "nanounet" and r["scenario"] == "S1" and r["dice"] is not None}
-    one = {(r["case"], r["lesion_id"]): r for r in rows if r["scale"] == 1.0 and r["replicate"] == 0 and r["dice"] is not None}
-    zero = {(r["case"], r["lesion_id"]): r for r in rows if r["scale"] == 0.0 and r["dice"] is not None}
-    same = [k for k in one if k in s1 and (args.crosscheck_run / "artifacts" / "prompts" / "S1" / f"{k[0]}.json").is_file()
-            and S.read_clicks(args.crosscheck_run / "artifacts" / "prompts" / "S1" / f"{k[0]}.json") == S.read_clicks(prompt_file(art, key_of(1.0, 0), k[0]))]
-    diffs = [abs(one[k]["dice"] - s1[k]["dice"]) for k in same]
-    out = {"done": True, "exp01_run": str(args.crosscheck_run), "lesions_compared": len(same), "max_abs_dice_diff_s1_r0": max(diffs) if diffs else None,
+    at = lambda sc: {(r["case"], r["lesion_id"]): r for r in rows if r["scale"] == sc and r["replicate"] == 0 and r["dice"] is not None}
+    same_ref = at(ref)
+    same = [k for k in same_ref if k in s1 and (args.crosscheck_run / "artifacts" / "prompts" / "S1" / f"{k[0]}.json").is_file()
+            and S.read_clicks(args.crosscheck_run / "artifacts" / "prompts" / "S1" / f"{k[0]}.json") == S.read_clicks(prompt_file(art, key_of(ref, 0), k[0]))]
+    diffs = [abs(same_ref[k]["dice"] - s1[k]["dice"]) for k in same]
+    out = {"done": True, "exp01_run": str(args.crosscheck_run), "exp01_click_noise_scale": ref, "lesions_compared": len(same), "max_abs_dice_diff_s1": max(diffs) if diffs else None,
            "lesions_with_identical_dice": sum(d < 1e-6 for d in diffs), "click_files_identical_for_cases": len({k[0] for k in same})}
-    both = [k for k in zero if k in s1]
+    note = f"cross-check vs exp01 {args.crosscheck_run.name}: s={ref:g} replicate 0 vs S1 on identical click files, {len(same)} lesions, max |Dice diff| {out['max_abs_dice_diff_s1']}"
+    one = at(1.0)
+    both = [k for k in one if k in s1] if ref != 1.0 else []
     if both:
-        out["noise_cost_dsc_s1_minus_s0"] = mean([s1[k]["dice"] for k in both]) - mean([zero[k]["dice"] for k in both])
-        out["lesions_s0_vs_s1"] = len(both)
-    note = (f"cross-check vs exp01 {args.crosscheck_run.name}: s=1 replicate 0 vs S1 on identical click files, {len(same)} lesions, max |Dice diff| "
-            f"{out['max_abs_dice_diff_s1_r0']}; s=0 vs S1 (the noise itself): mean Dice difference {out.get('noise_cost_dsc_s1_minus_s0')} over {len(both)} lesions")
+        out["noise_cost_dsc_s1_minus_s1r0"] = mean([s1[k]["dice"] for k in both]) - mean([one[k]["dice"] for k in both])
+        out["lesions_noise_cost"] = len(both)
+        note += f"; exp01 S1 minus exp02 s=1 replicate 0 (the cost of the noise): mean Dice difference {out['noise_cost_dsc_s1_minus_s1r0']} over {len(both)} lesions"
     return out, [note]
 
 

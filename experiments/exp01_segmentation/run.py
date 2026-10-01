@@ -1,7 +1,8 @@
 """exp01 - Segmentation, four prompt scenarios and prompt drop  (paper: Experiments > Segmentation; Table 'nine experiments' row 1)
 
-QUESTION   Does the segmenter answer the point rather than the image, in the four situations deployment produces: every lesion clicked (S1), only some
-           clicked (S2), nothing clicked (S3) and a click on empty tissue (S4)? And how much of its Dice does the prompt itself carry (prompt drop)?
+QUESTION   Given an ideal click, does the segmenter answer the point rather than the image, in the four situations deployment produces: every lesion
+           clicked (S1), only some clicked (S2), nothing clicked (S3) and a click on empty tissue (S4)? And how much of its Dice does the prompt itself
+           carry (prompt drop)? Only the segmenter is evaluated: click error is exp02's subject, so the clicks here carry no registration noise.
 WHY        Fills the segmentation row of the paper: per-lesion Dice, NSD@1 mm and detection with patient-level CIs, the selectivity margin of S2, the
            quietness of S3/S4, and the paired S1 minus prompt-zeroed drop; the same scenario click files feed ULS+ and nnInteractive.
 DATA       Cases of the eval manifest (experiments/exp00c_seg_eval_manifest/seg_eval_v1.json, one scan per case, tiers seen-cohort / outside / healthy),
@@ -10,8 +11,10 @@ DATA       Cases of the eval manifest (experiments/exp00c_seg_eval_manifest/seg_
            needs a fully annotated case with >= 2 lesions; S3/S4 run on healthy scans and fully annotated cases.
 METHOD     1. Per case, once: GT instances in the native grid; a seed per lesion (argmax EDT, inside the lesion); the S2 subset (strict, seeded), the S4
               decoy (tissue, >= 5 mm from every lesion). Cached as artifacts/lesions/<case>.json.
-           2. Clicks = seed + one draw of the empirical registration-error table (size-bin matched, resampled voxels -> mm -> native voxels), i.e. the
-              propagated-style noisy clicks of deployment; written as click JSONs to artifacts/prompts/<scenario>/<case>.json (S3 = no click).
+           2. Clicks = the seed itself (--click-noise-scale 0, the default), so every click lies inside its lesion at its deepest point. With a scale
+              s > 0 the seed is displaced by s x one draw of the empirical registration-error table (size-bin matched, resampled voxels -> mm ->
+              native voxels), the noisy clicks of deployment (exp02 sweeps this). Written as click JSONs to artifacts/prompts/<scenario>/<case>.json
+              (S3 = no click); these files are THE prompts of every system, nanoUNet reads them too, and their sha256 digest is stored in results.json.
            3. nanoUNet, whole volume, EMA weights, clustered tiles near the clicks, one preprocessing per scan: S1, S1 with the prompt channels zeroed
               (prompt drop), S2, S4. S3 is a tile with no click in it: the S1 tiles with zeroed prompt on scans with lesions (a call with an empty
               click list does nothing), the decoy tile with zeroed prompt on lesion-free scans. Masks go to artifacts/preds/nanounet/<scenario>/.
@@ -30,13 +33,17 @@ DEPENDS ON experiments/common.py, experiments/segment.py, experiments/scoring.py
 RUNTIME    About 20-40 s per case on one A100 (4 passes), i.e. 1-2 h at the default caps; the external systems take their own time. Resumable per pass.
 CAVEATS    S3 for nanoUNet is a tile with no click, for the external systems it is an empty click list (they emit nothing without a click), so S3 is only
            comparable in spirit. Decoys sit on voxels above -500 HU, so the CT couch can be hit rarely. --max-lesions-per-case makes S1 partly selective.
-           Overlap policy `common` (default) scores every method on the cases clean for all three systems; `own` on each method's own clean set.
+           Overlap policy `common` (default) scores every method on the cases clean for all three systems; `own` on each method's own clean set
+           (different cases per method: not paired, avoid for the headline). With more than one method under `common` the run stops if the methods
+           did not get identical cases, lesions and scenarios (parity check). With the default scale 0 the click is deterministic (--seed and
+           --backends then have no effect on the clicks) and the S1 click-in-lesion rate must be 1.0 (checked, printed in the notes).
 """
 
 # nanochat-style: allow R1 (experiment code, LOC cap waived by owner 2026-09-30)
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import time
 from collections import defaultdict
@@ -88,6 +95,26 @@ def prompt_file(art: Path, scenario: str, cid: str) -> Path:
     return art / "prompts" / scenario / f"{cid}.json"
 
 
+def prompts_digest(art: Path) -> str:
+    """sha256 over every click file (relative name + bytes, sorted): the owner and the partners can verify they ran the same clicks."""
+    h = hashlib.sha256()
+    for f in sorted((art / "prompts").glob("S[1-4]/*.json")):
+        h.update(str(f.relative_to(art / "prompts")).encode() + f.read_bytes())
+    return h.hexdigest()
+
+
+def parity_problems(lrows: list[dict], crows: list[dict], methods: list[str]) -> list[str]:
+    """Under --overlap-policy common every method must have been scored on the same cases, lesions and scenarios (S1_noprompt is nanoUNet-only)."""
+    if len(methods) < 2:
+        return []
+    keys = {m: ({(r["case"], r["scenario"]) for r in crows if r["method"] == m and r["scenario"] in EXTERNAL_SCENARIOS and r["status"] == "ok"},
+                {(r["case"], r["lesion_id"], r["scenario"]) for r in lrows if r["method"] == m and r["scenario"] in EXTERNAL_SCENARIOS}) for m in methods}
+    ref = methods[0]
+    return [problem(f"{m} was scored on different (case, scenario, lesion) sets than {ref}: {len(keys[m][0] ^ keys[ref][0])} case-scenarios and {len(keys[m][1] ^ keys[ref][1])} lesion rows differ",
+                    "identical cases, lesions and scenarios for every method under --overlap-policy common", "rerun with the same tier / source / case filters for every method, and --overlap-policy common")
+            for m in methods[1:] if keys[m] != keys[ref]]
+
+
 def pred_file(art: Path, ext_dirs: dict[str, Path], method: str, scenario: str, cid: str, n_used: int) -> Path:
     """Where a method's mask for (scenario, case) lives; nanoUNet's S3 on a scan with lesions is its S1_noprompt pass."""
     if method != "nanounet":
@@ -111,7 +138,8 @@ def parse() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     ap.add_argument("--methods", nargs="*", choices=["nanounet"], default=["nanounet"], help="methods run here (nanounet); leave empty to score only --external folders")
     ap.add_argument("--external", nargs="*", action="extend", default=[], metavar="NAME=DIR", help="prediction folders of systems run elsewhere, NAME in nninteractive, uls_plus; repeatable (layout: external_preds.py)")
     ap.add_argument("--overlap-policy", choices=["common", "own"], default="common", help="common: score every method on the cases clean for all three systems; own: each method on its own clean set")
-    ap.add_argument("--backends", nargs="+", choices=list(S.BACKEND_CHOICES), default=list(S.BACKEND_CHOICES), help="registration-error table backends the click offsets are drawn from")
+    ap.add_argument("--click-noise-scale", type=float, default=0.0, help="scale s of the registration-error offset added to each lesion's seed click: 0 = the ideal seed (default, segmenter-only evaluation), 1 = the full empirical draw")
+    ap.add_argument("--backends", nargs="+", choices=list(S.BACKEND_CHOICES), default=list(S.BACKEND_CHOICES), help="registration-error table backends the click offsets are drawn from (only used with --click-noise-scale > 0)")
     ap.add_argument("--emit-prompts-only", action="store_true", help="write lesion caches and click files to artifacts/, then stop (input for the external systems)")
     return ap, ap.parse_args()
 
@@ -127,6 +155,8 @@ def validate(args: argparse.Namespace) -> tuple[list[dict], dict[str, Path], lis
         problems.append(problem("nothing to score: --methods is empty and no --external was given", "nanounet and/or --external NAME=DIR", "rerun with --methods nanounet"))
     if args.emit_prompts_only and (args.rescore or args.external):
         problems.append(problem("--emit-prompts-only together with --rescore or --external", "prompts are written before any system runs", "drop --rescore / --external"))
+    if args.click_noise_scale < 0:
+        problems.append(problem(f"--click-noise-scale {args.click_noise_scale} is negative", "a scale >= 0 (0 = ideal seed, 1 = the full empirical offset)", "rerun with --click-noise-scale 0"))
     cases, p = S.filter_cases(manifest, args.tier, args.sources, args.max_cases_per_source)
     problems += p
     pool = [c for c in cases if any(S.method_ok(c, m, args.overlap_policy) for m in methods)]
@@ -187,10 +217,10 @@ def get_cache(case: dict, args: argparse.Namespace, art: Path) -> dict:
 
 
 def make_prompts(cache: dict, args: argparse.Namespace, wanted: tuple[str, ...]) -> dict[str, list]:
-    """Click lists per scenario: the noisy S1 clicks are seed + replicate-0 draw for every lesion (draw order independent of the cap)."""
+    """Click lists per scenario: S1 = seed + scale x replicate-0 draw for every lesion (scale 0 = the seed; the draw order is independent of the cap)."""
     sp, shape, cid = tuple(cache["spacing_zyx"]), tuple(cache["shape_zyx"]), cache["case_id"]
     offs = dict(zip((l["id"] for l in cache["lesions"]), S.draw_offsets(cache["lesions"], S.rng_for(args.seed, cid, "offset", 0), tuple(args.backends))))
-    s1 = [(str(l["id"]), S.offset_click(l, offs[l["id"]], 1.0, sp, shape)) for l in cache["lesions"] if l["id"] in cache["used"]]
+    s1 = [(str(l["id"]), S.offset_click(l, offs[l["id"]], args.click_noise_scale, sp, shape)) for l in cache["lesions"] if l["id"] in cache["used"]]
     all_p = {"S1": s1, "S2": [c for c in s1 if int(c[0]) in (cache["subset"] or [])], "S3": [], "S4": [("decoy", tuple(cache["decoy"]))] if cache["decoy"] else []}
     return {s: all_p[s] for s in ("S1", "S2", "S3", "S4") if s in wanted}
 
@@ -204,6 +234,11 @@ def passes(sc: tuple[str, ...], n_used: int) -> list[tuple[str, bool]]:
 def emit(cases: list[dict], args: argparse.Namespace, art: Path) -> dict[str, dict]:
     """Phase A: lesion caches and click files for every case (deterministic, cheap to redo)."""
     caches = {}
+    mark = art / "prompts" / "click_noise_scale.txt"
+    abort_if([problem(f"{art} holds clicks and masks made with --click-noise-scale {mark.read_text().strip()}, this run has {args.click_noise_scale}", "one click scale per run directory (masks on disk belong to the old clicks)",
+                      "rerun with a new --tag, or with the original --click-noise-scale")] if mark.is_file() and float(mark.read_text()) != args.click_noise_scale else [])
+    mark.parent.mkdir(parents=True, exist_ok=True)
+    mark.write_text(f"{args.click_noise_scale}\n")
     with nano_progress(len(cases), "lesions + prompts") as adv:
         for c in cases:
             cache = get_cache(c, args, art)
@@ -373,19 +408,24 @@ def main() -> None:
         if "nanounet" in methods:
             segment_all([c for c in cases if S.method_ok(c, "nanounet", args.overlap_policy)], caches, args, art)
     lrows, crows, dropped = score_all(cases, methods, ext_dirs, caches, args, art)
+    abort_if(parity_problems(lrows, crows, methods) if args.overlap_policy == "common" else [])
+    s1_clicks = [r["click_hit"] for r in lrows if r["scenario"] == "S1" and r["method"] == methods[0] and r.get("click_hit") is not None]
+    click_rate = float(np.mean(s1_clicks)) if s1_clicks else None
     table = summarise(lrows, crows, methods)
     summary = nest(table, crows)
     noise = load_table(DEFAULT_ERROR_TABLE)
     definitions = {"protocol": "longiseg_lesion_v1: per-lesion Dice, NSD, detection; case-mean then mean over cases", "iou_hit": IOU_HIT, "nsd_tol_mm": NSD_TOL_MM,
                    "gt_lesion_connectivity": S.GT_CONNECTIVITY, "pred_component_connectivity": S.PRED_CONNECTIVITY, "click_seed": "argmax EDT (mm) of the native GT component, inside the lesion",
-                   "click_noise": {"table": DEFAULT_ERROR_TABLE, "table_spacing_zyx": noise["spacing_zyx"], "backends": args.backends, "scale": 1.0, "draw": "empirical, size-bin matched, once per lesion"},
+                   "click_noise": {"scale": args.click_noise_scale, "table": DEFAULT_ERROR_TABLE, "table_spacing_zyx": noise["spacing_zyx"], "backends": args.backends, "draw": "empirical, size-bin matched, once per lesion (unused at scale 0)"},
+                   "prompts_sha256": prompts_digest(art), "s1_click_in_lesion_rate": click_rate,
                    "inference": {"mode": "clustered", "border_expand": True, "amp": True, "batch_size": 8, "cluster_margin_frac": 0.1, "seg_ckpt": str(SEG_CKPT), "ema": SEG_EMA},
                    "decoy": {"min_distance_mm": S.DECOY_GUARD_MM, "tissue_hu_above": S.TISSUE_HU}, "overlap_policy": args.overlap_policy,
                    "s3": "nanounet: tile with zeroed prompt at the S1 clicks (scan with lesions) or at the decoy (scan without); external: empty click list"}
     notes = [f"{m}: {len(v)} of {len(cases)} pooled cases not scored under --overlap-policy {args.overlap_policy}" for m, v in dropped.items() if v]
     notes += [f"{r['method']} {r['case']}: {r['status']}" for r in crows if r["status"] != "ok"]
     notes += ["S3 for nanoUNet is a tile with no click (a call with an empty click list does nothing); external systems get an empty click list",
-              f"click offsets drawn from backends {args.backends}; --max-lesions-per-case {args.max_lesions_per_case} (-1 = all): a cap leaves the other lesions unclicked in S1"]
+              f"click noise scale {args.click_noise_scale} (0 = the ideal seed; S1 click inside its lesion in {click_rate} of the clicked lesions, must be 1.0 at scale 0); prompts sha256 {prompts_digest(art)[:16]}",
+              f"click offsets drawn from backends {args.backends} (scale > 0 only); --max-lesions-per-case {args.max_lesions_per_case} (-1 = all): a cap leaves the other lesions unclicked in S1"]
     run.finish(summary, {"per_lesion": lrows, "per_case": crows, "summary_table": table, "cases": [{k: c[k] for k in ("case_id", "patient_id", "tier", "source", "cancer_type", "annotation", "image", "overlap")} for c in cases]},
                table_md=markdown(summary), definitions=definitions, notes=notes,
                next_cmd=f"python -m experiments.exp02_prompt_noise.run --tag paper_v1 --crosscheck-run {run.dir}")

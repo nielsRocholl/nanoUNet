@@ -152,7 +152,9 @@ Full run: `python -m experiments.exp00c_seg_eval_manifest.run --tag paper_v1` (a
 
 ### exp01_segmentation
 
-Does the segmenter answer the point rather than the image? Four scenarios per scan (S1 all lesions clicked, S2 a strict subset, S3 no click,
+Given an ideal click, does the segmenter answer the point rather than the image? Only the segmenter is evaluated, so the clicks carry no
+registration noise (`--click-noise-scale 0`: each click is the argmax-EDT seed of its GT lesion, always inside it; click error is exp02's job).
+Four scenarios per scan (S1 all lesions clicked, S2 a strict subset, S3 no click,
 S4 a decoy click on empty tissue) plus the prompt drop (S1 with the prompt channels zeroed), scored per lesion (Dice, NSD at 1 mm, detection at
 IoU > 0.1) with patient-level bootstrap CIs. Cases come from the exp00c manifest; nanoUNet runs here, ULS+ and nnInteractive are run by the owner
 on the click files this run writes and are scored from their prediction folders. Shared code: `experiments/segment.py`.
@@ -176,7 +178,8 @@ python -m experiments.exp01_segmentation.run --tag paper_v1_prompts --emit-promp
 | `--methods` | `nanounet` | methods run here; empty (`--methods`) scores only `--external` folders |
 | `--external` | none | `NAME=DIR` prediction folders, NAME = `nninteractive` or `uls_plus`; repeatable |
 | `--overlap-policy` | `common` | `common`: every method on the cases clean for all three systems (headline); `own`: each method on its own clean set |
-| `--backends` | both | registration-error table backends the click offsets are drawn from (`original`, `unigradicon`) |
+| `--click-noise-scale` | 0.0 | scale s of the registration-error offset added to each seed click: 0 = ideal seed, 1 = the full empirical draw |
+| `--backends` | both | registration-error table backends the click offsets are drawn from (`original`, `unigradicon`; only used with `--click-noise-scale` > 0) |
 | `--emit-prompts-only` | off | write lesion caches and click files to `artifacts/`, then stop |
 | `--rescore` | none | `RUN_DIR` whose `artifacts/` (caches, clicks, nanoUNet masks) are rescored; needed to add `--external` folders later |
 | `--tag`, `--out-root`, `--resume`, `--seed`, `--limit-patients`, `--device` | | common flags (table above) |
@@ -185,7 +188,9 @@ python -m experiments.exp01_segmentation.run --tag paper_v1_prompts --emit-promp
 `<scenario>` in `S1`, `S2`, `S3`, `S4`. Format: `{"points": [{"name": "<lesion id or decoy>", "point": [x, y, z]}]}`, `[x, y, z]` = 0-based voxel
 index of that case's image (NIfTI/SimpleITK index order, native grid). S1 = one click per lesion, S2 = the clicked subset (only cases with >= 2
 lesions), S4 = one decoy click, S3 = `{"points": []}` (no click). The image of a case is the `image` column of `cases.csv` of the run
-(`case_id` = file stem of the prediction). Clicks are identical for every system (seeded per case).
+(`case_id` = file stem of the prediction). Clicks are identical for every system (deterministic: at scale 0 the seed itself). The sha256 of all click files is stored in `results.json`
+(`definitions.prompts_sha256`) and printed in the notes, so partner labs can verify they ran the same clicks. Under `--overlap-policy common` (default)
+every method is scored on exactly the same cases, lesions and scenarios; the run stops with a list if they differ (parity check). Do not use `own` for the headline table.
 
 **Prediction folders.** `DIR/<scenario>/<case_id>.nii.gz` for every case the system is scored on and every scenario that case has a click
 file for (`S1`, `S2`, `S3`, `S4`; no `S1_noprompt`). Binary mask, non-zero = lesion foreground, same grid (size) as the case image; a system
@@ -205,7 +210,8 @@ nothing; ULS+ saw the held-out Longitudinal-CT cases, so under `--overlap-policy
 What does registration error cost the segmenter, and at which click offset does a lesion stop being found? For every lesion and replicate one
 offset is drawn from the empirical registration-error table and scaled by s; all lesions of a scan are clicked at once and segmented in one pass
 per (s, replicate). Dice and detection are reported against the scale and against the effective offset in mm, per lesion-size bin, with
-patient-level bootstrap CIs. Replicate 0 at s = 1 uses exactly exp01's S1 clicks, which `--crosscheck-run` verifies.
+patient-level bootstrap CIs. Replicate 0 at s = exp01's click-noise scale (0 by default, the ideal seed) uses exactly exp01's S1 clicks, which
+`--crosscheck-run` verifies; exp01 minus exp02 at s = 1 is then the cost of the noise.
 
 ```bash
 python -m experiments.exp02_prompt_noise.run --tag paper_v1 --crosscheck-run /nnunet_data/experiments/exp01_segmentation/<RUN_ID>
