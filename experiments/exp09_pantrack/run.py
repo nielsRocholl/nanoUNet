@@ -185,7 +185,7 @@ def main() -> None:
     layout_pairs = T.build_layout(args.data_root, idx, pairs, stats, layout) if not rescore else {}
     cases = scoring.load_pairs(layout, list(by_pid))
     patient_of = {p["pid"]: p["patient"] for p in pairs}
-    lesions = [{"pid": r["pid"], "scan_pair": f"{by_pid[r['pid']]['bl']} -> {by_pid[r['pid']]['fu']}", "lesion_id": r["lesion_id"], "organ": r["organ"], "type": r["lesion_type"], "class": r["topology_class"]}
+    lesions = [{"pid": p["pid"], "scan_pair": f"{p['bl']} -> {p['fu']}", "lesion_id": r["lesion_id"], "organ": r["organ"], "type": r["lesion_type"], "class": r["topology_class"]}
                for p in pairs for r in T.pair_rows(idx, p, stats)]
     per_pair: list[dict] = []
     methods: dict[str, dict[str, dict]] = {}

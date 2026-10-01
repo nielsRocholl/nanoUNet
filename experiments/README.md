@@ -83,13 +83,13 @@ def main() -> None:
 | 00c | `exp00c_seg_eval_manifest` | evaluation data for rows 1 and 2 | implemented, full run paper_v1 (`seg_eval_v1.json`) |
 | 01 | `exp01_segmentation` | 1 | implemented (smoke ok); full run needs the owner's ULS+ and nnInteractive prediction folders for the external rows |
 | 02 | `exp02_prompt_noise` | 2 | implemented (smoke ok) |
-| 03 | `exp03_matcher_alone` | 3 | implemented (20-step smoke ok); full run on `cache_v9_merge` |
+| 03 | `exp03_matcher_alone` | 3 | implemented (20-step smoke ok on `cache_v9_merge`, with exp04 and exp06 smoked on its output); full run on `cache_v9_merge` |
 | 04 | `exp04_baselines` | 4 | implemented, smoke-tested (8 patients); full run needs an exp03 run |
-| 05 | `exp05_full_pipeline` | 5 | implemented (smoke ok); numbers wait for the matcher retrain |
+| 05 | `exp05_full_pipeline` | 5 | implemented (smoke ok on `cache_v9_merge`, 3 patients); numbers wait for the matcher retrain |
 | 06 | `exp06_limits` | 6 | implemented, smoke-tested on a synthetic merge; full run needs an exp03 run |
-| 07 | `exp07_internal_set` | 7 | implemented (smoke ok); numbers wait for the matcher retrain |
-| 08 | `exp08_external_set` | 8 | implemented (thin wrapper of exp07, no smoke yet) |
-| 09 | `exp09_pantrack` | 9 | implemented (smoke ok); numbers wait for the matcher retrain |
+| 07 | `exp07_internal_set` | 7 | implemented (smoke ok last session; `--validate-only` re-checked, needs `difference_weighting` installed); numbers wait for the matcher retrain |
+| 08 | `exp08_external_set` | 8 | implemented (thin wrapper of exp07; startup check only, no end-to-end smoke) |
+| 09 | `exp09_pantrack` | 9 | implemented (smoke ok, 3 patients; a `pid` lookup bug found and fixed); numbers wait for the matcher retrain |
 
 Each experiment owns one section below (arguments, literal full-run command, outputs). Edit only your own section; the
 `<!-- end -->` lines keep neighbouring edits from colliding in git.
