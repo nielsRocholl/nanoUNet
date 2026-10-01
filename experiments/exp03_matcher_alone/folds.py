@@ -35,7 +35,7 @@ from lesionglue.data.source.splits import fold_map, pool_patient_ids
 
 N_PATIENTS = 300
 GRAPH_CACHE = Path("/nnunet_data/lesion_tracking/cache_v9")  # lesionglue_preprocess --split all --prop-fill unigradicon (fixed builder, tag v8_native)
-FOLD_CONFIG = MATCHER_FINAL.parent / "config.json"  # the final_v8_noval recipe: fixed max_steps, no validation, last.ckpt
+FOLD_CONFIG = MATCHER_FINAL.parent / "config.json"  # the final_v9_noval recipe: fixed max_steps, no validation, last.ckpt
 
 
 def all_patients() -> list[str]:

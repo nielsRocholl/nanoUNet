@@ -85,11 +85,11 @@ def main() -> None:
 | 02 | `exp02_prompt_noise` | 2 | implemented (smoke ok) |
 | 03 | `exp03_matcher_alone` | 3 | implemented (20-step smoke ok on `cache_v9_merge`, with exp04 and exp06 smoked on its output); full run on `cache_v9_merge` |
 | 04 | `exp04_baselines` | 4 | implemented, smoke-tested (8 patients); full run needs an exp03 run |
-| 05 | `exp05_full_pipeline` | 5 | implemented (smoke ok on `cache_v9_merge`, 3 patients); numbers wait for the matcher retrain |
+| 05 | `exp05_full_pipeline` | 5 | implemented (smoke ok with the retrained matcher, 3 patients); full run on the held-out 60 |
 | 06 | `exp06_limits` | 6 | implemented, smoke-tested on a synthetic merge; full run needs an exp03 run |
-| 07 | `exp07_internal_set` | 7 | implemented (smoke ok last session; `--validate-only` re-checked, needs `difference_weighting` installed); numbers wait for the matcher retrain |
-| 08 | `exp08_external_set` | 8 | implemented (thin wrapper of exp07; startup check only, no end-to-end smoke) |
-| 09 | `exp09_pantrack` | 9 | implemented (smoke ok, 3 patients; a `pid` lookup bug found and fixed); numbers wait for the matcher retrain |
+| 07 | `exp07_internal_set` | 7 | implemented (smoke ok with the retrained matcher and `difference_weighting` 0.2.0; ours equals exp05 setting B on 3 patients); full run on the held-out 60 |
+| 08 | `exp08_external_set` | 8 | implemented (thin wrapper of exp07, smoke ok on 2 patients) |
+| 09 | `exp09_pantrack` | 9 | implemented (smoke ok, 3 patients; a `pid` lookup bug found and fixed); needs an exp04 run for the tuned baselines |
 
 Each experiment owns one section below (arguments, literal full-run command, outputs). Edit only your own section; the
 `<!-- end -->` lines keep neighbouring edits from colliding in git.
@@ -355,7 +355,7 @@ Does the system generalise to unseen patients of the same centre? Masks (Dice, N
 | `--patients` | none | explicit patient ids instead of --patients-csv (debugging; ids then appear in command.txt) |
 | `--methods` | ['ours', 'kirchhoff'] | systems to run: ours (nanoUNet + LesionGlue) and/or kirchhoff (LongiSeg) |
 | `--seg-ckpt` | /nnunet_data/NanoUNet_results/nanounet/Dataset900_Merged_nnUNetResEncUNetLPlans_h200_smallpv_f0_h200_final_ft250_fromlast/finetune/bestsel-epoch=153-val_prompt_score=0.7261.ckpt | our segmenter checkpoint <model dir>/finetune/<file>.ckpt (EMA weights; plans.json etc. are read from <model dir>) |
-| `--matcher-ckpt` | /nnunet_data/lesion_tracking/runs/final_v8_noval/seed0/last.ckpt | our matcher checkpoint (EMA weights); the owner repoints the default after the retrain |
+| `--matcher-ckpt` | /nnunet_data/lesion_tracking/runs/final_v9_noval/seed0/last.ckpt | our matcher checkpoint (EMA weights) |
 | `--longiseg-model` | /nnunet_data/LongiSeg/_model | LongiSeg model folder (plans.json, dataset.json, fold_0..fold_4); research-only weights |
 | `--anonymize`, `--no-anonymize` | True | replace patient ids by a salted hash in every output (files, tables, log); coordinates are never stored |
 | `--salt` | none | salt of the patient hash (default: random, kept in artifacts/salt.txt so --resume and --rescore reproduce the ids) |
@@ -385,7 +385,7 @@ Does the system generalise to a new centre it has never seen? The same masks (Di
 | `--patients` | none | explicit patient ids instead of --patients-csv (debugging; ids then appear in command.txt) |
 | `--methods` | ['ours', 'kirchhoff'] | systems to run: ours (nanoUNet + LesionGlue) and/or kirchhoff (LongiSeg) |
 | `--seg-ckpt` | /nnunet_data/NanoUNet_results/nanounet/Dataset900_Merged_nnUNetResEncUNetLPlans_h200_smallpv_f0_h200_final_ft250_fromlast/finetune/bestsel-epoch=153-val_prompt_score=0.7261.ckpt | our segmenter checkpoint <model dir>/finetune/<file>.ckpt (EMA weights; plans.json etc. are read from <model dir>) |
-| `--matcher-ckpt` | /nnunet_data/lesion_tracking/runs/final_v8_noval/seed0/last.ckpt | our matcher checkpoint (EMA weights); the owner repoints the default after the retrain |
+| `--matcher-ckpt` | /nnunet_data/lesion_tracking/runs/final_v9_noval/seed0/last.ckpt | our matcher checkpoint (EMA weights) |
 | `--longiseg-model` | /nnunet_data/LongiSeg/_model | LongiSeg model folder (plans.json, dataset.json, fold_0..fold_4); research-only weights |
 | `--anonymize`, `--no-anonymize` | True | replace patient ids by a salted hash in every output (files, tables, log); coordinates are never stored |
 | `--salt` | none | salt of the patient hash (default: random, kept in artifacts/salt.txt so --resume and --rescore reproduce the ids) |
@@ -413,7 +413,7 @@ Does the identity matcher transfer to a disease and a scan protocol it never saw
 | `--data-root` | /nnunet_data/raw/PanTrack | PanTrack root (images/, labels/, totalseg/, patients.json, tracking.json, organ_annotations.json) |
 | `--patients` | none | explicit PanTrack patient ids (e.g. PanTrack_001) instead of all 45 (smoke runs) |
 | `--settings` | ['A', 'C'] | ours: A = Lstar, C = Lhat (both scans segmented), B = annotated BL + segmented FU; none = baselines only |
-| `--matcher-ckpt` | /nnunet_data/lesion_tracking/runs/final_v8_noval/seed0/last.ckpt | matcher checkpoint (EMA weights); the owner repoints the default after the retrain |
+| `--matcher-ckpt` | /nnunet_data/lesion_tracking/runs/final_v9_noval/seed0/last.ckpt | matcher checkpoint (EMA weights) |
 | `--tau` | none | decoder cut-off; default: the matcher checkpoint's own dust_tau |
 | `--baselines-run` | none | exp04 RUN_DIR whose chosen_params give the Di Veroli / Qahqaie hyperparameters (default: Di Veroli published d=1 p=0.10 r=7, no Qahqaie) |
 | `--workers` | 3 | processes for the scan statistics and the baseline inputs (each holds two CTs in memory) |

@@ -49,7 +49,7 @@ HOLDOUT_CSV = LONGI_ROOT / "test_patients.csv"
 SEG_MODEL_DIR = Path("/nnunet_data/NanoUNet_results/nanounet/Dataset900_Merged_nnUNetResEncUNetLPlans_h200_smallpv_f0_h200_final_ft250_fromlast")
 SEG_CKPT = SEG_MODEL_DIR / "finetune" / "bestsel-epoch=153-val_prompt_score=0.7261.ckpt"  # owner-chosen 2026-09-30, see seg-checkpoint sweep
 SEG_EMA = True
-MATCHER_FINAL = Path("/nnunet_data/lesion_tracking/runs/final_v8_noval/seed0/last.ckpt")  # selection-free, trained on the 240 pool
+MATCHER_FINAL = Path("/nnunet_data/lesion_tracking/runs/final_v9_noval/seed0/last.ckpt")  # selection-free, trained on the 240 train+val pool, graph cache v9 (merge-target nodes, uniGradICON fill)
 LONGISEG_DIR = Path("/nnunet_data/LongiSeg")
 LONGISEG_MODEL = LONGISEG_DIR / "_model"
 BOOTSTRAP_B = 10_000
