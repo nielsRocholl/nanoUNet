@@ -1,0 +1,97 @@
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ exp00c_seg_eval_manifest  |  run 20260930T184041Z_paper_v1                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+                                     config                                     
+  argument          value                                              source   
+  tag               paper_v1                                           cli      
+  out-root          /nnunet_data/experiments                           default  
+  resume            None                                               default  
+  seed              0                                                  default  
+  limit-patients    -1                                                 default  
+  cap               30                                                 default  
+  val-per-cohort    5                                                  default  
+  include-luna25    False                                              default  
+  manifest-out      /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf…    default  
+  header-cache      /root/.cache/nanounet_tmp/exp00c_headers.json      default  
+  corpus-dir        /nnunet_data/NanoUNet_preprocessed/Dataset900_…    default  
+  workers           16                                                 default  
+
+
+SegRap25: 120 candidates, 0 dropped by header, 120 patients alive, 30 selected
+
+ScienceDBLungTumorCT: 1167 candidates, 0 dropped by header, 1167 patients alive,
+30 selected
+
+NSCLC-Radiogenomics: 88 candidates, 0 dropped by header, 88 patients alive, 30 
+selected
+
+HCC-TACE-SEG: 74 candidates, 0 dropped by header, 74 patients alive, 30 selected
+
+SpinalMyelomaCT: 72 candidates, 0 dropped by header, 67 patients alive, 30 
+selected
+
+BoneTumorLungMetastasis: 61 candidates, 0 dropped by header, 61 patients alive, 
+30 selected
+
+PANORAMA: 479 candidates, 99 dropped by header, 379 patients alive, 30 selected
+
+AbdomenAtlas-esophagus: 154 candidates, 0 dropped by header, 154 patients alive,
+30 selected
+
+AbdomenAtlas-endometrial: 79 candidates, 0 dropped by header, 79 patients alive,
+30 selected
+
+
+                                    coverage                                    
+  tier           source           cancer type     cases    patients    lesions  
+  healthy        HealthyImage…    none            40       40          0        
+  healthy        HealthyImage…    none            82       82          0        
+  healthy        HealthyImage…    none            50       50          0        
+  outside        AbdomenAtlas…    endometrial     30       30          42       
+  outside        AbdomenAtlas…    esophagus       30       30          30       
+  outside        BoneTumorLun…    lung            30       30          532      
+  outside        HCC-TACE-SEG     liver           30       30          77       
+  outside        NSCLC-Radiog…    lung            30       30          68       
+  outside        PANORAMA         pancreas        30       30          30       
+  outside        ScienceDBLun…    lung            30       30          39       
+  outside        SegRap25         head-neck       30       30          352      
+  outside        SpinalMyelom…    bone            30       30          1469     
+  seen-cohort    Longitudinal…    melanoma        132      60          1141     
+  seen-cohort    val:Adrenal-…    adrenal         5        5           5        
+  seen-cohort    val:CLM          liver           5        5           15       
+  seen-cohort    val:KiTS23       kidney          5        5           5        
+  seen-cohort    val:LIDC-IDRI    lung            5        5           17       
+  seen-cohort    val:LNDb         lung            5        5           17       
+  seen-cohort    val:LiTS         liver           5        5           32       
+  seen-cohort    val:Longitud…    skin_melano…    5        5           49       
+  seen-cohort    val:MCT-LTDi…    liver           5        5           10       
+  seen-cohort    val:MSD-Colon    colon           5        5           5        
+  seen-cohort    val:MSD-Liver    liver           5        5           18       
+  seen-cohort    val:MSD-Lung     lung            5        5           9        
+  seen-cohort    val:MSD-Panc…    pancreas        5        5           5        
+  seen-cohort    val:MSWAL        abdomen_mix…    5        5           5        
+  seen-cohort    val:Mediasti…    lymph_node      5        5           37       
+  seen-cohort    val:PanTS        pancreas        5        5           6        
+  seen-cohort    val:RIDER-Lu…    lung            5        5           5        
+  seen-cohort    val:RUMC-Bone    bone            5        5           35       
+  seen-cohort    val:RUMC-Pan…    pancreas        2        2           3        
+  seen-cohort    val:WAW-TACE     liver           5        5           8        
+  seen-cohort    val:WORC-CRLM    liver           5        5           5        
+  seen-cohort    val:WORC-GIST    gist            5        5           9        
+done exp00c_seg_eval_manifest | run: 20260930T184041Z_paper_v1 | wall: 159.9 s |
+dir: /nnunet_data/experiments/exp00c_seg_eval_manifest/20260930T184041Z_paper_v1
+  cases.seen-cohort: 234
+  cases.outside: 270
+  cases.healthy: 172
+  n_cases: 676
+  n_lesions: 4080
+  n_dropped_header: 99
+  manifest: 
+/nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00c_seg_eval_
+manifest/seg_eval_v1.json
+  sources_kept: ['SegRap25', 'ScienceDBLungTumorCT', 'NSCLC-Radiogenomics', 
+'HCC-TACE-SEG', 'SpinalMyelomaCT', 'BoneTumorLungMetastasis', 'PANORAMA', 
+'AbdomenAtlas-esophagus', 'AbdomenAtlas-endometrial']
+next: cat 
+/nnunet_data/experiments/exp00c_seg_eval_manifest/20260930T184041Z_paper_v1/tabl
+e.md

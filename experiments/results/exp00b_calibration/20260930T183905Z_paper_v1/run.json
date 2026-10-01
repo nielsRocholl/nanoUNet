@@ -1,0 +1,92 @@
+{
+ "exp": "exp00b_calibration",
+ "run_id": "20260930T183905Z_paper_v1",
+ "status": "ok",
+ "started_utc": "2026-09-30T18:39:05+00:00",
+ "finished_utc": "2026-09-30T18:39:16+00:00",
+ "wall_sec": 11.6,
+ "command": "python /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00b_calibration/run.py --tag paper_v1",
+ "argv": [
+  "/nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00b_calibration/run.py",
+  "--tag",
+  "paper_v1"
+ ],
+ "cwd": "/nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf",
+ "resolved_args": {
+  "tag": "paper_v1",
+  "out_root": "/nnunet_data/experiments",
+  "resume": null,
+  "seed": 0,
+  "limit_patients": -1,
+  "data_root": "/nnunet_data/Longitudinal-CT",
+  "table": null,
+  "holdout_csv": "/nnunet_data/Longitudinal-CT/test_patients.csv",
+  "segmenter_plan": "/nnunet_data/NanoUNet_preprocessed/Dataset900_Merged/nnUNetResEncUNetLPlans_h200_smallpv.json",
+  "workers": 16
+ },
+ "resolved_command": "python /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00b_calibration/run.py --tag paper_v1 --out-root /nnunet_data/experiments --seed 0 --limit-patients -1 --data-root /nnunet_data/Longitudinal-CT --holdout-csv /nnunet_data/Longitudinal-CT/test_patients.csv --segmenter-plan /nnunet_data/NanoUNet_preprocessed/Dataset900_Merged/nnUNetResEncUNetLPlans_h200_smallpv.json --workers 16",
+ "git": {
+  "sha": "399d457f0540a8e5bd972c9cce78a8021c166d92",
+  "dirty": true,
+  "diff_sha256": "1cef138d3c7e2f580d6e84b8c8d6394ac94b3d216f19fe08d6e47a0b4226e555"
+ },
+ "host": "dlc-arceus",
+ "gpu": {
+  "name": "NVIDIA A100-SXM4-40GB",
+  "mem": "40960 MiB"
+ },
+ "versions": {
+  "python": "3.11.3",
+  "torch": "2.7.1+cu118",
+  "lightning": "2.5.2",
+  "torch_geometric": "2.8.0",
+  "numpy": "1.26.4",
+  "simpleitk": "2.5.2"
+ },
+ "seeds": {
+  "seed": 0
+ },
+ "env": {
+  "NANOUNET_RAW": "/nnunet_data/NanoUNet_raw",
+  "NANOUNET_PREPROCESSED": "/nnunet_data/NanoUNet_preprocessed",
+  "NANOUNET_RESULTS": "/nnunet_data/NanoUNet_results",
+  "NANOUNET_TMPDIR": "/root/.cache/nanounet_tmp",
+  "LongiSeg_raw": null,
+  "LongiSeg_preprocessed": null,
+  "LongiSeg_results": null
+ },
+ "inputs": [
+  {
+   "name": "registration error table",
+   "path": "/nnunet_data/Longitudinal-CT/derivatives/registration_error_table.json",
+   "kind": "file",
+   "bytes": 385347,
+   "mtime_utc": "2026-07-27T10:47:05+00:00",
+   "sha256": "bb5e893f976574190ea83625ed2c8c38ba3b96b02a08aab3411fade636029ad0"
+  },
+  {
+   "name": "holdout csv",
+   "path": "/nnunet_data/Longitudinal-CT/test_patients.csv",
+   "kind": "file",
+   "bytes": 668,
+   "mtime_utc": "2026-07-27T09:06:45+00:00",
+   "sha256": "e06bdadba5104775c392dee26dae0f377b5f9f1f96b0252b0927d2ac61acc3cd"
+  },
+  {
+   "name": "segmenter plan",
+   "path": "/nnunet_data/NanoUNet_preprocessed/Dataset900_Merged/nnUNetResEncUNetLPlans_h200_smallpv.json",
+   "kind": "file",
+   "bytes": 5928,
+   "mtime_utc": "2026-09-02T17:14:43+00:00",
+   "sha256": "0af2811835afe654e9f55d9bdc9ac25a555e0b189905b64c835fd52e1ed47f21"
+  }
+ ],
+ "rescored_from": null,
+ "resumes": [],
+ "outputs": {
+  "run_dir": "/nnunet_data/experiments/exp00b_calibration/20260930T183905Z_paper_v1",
+  "mirror_dir": "/nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/results/exp00b_calibration/20260930T183905Z_paper_v1",
+  "artifacts_dir": "/nnunet_data/experiments/exp00b_calibration/20260930T183905Z_paper_v1/artifacts"
+ },
+ "mirror_skipped": []
+}

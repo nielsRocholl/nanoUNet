@@ -1,0 +1,4 @@
+split,n_patients_in_split,n_patients_with_graph,n_graphs,n_patients_multi_graph,edges_replayed,positives_replayed,edges_cache_meta,positives_cache_meta,matches_cache_meta
+train,192,180,199,17,55410,1659,55410,1659,True
+val,48,46,48,2,7806,340,7806,340,True
+test,60,57,59,2,11366,462,11366,462,True

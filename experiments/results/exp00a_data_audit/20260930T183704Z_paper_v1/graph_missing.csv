@@ -1,0 +1,18 @@
+patient,graph_split,why,n_bl_pair,n_fu_pair,n_unclear_pair,in_holdout60
+06eb133bbf,train,"FU region 0: 2 BL nodes, 0 FU nodes",2,0,0,False
+06eb61b839,train,"FU region 0: 0 BL nodes, 9 FU nodes",8,9,0,False
+0777d5c17d,train,"FU region 0: 1 BL nodes, 0 FU nodes",1,0,0,False
+0aa1883c64,train,"FU region 0: 1 BL nodes, 0 FU nodes",1,0,0,False
+19f3cd308f,train,"FU region 0: 3 BL nodes, 0 FU nodes",3,0,0,False
+5878a7ab84,train,"FU region 0: 2 BL nodes, 0 FU nodes",2,0,0,False
+8e98d81f82,train,"FU region 0: 0 BL nodes, 3 FU nodes",11,3,0,False
+a3c65c2974,train,"FU region 0: 1 BL nodes, 0 FU nodes",1,0,0,False
+b73ce398c3,train,"FU region 0: 3 BL nodes, 0 FU nodes",3,0,0,False
+d296c101da,train,"FU region 0: 1 BL nodes, 0 FU nodes",1,0,0,False
+d947bf06a8,train,"FU region 0: 13 BL nodes, 0 FU nodes",13,0,0,False
+e56954b4f6,train,"FU region 0: 1 BL nodes, 0 FU nodes",1,0,0,False
+c6f057b865,val,"FU region 0: 0 BL nodes, 6 FU nodes; FU region 1: 1 BL nodes, 0 FU nodes",0,6,0,False
+fc22130974,val,"FU region 0: 2 BL nodes, 0 FU nodes",2,0,0,False
+07e1cd7dca,test,"FU region 0: 2 BL nodes, 0 FU nodes",2,0,0,True
+6883966fd8,test,"FU region 0: 3 BL nodes, 0 FU nodes",3,0,0,True
+cfa0860e83,test,"FU region 0: 9 BL nodes, 0 FU nodes",9,0,0,True

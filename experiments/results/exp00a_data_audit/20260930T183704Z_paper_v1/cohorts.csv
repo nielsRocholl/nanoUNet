@@ -1,0 +1,22 @@
+cohort_id,paper_name,region,paper_volumes,volumes_splits_final,volumes_cohorts_json,volumes_dataset_json,n_train,n_val,val_share,val_within_one_case_of_15pct
+d013,Longitudinal-CT,Whole body,537,537,537,537,456,81,0.1508,True
+d024,LIDC-IDRI,Thorax,897,897,897,897,762,135,0.1505,True
+d012,LNDb,Thorax,216,216,216,216,184,32,0.1481,True
+d015,MSD Lung,Thorax,63,63,63,63,54,9,0.1429,True
+d029,RIDER Lung CT,Thorax,59,59,59,59,49,10,0.1695,False
+d030,Mediastinal LN,Thorax,120,120,120,120,102,18,0.15,True
+d027,MCT-LTDiag,Liver,516,516,516,516,439,77,0.1492,True
+d019,WAW-TACE,Liver,232,232,232,232,197,35,0.1509,True
+d011,CRLM,Liver,197,197,197,197,167,30,0.1523,True
+d017,MSD Liver,Liver,130,130,130,130,110,20,0.1538,True
+d023,LiTS,Liver,126,126,126,126,107,19,0.1508,True
+d020,WORC CRLM,Liver,77,77,77,77,65,12,0.1558,True
+d028,PanTS,Pancreas,880,880,880,880,748,132,0.15,True
+d016,MSD Pancreas,Pancreas,281,281,281,281,239,42,0.1495,True
+d026,RUMC Pancreas,Pancreas,13,13,13,119,11,2,0.1538,True
+d022,KiTS23,Other abdomen,489,489,489,489,416,73,0.1493,True
+d018,MSWAL,Other abdomen,284,284,284,284,241,43,0.1514,True
+d021,WORC GIST,Other abdomen,245,245,245,245,208,37,0.151,True
+d014,MSD Colon,Other abdomen,126,126,126,126,107,19,0.1508,True
+d031,Adrenal-ACC-Ki67,Other abdomen,51,51,51,51,43,8,0.1569,True
+d025,RUMC Bone,Bone,151,151,151,151,128,23,0.1523,True

@@ -1,0 +1,10 @@
+patient,side,scan_index,status,n_expected,n_missing_points,n_wrong_points
+289dff0766,BL,0,points missing/wrong,12,6,0
+577bcc914f,BL,0,points missing/wrong,23,2,0
+671f8ff3e6,BL,0,points missing/wrong,30,1,0
+73278a4a86,BL,0,points missing/wrong,4,3,0
+84d9ee44e4,BL,1,json missing,1,1,0
+8e98d81f82,BL,0,points missing/wrong,11,8,0
+a0a080f42e,BL,0,points missing/wrong,4,1,0
+c4258e0f53,BL,0,points missing/wrong,8,2,0
+c4de9fe968,BL,0,points missing/wrong,54,4,0

@@ -1,0 +1,48 @@
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ exp00b_calibration  |  run 20260930T183905Z_paper_v1                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+                                     config                                     
+  argument          value                                              source   
+  tag               paper_v1                                           cli      
+  out-root          /nnunet_data/experiments                           default  
+  resume            None                                               default  
+  seed              0                                                  default  
+  limit-patients    -1                                                 default  
+  data-root         /nnunet_data/Longitudinal-CT                       default  
+  table             None                                               default  
+  holdout-csv       /nnunet_data/Longitudinal-CT/test_patients.csv     default  
+  segmenter-plan    /nnunet_data/NanoUNet_preprocessed/Dataset900_…    default  
+  workers           16                                                 default  
+
+reproduction: original: recomputed [383, 935, 682, 195, 105, 59] vs shipped 
+[381, 932, 676, 194, 104, 57]; unigradicon: recomputed [351, 843, 591, 188, 101,
+102] vs shipped [351, 835, 576, 184, 97, 85]
+done exp00b_calibration | run: 20260930T183905Z_paper_v1 | wall: 11.6 s | dir: 
+/nnunet_data/experiments/exp00b_calibration/20260930T183905Z_paper_v1
+  table_matches_shipped: False
+  shipped_rows_reproduced.original: 2344/2344
+  shipped_rows_reproduced.unigradicon: 2128/2128
+  n_per_bin_recomputed.original: [383, 935, 682, 195, 105, 59]
+  n_per_bin_recomputed.unigradicon: [351, 843, 591, 188, 101, 102]
+  n_per_bin_shipped.original: [381, 932, 676, 194, 104, 57]
+  n_per_bin_shipped.unigradicon: [351, 835, 576, 184, 97, 85]
+  recomputed_rows_absent_from_table.original: 15
+  recomputed_rows_absent_from_table.unigradicon: 48
+  overall_median_mm.original: 4.053
+  overall_median_mm.unigradicon: 5.628
+  holdout60_share_of_table.original.rows_from_holdout60: 399
+  holdout60_share_of_table.original.rows_total: 2344
+  holdout60_share_of_table.original.share: 0.1702
+  holdout60_share_of_table.unigradicon.rows_from_holdout60: 419
+  holdout60_share_of_table.unigradicon.rows_total: 2128
+  holdout60_share_of_table.unigradicon.share: 0.1969
+  frame_check.table_spacing_zyx: 1.25 [0.781, 0.789]
+  frame_check.segmenter_plan_spacing_zyx: 2.5 [0.7578, 0.7676]
+  frame_check.z_spacing_ratio_plan_over_table: 2
+  frame_check.frame: resampled_voxels_zyx
+  frame_check.note: nanounet applies the table offsets to centroids in the 
+preprocessed grid (plan spacing) and computes the size bin with the table 
+spacing; with a z spacing of 2.5 mm against 1.25 mm the z offsets are 2x larger 
+in mm than measured
+next: cat 
+/nnunet_data/experiments/exp00b_calibration/20260930T183905Z_paper_v1/table.md

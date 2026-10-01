@@ -1,0 +1,15 @@
+fact,value
+rows_in_meta,49
+img_id_bl_values,"[0, 1]"
+img_id_fu_values,[0]
+classes_pair,"{""UNCHANGED"": 24, ""DISAPPEARING"": 23, ""NEWLYAPPEARING"": 0, ""MERGING"": 2}"
+n_unclear,0
+official_split,val
+in_holdout60,True
+graph_split,test
+graphs_in_cache,1
+merge_group_sizes,[2]
+files_on_disk,"[""inputsTrBL/3988c7f88e_00.json"", ""inputsTrBL/3988c7f88e_00.nii.gz"", ""inputsTrBL/3988c7f88e_01.json"", ""inputsTrBL/3988c7f88e_01.nii.gz"", ""inputsTrFU/3988c7f88e_00.json"", ""inputsTrFU/3988c7f88e_00.nii.gz"", ""targetsTrBL/3988c7f88e_00.nii.gz"", ""targetsTrBL/3988c7f88e_01.nii.gz"", ""targetsTrFU/3988c7f88e_00.nii.gz""]"
+click_audit_rows,[]
+in_registration_table_case_failures,"{""original"": true, ""unigradicon"": true}"
+clickfix_report,"[{""case"": ""3988c7f88e_00"", ""status"": ""ok"", ""n_lesions"": 39, ""n_flagged"": 0, ""n_sanity_bad"": 0, ""n_bl_filled"": 0, ""n_fu_filled"": 23}]"
