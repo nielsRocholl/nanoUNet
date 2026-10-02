@@ -576,3 +576,16 @@ checker (§0.2). Each commit message ends with the attribution line the session 
 Rule IDs touched/waived and the checker result; every new error message rendered; P1/P2/P3/P5 acceptance
 outputs; P7 timings, sizes, sha256 before/after, gate results; P8 throughput and wall-time extrapolation; the
 author decisions A1–A6 as implemented, and anything in this plan that turned out to be wrong.
+
+## 7. Implementation log (2026-10-02)
+
+- Preprocess (P7): 5690 cases, 1.3 TB, run interactively on a 50-CPU/375 GB node, `-np 36`, about 3.7 h wall.
+  The first 3 h ran at 12-30 cases/min because every `.b2nd` was saved with zstd clevel 8 on one thread (6-9x
+  slower than clevel 3, files 4 % larger). `save_case` now defaults to clevel 3; cases written earlier keep clevel 8
+  (identical decoded content).
+- Frozen files unchanged: `splits_final.json` 1016c2be..., `cohorts.json` ec46f4d0...; test-patient guard 0 of 60.
+- Lesion weights on the new grid: 98.9 % of 5213 centroids matched, median match distance 0.98 voxel (gate 8).
+- Not yet measured (no GPU in the preprocessing session): step time at batch 12/10/8, so `SUP_EPOCHS=200` in
+  `nanounet/scripts/slurm_foundation_900_h200.sh` is provisional.
+- CPU `nanounet_predict` with the default `--batch-size 8` at a 192^3 patch exhausts RAM (>280 GB, silently
+  OOM-killed); use `--batch-size 1` on CPU. The GPU path clamps the batch to free VRAM.
