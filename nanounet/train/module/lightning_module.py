@@ -17,7 +17,7 @@ from nanounet.diag import purge_torch_tmp
 from nanounet.model.loss.dice_metrics import prompt_pair_dice, subset_dice_row, val_step_row
 from nanounet.model.loss.losses import build_loss, consistency_dice_term
 from nanounet.model.lr_schedule import PolyLRScheduler, StretchedTailPolyLRScheduler
-from nanounet.model.mae_transfer import load_full_net, load_mae_encoder
+from nanounet.model.mae_transfer import load_foundation_encoder, load_full_net, load_mae_encoder
 from nanounet.model.network import build_net
 from nanounet.plan.plans import Plans
 from nanounet.train.module.val_metrics import log_val_metrics
@@ -41,6 +41,7 @@ class NanoUNetLM(pl.LightningModule):
         optimizer: str = "sgd",
         mae_ckpt: str | None = None,
         init_weights: str | None = None,
+        foundation_ckpt: str | None = None,
         consistency_weight: float = 0.0,
         consistency_warmup_epochs: int = 50,
         warmup_epochs: int = 0,
@@ -58,6 +59,8 @@ class NanoUNetLM(pl.LightningModule):
         self.net = build_net(self.cm, self.label_manager, self.dj, enable_deep_supervision)
         if init_weights is not None:
             load_full_net(self.net, init_weights)
+        elif foundation_ckpt is not None:
+            load_foundation_encoder(self.net, foundation_ckpt)
         elif mae_ckpt is not None:
             load_mae_encoder(self.net, mae_ckpt)
         self.loss = build_loss(self.cm, self.label_manager, enable_deep_supervision, loss_type=loss_type)

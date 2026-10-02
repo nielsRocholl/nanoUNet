@@ -31,6 +31,21 @@ python -c "import sys; import nanounet.cli.preprocess, nanounet.cli.train, nanou
 
 
 
+## Pretrained weights and license
+
+`nanounet_preprocess` downloads the DKFZ nnFoundationCNN encoder (Hugging Face `MIC-DKFZ/nnFoundationCNN`,
+license **CC-BY-SA-4.0**: share derived weights under the same license, with attribution) and `nanounet_train`
+starts from it. Cite:
+
+```bibtex
+@misc{harsy2026nnfoundation3dfoundationmodels,
+  title={nnFoundation: 3D Foundation Models for Radiology},
+  author={Constantin Ulrich Harsy and Tassilo Wald and Karol Gotkowski and others and Fabian Isensee and Klaus H. Maier-Hein},
+  year={2026}, eprint={2609.26924}, archivePrefix={arXiv}, primaryClass={cs.CV},
+  url={https://arxiv.org/abs/2609.26924}
+}
+```
+
 ## Documentation
 
 

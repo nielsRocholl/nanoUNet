@@ -13,6 +13,7 @@ import shlex
 
 from batchgenerators.utilities.file_and_folder_operations import join, maybe_mkdir_p
 
+from nanounet.cli.train_foundation import check_foundation_flags, guard_test_patients, resolve_foundation
 from nanounet.cli.train_parser import build_train_parser, train_config_rows, validate_train_args
 from core.ui import cprint, config_table, nano_header
 from nanounet.common import preprocessed_dir, quiet_lightning_runtime, raw_dir, results_dir, setup_logging
@@ -32,6 +33,7 @@ from nanounet.train.fit import run_mae_pretrain, run_supervised
 def main() -> None:
     args = build_train_parser().parse_args()
     validate_train_args(args)
+    check_foundation_flags(args)
     set_mem_diag(args.mem_diag)
     setup_logging()
     init_dataloader_ipc()
@@ -76,6 +78,8 @@ def main() -> None:
             f"Fix: pass an existing --resume path, or drop --resume to start a fresh run   (see nanounet/docs/steps/train.md)"
         )
 
+    foundation_ckpt = resolve_foundation(args, plans_path)
+    guard_test_patients(args, join(pp, ds, "splits_final.json"), dj_path)
     config_table(train_config_rows(args, ds, out), title="nanoUNet train")
 
     mae_ckpt_arg = args.mae_ckpt
@@ -84,7 +88,7 @@ def main() -> None:
 
     run_supervised(
         args, ds, plans_path, dj_path, out, ckpt_dir, accel, loggers, dl_b,
-        None if sup_resume or args.init_weights else mae_ckpt_arg, sup_resume,
+        None if sup_resume or args.init_weights else mae_ckpt_arg, sup_resume, foundation_ckpt,
     )
     cprint(f"[green]done — checkpoints in {join(out, ckpt_dir)}[/green]")
     cprint(f"next: nanounet_predict -i <cases-dir> -o <pred-dir> -m {shlex.quote(out)}", markup=False, soft_wrap=True)

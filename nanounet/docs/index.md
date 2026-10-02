@@ -1,6 +1,6 @@
 # nanoUNet documentation
 
-Minimal prompt-aware 3D ResEnc U-Net with PyTorch Lightning and optional MAE pretraining. The U-Net preprocessing, training, and setup pipeline draws a lot of inspiration from [nnU-Net](https://github.com/MIC-DKFZ/nnUNet).
+Minimal prompt-aware 3D ResEnc U-Net with PyTorch Lightning and nnFoundationCNN weights (default) or optional MAE pretraining. The U-Net preprocessing, training, and setup pipeline draws a lot of inspiration from [nnU-Net](https://github.com/MIC-DKFZ/nnUNet).
 
 ## Pipeline overview
 
@@ -21,8 +21,8 @@ flowchart LR
 Set environment variables (see [README](../README.md#environment)) then run:
 
 ```bash
-nanounet_preprocess -d 001 --planner nnUNetPlannerResEncL -np 8
-nanounet_train -d 001 -f 0 --plans nnUNetResEncUNetLPlans --config nanounet/configs/default.json
+nanounet_preprocess -d 001 -np 8   # nnFoundationCNN plans nnFoundationCNN_z1p0, z resampled to 1 mm
+nanounet_train -d 001 -f 0 --plans nnFoundationCNN_z1p0 --config nanounet/configs/default.json
 nanounet_predict -i /path/to/scans -o /path/to/out -m /path/to/run --ckpt last.ckpt
 ```
 

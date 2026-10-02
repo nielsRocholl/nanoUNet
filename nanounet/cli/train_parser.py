@@ -18,9 +18,9 @@ def build_train_parser() -> argparse.ArgumentParser:
     ap.add_argument("--config", dest="roi_cfg", default="nanounet/configs/default.json", help="ROI/prompt config JSON; relative paths are tried under cwd then the repo root.")
     ap.add_argument("--val-manifest", default=None, help="fixed validation manifest from nanounet_build_valset; omit for the legacy per-epoch random val sampling")
     ap.add_argument("--epochs", type=int, default=1000, help="Supervised training epoch budget.")
-    ap.add_argument("--lr", type=float, default=0.01, help="Supervised initial learning rate.")
+    ap.add_argument("--lr", type=float, default=None, help="Supervised initial learning rate; default 0.01, or 1e-3 with nnFoundationCNN weights.")
     ap.add_argument("--wd", type=float, default=3e-5, help="Weight decay for the supervised optimizer.")
-    ap.add_argument("--optimizer", choices=("sgd", "adamw"), default="sgd", help="Supervised optimizer.")
+    ap.add_argument("--optimizer", choices=("sgd", "adamw"), default=None, help="Supervised optimizer; default sgd.")
     ap.add_argument("--grad-clip", type=float, default=0.0, help="Max gradient norm for supervised training; 0 disables clipping.")
     ap.add_argument("--batch-size", type=int, default=None, help="Supervised batch size; None takes it from plans 3d_fullres.batch_size.")
     ap.add_argument("--iters-per-epoch", type=int, default=250, help="Supervised training batches per epoch.")
@@ -30,7 +30,7 @@ def build_train_parser() -> argparse.ArgumentParser:
     ap.add_argument("--stretched-k", type=int, default=750, help="stretched_tail_poly: epoch where the poly curve transitions into the stretched tail.")
     ap.add_argument("--stretched-ref", type=int, default=1000, help="stretched_tail_poly: reference epoch count the poly portion is shaped against.")
     ap.add_argument("--stretched-exp", type=float, default=0.9, help="stretched_tail_poly: poly exponent.")
-    ap.add_argument("--warmup-epochs", type=int, default=0, help="Linear LR warmup over the first N epochs, applied to either --lr-schedule. 0 disables it and reproduces the pre-warmup LR curve exactly.")
+    ap.add_argument("--warmup-epochs", type=int, default=None, help="Linear LR warmup over the first N epochs, applied to either --lr-schedule. Default 0 (the pre-warmup LR curve exactly), or 2 with nnFoundationCNN weights.")
     ap.add_argument("--ema-decay", type=float, default=0.0, help="Weight EMA decay (e.g. 0.999); logs val_dice_ema next to val_dice. 0 disables EMA.")
     ap.add_argument("--monitor", default="val_dice", help="Metric ModelCheckpoint tracks for best-* checkpoints.")
     ap.add_argument("--no-wandb", action="store_true", help="Disable Weights & Biases logging (a CSVLogger under metrics/ is always on regardless).")
@@ -38,10 +38,12 @@ def build_train_parser() -> argparse.ArgumentParser:
     ap.add_argument("--wandb-name", default=None, help="W&B run name; default <Dataset>_f<fold>.")
     ap.add_argument("--loss", "-loss", choices=("dc_ce", "cc_dc_ce"), default="dc_ce", metavar="MODE", help="Supervised loss: dc_ce (Dice+CE) or cc_dc_ce (CPU connected components; +100% epoch time vs dc_ce on A100-40GB, batch 2, 4 iters/epoch, median e1-e3, 2026-09-30).")
     ap.add_argument("--resume", default=None, help="Resume supervised training from this Lightning ckpt; must sit in a checkpoints/ or finetune/ dir; its recorded num_epochs must match --epochs; omit for a fresh run.")
-    ap.add_argument("--init-weights", default=None, help="Load full net weights from this supervised ckpt (fresh optimizer/epoch count); conflicts with --resume, --mae-ckpt, --mae-pretrain.")
+    ap.add_argument("--init-weights", default=None, help="Load full net weights from this supervised ckpt (fresh optimizer/epoch count); conflicts with --resume, --mae-ckpt, --mae-pretrain; skips nnFoundationCNN weights.")
     ap.add_argument("--only-prefix", default=None, help="Restrict train/val case keys to those starting with this prefix, e.g. d013_.")
     ap.add_argument("--precision", default="16-mixed", help="Precision passed to the Lightning Trainer.")
     ap.add_argument("--accelerator", default="auto", choices=("auto", "cpu", "cuda", "gpu", "mps"), help="Training device passed to the Lightning Trainer; gpu maps to cuda.")
+    ap.add_argument("--no-foundation", action="store_true", help="Ignore the plans' nnFoundationCNN weights and its defaults (lr 1e-3, 2 warmup epochs, no deep supervision).")
+    ap.add_argument("--deep-supervision", choices=("auto", "on", "off"), default="auto", help="Deep supervision heads; auto is off with nnFoundationCNN weights, on otherwise.")
     ap.add_argument("--mae-ckpt", default=None, help="Load encoder weights from this MAE checkpoint; skips the integrated MAE run even with --mae-pretrain set.")
     ap.add_argument("--mae-pretrain", action="store_true", help="Run an integrated MAE stage under <run>/mae_pretrain/ before supervised training.")
     ap.add_argument("--mae-resume", default=None, help="Resume the integrated MAE stage from this Lightning ckpt; requires --mae-pretrain, conflicts with --mae-ckpt.")
@@ -123,13 +125,16 @@ def validate_train_args(args) -> None:
 
 
 def train_config_rows(args, ds: str, out: str) -> list[tuple[str, object, str]]:
+    src = args.sources
     return [
         ("dataset", ds, "cli"),
         ("fold", args.fold, "cli"),
         ("plans", args.plans_identifier, "cli"),
         ("loss", args.loss, "cli/default"),
-        ("optimizer", args.optimizer, "cli/default"),
-        ("lr", args.lr, "cli/default"),
+        ("optimizer", args.optimizer, src["optimizer"]),
+        ("lr", args.lr, src["lr"]),
+        ("deep_supervision", args.enable_ds, src["deep_supervision"]),
+        ("no_foundation", args.no_foundation, "cli/default"),
         ("epochs", args.epochs, "cli/default"),
         ("batch_size", args.batch_size if args.batch_size is not None else "from plans", "cli/plans"),
         ("precision", args.precision, "cli/default"),
@@ -138,7 +143,7 @@ def train_config_rows(args, ds: str, out: str) -> list[tuple[str, object, str]]:
         ("mae_pretrain", args.mae_pretrain, "cli"),
         ("prompts_per_patch", args.prompts_per_patch, "cli/default"),
         ("consistency_weight", args.consistency_weight, "cli/default"),
-        ("warmup_epochs", args.warmup_epochs, "cli/default"),
+        ("warmup_epochs", args.warmup_epochs, src["warmup_epochs"]),
         ("ema_decay", args.ema_decay, "cli/default"),
         ("monitor", args.monitor, "cli/default"),
         ("val_manifest", args.val_manifest or "legacy random val", "cli/default"),

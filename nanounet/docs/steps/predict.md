@@ -72,6 +72,11 @@ TTA cat size is probed from free VRAM (no flag). `--batch-size` is a cap the eng
 
 `--ckpt last.ckpt` (or any basename) is tried as a path, then `-m/<name>`, `-m/checkpoints/<name>`, `-m/finetune/<name>`. Omit `--ckpt` for `last.ckpt`. Default weights are raw `net.*`. `--ema` loads the EMA shadow from that same file (`last.ckpt` = end-of-run shadow; `best-*.ckpt` = that epoch's shadow). Do not overwrite a raw `-o`. Train with `--ema-decay 0.999` or the shadow is empty.
 
+## Spacing
+
+Plans with `spacing_mode: "z_only"` (nnFoundationCNN_z1p0) resample only the thickest axis, to 1.0 mm, per scan;
+inference applies the same rule, and outputs return to each input's own size, spacing, origin and direction.
+
 ## Inputs / outputs
 
 **Inputs**

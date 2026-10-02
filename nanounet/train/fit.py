@@ -133,7 +133,7 @@ def run_mae_pretrain(args, ds, pp, plans_path, dj_path, out, accel, loggers, dl_
 
 
 def run_supervised(
-    args, ds, plans_path, dj_path, out, ckpt_dir, accel, loggers, dl_b, mae_ckpt_arg, sup_resume
+    args, ds, plans_path, dj_path, out, ckpt_dir, accel, loggers, dl_b, mae_ckpt_arg, sup_resume, foundation_ckpt=None
 ) -> None:
     """Supervised stage."""
     if sup_resume:
@@ -148,12 +148,14 @@ def run_supervised(
         args.iters_per_epoch, args.val_iters, persistent_workers=args.dl_persistent_workers,
         only_prefix=args.only_prefix,
         prompts_per_patch=args.prompts_per_patch, val_manifest=args.val_manifest,
+        enable_deep_supervision=args.enable_ds,
     )
     lm = NanoUNetLM(
         plans_path, dj_path, args.roi_cfg, out, initial_lr=args.lr, weight_decay=args.wd,
         num_epochs=args.epochs, lr_schedule=args.lr_schedule, stretched_k=args.stretched_k,
         stretched_ref=args.stretched_ref, stretched_exp=args.stretched_exp, loss_type=args.loss,
         optimizer=args.optimizer, mae_ckpt=mae_ckpt_arg, init_weights=args.init_weights,
+        foundation_ckpt=None if sup_resume else foundation_ckpt, enable_deep_supervision=args.enable_ds,
         consistency_weight=args.consistency_weight,
         consistency_warmup_epochs=args.consistency_warmup_epochs, warmup_epochs=args.warmup_epochs,
     )

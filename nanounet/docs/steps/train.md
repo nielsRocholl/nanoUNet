@@ -1,9 +1,8 @@
 # Supervised training
 
-Prompt-aware supervised training on one fold. Optional integrated MAE pretrain and MAE encoder transfer.
+Prompt-aware supervised training on one fold. Loads nnFoundationCNN weights by default; MAE is the opt-out path.
 
 Default run dir: `$NANOUNET_RESULTS/nanounet/<DatasetFolder>_<plans>_f<fold>/`.
-
 ## Command
 
 ```bash
@@ -27,6 +26,18 @@ nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv \
   --dl-persistent-workers
 ```
 
+## nnFoundationCNN weights (default)
+
+When the plans have `pretrain_info` and `--no-foundation` is absent, training loads only the encoder
+(448 tensors; the prompt channel of the stem starts at zero) and trains decoder and head from scratch.
+It checks the checkpoint file and its sha256 against the plans first. Flags you leave unset change to:
+SGD, `--lr 1e-3`, `--warmup-epochs 2`, poly schedule, `--deep-supervision off`. The config table shows each value's
+source (`cli`, `foundation default`, `default`). `--init-weights` skips the foundation load; `--mae-ckpt` and
+`--mae-pretrain` need `--no-foundation`. Precedence: `--init-weights` > foundation > `--mae-ckpt`.
+
+At startup the 60 Longitudinal-CT test patients (`/nnunet_data/Longitudinal-CT/test_patients.csv`) are checked
+against every train/val case; any hit stops the run.
+
 ## Arguments
 
 | Argument | Type | Default | Description |
@@ -38,9 +49,11 @@ nanounet_train -d 999 -f 0 --plans nnUNetResEncUNetLPlans_h200_smallpv \
 | `--val-manifest` | str | none | Fixed validation manifest from `nanounet_build_valset`; omit for legacy per-epoch random val sampling. See [valset.md](valset.md) |
 | `--val-every-n-epochs` | int | 1 | Validate every N epochs. With a fixed `--val-manifest` the per-epoch resampling noise is gone, so `2` costs ~3% of run time instead of ~18% and still gives 600 points over 1200 epochs |
 | `--epochs` | int | `1000` | Supervised epoch budget |
-| `--lr` | float | `0.01` | Supervised initial learning rate |
+| `--lr` | float | `0.01` (`1e-3` foundation) | Supervised initial learning rate |
 | `--wd` | float | `3e-5` | Weight decay |
 | `--optimizer` | choice | `sgd` | `sgd` \| `adamw` |
+| `--no-foundation` | flag | off | Ignore the plans' nnFoundationCNN weights and defaults |
+| `--deep-supervision` | choice | `auto` | `auto` (off with foundation weights, else on) \| `on` \| `off` |
 | `--grad-clip` | float | `0.0` | Max grad norm; 0 disables |
 | `--batch-size` | int | from plans | Override `3d_fullres.batch_size` |
 | `--iters-per-epoch` | int | `250` | Training batches per epoch |
@@ -158,6 +171,8 @@ Full write-up: [dev-notes/cgroup_memory.md](../dev-notes/cgroup_memory.md).
 | Error | Cause | Fix |
 |-------|-------|-----|
 | `--mae-resume requires --mae-pretrain` | MAE resume without integrated flag | Add `--mae-pretrain` or use `--mae-ckpt` |
+| `--mae-ckpt was given while nnFoundationCNN weights are the default` | MAE flag with foundation plans | Add `--no-foundation` or drop the MAE flag |
+| `nnFoundationCNN checkpoint ... sha256 differs` / `N case(s) belong to Longitudinal-CT test patients` | Cache replaced / test patient in train or val | Re-run `nanounet_preprocess`, or `--no-foundation` / fix raw `dataset.json`, rebuild splits |
 | Conflicting resume flags | `--init-weights` + `--resume` / `--mae-pretrain` | Pick one init path |
 | Cgroup OOM | tmpfs TMPDIR during checkpoint save | Set `NANOUNET_TMPDIR`; see cgroup doc |
 | Missing plans / config | Preprocess or path error | Verify `--plans` basename and `--config` path |
