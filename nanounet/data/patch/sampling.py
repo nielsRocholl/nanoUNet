@@ -14,6 +14,7 @@ from scipy.spatial import cKDTree
 
 from nanounet.config import RoiPromptConfig
 from nanounet.data.patch.error_table import draw_propagated_offset
+from nanounet.data.patch.spacing import bind_case_spacing
 from nanounet.data.patch.instance_target import kept_clicks, resolve_instance_target
 from nanounet.data.patch.bbox import _sample_bbox, crop_patch
 from nanounet.prompt.centroids import filter_centroids_in_patch
@@ -123,6 +124,7 @@ def build_patch(
     extra_rng: np.random.Generator | None = None,
 ) -> dict:
     _ = annotated_classes_key
+    cfg = bind_case_spacing(cfg, properties)  # z-only: this case's own mm/voxel scale
     raw_c = properties.get("centroids_zyx")
     if raw_c is None:
         raise KeyError("centroids_zyx required; no seg-derived fallback (R12)\nExpected properties centroid list from the case's preprocessed sidecar.\nFix: nanounet_preprocess -d 501 --sidecars-only --plans-name nnUNetResEncUNetLPlans to regenerate the sidecar with centroids. See nanounet/docs/steps/preprocess.md")

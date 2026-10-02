@@ -4,7 +4,7 @@ Schema (see nanounet/docs/reference/config.md): {frame, spacing_zyx, size_bins_m
 backends: {name: {offsets_zyx: [[dz,dy,dx], ...] per size bin]}}, excluded, provenance}. Offsets are
 in the TABLE's resampled voxels (table spacing_zyx), so the draw goes voxels -> mm with the table
 spacing, then mm -> voxels with the training data's spacing (PropagatedConfig.data_spacing_zyx,
-bound from the plans by bind_roi_spacing); lesion volume -> diameter also uses the data spacing.
+bound from the plans, or per case, by nanounet/data/patch/spacing.py); lesion volume -> diameter also uses the data spacing.
 Shared by nanounet/config.py (startup validation) and
 nanounet/data/patch/sampling.py (the actual draw), so the JSON is parsed exactly once per process.
 """
@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Tuple
 
@@ -22,7 +21,7 @@ import numpy as np
 from nanounet.prompt.centroids import apply_propagation_offset
 
 if TYPE_CHECKING:
-    from nanounet.config import PropagatedConfig, RoiPromptConfig
+    from nanounet.config import PropagatedConfig
 
 _CACHE: Dict[str, dict] = {}
 
@@ -109,14 +108,6 @@ def validate_table(path: str, backends: Tuple[str, ...]) -> None:
                 )
 
 
-def bind_roi_spacing(cfg: "RoiPromptConfig", spacing_zyx: Tuple[float, float, float]) -> "RoiPromptConfig":
-    """cfg with sampling.propagated.data_spacing_zyx = the plans' `3d_fullres.spacing` (array-axis
-    order), so empirical offsets scale mm -> data voxels. Call once where the plans are known."""
-    sp = tuple(float(x) for x in spacing_zyx)
-    prop = replace(cfg.sampling.propagated, data_spacing_zyx=sp)
-    return replace(cfg, sampling=replace(cfg.sampling, propagated=prop))
-
-
 def volume_vox_to_diam_mm(volume_vox: float, spacing_zyx: Tuple[float, float, float]) -> float:
     vol_mm3 = volume_vox * spacing_zyx[0] * spacing_zyx[1] * spacing_zyx[2]
     return 2.0 * (3.0 * vol_mm3 / (4.0 * math.pi)) ** (1.0 / 3.0)
@@ -181,11 +172,10 @@ def draw_propagated_offset(
     sp = prop.data_spacing_zyx
     if sp is None:
         raise ValueError(
-            "propagated.mode='empirical' needs the training data's voxel spacing to convert the "
-            "table's mm offsets to voxels, but none was bound.\n"
-            "Expected PropagatedConfig.data_spacing_zyx = the plans' 3d_fullres spacing.\n"
-            "Fix: call bind_roi_spacing(cfg, cm.spacing) after load_config "
-            "(nanounet/data/patch/error_table.py), or set propagated.mode to 'gaussian'."
+            "propagated.mode='empirical' needs a voxel spacing to convert the table's mm offsets to voxels, "
+            "but none was bound (z-only plans: the case has no spacing_after_resampling).\n"
+            "Expected the plans' 3d_fullres spacing (bind_plan_spacing) or the case's spacing_after_resampling.\n"
+            "Fix: re-run nanounet_preprocess for this plan, or set propagated.mode to 'gaussian'."
         )
     if volume_vox is None:
         dmm = sample_offset_mm_pooled(prop.error_table, prop.backends, rng)

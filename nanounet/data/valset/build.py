@@ -7,7 +7,7 @@ here so nanounet/data/valset/manifest.py never touches any of it at validation t
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import cc3d
 import numpy as np
@@ -17,7 +17,8 @@ from rich.table import Table
 
 from core.ui import cprint
 from nanounet.data.store.blosc2_dataset import case_spatial_shape, load_case_properties
-from nanounet.data.patch.error_table import draw_propagated_offset
+from nanounet.data.patch.error_table import draw_propagated_offset, volume_vox_to_diam_mm
+from nanounet.data.patch.spacing import case_spacing
 from nanounet.data.patch.bbox import _sample_bbox
 from nanounet.data.patch.sampling import _sample_false_pos
 from nanounet.data.valset.manifest import SCENARIOS, SIZE_BUCKETS
@@ -34,6 +35,7 @@ class CaseInfo:
     shape: np.ndarray
     cts_global: list[tuple[int, int, int]]
     vols: list[float]
+    spacing: tuple | None  # spacing_after_resampling; None on older data
 
 
 def case_info(case_dir: str, cid: str, cache: dict[str, "CaseInfo"]) -> "CaseInfo":
@@ -44,7 +46,8 @@ def case_info(case_dir: str, cid: str, cache: dict[str, "CaseInfo"]) -> "CaseInf
     shape = np.array(case_spatial_shape(case_dir, cid))
     cts = [tuple(int(x) for x in c) for c in props["centroids_zyx"]]
     vols = [float(v) for v in props["volume_vox"]]
-    info = CaseInfo(cid, shape, cts, vols)
+    sp = props.get("spacing_after_resampling")
+    info = CaseInfo(cid, shape, cts, vols, sp and tuple(float(x) for x in sp))
     cache[cid] = info
     return info
 
@@ -81,9 +84,9 @@ def _in_patch_idxs(cts_global: list[tuple[int, int, int]], bbox: list[list[int]]
     ]
 
 
-def _size_bucket(vols: list[float], idxs: list[int], small_max: int) -> str:
-    biggest = max((vols[j] for j in idxs), default=0.0)
-    return "small" if biggest <= small_max else "large"
+def _size_bucket(case: CaseInfo, idxs: list[int], prop_cfg, small_max_mm: float) -> str:
+    biggest = max((case.vols[j] for j in idxs), default=0.0)
+    return "small" if volume_vox_to_diam_mm(biggest, case_spacing(case, prop_cfg)) <= small_max_mm else "large"
 
 
 def draw_bbox(shape, cts_global, patch_size, fg_prob: float, rng) -> list[list[int]]:
@@ -98,6 +101,7 @@ def draw_lesion_clicks(idxs, case: CaseInfo, bbox, prop_cfg, rng1, rng2):
     """Displace the chosen centroids independently for draw 1/2, then filter into the patch --
     filter_centroids_in_patch converts GLOBAL displaced coords to PATCH-LOCAL in one step."""
     pslc = tuple(slice(a, b) for a, b in bbox)
+    prop_cfg = replace(prop_cfg, data_spacing_zyx=case_spacing(case, prop_cfg))
     d1 = [draw_propagated_offset(case.cts_global[j], case.vols[j], prop_cfg, rng1) for j in idxs]
     d2 = [draw_propagated_offset(case.cts_global[j], case.vols[j], prop_cfg, rng2) for j in idxs]
     return filter_centroids_in_patch(d1, pslc), filter_centroids_in_patch(d2, pslc)
@@ -149,7 +153,7 @@ def try_foreground(scenario: str, ds, cid: str, case: CaseInfo, patch_size, prop
     c1, c2 = draw_lesion_clicks(chosen, case, bbox, prop_cfg, rng1, rng2)
     if scenario in ("all_clicked", "subset_clicked") and (not c1 or not c2):
         return "reject_zero_clicks"
-    size_bucket = _size_bucket(case.vols, idxs, small_max)
+    size_bucket = _size_bucket(case, idxs, prop_cfg, small_max)
     return {
         "bbox": bbox,
         "clicks": c1,

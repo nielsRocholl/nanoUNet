@@ -34,10 +34,10 @@ from nanounet.data.loader.prefs import DataloaderBucket, build_iter_dataloader
 from nanounet.data.loader.workers import collate_patches, worker_init
 from nanounet.train.patches.render import concat_variant_keypoints, render_variant, split_variant_keypoints
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SCENARIOS = ("all_clicked", "subset_clicked", "none_clicked", "lesion_free_decoy")
 SIZE_BUCKETS = ("small", "large")
-SMALL_LESION_MAX_VOX = 500  # ~10mm diameter at the plans spacing; see nanounet/docs/steps/valset.md
+SMALL_LESION_MAX_DIAM_MM = 10.0  # equivalent-sphere diameter, from each case's own spacing; see nanounet/docs/steps/valset.md
 
 @dataclass(frozen=True)
 class ValManifest:

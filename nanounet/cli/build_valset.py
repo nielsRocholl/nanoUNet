@@ -18,9 +18,9 @@ from batchgenerators.utilities.file_and_folder_operations import join
 from core.ui import arg_rows, config_table, cprint, nano_header, nano_progress
 from nanounet.common import preprocessed_dir, resolve_user_config_path
 from nanounet.config import load_config
-from nanounet.data.patch.error_table import bind_roi_spacing
+from nanounet.data.patch.spacing import bind_plan_spacing
 from nanounet.data.store.blosc2_dataset import Blosc2Folder
-from nanounet.data.valset.manifest import SCENARIOS, SCHEMA_VERSION, SMALL_LESION_MAX_VOX, sidecar_path, config_stamp
+from nanounet.data.valset.manifest import SCENARIOS, SCHEMA_VERSION, SMALL_LESION_MAX_DIAM_MM, sidecar_path, config_stamp
 from nanounet.data.valset.alloc import allocate, load_cohorts, scenario_allocation
 from nanounet.data.valset.build import (
     LabelCache, build_subset_target, case_info, report_composition, try_foreground, try_lesion_free_decoy,
@@ -63,7 +63,7 @@ def _fill_scenario(scenario, ds, case_dir, ids, want, max_tries, rngs, patch_siz
         if scenario == "lesion_free_decoy":
             res = try_lesion_free_decoy(ds, cid, case, patch_size, rng_bbox, rng_decoy)
         else:
-            res = try_foreground(scenario, ds, cid, case, patch_size, prop_cfg, SMALL_LESION_MAX_VOX, rng_bbox, rng_choice, rng1, rng2)
+            res = try_foreground(scenario, ds, cid, case, patch_size, prop_cfg, SMALL_LESION_MAX_DIAM_MM, rng_bbox, rng_choice, rng1, rng2)
         if res is None:
             reject[(scenario, "not_accepted")] += 1
             continue
@@ -108,7 +108,7 @@ def main() -> None:
     cm = pm.get_configuration("3d_fullres")
     case_dir = join(pp, ds_name, cm.data_identifier)
     cfg_path = resolve_user_config_path(args.config)
-    roi_cfg = bind_roi_spacing(load_config(cfg_path), cm.spacing)
+    roi_cfg = bind_plan_spacing(load_config(cfg_path), cm)
     patch_size = np.array(cm.patch_size)
     by_cohort, cohort_weights = load_cohorts(pp, ds_name, cohort_of)
     per_cohort_total = allocate({c: len(v) for c, v in by_cohort.items()}, args.n_patches, args.floor)
@@ -180,7 +180,7 @@ def main() -> None:
     header = {
         "schema": SCHEMA_VERSION, "dataset": ds_name, "plans": args.plans, "config_path": cfg_path,
         "config_stamp": config_stamp(roi_cfg),
-        "seed": args.seed, "patch_size": [int(x) for x in patch_size], "small_lesion_max_vox": SMALL_LESION_MAX_VOX,
+        "seed": args.seed, "patch_size": [int(x) for x in patch_size], "small_lesion_max_diam_mm": SMALL_LESION_MAX_DIAM_MM,
         "scenario_counts": scenario_counts, "cohort_weights": cohort_weights, "entries": all_entries,
         "subset_capable_cohorts": sorted(c for c, n in multi_counts.items() if n > 0),
         "cohort_multi_counts": multi_counts,
