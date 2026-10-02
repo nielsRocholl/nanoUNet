@@ -6,15 +6,49 @@ Meta CSV: optional img_id_fu filter; cog_propagated else cog_fu. Missing BL ids 
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from lesionglue.common import LESION_TYPES
-from lesionglue.data.source.meta import parse_xyz
+from lesionglue.data.source.meta import LesionRow, parse_xyz
 
 _SLIM = {"lesion_id", "z", "y", "x"}
+PROP_FILLS = ("none", "unigradicon")
+UNIGRAD_REL = "derivatives/unigrad-icon-registration"  # {train,test}/lesions/{pid}_{img_id_fu:02d}.json, one entry per lesion
+
+
+def fill_propagated(rows: list[LesionRow], root: Path, pid: str, fu_id: int) -> tuple[list[LesionRow], dict[str, int]]:
+    """Opt-in fill of missing cog_propagated for the rows of one FU region (lesionglue_preprocess --prop-fill unigradicon).
+
+    A BL-side row without cog_propagated (129 lesions in 25 patients) gets the uniGradICON bl_click, a point in the same FU
+    voxel frame (median 5.8 mm from cog_propagated where both exist), but ONLY where the registration's own sanity_ok is true.
+    The rest stay without a position and are dropped by node_rows, never guessed (R12). Returns the rows (prop_source=1 on
+    filled ones) and counts: missing, filled, unsafe (sanity_ok false), no_entry (no click for that lesion).
+    """
+    path = next((p for sp in ("train", "test") if (p := Path(root) / UNIGRAD_REL / sp / "lesions" / f"{pid}_{fu_id:02d}.json").is_file()), None)
+    entries = {} if path is None else {int(e["lesion_id"]): e for e in json.loads(path.read_text())["lesions"]}
+    stats = {"missing": 0, "filled": 0, "unsafe": 0, "no_entry": 0}
+    out = []
+    for r in rows:
+        if r.topology == "NEWLYAPPEARING" or r.cog_propagated is not None:
+            out.append(r)
+            continue
+        stats["missing"] += 1
+        e = entries.get(r.lesion_id)
+        if e is None or e.get("bl_click") is None:
+            stats["no_entry"] += 1
+            out.append(r)
+        elif not e.get("sanity_ok"):
+            stats["unsafe"] += 1
+            out.append(r)
+        else:
+            assert len(e["bl_click"]) == 3, f"{path}: bl_click {e['bl_click']} is not x y z"
+            stats["filled"] += 1
+            out.append(replace(r, cog_propagated=tuple(float(v) for v in e["bl_click"]), prop_source=1))
+    return out, stats
 
 
 def load_propagated(

@@ -15,8 +15,8 @@ The tracking split is `lesionglue/configs/split.json` (written by `lesionglue_sp
 
 ## Cache
 
-`{CACHE_ROOT}/processed/{split}_v7_native.pt` (default `CACHE_ROOT=/nnunet_data/lesion_tracking/cache`), built by `lesionglue_preprocess`.
-Multi-region graphs (one per follow-up body-region volume) live in `/nnunet_data/lesion_tracking/cache_v8_regions`; that cache does not overwrite v7.
+`{CACHE_ROOT}/processed/{split}_v8_native.pt` (default `CACHE_ROOT=/nnunet_data/lesion_tracking/cache`), built by `lesionglue_preprocess`.
+Multi-region graphs (one per follow-up body-region volume) live in a cache dir of their own (rebuild with `lesionglue_preprocess --cache <dir>`). The tag changed from `v7_native` to `v8_native` when merge targets became FU nodes, so older caches (`cache_v8_regions`) are refused, not reused.
 
 ## Training vs deployment
 
@@ -48,6 +48,6 @@ lesionglue/
 - Missing NIfTI or CSV under `--root`.
 - Empty BL or FU side.
 - Missing `lesionglue/configs/split.json`: run `lesionglue_split`.
-- Stale `{split}_v6_h60.pt` files in `processed/` are ignored; the cache tag is `v7_native`.
+- Stale `{split}_v6_h60.pt` files in `processed/` are ignored; the cache tag is `v8_native`.
 
 Per-command error messages and fixes are in the `Common errors` tables of [steps/](../steps/).

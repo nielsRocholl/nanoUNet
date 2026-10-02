@@ -1,0 +1,169 @@
+{
+ "exp": "exp00a_data_audit",
+ "run_id": "20260930T183704Z_paper_v1",
+ "status": "ok",
+ "started_utc": "2026-09-30T18:37:04+00:00",
+ "finished_utc": "2026-09-30T18:37:49+00:00",
+ "wall_sec": 45.0,
+ "command": "python /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00a_data_audit/run.py --tag paper_v1",
+ "argv": [
+  "/nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00a_data_audit/run.py",
+  "--tag",
+  "paper_v1"
+ ],
+ "cwd": "/nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf",
+ "resolved_args": {
+  "tag": "paper_v1",
+  "out_root": "/nnunet_data/experiments",
+  "resume": null,
+  "seed": 0,
+  "limit_patients": -1,
+  "data_root": "/nnunet_data/Longitudinal-CT",
+  "holdout_csv": "/nnunet_data/Longitudinal-CT/test_patients.csv",
+  "corpus_dir": "/nnunet_data/NanoUNet_preprocessed/Dataset900_Merged",
+  "raw_dir": "/nnunet_data/NanoUNet_raw",
+  "pantrack_dir": "/nnunet_data/raw/PanTrack",
+  "graph_split": "/nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/lesionglue/configs/split.json",
+  "graph_cache_dir": "/nnunet_data/lesion_tracking/cache_v8_regions/processed",
+  "graph_cache_tag": "v7_native",
+  "workers": 8
+ },
+ "resolved_command": "python /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00a_data_audit/run.py --tag paper_v1 --out-root /nnunet_data/experiments --seed 0 --limit-patients -1 --data-root /nnunet_data/Longitudinal-CT --holdout-csv /nnunet_data/Longitudinal-CT/test_patients.csv --corpus-dir /nnunet_data/NanoUNet_preprocessed/Dataset900_Merged --raw-dir /nnunet_data/NanoUNet_raw --pantrack-dir /nnunet_data/raw/PanTrack --graph-split /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/lesionglue/configs/split.json --graph-cache-dir /nnunet_data/lesion_tracking/cache_v8_regions/processed --graph-cache-tag v7_native --workers 8",
+ "git": {
+  "sha": "399d457f0540a8e5bd972c9cce78a8021c166d92",
+  "dirty": true,
+  "diff_sha256": "1cef138d3c7e2f580d6e84b8c8d6394ac94b3d216f19fe08d6e47a0b4226e555"
+ },
+ "host": "dlc-arceus",
+ "gpu": {
+  "name": "NVIDIA A100-SXM4-40GB",
+  "mem": "40960 MiB"
+ },
+ "versions": {
+  "python": "3.11.3",
+  "torch": "2.7.1+cu118",
+  "lightning": "2.5.2",
+  "torch_geometric": "2.8.0",
+  "numpy": "1.26.4",
+  "simpleitk": "2.5.2"
+ },
+ "seeds": {
+  "seed": 0
+ },
+ "env": {
+  "NANOUNET_RAW": "/nnunet_data/NanoUNet_raw",
+  "NANOUNET_PREPROCESSED": "/nnunet_data/NanoUNet_preprocessed",
+  "NANOUNET_RESULTS": "/nnunet_data/NanoUNet_results",
+  "NANOUNET_TMPDIR": "/root/.cache/nanounet_tmp",
+  "LongiSeg_raw": null,
+  "LongiSeg_preprocessed": null,
+  "LongiSeg_results": null
+ },
+ "inputs": [
+  {
+   "name": "holdout csv",
+   "path": "/nnunet_data/Longitudinal-CT/test_patients.csv",
+   "kind": "file",
+   "bytes": 668,
+   "mtime_utc": "2026-07-27T09:06:45+00:00",
+   "sha256": "e06bdadba5104775c392dee26dae0f377b5f9f1f96b0252b0927d2ac61acc3cd"
+  },
+  {
+   "name": "released split",
+   "path": "/nnunet_data/Longitudinal-CT/data_split.json",
+   "kind": "file",
+   "bytes": 6969,
+   "mtime_utc": "2026-04-10T13:30:08+00:00",
+   "sha256": "2d8d5b492306ebb9e3c1818b4fe3854cabc41cd26d8a89fa1c4257c023102a71"
+  },
+  {
+   "name": "meta dir",
+   "path": "/nnunet_data/Longitudinal-CT/meta",
+   "kind": "dir",
+   "bytes": 0,
+   "mtime_utc": "2026-04-10T13:37:30+00:00",
+   "n_files": 300,
+   "sha256": "7c8c0fbcc4f0d13696be867904ca783aed0863a426c7609edf0af5f7148972b3"
+  },
+  {
+   "name": "cohorts.json",
+   "path": "/nnunet_data/NanoUNet_preprocessed/Dataset900_Merged/cohorts.json",
+   "kind": "file",
+   "bytes": 3169,
+   "mtime_utc": "2026-09-03T07:07:57+00:00",
+   "sha256": "ec46f4d03335cd91c40a90de49625aced2f7137bf33530437ab41464e5a2a1d9"
+  },
+  {
+   "name": "dataset.json",
+   "path": "/nnunet_data/NanoUNet_preprocessed/Dataset900_Merged/dataset.json",
+   "kind": "file",
+   "bytes": 1795953,
+   "mtime_utc": "2026-09-02T17:14:43+00:00",
+   "sha256": "a8a4766459e3d954c77d0f3ce7233ce900b0bc94dfb62aac5aaaf683418c5c5c"
+  },
+  {
+   "name": "splits_final.json",
+   "path": "/nnunet_data/NanoUNet_preprocessed/Dataset900_Merged/splits_final.json",
+   "kind": "file",
+   "bytes": 180739,
+   "mtime_utc": "2026-09-03T07:07:47+00:00",
+   "sha256": "1016c2be2ac003bbe8f98d023c791dec2454c25c4d7f045c4701246d3e823ee7"
+  },
+  {
+   "name": "graph split",
+   "path": "/nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/lesionglue/configs/split.json",
+   "kind": "file",
+   "bytes": 5497,
+   "mtime_utc": "2026-09-30T15:39:12+00:00",
+   "sha256": "42dd75d49ba22a5a683f1c23f5d9bcd47458a439e95644bdbf43d4d789f4d19a"
+  },
+  {
+   "name": "PanTrack tracking.json",
+   "path": "/nnunet_data/raw/PanTrack/tracking.json",
+   "kind": "file",
+   "bytes": 113122,
+   "mtime_utc": "2026-09-01T07:28:04+00:00",
+   "sha256": "a2f3709386669dcc20c83d6720760533ea5fce677122a2e607fe0f97a9609dc4"
+  },
+  {
+   "name": "registration error table",
+   "path": "/nnunet_data/Longitudinal-CT/derivatives/registration_error_table.json",
+   "kind": "file",
+   "bytes": 385347,
+   "mtime_utc": "2026-07-27T10:47:05+00:00",
+   "sha256": "bb5e893f976574190ea83625ed2c8c38ba3b96b02a08aab3411fade636029ad0"
+  },
+  {
+   "name": "graph cache meta (train)",
+   "path": "/nnunet_data/lesion_tracking/cache_v8_regions/processed/train_v7_native_meta.pt",
+   "kind": "file",
+   "bytes": 1403,
+   "mtime_utc": "2026-08-27T10:59:16+00:00",
+   "sha256": "d5912e7476446aecd03f56c5bc636ad8b7a26c106be5ca00df593cb0f130f0c7"
+  },
+  {
+   "name": "graph cache meta (val)",
+   "path": "/nnunet_data/lesion_tracking/cache_v8_regions/processed/val_v7_native_meta.pt",
+   "kind": "file",
+   "bytes": 1391,
+   "mtime_utc": "2026-08-27T11:05:06+00:00",
+   "sha256": "28735c119d83ff835116c78db199c16303dc855e1b9ceb776e73f54fd2a9f7ae"
+  },
+  {
+   "name": "graph cache meta (test)",
+   "path": "/nnunet_data/lesion_tracking/cache_v8_regions/processed/test_v7_native_meta.pt",
+   "kind": "file",
+   "bytes": 1397,
+   "mtime_utc": "2026-08-27T11:16:33+00:00",
+   "sha256": "e3b3fc2878f8e2c4eb3e51e350fe79e19211575fec66fa9b0d3eae415b53a129"
+  }
+ ],
+ "rescored_from": null,
+ "resumes": [],
+ "outputs": {
+  "run_dir": "/nnunet_data/experiments/exp00a_data_audit/20260930T183704Z_paper_v1",
+  "mirror_dir": "/nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/results/exp00a_data_audit/20260930T183704Z_paper_v1",
+  "artifacts_dir": "/nnunet_data/experiments/exp00a_data_audit/20260930T183704Z_paper_v1/artifacts"
+ },
+ "mirror_skipped": []
+}

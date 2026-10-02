@@ -1,0 +1,3 @@
+backend,shipped_rows_total,shipped_rows_from_holdout60,share,holdout_patients_contributing,per_bin_from_holdout60
+original,2344,399,0.17022184300341298,51,"[76, 173, 98, 35, 10, 7]"
+unigradicon,2128,419,0.19689849624060152,47,"[77, 171, 90, 53, 14, 14]"

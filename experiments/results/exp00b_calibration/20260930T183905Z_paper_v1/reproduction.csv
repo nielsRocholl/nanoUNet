@@ -1,0 +1,13 @@
+backend,size_bin,bin_mm,n_recomputed,n_shipped_table,n_provenance,diff_recomputed_minus_shipped,shipped_rows_found_in_recomputed,recomputed_rows_absent_from_table
+original,0,"[0, 5]",383,381,381,2,381,2
+original,1,"[5, 10]",935,932,932,3,932,3
+original,2,"[10, 20]",682,676,676,6,676,6
+original,3,"[20, 30]",195,194,194,1,194,1
+original,4,"[30, 50]",105,104,104,1,104,1
+original,5,"[50, 1000000000.0]",59,57,57,2,57,2
+unigradicon,0,"[0, 5]",351,351,351,0,351,0
+unigradicon,1,"[5, 10]",843,835,835,8,835,8
+unigradicon,2,"[10, 20]",591,576,576,15,576,15
+unigradicon,3,"[20, 30]",188,184,184,4,184,4
+unigradicon,4,"[30, 50]",101,97,97,4,97,4
+unigradicon,5,"[50, 1000000000.0]",102,85,85,17,85,17

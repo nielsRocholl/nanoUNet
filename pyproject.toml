@@ -62,4 +62,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["core*", "nanounet*", "lesionglue*", "segtrack*"]
+include = ["core*", "nanounet*", "lesionglue*", "segtrack*", "experiments*"]

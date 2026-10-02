@@ -35,7 +35,7 @@ lesionglue_eval --split test --root /nnunet_data/Longitudinal-CT --dust-tau 0.10
 
 | Path | Format | Written by |
 |---|---|---|
-| `/nnunet_data/lesion_tracking/cache/processed/test_v7_native.pt` | PyG cache | `lesionglue_preprocess` |
+| `/nnunet_data/lesion_tracking/cache/processed/test_v8_native.pt` | PyG cache | `lesionglue_preprocess` |
 | `--ckpt` | Lightning `.ckpt` | `lesionglue_train` |
 | `--out` (`runs/eval_test.json`) | JSON: `ckpt`, `split`, `weights`, `rows[]` (per tau: counts, `match_score`, `metrics`), `selected` | this step |
 
@@ -65,7 +65,7 @@ lesionglue_report --config lesionglue/configs/base.json --root /nnunet_data/Long
 |----------|------|---------|-------------|
 | `--config` | path | required | Training config JSON (`lesionglue/configs/*.json`); builds model and trainer |
 | `--root` | path | `DATASET_ROOT` | Longitudinal-CT dataset root |
-| `--cache` | path | `CACHE_ROOT` | Cached graph dir; needs `processed/{train,val,test}_v7_native.pt` |
+| `--cache` | path | `CACHE_ROOT` | Cached graph dir; needs `processed/{train,val,test}_v8_native.pt` |
 | `--out` | path | required | Output dir for `report.json` and `checkpoints/` (created if missing) |
 | `--checkpoint` | str | `""` | Skip training, only evaluate this `.ckpt` |
 | `--no-early-stop` | flag | off | Train to `max_steps` without EarlyStopping |
@@ -85,7 +85,7 @@ lesionglue_report --config lesionglue/configs/base.json --root /nnunet_data/Long
 
 | Path | Format | Written by |
 |---|---|---|
-| `/nnunet_data/lesion_tracking/cache/processed/{train,val,test}_v7_native.pt` | PyG cache | `lesionglue_preprocess` |
+| `/nnunet_data/lesion_tracking/cache/processed/{train,val,test}_v8_native.pt` | PyG cache | `lesionglue_preprocess` |
 | `runs/report_v7/checkpoints/*.ckpt` | Lightning `.ckpt` (only without `--checkpoint`) | this step |
 | `runs/report_v7/report.json` | JSON: `best_checkpoint`, `config`, `decode`, `gnn.{val,test}`, `baseline.{val,test}` | this step |
 
@@ -132,7 +132,7 @@ lesionglue_predict --split val --root /nnunet_data/Longitudinal-CT --out runs/pr
 
 | Path | Format | Written by |
 |---|---|---|
-| `/nnunet_data/lesion_tracking/cache/processed/val_v7_native.pt` | PyG cache | `lesionglue_preprocess` |
+| `/nnunet_data/lesion_tracking/cache/processed/val_v8_native.pt` | PyG cache | `lesionglue_preprocess` |
 | `runs/preds_val/<patient>.csv` | CSV: `bl_lesion_id,fu_lesion_id,prob,decoded` | this step |
 
 ### Common errors
@@ -166,7 +166,7 @@ lesionglue_baseline_distance --split test --root /nnunet_data/Longitudinal-CT
 
 | Path | Format | Written by |
 |---|---|---|
-| `/nnunet_data/lesion_tracking/cache/processed/test_v7_native.pt` | PyG cache | `lesionglue_preprocess` |
+| `/nnunet_data/lesion_tracking/cache/processed/test_v8_native.pt` | PyG cache | `lesionglue_preprocess` |
 | stdout line `distance_baseline split=test AP=... AUROC=...` | text | this step (no file is written) |
 
 ### Common errors

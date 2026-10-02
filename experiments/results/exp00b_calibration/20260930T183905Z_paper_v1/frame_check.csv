@@ -1,0 +1,2 @@
+table_spacing_zyx,segmenter_plan_spacing_zyx,z_spacing_ratio_plan_over_table,frame,note
+"[1.25, 0.781, 0.789]","[2.5, 0.7578125, 0.767578125]",2.0,resampled_voxels_zyx,nanounet applies the table offsets to centroids in the preprocessed grid (plan spacing) and computes the size bin with the table spacing; with a z spacing of 2.5 mm against 1.25 mm the z offsets are 2x larger in mm than measured

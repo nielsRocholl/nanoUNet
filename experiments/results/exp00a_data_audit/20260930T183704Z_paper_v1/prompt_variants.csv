@@ -1,0 +1,29 @@
+variant,value,n
+PRIMARY: share of all lesions with nearest other centroid < 30 vox (single-lesion volumes count as no neighbour),0.3295548797345867,18085
+"share among lesions in volumes with >= 2 lesions, voxels",0.39807640929735505,14972
+"share among lesions in volumes with >= 2 lesions, distance in mm (plan spacing zyx)",0.3567993588030991,14972
+"share of all lesions, distance in mm",0.2953829140171413,18085
+share of all lesions using EDT seed points instead of centroids,0.32662427426043683,18085
+"PRIMARY: median equivalent-sphere radius, vox",4.638339757884534,18085
+"median half-mean bounding-box extent, vox",5.666666666666667,18085
+"median equivalent-sphere radius, cohort d011, vox",6.439437903230572,510
+"median equivalent-sphere radius, cohort d012, vox",2.1900533228654027,664
+"median equivalent-sphere radius, cohort d013, vox",3.7730969937032692,5213
+"median equivalent-sphere radius, cohort d014, vox",15.168859233212865,131
+"median equivalent-sphere radius, cohort d015, vox",9.215242749756346,73
+"median equivalent-sphere radius, cohort d016, vox",9.808728981888164,283
+"median equivalent-sphere radius, cohort d017, vox",4.630930256838134,837
+"median equivalent-sphere radius, cohort d018, vox",8.086520783531116,611
+"median equivalent-sphere radius, cohort d019, vox",13.894803425810075,370
+"median equivalent-sphere radius, cohort d020, vox",9.103421981880944,80
+"median equivalent-sphere radius, cohort d021, vox",17.579592349647925,331
+"median equivalent-sphere radius, cohort d022, vox",14.753282363325157,585
+"median equivalent-sphere radius, cohort d023, vox",4.643845468904196,810
+"median equivalent-sphere radius, cohort d024, vox",2.8305988897884706,2689
+"median equivalent-sphere radius, cohort d025, vox",6.58303906058164,699
+"median equivalent-sphere radius, cohort d026, vox",5.507175104986281,20
+"median equivalent-sphere radius, cohort d027, vox",5.646260512850638,1991
+"median equivalent-sphere radius, cohort d028, vox",7.770064938987863,1119
+"median equivalent-sphere radius, cohort d029, vox",11.783794593520806,59
+"median equivalent-sphere radius, cohort d030, vox",4.855487739637262,958
+"median equivalent-sphere radius, cohort d031, vox",31.019172035744234,52

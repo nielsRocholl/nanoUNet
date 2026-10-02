@@ -1,0 +1,5 @@
+python /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00c_seg_eval_manifest/run.py --tag paper_v1
+python /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00c_seg_eval_manifest/run.py --tag paper_v1 --out-root /nnunet_data/experiments --seed 0 --limit-patients -1 --cap 30 --val-per-cohort 5 --manifest-out /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00c_seg_eval_manifest/seg_eval_v1.json --header-cache /root/.cache/nanounet_tmp/exp00c_headers.json --corpus-dir /nnunet_data/NanoUNet_preprocessed/Dataset900_Merged --workers 16
+cwd: /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf
+git: 967a19907c3026dd0d9cac9721b190c76fd81adb dirty=True
+

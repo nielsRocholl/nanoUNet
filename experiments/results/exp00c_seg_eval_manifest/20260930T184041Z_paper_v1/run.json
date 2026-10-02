@@ -1,0 +1,94 @@
+{
+ "exp": "exp00c_seg_eval_manifest",
+ "run_id": "20260930T184041Z_paper_v1",
+ "status": "ok",
+ "started_utc": "2026-09-30T18:40:41+00:00",
+ "finished_utc": "2026-09-30T18:43:21+00:00",
+ "wall_sec": 159.9,
+ "command": "python /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00c_seg_eval_manifest/run.py --tag paper_v1",
+ "argv": [
+  "/nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00c_seg_eval_manifest/run.py",
+  "--tag",
+  "paper_v1"
+ ],
+ "cwd": "/nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf",
+ "resolved_args": {
+  "tag": "paper_v1",
+  "out_root": "/nnunet_data/experiments",
+  "resume": null,
+  "seed": 0,
+  "limit_patients": -1,
+  "cap": 30,
+  "val_per_cohort": 5,
+  "include_luna25": false,
+  "manifest_out": "/nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00c_seg_eval_manifest/seg_eval_v1.json",
+  "header_cache": "/root/.cache/nanounet_tmp/exp00c_headers.json",
+  "corpus_dir": "/nnunet_data/NanoUNet_preprocessed/Dataset900_Merged",
+  "workers": 16
+ },
+ "resolved_command": "python /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00c_seg_eval_manifest/run.py --tag paper_v1 --out-root /nnunet_data/experiments --seed 0 --limit-patients -1 --cap 30 --val-per-cohort 5 --manifest-out /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00c_seg_eval_manifest/seg_eval_v1.json --header-cache /root/.cache/nanounet_tmp/exp00c_headers.json --corpus-dir /nnunet_data/NanoUNet_preprocessed/Dataset900_Merged --workers 16",
+ "git": {
+  "sha": "967a19907c3026dd0d9cac9721b190c76fd81adb",
+  "dirty": true,
+  "diff_sha256": "551bcfe80a89160681f5433491337887ff64d69c87568cab4dc12ff4b460ee64"
+ },
+ "host": "dlc-arceus",
+ "gpu": {
+  "name": "NVIDIA A100-SXM4-40GB",
+  "mem": "40960 MiB"
+ },
+ "versions": {
+  "python": "3.11.3",
+  "torch": "2.7.1+cu118",
+  "lightning": "2.5.2",
+  "torch_geometric": "2.8.0",
+  "numpy": "1.26.4",
+  "simpleitk": "2.5.2"
+ },
+ "seeds": {
+  "seed": 0
+ },
+ "env": {
+  "NANOUNET_RAW": "/nnunet_data/NanoUNet_raw",
+  "NANOUNET_PREPROCESSED": "/nnunet_data/NanoUNet_preprocessed",
+  "NANOUNET_RESULTS": "/nnunet_data/NanoUNet_results",
+  "NANOUNET_TMPDIR": "/root/.cache/nanounet_tmp",
+  "LongiSeg_raw": null,
+  "LongiSeg_preprocessed": null,
+  "LongiSeg_results": null
+ },
+ "inputs": [
+  {
+   "name": "corpus dataset.json",
+   "path": "/nnunet_data/NanoUNet_preprocessed/Dataset900_Merged/dataset.json",
+   "kind": "file",
+   "bytes": 1795953,
+   "mtime_utc": "2026-09-02T17:14:43+00:00",
+   "sha256": "a8a4766459e3d954c77d0f3ce7233ce900b0bc94dfb62aac5aaaf683418c5c5c"
+  },
+  {
+   "name": "splits_final.json",
+   "path": "/nnunet_data/NanoUNet_preprocessed/Dataset900_Merged/splits_final.json",
+   "kind": "file",
+   "bytes": 180739,
+   "mtime_utc": "2026-09-03T07:07:47+00:00",
+   "sha256": "1016c2be2ac003bbe8f98d023c791dec2454c25c4d7f045c4701246d3e823ee7"
+  },
+  {
+   "name": "holdout csv",
+   "path": "/nnunet_data/Longitudinal-CT/test_patients.csv",
+   "kind": "file",
+   "bytes": 668,
+   "mtime_utc": "2026-07-27T09:06:45+00:00",
+   "sha256": "e06bdadba5104775c392dee26dae0f377b5f9f1f96b0252b0927d2ac61acc3cd"
+  }
+ ],
+ "rescored_from": null,
+ "resumes": [],
+ "outputs": {
+  "run_dir": "/nnunet_data/experiments/exp00c_seg_eval_manifest/20260930T184041Z_paper_v1",
+  "mirror_dir": "/nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/results/exp00c_seg_eval_manifest/20260930T184041Z_paper_v1",
+  "artifacts_dir": "/nnunet_data/experiments/exp00c_seg_eval_manifest/20260930T184041Z_paper_v1/artifacts"
+ },
+ "mirror_skipped": []
+}

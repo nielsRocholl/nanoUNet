@@ -1,0 +1,5 @@
+python /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00a_data_audit/run.py --tag paper_v1
+python /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/experiments/exp00a_data_audit/run.py --tag paper_v1 --out-root /nnunet_data/experiments --seed 0 --limit-patients -1 --data-root /nnunet_data/Longitudinal-CT --holdout-csv /nnunet_data/Longitudinal-CT/test_patients.csv --corpus-dir /nnunet_data/NanoUNet_preprocessed/Dataset900_Merged --raw-dir /nnunet_data/NanoUNet_raw --pantrack-dir /nnunet_data/raw/PanTrack --graph-split /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf/lesionglue/configs/split.json --graph-cache-dir /nnunet_data/lesion_tracking/cache_v8_regions/processed --graph-cache-tag v7_native --workers 8
+cwd: /nanoUNet/.claude/worktrees/agent-a81a0c5a44cf057bf
+git: 399d457f0540a8e5bd972c9cce78a8021c166d92 dirty=True
+

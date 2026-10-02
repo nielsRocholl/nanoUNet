@@ -24,6 +24,7 @@ PROJECTS = {  # R21: project -> projects it may import. One-way and acyclic; cor
     "nanounet": {"core"},
     "lesionglue": {"core"},
     "segtrack": {"core", "nanounet", "lesionglue"},
+    "experiments": {"core", "nanounet", "lesionglue", "segtrack"},  # paper experiments: one folder per experiment, no console scripts
 }
 PKGS = [ROOT / p for p in PROJECTS]
 CMD_RE = "|".join(p for p in PROJECTS if p != "core")  # console scripts are <project>_<cmd>
@@ -233,7 +234,7 @@ def check_docs(add, flags: dict) -> None:
             if line.startswith("|"):
                 for f in set(re.findall(r"`(--[a-z0-9][a-z0-9_-]*)", line)) - {k[0] for k in flags}:
                     add(rel, i, "D4", "error", f"documented flag {f} not defined by any CLI (stale doc?)")
-            for mod in set(re.findall(rf"(?<![\w/])(?:{CMD_RE})\.[a-z_.]+", line)):
+            for mod in set(re.findall(rf"(?<![\w/])(?:{CMD_RE})\.[a-z0-9_.]+", line)):
                 if not _module_exists(mod.rstrip(".")):
                     add(rel, i, "K8", "warn", f"`{mod}` does not import")
     for s in sorted(scripts):
@@ -250,7 +251,7 @@ def check_docs(add, flags: dict) -> None:
             add(rel, line, "D3", "warn", f"{flag} missing from {step}")
     for sh in sorted(sh for pkg in PKGS for sh in (pkg / "scripts").glob("*.sh")):
         for i, line in enumerate(sh.read_text(encoding="utf-8").splitlines(), 1):
-            for mod in set(re.findall(rf"(?<![\w/])(?:{CMD_RE})\.[a-z_.]+", line)):
+            for mod in set(re.findall(rf"(?<![\w/])(?:{CMD_RE})\.[a-z0-9_.]+", line)):
                 if not _module_exists(mod.rstrip(".")):
                     add(str(sh.relative_to(ROOT)), i, "K8", "warn", f"`{mod}` does not import")
     for folder in [ROOT / "docs" / f for f in SCRATCH] + [pkg / "docs" / f for pkg in PKGS for f in SCRATCH]:

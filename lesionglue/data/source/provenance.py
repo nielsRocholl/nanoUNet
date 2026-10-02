@@ -1,7 +1,7 @@
 """Per-lesion registration provenance: was this position observed, or a registration guess?
 
 Every graph-eligible node (BL node for UNCHANGED/DISAPPEARED/MERGED/SPLIT, FU node for
-UNCHANGED/NEWLYAPPEARING/SPLIT, per lesionglue/data/graph/dense.py::node_rows) always has its own
+UNCHANGED/NEWLYAPPEARING/SPLIT and each merge target, per lesionglue/data/graph/dense.py::node_rows) always has its own
 cog_bl / cog_fu populated in meta/*.csv -- verified across all 300 patients (4,079 BL-eligible
 rows, 0 empty cog_bl; 3,065 FU-eligible rows, 0 empty cog_fu). So the plan's original rule
 ("imputed if cog_bl/cog_fu is empty") is a no-op at the graph-node level: it never fires for a

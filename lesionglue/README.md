@@ -73,7 +73,7 @@ and common errors.
 | Command | Purpose | Step doc |
 |---|---|---|
 | `lesionglue_split` | Carve train/val/test patient split (`lesionglue/configs/split.json`) | [data.md](docs/steps/data.md) |
-| `lesionglue_preprocess` | Build cached L0 graphs (`v7_native`) | [data.md](docs/steps/data.md) |
+| `lesionglue_preprocess` | Build cached L0 graphs (`v8_native`) | [data.md](docs/steps/data.md) |
 | `lesionglue_audit` | Read-only label audit | [data.md](docs/steps/data.md) |
 | `lesionglue_train` | Train the matcher from a config JSON | [train.md](docs/steps/train.md) |
 | `lesionglue_cv` | Patient-level k-fold training | [train.md](docs/steps/train.md) |

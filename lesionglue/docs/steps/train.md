@@ -1,7 +1,7 @@
 # Train
 
 A config JSON ([`lesionglue/config.py`](../../config.py), examples in `lesionglue/configs/`) drives the matcher. `lesionglue_cv` trains one model per patient-level fold, `lesionglue_oof` scores each fold checkpoint on its own held-out patients, and `lesionglue_pool` concatenates those per-patient counts into one out-of-fold estimate with a patient-bootstrap 95% CI.
-`lesionglue_train` without `--fold` is the final fit on train+val (no validation, `last.ckpt` only).
+`lesionglue_train` without `--fold` is the final fit on the pool (no validation, `last.ckpt` only). `--pool` picks the pool: `train-val` (default) is the 240 patients of the train and val caches; `all` adds the test cache, so the fit set and the CV folds cover all 300 patients.
 All four need the cached lesion graphs (`lesionglue_preprocess`) and `lesionglue/configs/split.json` (`lesionglue_split`).
 
 Config fields (`max_steps`, `n_folds`, `cv_seed`, `ema_decay`, `intra`, ...) are defined once in [`lesionglue/config.py`](../../config.py); unknown keys are rejected. The selection metric is `val_match_score_ema`.
@@ -14,10 +14,11 @@ Config fields (`max_steps`, `n_folds`, `cv_seed`, `ema_decay`, `intra`, ...) are
 lesionglue_train --config lesionglue/configs/base.json --out runs/base --fold 0
 ```
 
-Final fit on train+val, no validation:
+Final fit on the pool, no validation; then one selection-free fold of the 5-fold over all 300 patients (fold 0 is held out of the fit but never validated, nothing is chosen on it, `last.ckpt` only):
 
 ```bash
 lesionglue_train --config lesionglue/configs/complete.json --out runs/final_seed0 --seed 0
+lesionglue_train --config lesionglue/configs/complete.json --out runs/cv5/fold0 --pool all --fold 0 --no-val
 ```
 
 ### Arguments
@@ -28,10 +29,12 @@ lesionglue_train --config lesionglue/configs/complete.json --out runs/final_seed
 | `--root` | str | `/nnunet_data/Longitudinal-CT` | Dataset root read by the datamodule |
 | `--cache` | str | `/nnunet_data/lesion_tracking/cache` | Root of the cached lesion graphs |
 | `--out` | str | `lightning_logs` | Run dir for checkpoints, `config.json`, `fold_metrics.json`. Refuses to run if it already holds `*.ckpt` |
-| `--fold` | int | none | CV fold in `[0, n_folds)` held out for validation. Omitted: no-val fit on train+val, saves `last.ckpt` only |
+| `--pool` | choice | `train-val` | `train-val`: the 240 train+val patients; `all`: train+val+test caches, all 300 patients (the holdout is then inside the pool) |
+| `--fold` | int | none | CV fold in `[0, n_folds)` held out for validation. Omitted: no-val fit on the whole pool, saves `last.ckpt` only |
+| `--no-val` | flag | off | With `--fold`: no validation loop, no EarlyStopping, no selection; fit for `max_steps`, save `last.ckpt` and `fold_metrics.json` (`val_disabled: true`, `n_held_out`). Implied without `--fold` |
 | `--seed` | int | none | Override the config seed; none uses the seed from `--config` |
 | `--max-steps` | int | none | Override `max_steps` (optimizer steps); none uses the config value |
-| `--no-early-stop` | flag | off | Disable EarlyStopping on `val_match_score_ema` (only applies with `--fold`) |
+| `--no-early-stop` | flag | off | Disable EarlyStopping on `val_match_score_ema` (only applies with `--fold` and without `--no-val`) |
 | `--wandb` | flag | off | Log to Weights & Biases (needs the `wandb` package; also on when `--wandb-run-name` is set) |
 | `--wandb-project` | str | `lesion-tracking` | W&B project name |
 | `--wandb-run-name` | str | `""` | W&B run name; a non-blank value also turns on W&B logging |
@@ -43,7 +46,7 @@ Device: MPS when available, else Lightning `accelerator=auto`, one device. The h
 | Path | Format | Written by |
 |---|---|---|
 | `lesionglue/configs/base.json` (`--config`) | JSON | you |
-| `$CACHE/processed/train_v7_native.pt`, `val_v7_native.pt` (`--cache`) | torch graph cache | `lesionglue_preprocess` |
+| `$CACHE/processed/train_v8_native.pt`, `val_v8_native.pt` (`--cache`; also `test_v8_native.pt` with `--pool all`) | torch graph cache | `lesionglue_preprocess` |
 | `lesionglue/configs/split.json` | JSON | `lesionglue_split` |
 | `runs/base/config.json` | JSON (resolved config, after `--seed`/`--max-steps`) | this step |
 | `runs/base/best.ckpt` | Lightning ckpt, best `val_match_score_ema` (fold runs) | this step |
@@ -86,6 +89,7 @@ lesionglue_cv --config lesionglue/configs/base.json --out runs/cv --start-fold 2
 |----------|------|---------|-------------|
 | `--config` | str | required | Config JSON; sets `n_folds` and seed, passed to each fold's `lesionglue_train` run |
 | `--out` | str | required | CV output root; writes `fold_*/` subdirs |
+| `--pool` | choice | `train-val` | Patient pool the folds are drawn from (`train-val` or `all`); passed to every fold's `lesionglue_train` |
 | `--start-fold` | int | 0 | First fold index to run (inclusive) |
 | `--end-fold` | int | none (`n_folds`) | Exclusive upper bound |
 | `--wandb` | flag | off | Log each fold's training run to W&B |
@@ -125,6 +129,7 @@ lesionglue_oof --ckpt runs/cv/fold_0/best.ckpt --fold 0 --config lesionglue/conf
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `--ckpt` | str | required | Checkpoint to validate (`best.ckpt`, `best_raw.ckpt`, `swa_plateau.ckpt`) |
+| `--pool` | choice | `train-val` | Pool the checkpoint's folds were drawn from; must match its training run (`train-val` or `all`) |
 | `--fold` | int | required | CV fold whose held-out patients are scored; in `[0, n_folds)` of `--config` |
 | `--config` | str | required | JSON config the checkpoint was trained with (gives `n_folds`, `cv_seed`, graph settings) |
 | `--root` | str | `/nnunet_data/Longitudinal-CT` | Dataset root for the datamodule and fold split |
@@ -141,7 +146,7 @@ Runs one validation pass on CPU. Name the output dir `oof_<selector>` (`oof_best
 |---|---|---|
 | `runs/cv/fold_0/best.ckpt` (`--ckpt`) | Lightning ckpt | `lesionglue_train` |
 | `lesionglue/configs/base.json` (`--config`) | JSON | you |
-| `$CACHE/processed/*_v7_native.pt` | torch graph cache | `lesionglue_preprocess` |
+| `$CACHE/processed/*_v8_native.pt` | torch graph cache | `lesionglue_preprocess` |
 | `runs/cv/fold_0/oof_best/val_per_patient.json` | JSON (`match_score`, per-subtype acc, `per_patient` counts) | this step |
 
 ### Common errors
@@ -150,8 +155,7 @@ Runs one validation pass on CPU. Name the output dir `oof_<selector>` (`oof_best
 |---|---|
 | `EMA evaluation requested but this checkpoint has no ema_matcher.` | Add `--no-ema` |
 | `AssertionError` (no text, from `assert args.fold in range(cfg.n_folds)`) | `--fold` must be in `[0, n_folds)` of `--config` |
-| `fold N val loader leaked non-fold patients` | `--config` (`n_folds`, `cv_seed`) differs from the training run; use the config the checkpoint was trained with |
-| `evaluated patient set != fold N val loader` | Same cause; rerun with the matching `--config` and `--fold` |
+| `fold N val loader leaked non-fold patients` or `evaluated patient set != fold N val loader` | `--config` (`n_folds`, `cv_seed`) or `--pool` differs from the training run; use the ones the checkpoint was trained with |
 | `fold N: empty train or val after patient split` | `--fold` has no cached patients; check `--cache` and `--root` |
 | `No graph cache at` | `lesionglue_preprocess --split train`, then `--split val` |
 
@@ -161,12 +165,6 @@ Runs one validation pass on CPU. Name the output dir `oof_<selector>` (`oof_best
 
 ```bash
 lesionglue_pool --runs runs/cv --out runs/cv/pool
-```
-
-With the registration-flagged vs clean split:
-
-```bash
-lesionglue_pool --runs runs/cv --out runs/cv/pool --stratify-registration
 ```
 
 ### Arguments

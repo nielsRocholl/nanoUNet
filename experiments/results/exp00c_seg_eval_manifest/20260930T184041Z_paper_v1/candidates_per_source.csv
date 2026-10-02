@@ -1,0 +1,10 @@
+source,n_total_readme,n_candidates,n_dropped_header,n_patients_alive,n_selected
+SegRap25,240,120,0,120,30
+ScienceDBLungTumorCT,1167,1167,0,1167,30
+NSCLC-Radiogenomics,88,88,0,88,30
+HCC-TACE-SEG,74,74,0,74,30
+SpinalMyelomaCT,72,72,0,67,30
+BoneTumorLungMetastasis,61,61,0,61,30
+PANORAMA,479,479,99,379,30
+AbdomenAtlas-esophagus,154,154,0,154,30
+AbdomenAtlas-endometrial,79,79,0,79,30

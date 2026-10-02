@@ -20,7 +20,7 @@ from lesionglue.common import CACHE_ROOT, DATASET_ROOT, DEPLOYED_DUST_TAU, confi
 from lesionglue.config import load_config
 from lesionglue.eval.bootstrap import match_score_from_counts
 from lesionglue.data.graph.dense import graph_config
-from lesionglue.data.source.splits import fold_patient_sets
+from lesionglue.data.source.splits import POOLS, fold_patient_sets, pool_patient_ids
 from lesionglue.train.datamodule import MatcherDataModule
 from lesionglue.train.module import MatcherModule
 
@@ -28,6 +28,7 @@ from lesionglue.train.module import MatcherModule
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True, help="checkpoint to validate (e.g. best.ckpt, best_raw.ckpt, swa_plateau.ckpt)")
+    ap.add_argument("--pool", choices=POOLS, default="train-val", help="patient pool the checkpoint's folds were drawn from, must match its training run: train-val = 240 patients, all = all 300")
     ap.add_argument("--fold", type=int, required=True, help="CV fold whose held-out patients are scored; must be in [0, n_folds) of --config")
     ap.add_argument("--config", required=True, help="JSON config the checkpoint was trained with (gives n_folds, cv_seed, graph settings)")
     ap.add_argument("--root", default=str(DATASET_ROOT), help="dataset root directory passed to the datamodule and fold split")
@@ -45,7 +46,7 @@ def main() -> None:
     dm = MatcherDataModule(
         cache_root=Path(args.cache), dataset_root=Path(args.root),
         val_batch_size=cfg.val_batch_size, num_workers=cfg.num_workers,
-        graph=graph_config(cfg), fold=args.fold, n_folds=cfg.n_folds, cv_seed=cfg.cv_seed,
+        graph=graph_config(cfg), fold=args.fold, n_folds=cfg.n_folds, cv_seed=cfg.cv_seed, pool=args.pool,
     )
     dm.prepare_data()
     dm.setup()
@@ -61,7 +62,7 @@ def main() -> None:
     trainer.validate(mod, dataloaders=dm.val_dataloader())
 
     per_patient = mod._per_patient
-    _, val_pids = fold_patient_sets(args.root, args.fold, cfg.n_folds, cfg.cv_seed)
+    _, val_pids = fold_patient_sets(args.root, args.fold, cfg.n_folds, cfg.cv_seed, pool_pids=pool_patient_ids(args.root, args.pool))
     # fold_patient_sets covers the whole 270-patient train+val pool, but only 252 patients have
     # cached graphs (19 are skipped -- complete responders, registration failures, dominant-FU
     # casualties; see round12_findings.md A.1.2). So the reachable set is the pooled cache filtered

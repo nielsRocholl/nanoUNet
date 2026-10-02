@@ -58,6 +58,8 @@ def drop_nodes(
     data["bl"].img_bl = data["bl"].img_bl[kb]
     data["bl"].sp_bl = data["bl"].sp_bl[kb]
     data["bl"].no_match_label = nm_bl[kb]
+    if hasattr(data["bl"], "prop_source") and data["bl"].prop_source is not None:
+        data["bl"].prop_source = data["bl"].prop_source[kb]
     if hasattr(data["bl"], "lesion_id") and data["bl"].lesion_id is not None:
         data["bl"].lesion_id = data["bl"].lesion_id[kb]
     data["fu"].x = data["fu"].x[kf]

@@ -7,6 +7,7 @@ CT lesion research code: one project per top-level folder. Each folder is self-c
 | [`nanounet/`](nanounet/) | promptable 3D lesion segmentation (ResEnc nnU-Net, Lightning, MAE pretraining) | `core` | [`nanounet/README.md`](nanounet/README.md) |
 | [`lesionglue/`](lesionglue/) | LesionGlue: baseline ↔ follow-up lesion matching with a dense PyG GNN | `core` | [`lesionglue/README.md`](lesionglue/README.md) |
 | [`segtrack/`](segtrack/) | pipeline: segment both timepoints with nanounet, link lesions with LesionGlue | `core`, `nanounet`, `lesionglue` | [`segtrack/README.md`](segtrack/README.md) |
+| [`experiments/`](experiments/) | the paper's experiments: one folder per experiment, every run recorded (exact command, provenance, per-lesion results) | `core`, `nanounet`, `lesionglue`, `segtrack` | [`experiments/README.md`](experiments/README.md) |
 | [`core/`](core/) | shared terminal UI (one stderr console, headers, config tables, progress) | — | [`core/ui.py`](core/ui.py) |
 
 ## Pipeline
@@ -36,6 +37,10 @@ The first installs `core` + `nanounet`. The `lesionglue` extra adds torch-geomet
 | nanounet | `nanounet_preprocess`, `nanounet_train`, `nanounet_pretrain`, `nanounet_predict`, `nanounet_build_splits`, `nanounet_build_valset`, `nanounet_lesion_weights` |
 | lesionglue | `lesionglue_split`, `lesionglue_preprocess`, `lesionglue_train`, `lesionglue_cv`, `lesionglue_oof`, `lesionglue_pool`, `lesionglue_eval`, `lesionglue_report`, `lesionglue_predict`, `lesionglue_track`, `lesionglue_audit`, `lesionglue_qc`, `lesionglue_baseline_distance` |
 | segtrack | `segtrack_run` |
+
+## Experiments
+
+`experiments/` reproduces the paper's numbers. Run one experiment from the repo root with `python -m experiments.<expNN_name>.run --tag paper_v1` (each folder's `run.py` opens with a plain-language description). Every run writes a run directory with the exact command, provenance, per-lesion/per-patient tables and a paper-shaped `table.md`; the light files are mirrored into `experiments/results/` so plots can be regenerated from git alone.
 
 ## Rules
 

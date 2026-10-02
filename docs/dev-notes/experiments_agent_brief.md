@@ -1,0 +1,25 @@
+# Brief for experiment-implementation agents (rules every agent follows)
+
+Date: 2026-09-30
+Status: active while the experiments project (docs/dev-notes/experiments_plan.md) is being implemented
+
+You are a Sonnet implementation agent on the nanoUNet monorepo. You work in your own git worktree (your current
+directory). Never edit files in `/nanoUNet` (the lead's checkout); you may READ `/nanoUNet/lesionglue.tex` (the paper,
+not in your worktree) and everything under `/nnunet_data`.
+
+**Read first (in your worktree):** `docs/dev-notes/experiments_plan.md` (all of it: it is the spec; note the "Phase 0
+outcome" block after Sec. 4), `experiments/README.md`, `experiments/common.py`, `.claude/skills/nanochat-style/SKILL.md`,
+and the memory notes `/home/nielsrocholl/.claude/projects/-nanoUNet/memory/experiments-plan-2026-09-30.md` and
+`.../seg-checkpoint-selection-2026-09-30.md`.
+
+## Rules
+
+1. **Environment.** In every shell: `export PYTHONPATH=$PWD NANOUNET_RAW=/nnunet_data/NanoUNet_raw NANOUNET_PREPROCESSED=/nnunet_data/NanoUNet_preprocessed NANOUNET_RESULTS=/nnunet_data/NanoUNet_results NANOUNET_TMPDIR=/root/.cache/nanounet_tmp`. The interpreter is `python3`, pip is `pip3`. Run experiments as `python -m experiments.<folder>.run ...` from the worktree root. `/nnunet_data` is a CIFS mount: never write under `targetsTr*`/`inputsTr*`, use `shutil.copyfileobj` not `copy2`, and hold a SimpleITK image in a variable before `GetArrayFromImage` (never inline `GetArrayViewFromImage(ReadImage(f))`).
+2. **Shared machine.** One A100 40 GB and a 40 GB RAM cgroup are shared by all agents: wrap every GPU job in `flock /tmp/gpu.lock <cmd>`, run at most one `nanounet_predict`-sized job yourself, keep every run under about 20 minutes, and NEVER launch a full multi-hour run (smoke only: `--limit-patients 3 --tag smoke`). Loading big graph caches from CIFS takes minutes: cache what you need in a local scratch file.
+3. **Git.** Small commits. After EVERY commit run `git fetch -q origin && git rebase origin/main && git push origin HEAD:main` (retry if rejected). Stage only your own paths with `git add <explicit paths>`; never `git add -A` or `.`; never commit smoke run dirs or `artifacts/`. Commit message trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. On a rebase conflict in `experiments/README.md` keep both sides. Unpushed work is lost when the container dies.
+4. **Scope.** Touch only the paths your task lists plus your own section of `experiments/README.md`. A change to `experiments/common.py` must be additive and backward-compatible, in its own commit, pushed at once, and named in your report. Do not touch the owner's `.gitignore` edits or `lesionglue.tex`.
+5. **The plan is the spec.** If it is ambiguous, wrong, or contradicted by the data, do not guess (R12): finish everything that is unambiguous and put the question under BLOCKERS in your report.
+6. **Style (nanochat-style).** First line of every file you create under `experiments/exp*/` (and any shared module that needs it): `# nanochat-style: allow R1 (experiment code, LOC cap waived by owner 2026-09-30)`. Every `run.py` opens with the Sec. 4 docstring template (QUESTION / WHY / DATA / METHOD / OUTPUT / COMMAND / DEPENDS ON / RUNTIME / CAVEATS) in plain words, with the literal `python -m experiments...` COMMAND. Side modules get an ordinary docstring (what is inside and the non-obvious why). Output only through `cprint`/`start_run`/`Run.finish` (no `print`), boundary errors E1 with a `Fix:` line, startup problems all at once via `abort_if` (E6), kebab-case flags with `help=` (U8), exactly one JSON line on stdout (`finish` writes it), no fallbacks for missing data (R12), no permanent tests (R16; write a temporary validation script under the scratch dir, never commit it). Follow the run.py skeleton in `experiments/README.md`.
+7. **Definition of done (plan Sec. 9).** `--help` is clean; a smoke run `--limit-patients 3 --tag smoke` completes and yields a full run dir (check `command.txt`, `run.json` with status ok, `log.txt`, `results.json`, per-table CSVs, `table.md`, the mirror dir, one line in `INDEX_smoke.jsonl`); stdout has exactly one JSON line; `--resume` and (where the experiment has a predict/score split) `--rescore` work; `python .claude/skills/nanochat-style/scripts/check.py --changed` reports 0 errors and no new warns; every new error path was triggered once and its rendered message pasted in your report.
+8. **README section.** Fill your predefined section(s) in `experiments/README.md`: argument table (flags in backticks; the checker fails on documented flags that do not exist), the literal full-run command, outputs, runtime estimate, and update the status column of the index table. Edit only your own section.
+9. **Report** (at most 35 lines, plain): files created; commit shas that are on `origin/main` (verify with `git log origin/main --oneline | head`); checker summary line; smoke wall time; literal full-run command(s) with runtime estimate; the rendered E1 messages; BLOCKERS and open questions; every deviation from the plan and why.

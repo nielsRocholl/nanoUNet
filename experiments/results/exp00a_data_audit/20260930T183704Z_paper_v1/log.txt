@@ -1,0 +1,82 @@
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ exp00a_data_audit  |  run 20260930T183704Z_paper_v1                          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+                                     config                                     
+  argument           value                                             source   
+  tag                paper_v1                                          cli      
+  out-root           /nnunet_data/experiments                          default  
+  resume             None                                              default  
+  seed               0                                                 default  
+  limit-patients     -1                                                default  
+  data-root          /nnunet_data/Longitudinal-CT                      default  
+  holdout-csv        /nnunet_data/Longitudinal-CT/test_patients.csv    default  
+  corpus-dir         /nnunet_data/NanoUNet_preprocessed/Dataset900…    default  
+  raw-dir            /nnunet_data/NanoUNet_raw                         default  
+  pantrack-dir       /nnunet_data/raw/PanTrack                         default  
+  graph-split        /nanoUNet/.claude/worktrees/agent-a81a0c5a44c…    default  
+  graph-cache-dir    /nnunet_data/lesion_tracking/cache_v8_regions…    default  
+  graph-cache-tag    v7_native                                         default  
+  workers            8                                                 default  
+corpus: d013 validation split is patient-level: train 205 / val 35 patients, 
+overlap 0
+
+
+                       claims that do NOT match (7 of 68)                       
+  claim                                            paper    measured            
+  5690 volumes: dataset.json entries               5690     5796                
+  15 % of each cohort held out for validation      0        1                   
+  (every cohort within one case of 15 %)                                        
+  neighbour within 30 vox for x % of lesions       42       32.955487973458666  
+  PanTrack annotated lesion instances              292      289                 
+  PanTrack annotated lesion instances (label       292      289                 
+  NIfTIs)                                                                       
+  PanTrack pancreas instances                      165      164                 
+  PanTrack liver instances                         124      122                 
+done exp00a_data_audit | run: 20260930T183704Z_paper_v1 | wall: 45.0 s | dir: 
+/nnunet_data/experiments/exp00a_data_audit/20260930T183704Z_paper_v1
+  claims.n: 68
+  claims.n_match: 61
+  claims.n_mismatch: 7
+  claims.mismatches: ['5690 volumes: dataset.json entries', '15 % of each cohort
+held out for validation (every cohort within one case of 15 %)', 'neighbour 
+within 30 vox for x % of lesions', 'PanTrack annotated lesion instances', 
+'PanTrack annotated lesion instances (label NIfTIs)', 'PanTrack pancreas 
+instances', 'PanTrack liver instances']
+  linking_unclear.paper_rule_all300.n_lesions: 4530
+  linking_unclear.paper_rule_all300.UNCHANGED: 2424
+  linking_unclear.paper_rule_all300.DISAPPEARING: 1382
+  linking_unclear.paper_rule_all300.NEWLYAPPEARING: 558
+  linking_unclear.paper_rule_all300.MERGING: 166
+  linking_unclear.unclear_excluded_all300.n_lesions: 4396
+  linking_unclear.unclear_excluded_all300.UNCHANGED: 2421
+  linking_unclear.unclear_excluded_all300.DISAPPEARING: 1251
+  linking_unclear.unclear_excluded_all300.NEWLYAPPEARING: 558
+  linking_unclear.unclear_excluded_all300.MERGING: 166
+  linking_unclear.unclear_rows_in_pairs: 134
+  linking_unclear.unclear_rows_all_regions: 135
+  linking_unclear.paper_rule_holdout60.n_lesions: 774
+  linking_unclear.paper_rule_holdout60.UNCHANGED: 475
+  linking_unclear.paper_rule_holdout60.DISAPPEARING: 213
+  linking_unclear.paper_rule_holdout60.NEWLYAPPEARING: 67
+  linking_unclear.paper_rule_holdout60.MERGING: 19
+  linking_unclear.unclear_excluded_holdout60.n_lesions: 759
+  linking_unclear.unclear_excluded_holdout60.UNCHANGED: 475
+  linking_unclear.unclear_excluded_holdout60.DISAPPEARING: 198
+  linking_unclear.unclear_excluded_holdout60.NEWLYAPPEARING: 67
+  linking_unclear.unclear_excluded_holdout60.MERGING: 19
+  linking_unclear.rows_all_regions: 4638
+  linking_unclear.patients_with_several_fu_regions: 32
+  graph_cache.train.patients: 192
+  graph_cache.train.with_graph: 180
+  graph_cache.train.graphs: 199
+  graph_cache.train.matches_cache_meta: True
+  graph_cache.val.patients: 48
+  graph_cache.val.with_graph: 46
+  graph_cache.val.graphs: 48
+  graph_cache.val.matches_cache_meta: True
+  graph_cache.test.patients: 60
+  graph_cache.test.with_graph: 57
+  graph_cache.test.graphs: 59
+  graph_cache.test.matches_cache_meta: True
+next: cat 
+/nnunet_data/experiments/exp00a_data_audit/20260930T183704Z_paper_v1/table.md
