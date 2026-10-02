@@ -71,6 +71,10 @@ computed over `all_clicked` rows only, so they compare model quality, not scenar
 **Inputs:** preprocessed dataset dir, `splits_final.json`, plans JSON, ROI/prompt config.
 **Outputs:** `--out` manifest `.json` plus sibling `.targets.npz` sidecar.
 
+Click offsets and the small/large cut are physical (mm): table offsets convert to voxels with each case's
+`spacing_after_resampling` (z-only plans) or the plans' spacing (median plans). Under foundation plans name
+the manifest `valset_<n>_<plans>.json` (`nanounet_preprocess` does this for you).
+
 ## Manifest schema
 
 One JSON file plus a `.targets.npz` sidecar (packed-bit clicked-subset masks, `.json` -> same path
@@ -81,7 +85,7 @@ with `.targets.npz`).
 | `bbox` | `[[z0,z1],[y0,y1],[x0,x1]]`, half-open, preprocessed case frame |
 | `clicks_zyx` / `clicks2_zyx` | Patch-local coords, post-displacement, draw 1 / draw 2 |
 | `n_false_pos` | Trailing decoy count in each click list |
-| `size_bucket` | `small`/`large` by the largest in-patch lesion's voxel volume |
+| `size_bucket` | `small`/`large` by the largest in-patch lesion's equivalent-sphere diameter (`small` if <= 10 mm, header `small_lesion_max_diam_mm`), computed with the case's own spacing |
 | `click_inside` | 1/0/-1, majority vote of draw-1 clicks landing on foreground |
 | `subset_target_index` | Row into the `.npz` sidecar, or `-1` |
 | `draws_matched` | 1 if draw 1 and draw 2 kept the same lesion-click count (displacement can drop a click from one draw only) |
@@ -113,6 +117,7 @@ A bucket with zero rows logs `NaN`, never a fabricated `0.0`.
 |-------|-------|-----|
 | `splits_final.json already exists` | `nanounet_build_splits` without `--force` | Add `--force` (old file is backed up) |
 | `No validation manifest at <path>` | `--val-manifest` path missing | Run `nanounet_build_valset` first |
-| `<path> has schema N, this build expects 1` | Stale manifest format | Rebuild with `nanounet_build_valset` |
+| `<path> has schema N, this build expects 2` | Stale manifest format (schema 2: mm small-lesion threshold, per-case spacing) | Rebuild with `nanounet_build_valset` |
 | `subset_clicked target ... exceeds available capacity` | `--mix` asks for more selectivity patches than multi-lesion cohorts can supply | Lower the `subset_clicked` share or raise `--n-patches` |
+| `No voxel spacing for case` | The case has no `spacing_after_resampling` (preprocessed by an old build) and the plans bind no dataset spacing | `nanounet_preprocess -d <id> --resume` |
 | `Could not fill scenario '...'` | Cohort ran out of eligible patches within `--max-tries` | Lower that scenario's `--mix` share, or raise `--max-tries` |

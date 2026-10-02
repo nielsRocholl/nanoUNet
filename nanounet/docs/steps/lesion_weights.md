@@ -15,7 +15,7 @@ nanounet_lesion_weights -d 13 --plans nnUNetResEncUNetLPlans --meta-dir /path/to
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `-d`, `--dataset_id` | int | required | Dataset id, e.g. 13 |
-| `--plans` | str | required | Plans identifier, no `.json` |
+| `--plans` | str | required | Plans identifier, no `.json`; rerun per plans (weights live in that plans' data folder and follow its voxel grid), e.g. `nnFoundationCNN_z1p0` |
 | `--meta-dir` | str | required | Folder of `<hash>.csv` lesion-type files |
 | `--only-prefix` | str | `d013_Longitudinal_CT_` | Case id prefix up to the per-patient hash; used both to filter case ids and to parse hash/timepoint from each id |
 | `--cog-axis-order` | choice | `xyz` | Axis order of the `cog_bl`/`cog_fu` columns in the meta CSV: `xyz` or `zyx` |
