@@ -11,6 +11,8 @@ import tempfile
 import numpy as np
 import torch
 
+from nanounet.plan.resenc.foundation_plan import export_spacing
+
 
 def _axis_overlap(patch_sl: slice, rev_sl: slice) -> tuple[slice, slice] | None:
     i0 = max(patch_sl.start, rev_sl.start)
@@ -69,7 +71,7 @@ def tiles_to_native_seg(
     """Nearest-resample each plan-space crop into native scanner zeros (per-tile paste)."""
     sh = props["shape_after_cropping_and_before_resampling"]
     sp_t = [props["spacing"][i] for i in pl.transpose_forward]
-    cur_sp = cm.spacing if len(cm.spacing) == len(sh) else [sp_t[0], *cm.spacing]
+    cur_sp = export_spacing(cm, props, sp_t)
     tgt_sp = [props["spacing"][i] for i in pl.transpose_forward]
     P, N = np.array(pp_shape, dtype=np.int64), np.array(sh, dtype=np.int64)
     crop_bb = props["bbox_used_for_cropping"]

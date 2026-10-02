@@ -11,6 +11,7 @@ from acvl_utils.cropping_and_padding.bounding_boxes import insert_crop_into_imag
 from nanounet.data.store.io import reader_writer_class_from_dataset
 from nanounet.infer.export.tiles import tiles_to_native_seg
 from nanounet.plan.plans import Config3d, Plans
+from nanounet.plan.resenc.foundation_plan import export_spacing
 
 
 def save_preprocessed_seg(seg: np.ndarray, spacing: tuple[float, ...], out_path: str) -> None:
@@ -35,7 +36,7 @@ def export_preprocessed_seg_to_native(
     torch.set_num_threads(num_threads)
     sp_t = [props["spacing"][i] for i in plans.transpose_forward]
     sh = props["shape_after_cropping_and_before_resampling"]
-    cur_sp = cm.spacing if len(cm.spacing) == len(sh) else [sp_t[0], *cm.spacing]
+    cur_sp = export_spacing(cm, props, sp_t)
     tgt_sp = [props["spacing"][i] for i in plans.transpose_forward]
     x = seg_pp[None].astype(np.float32)
     x = np.asarray(cm.resampling_fn_seg(x, sh, cur_sp, tgt_sp))

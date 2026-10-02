@@ -43,6 +43,29 @@ def zonly_target_spacing(sp, z_target: float, ratio: float = THICK_AXIS_RATIO) -
     return t, ax
 
 
+def case_target_spacing(cm, o_sp) -> tuple[list[float], int]:
+    """(target spacing, resampled axis) for one case in plan axis order. Median mode (every non-foundation
+    plan) returns the plan's spacing and axis -1 (all axes); z_only mode returns the per-case thick-axis rule."""
+    c = cm.configuration
+    if c.get("spacing_mode", "median") == "z_only":
+        return zonly_target_spacing(o_sp, c["z_target_mm"], c["thick_axis_ratio"])
+    t = list(cm.spacing)
+    return (t if len(t) == len(o_sp) else [o_sp[0], *t]), -1
+
+
+def export_spacing(cm, props: dict, sp_t: list[float]) -> list[float]:
+    """Spacing of the plan-space prediction grid, for resampling a prediction back to the native grid."""
+    if cm.configuration.get("spacing_mode", "median") != "z_only":
+        return cm.spacing if len(cm.spacing) == len(sp_t) else [sp_t[0], *cm.spacing]
+    if "spacing_after_resampling" not in props:
+        raise SystemExit(
+            "This case's properties have no 'spacing_after_resampling', which z-only plans need to map predictions back to the native grid.\n"
+            "Expected the sidecar written by a z-only preprocess (every case records the spacing it was resampled to).\n"
+            "Fix: re-run nanounet_preprocess for this plan (the case was preprocessed before spacing_after_resampling existed)"
+        )
+    return props["spacing_after_resampling"]
+
+
 def _batch_size(gpu_mem_gb: float, n_in: int, n_out: int) -> int:
     preset = PRESETS[PRESET]
     est = estimate_conv_feature_map_size(tuple(PATCH_SIZE), n_in, n_out, NET_CLASS, ARCH_KWARGS, KW_REQUIRES_IMPORT)

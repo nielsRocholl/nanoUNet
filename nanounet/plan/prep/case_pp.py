@@ -14,6 +14,7 @@ from nanounet.data.volume.normalization import normalization_class_from_plan_nam
 from nanounet.data.volume.resampling import compute_new_shape
 from nanounet.plan.labels import labels_from_dataset_json
 from nanounet.plan.plans import Config3d, Plans
+from nanounet.plan.resenc.foundation_plan import case_target_spacing
 
 
 def sample_foreground_locations(
@@ -119,9 +120,8 @@ def crop_normalize_case(
     data, seg, bbox = crop_to_nonzero(data, seg)
     properties["bbox_used_for_cropping"] = bbox
     properties["shape_after_cropping_and_before_resampling"] = data.shape[1:]
-    t_sp = list(cm.spacing)
-    if len(t_sp) < len(data.shape[1:]):
-        t_sp = [o_sp[0]] + t_sp
+    t_sp, properties["resampled_axis"] = case_target_spacing(cm, o_sp)
+    properties["spacing_after_resampling"] = t_sp
     new_sh = tuple(int(x) for x in compute_new_shape(data.shape[1:], o_sp, t_sp))
     fi = plans.foreground_intensity_properties_per_channel
     for c in range(data.shape[0]):
