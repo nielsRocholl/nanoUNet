@@ -41,7 +41,7 @@ the job — the canonical data stays on `/nnunet_data`.
   submits the preprocessing job.
 - **H2, after P10**: the owner reviews and submits the SLURM job. You never run `sbatch`.
 
-No fingerprinting and no planner run is needed: Dataset900's existing `dataset_fingerprint.json` is reused
+No planner run is needed, and the fingerprint is computed once up front (the old one was deleted; see §2.4) and then reused
 (`--skip-fingerprint`), and the foundation plans JSON is written directly from fixed constants (P2, seconds). But
 the data itself **must** be re-preprocessed (new spacing, Z-score, new patch-sized blosc2 chunks, new sidecar keys),
 and that needs Stage A's code first.
@@ -168,17 +168,28 @@ model take 578–706 s/epoch at 1000 iters/epoch, about 1.3–1.5× the pure GPU
 
 ### 2.4 Dataset900_Merged facts
 
-- Raw: `/nnunet_data/NanoUNet_raw/Dataset900_Merged` (`dataset.json`, `imagesTr`, `labelsTr`).
-- Preprocessed (canonical): `/nnunet_data/NanoUNet_preprocessed/Dataset900_Merged/` containing
-  `dataset.json`, `dataset_fingerprint.json` (5796 cases), `splits_final.json`
-  (+ `splits_final.backup-20260903-070746.json`), `cohorts.json`, `valset_2000.json`, `gt_segmentations/`,
-  `nnUNetResEncUNetLPlans_h200_smallpv.json`, and the current data folder **`nnUNetPlans_3d_fullres/`**
-  (5690 `.pkl`, 11380 `.b2nd`, 6227 `.json`; 331 GB).
+**Update 2026-10-02:** the old preprocessed folder was deleted by accident, so this plan REBUILDS it. Nothing
+below that mentions the old `nnUNetPlans_3d_fullres/`, the 5796-case fingerprint, `valset_2000.json` or the old
+plans JSON exists any more; the old 2.5 mm data and valset are NOT rebuilt.
+
+- Raw: `/nnunet_data/NanoUNet_raw/Dataset900_Merged/` holds only `dataset.json` (5690 cases, entries point into the
+  source datasets `Dataset011..031`) and `merged_sources.json`.
+- Preprocessed (canonical, rebuilt by P7): `/nnunet_data/NanoUNet_preprocessed/Dataset900_Merged/`.
+  - `splits_final.json` / `cohorts.json`: **regenerated 2026-10-02**, then frozen (D6) and never rewritten.
+    Splits = `make_balanced_split(sorted(dataset.json["dataset"]), 0.15, 12345)`: 4833 train / 857 val; all 102
+    `val:` cases of `experiments/exp00c_seg_eval_manifest/20260930T184041Z_paper_v1/cases.csv` land in val, none in
+    train, which confirms it reproduces the original. sha256 splits `1016c2be2ac003bbe8f98d023c791dec2454c25c4d7f045c4701246d3e823ee7`,
+    cohorts `ec46f4d03335cd91c40a90de49625aced2f7137bf33530437ab41464e5a2a1d9`. Per-cohort counts equal
+    `exp00a_data_audit.PAPER_COHORTS` (21 cohorts, 5690 total); only d029 is >1 case off 15% (10 of 59 val, patient-grouped draw).
+  - `dataset_fingerprint.json`: computed fresh (5690 cases; the old one had 5796). Only nominal values use it.
+  - Hard guard (all of split creation, preprocess splits-safety, train startup): the 60 patients in
+    `/nnunet_data/Longitudinal-CT/test_patients.csv` must not appear in any case id or image/label path
+    (`nanounet/plan/dataset/holdout.py`). Result at creation: 0 matches.
+  - New data folder `nnFoundationCNN_z1p0_3d_fullres/`, plans `nnFoundationCNN_z1p0.json`, sidecars,
+    `gt_segmentations/`, lesion weights, `valset_2000_nnFoundationCNN_z1p0.json` (all produced by P7).
 - **Danger:** `run_preprocess` does `shutil.rmtree(out_dir)` on the plan's `data_identifier` folder when not
-  `--resume`. The new plan's `data_identifier` must never equal `nnUNetPlans_3d_fullres`.
-- **Danger:** `nanounet_preprocess` without `--no-splits` **overwrites** `splits_final.json` and `cohorts.json`
-  in the dataset folder (shared by all plans), and `--valset-config` writes `valset_<n>.json` (would overwrite
-  `valset_2000.json` for n=2000).
+  `--resume`; keep `data_identifier` unique per plans variant.
+- Splits/cohorts in `nanounet_preprocess`: P6 never rewrites existing files (verify and keep); only absent files are created.
 - Native z-spacing (array axis 0): p5/25/50/75/95 = 0.70/1.00/2.50/3.00/5.00 mm. 28% ≤ 1 mm, 21% in (1,2],
   28% in (2,3], 2% in (3,4.5], 21% > 4.5 mm. In-plane spacing p5/50/95 = 0.594/0.758/0.977 mm.
 - Total voxels after z-only resampling at 1.0 mm vs current: **2.23×** (median case 83 Mvox, p95 209 Mvox). By
@@ -448,7 +459,7 @@ Target folder: `/nnunet_data/NanoUNet_preprocessed/Dataset900_Merged/` (the same
 the new data goes into its own `nnFoundationCNN_z1p0_3d_fullres/` subfolder, P2 guarantees the name).
 `NANOUNET_PREPROCESSED=/nnunet_data/NanoUNet_preprocessed` for every step.
 
-1. Record the sha256 of `splits_final.json` and `cohorts.json` **before** anything runs (paste them in the report).
+1. Record the sha256 of `splits_final.json` and `cohorts.json` (regenerated 2026-10-02, values in §2.4; paste them in the report). They must be unchanged after the job.
 2. Measure first (in your session): run the P3 code on a 50-case cohort-stratified subset into a scratch output
    under `/nnunet_data` (e.g. `/nnunet_data/NanoUNet_preprocessed/_probe_nnFoundationCNN_z1p0/`, deleted afterwards)
    to get seconds per case, peak RAM per worker, bytes per case and CIFS write throughput. Extrapolate total wall
@@ -457,7 +468,7 @@ the new data goes into its own `nnFoundationCNN_z1p0_3d_fullres/` subfolder, P2 
    `nanounet/scripts/slurm_final_900_h200.sh` (same image and `/nnunet_data` mount; CPU-heavy: many cpus, enough
    `--mem` for `-np` workers from step 2; a GPU is not needed unless the partition requires one). It runs:
    ```bash
-   nanounet_preprocess -d 900 --skip-fingerprint --target-z 1.0 --gpu-memory-gb 141 -np <N> --resume
+   nanounet_preprocess -d 900 --skip-fingerprint --target-z 1.0 --gpu-memory-gb 141 -np <N> --resume   # fingerprint computed beforehand (2026-10-02)
    ```
    `--resume` makes resubmits continue where they stopped. It must **not** create a new `splits_final.json`
    (P6 splits safety) and must print the sha256 check at the end. Commit and push; **STOP at H1** for the owner to

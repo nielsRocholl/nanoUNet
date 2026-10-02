@@ -50,19 +50,23 @@ def site_balanced_weights(rows: list[dict]) -> tuple[dict[str, list[str]], dict[
     return sites, weights
 
 
-def run_cohorts(dataset_id: int, out_dir: str) -> str:
-    """Write cohorts.json into `out_dir` (the preprocessed dataset dir). Returns the path."""
+def cohorts_doc(dataset_id: int) -> dict:
+    """The cohorts.json content, derived fresh from the raw dataset (deterministic)."""
     raw_name = convert_id_to_dataset_name(dataset_id)
     rows = _source_rows(dataset_id, raw_name)
     sites, weights = site_balanced_weights(rows)
     total = sum(weights.values())
     assert abs(total - 1.0) < 1e-6, f"cohort weights sum to {total}, expected 1.0 (internal bug)"
-    doc = {
+    return {
         "rule": RULE,
         "sites": {site: sorted(prefixes) for site, prefixes in sorted(sites.items())},
         "weights": {p: round(w, 6) for p, w in sorted(weights.items())},
         "counts": {r["prefix"]: {"cases": r["cases"], "site": r["site"]} for r in rows},
     }
+
+
+def run_cohorts(dataset_id: int, out_dir: str) -> str:
+    """Write cohorts.json into `out_dir` (the preprocessed dataset dir). Returns the path."""
     out_path = join(out_dir, "cohorts.json")
-    save_json(doc, out_path, sort_keys=False)
+    save_json(cohorts_doc(dataset_id), out_path, sort_keys=False)
     return out_path
