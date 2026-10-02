@@ -17,6 +17,8 @@ class PropagatedConfig:
     backends: Tuple[str, ...]
     sigma_per_axis: Tuple[float, float, float]
     max_vox: float
+    # plans 3d_fullres.spacing, bound by bind_roi_spacing; in the valset config_stamp (pre-mm manifests go stale)
+    data_spacing_zyx: Tuple[float, float, float] | None = None
 
 
 @dataclass(frozen=True)

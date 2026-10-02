@@ -2,7 +2,10 @@
 
 Schema (see nanounet/docs/reference/config.md): {frame, spacing_zyx, size_bins_mm,
 backends: {name: {offsets_zyx: [[dz,dy,dx], ...] per size bin]}}, excluded, provenance}. Offsets are
-in RESAMPLED voxels. Shared by nanounet/config.py (startup validation) and
+in the TABLE's resampled voxels (table spacing_zyx), so the draw goes voxels -> mm with the table
+spacing, then mm -> voxels with the training data's spacing (PropagatedConfig.data_spacing_zyx,
+bound from the plans by bind_roi_spacing); lesion volume -> diameter also uses the data spacing.
+Shared by nanounet/config.py (startup validation) and
 nanounet/data/patch/sampling.py (the actual draw), so the JSON is parsed exactly once per process.
 """
 
@@ -10,6 +13,7 @@ from __future__ import annotations
 
 import json
 import math
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Tuple
 
@@ -18,7 +22,7 @@ import numpy as np
 from nanounet.prompt.centroids import apply_propagation_offset
 
 if TYPE_CHECKING:
-    from nanounet.config import PropagatedConfig
+    from nanounet.config import PropagatedConfig, RoiPromptConfig
 
 _CACHE: Dict[str, dict] = {}
 
@@ -76,6 +80,11 @@ def validate_table(path: str, backends: Tuple[str, ...]) -> None:
         raise ValueError(
             f"propagated.error_table {path!r} is not valid JSON ({e}).\n{fix}"
         ) from e
+    if table.get("frame") != "resampled_voxels_zyx" or len(table.get("spacing_zyx", [])) != 3:
+        raise ValueError(  # nanochat-style: allow E1 (Fix: line is in the `fix` variable)
+            f"propagated.error_table {path!r} has frame={table.get('frame')!r} and "
+            f"spacing_zyx={table.get('spacing_zyx')!r}; expected frame 'resampled_voxels_zyx' with a 3-value spacing_zyx.\n{fix}"
+        )
     size_bins = table.get("size_bins_mm")
     if not size_bins:
         raise ValueError(f"propagated.error_table {path!r} has no size_bins_mm.\n{fix}")
@@ -100,6 +109,14 @@ def validate_table(path: str, backends: Tuple[str, ...]) -> None:
                 )
 
 
+def bind_roi_spacing(cfg: "RoiPromptConfig", spacing_zyx: Tuple[float, float, float]) -> "RoiPromptConfig":
+    """cfg with sampling.propagated.data_spacing_zyx = the plans' `3d_fullres.spacing` (array-axis
+    order), so empirical offsets scale mm -> data voxels. Call once where the plans are known."""
+    sp = tuple(float(x) for x in spacing_zyx)
+    prop = replace(cfg.sampling.propagated, data_spacing_zyx=sp)
+    return replace(cfg, sampling=replace(cfg.sampling, propagated=prop))
+
+
 def volume_vox_to_diam_mm(volume_vox: float, spacing_zyx: Tuple[float, float, float]) -> float:
     vol_mm3 = volume_vox * spacing_zyx[0] * spacing_zyx[1] * spacing_zyx[2]
     return 2.0 * (3.0 * vol_mm3 / (4.0 * math.pi)) ** (1.0 / 3.0)
@@ -119,29 +136,34 @@ def _draw_from_bin(table: dict, backends: Tuple[str, ...], binidx: int, rng: np.
     return float(off[0]), float(off[1]), float(off[2])
 
 
-def sample_offset_vox(
+def sample_offset_mm(
     volume_vox: float,
     path: str,
     backends: Tuple[str, ...],
+    data_spacing_zyx: Tuple[float, ...],
     rng: np.random.Generator,
 ) -> Tuple[float, float, float]:
-    """One offset (dz,dy,dx) in RESAMPLED voxels, drawn from the measured table, size-matched to
-    the lesion's equivalent-sphere diameter."""
+    """One offset (dz,dy,dx) in MILLIMETRES, drawn from the measured table, size-matched to the
+    lesion's equivalent-sphere diameter (volume_vox is in DATA voxels)."""
     table = load_table(path)
-    spacing = tuple(float(x) for x in table["spacing_zyx"])
-    diam_mm = volume_vox_to_diam_mm(float(volume_vox), spacing)
+    diam_mm = volume_vox_to_diam_mm(float(volume_vox), data_spacing_zyx)
     binidx = _bin_index(diam_mm, table["size_bins_mm"])
-    return _draw_from_bin(table, backends, binidx, rng)
+    return _table_vox_to_mm(_draw_from_bin(table, backends, binidx, rng), table)
 
 
-def sample_offset_vox_pooled(
+def sample_offset_mm_pooled(
     path: str, backends: Tuple[str, ...], rng: np.random.Generator
 ) -> Tuple[float, float, float]:
-    """Offset drawn from a uniformly-random size bin -- used when no lesion volume is known
+    """Offset (mm) drawn from a uniformly-random size bin -- used when no lesion volume is known
     (e.g. a follow-up click with no matching segmentation component)."""
     table = load_table(path)
     binidx = int(rng.integers(len(table["size_bins_mm"])))
-    return _draw_from_bin(table, backends, binidx, rng)
+    return _table_vox_to_mm(_draw_from_bin(table, backends, binidx, rng), table)
+
+
+def _table_vox_to_mm(off: Tuple[float, float, float], table: dict) -> Tuple[float, float, float]:
+    sp = table["spacing_zyx"]
+    return (off[0] * float(sp[0]), off[1] * float(sp[1]), off[2] * float(sp[2]))
 
 
 def draw_propagated_offset(
@@ -151,14 +173,22 @@ def draw_propagated_offset(
     rng: np.random.Generator,
 ) -> Tuple[int, int, int]:
     """Displace a GLOBAL centroid by one draw from cfg.sampling.propagated. mode='empirical' draws
-    a real measured registration offset, size-matched via volume_vox (pooled across bins if the
+    a real measured registration offset (mm -> data voxels via prop.data_spacing_zyx), size-matched via volume_vox (pooled across bins if the
     volume is unknown, e.g. an unmatched follow-up click); mode='gaussian' keeps the legacy
     Gaussian jitter. No magnitude clip for empirical -- the table is already outlier-filtered."""
     if prop.mode == "gaussian":
         return apply_propagation_offset(centroid_zyx, prop.sigma_per_axis, prop.max_vox, rng)
+    sp = prop.data_spacing_zyx
+    if sp is None:
+        raise ValueError(
+            "propagated.mode='empirical' needs the training data's voxel spacing to convert the "
+            "table's mm offsets to voxels, but none was bound.\n"
+            "Expected PropagatedConfig.data_spacing_zyx = the plans' 3d_fullres spacing.\n"
+            "Fix: call bind_roi_spacing(cfg, cm.spacing) after load_config "
+            "(nanounet/data/patch/error_table.py), or set propagated.mode to 'gaussian'."
+        )
     if volume_vox is None:
-        dz, dy, dx = sample_offset_vox_pooled(prop.error_table, prop.backends, rng)
+        dmm = sample_offset_mm_pooled(prop.error_table, prop.backends, rng)
     else:
-        dz, dy, dx = sample_offset_vox(float(volume_vox), prop.error_table, prop.backends, rng)
-    cz, cy, cx = centroid_zyx
-    return (int(round(cz + dz)), int(round(cy + dy)), int(round(cx + dx)))
+        dmm = sample_offset_mm(float(volume_vox), prop.error_table, prop.backends, sp, rng)
+    return tuple(int(round(c + d / s)) for c, d, s in zip(centroid_zyx, dmm, sp))

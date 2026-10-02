@@ -74,6 +74,13 @@ There is no separate `neg` mode — drop covers no-prompt training.
 
 `mode: "empirical"` (default) draws real registration-error offsets from the measured table,
 size-matched to each lesion's equivalent-sphere diameter (`volume_vox` from the centroid sidecar).
+Table offsets are in the table's resampled voxels (`spacing_zyx`, currently `[1.25, 0.781, 0.789]` mm).
+The draw converts them to mm with that spacing, then to voxels with the training data's spacing
+(plans `3d_fullres.spacing`, bound at startup by `bind_roi_spacing`; e.g. Dataset900 `[2.5, 0.758, 0.768]`
+turns a 4-voxel table z offset into 2 voxels). `volume_vox` -> diameter also uses the data spacing.
+The table must have `frame: "resampled_voxels_zyx"` and a 3-value `spacing_zyx`. Drawing without a bound
+spacing raises. `data_spacing_zyx` is part of the valset `config_stamp`, so manifests built before this
+fix load as stale and must be rebuilt (`nanounet_build_valset`).
 No magnitude clip -- the table is already outlier-filtered. At startup the table is validated to
 exist, parse, and have a non-empty offset pool for every `(size bin, backend)` pair in `backends`;
 otherwise the config load raises, pointing at `propagated.error_table` / `propagated.mode`.
