@@ -31,7 +31,9 @@ The old path (planner topology, median spacing, CTNormalization) stays available
 
 **Nothing may live only on a node's local disk.** Interactive sessions and SLURM containers (including
 `dlc-slowpoke`) are wiped when they end. Code goes to git (pushed), data goes to `/nnunet_data` (CIFS; the network
-link was upgraded, so measure its throughput rather than assuming the old ~0.25 it/s training bottleneck).
+link was upgraded, so copies are faster than before). The **training** job always stages a copy of the data to the
+node's local disk with rclone at job start (as the existing train scripts do); that copy is scratch and dies with
+the job — the canonical data stays on `/nnunet_data`.
 
 **Hand-back points (STOP and report to the owner, do not continue on your own):**
 - **H1, after Stage A** (code that preprocessing needs, plus the preprocessing SLURM script): the owner reviews and
@@ -65,7 +67,8 @@ A phase is not done until the checker is clean.
 | D2 | Prompt geometry (registration-error offsets, lesion-size bins) must be physical (mm) and converted **per case**. A separate task is fixing the dataset-level version first (see §3, dependency P0). |
 | D3 | Cases whose thick axis is not array axis 0 (KiTS d022, some PanTS d028) are handled by **resampling whichever axis is thickest, per case**. No reorientation. |
 | D4 | Official finetune recipe: SGD (Nesterov, momentum 0.99), lr **1e-3**, linear warmup of the whole net, then poly; **deep supervision off**. Batch size is **not** fixed to 2 (nnU-Net hard-codes 2); we derive it from the VRAM budget with our existing estimator. **Units:** nnU-Net's 50 warmup epochs are 50 × 250 iters × batch 2 = 25k patches; our epoch is 1000 iters × batch 12 = 12k patches, so the equivalent default is **`--warmup-epochs 2`**, not 50. |
-| D10 | **Hard cap: 4 days of supervised training** (wall clock, including validation and staging). A somewhat lower batch size than the estimator's 12 is acceptable if it buys more updates in the budget. Set batch and epoch count from the P8 measurement, not from a target epoch count (see P10). |
+| D10 | **Budget: roughly 4 days of supervised training** (wall clock, including validation and the rclone staging copy). This is a target, not a hard cap; a few hours either way is fine. A somewhat lower batch size than the estimator's 12 is acceptable if it buys more updates in the budget. Set batch and epoch count from the P8 measurement, not from a target epoch count (see P10). |
+| D11 | **Training always reads from node-local disk.** The training SLURM job copies the dataset from `/nnunet_data` to local disk with rclone at job start, exactly like `nanounet/scripts/slurm_final_900_h200.sh` does. Never train directly from CIFS. |
 | D5 | **No control run.** Do not plan or launch a same-spacing-without-foundation ablation. |
 | D6 | `splits_final.json` stays **exactly** as it is (byte-identical). Click-point sidecars (`*_centroids.json`), the valset manifest and the d013 lesion weights must be **regenerated** in the new voxel grid. |
 | D7 | `z_target = 1.0 mm`. |
@@ -477,10 +480,11 @@ the new data goes into its own `nnFoundationCNN_z1p0_3d_fullres/` subfolder, P2 
 
 ### P8. Throughput and smoke training
 
-- GPU gate (G4, `references/gpu.md` in the skill): measure step time and data-loader throughput at batch 12, 10
-  and 8, reading **from `/nnunet_data`** (new network link) and, for comparison, from a node-local copy of a
-  subset. Report it/s, s/epoch at `--iters-per-epoch 1000`, GPU utilization (compute-bound vs loader-bound), and
-  whether the training job needs to stage data locally at all.
+- GPU gate (G4, `references/gpu.md` in the skill): on a node-local copy of a cohort-stratified subset (D11), measure
+  step time and data-loader throughput at batch 12, 10 and 8. Report it/s, s/epoch at `--iters-per-epoch 1000`, and
+  GPU utilization (must be compute-bound, not loader-bound).
+- Copy throughput: time an rclone copy of a few GB from `/nnunet_data` to local disk (new network link) and
+  extrapolate the full staging time for the new data folder; it goes into the P10 budget.
 - Smoke run (local subset, no W&B):
   ```bash
   nanounet_train -d 900 -f 0 --plans nnFoundationCNN_z1p0 --config nanounet/configs/longrun900.json \
@@ -515,17 +519,19 @@ local staging to `/root/NanoUNet_preprocessed`, the resume state machine,
   re-pass them as flags unless you must. Keep `PROMPTS_PER_PATCH=2`, `CONSISTENCY_WEIGHT=0.02`, `EMA_DECAY=0.999`,
   `VAL_EVERY_N=2`, `ITERS_PER_EPOCH=1000`, `ROI_CONFIG=nanounet/configs/longrun900.json`; batch size from the plans
   (expect 12; drop the old `BATCH_SIZE=12` override or set it from the plans).
-- **Epoch budget: 4 days of supervised training, hard cap (D10).** One 192³ patch is 3× the voxels of the old
+- **Epoch budget: roughly 4 days of supervised training (D10; a target, not a hard cap).** One 192³ patch is 3× the voxels of the old
   64×192² patch; expect about 1.5 s/step at batch 12 (~25 min per 1000-iter epoch; the old run was 578 s), less at
   batch 8–10. From the P8 numbers pick the batch (12, 10 or 8; even, A4) and compute
-  `SUP_EPOCHS = floor((96 h − staging − 3 h margin) × 3600 / s_per_epoch)`; put the arithmetic in the script header
+  `SUP_EPOCHS ≈ (96 h − rclone staging − ~3 h margin) × 3600 / s_per_epoch`; put the arithmetic in the script header
   and confirm with the owner at H2. For scale: ~200 epochs at batch 12 = 2.4 M patches, about 5× nnU-Net's full
   1000-epoch finetune default (500k patches); a pretrained encoder needs fewer updates than our 1200-epoch scratch
   run. The poly schedule is sized to `SUP_EPOCHS`, so it ends on time. The d013 finetune stage comes after and is
   not part of the 4 days.
-- **Data source.** Read the data from `/nnunet_data` unless P8 shows the loader starving the GPU; only then stage to
-  node-local disk at job start (and count the copy time, measured in P8, inside the 4 days). Node-local copies are
-  scratch: they disappear with the job.
+- **Data source (D11).** Always stage to node-local disk with rclone at job start, reusing the old script's staging
+  block (same source/destination layout, gap-filling copy on resubmit) but pointed at the new plans JSON, the new
+  `nnFoundationCNN_z1p0_3d_fullres/` folder (with sidecars and lesion weights), `splits_final.json`, `cohorts.json`,
+  `dataset.json` and `valset_2000_nnFoundationCNN_z1p0.json`. Do not copy the old `nnUNetPlans_3d_fullres/` folder.
+  Point `NANOUNET_PREPROCESSED` at the local copy for training.
 - The d013 finetune stage (`FT_*`) stays in the script, pointed at the new plans and
   `nanounet/configs/finetune900_d013.json`, with `--init-weights` from the supervised run (A6: foundation skipped).
 - Header comment: what the job does, expected wall time, resume instructions, output dir
