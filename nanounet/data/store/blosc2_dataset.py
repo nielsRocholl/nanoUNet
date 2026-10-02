@@ -108,7 +108,7 @@ class Blosc2Folder:
                 _fadvise_dontneed(seg_prev_path)
 
     @staticmethod
-    def save_case(data: np.ndarray, seg: np.ndarray, properties: dict, output_filename_truncated: str, chunks=None, blocks=None, chunks_seg=None, blocks_seg=None, clevel: int = 8, codec=blosc2.Codec.ZSTD):
+    def save_case(data: np.ndarray, seg: np.ndarray, properties: dict, output_filename_truncated: str, chunks=None, blocks=None, chunks_seg=None, blocks_seg=None, clevel: int = 3, codec=blosc2.Codec.ZSTD):
         blosc2.set_nthreads(1)
         if chunks_seg is None:
             chunks_seg = chunks
