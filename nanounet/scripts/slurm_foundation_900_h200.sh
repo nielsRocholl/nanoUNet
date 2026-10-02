@@ -20,14 +20,14 @@
 # Recipe (from the plans' pretrain_info, nanounet_train defaults): foundation encoder, SGD, lr 1e-3,
 # 2 warmup epochs, poly, deep supervision off. Not re-passed below; the config table prints them.
 #
-# WALL BUDGET (D10, ~4 d supervised): s/epoch comes from the P8 step-time measurement at BATCH_SIZE.
-#   SUP_EPOCHS = (96 h - rclone staging - 3 h margin) * 3600 / EPOCH_S
-#   Provisional until measured on a GPU: EPOCH_S ~ 1500 s at batch 12 (1.5 s/step, 192^3 patch)
-#   => (96 - 4 - 3) * 3600 / 1500 = 213 -> SUP_EPOCHS=200 (2.4 M patches). Re-derive from P8 before submitting.
-# qos=vram is 7 d: supervised ~4.2 d + staging + FT ~1 d fits one allocation; a resume just re-enters the state machine.
+# WALL BUDGET (D10, ~4 d supervised). Measured on one H200, batch 8, 192^3 patch, prompts-per-patch 2, 24 CPUs:
+#   1.15 s/step => ~19 min per 1000-iter epoch; val every 2nd epoch adds ~2 min/epoch on average => ~21.5 min/epoch.
+#   GPU util median 93 %, peak 94 GB of 143 GB (batch 12 peaked at 133 GB, so batch 8 is the safe choice).
+#   SUP_EPOCHS = (96 h - ~0.7 h rclone staging - 3 h margin) * 3600 / 1290 s ~= 260 -> SUP_EPOCHS=250 (~90 h, 2.0 M patches).
+# qos=vram is 7 d: staging + supervised ~3.9 d + d013 FT ~1 d fits one allocation; a resume re-enters the state machine.
 #
-# CODE: the image's nanounet is OLD. CODE_DIR is a checkout of the branch on /nnunet_data, pinned by CODE_SHA;
-# PYTHONPATH makes it win over the installed package. No network needed.
+# CODE: the container image must carry feat/nnfoundation-zonly (>= CODE_SHA). The job checks this below and refuses to
+# start on the old image. Use a NEW --container-name per image rebuild: a named container keeps its overlay on the node.
 # Resume is a state machine on NFS, not RESUME=last.ckpt. FRESH=1 wipes $OUT only.
 # Never deletes $OUT_FT; refuses to overwrite it. SKIP_SUP=1 stops supervised where last.ckpt is and goes to FT.
 
@@ -39,17 +39,16 @@ DS_FOLDER=Dataset900_Merged
 PLANS_NAME=nnFoundationCNN_z1p0
 ROI_CONFIG=nanounet/configs/longrun900.json
 FT_CONFIG=nanounet/configs/finetune900_d013.json
-SUP_EPOCHS=200
+SUP_EPOCHS=250
 FT_EPOCHS=80
 ITERS_PER_EPOCH=1000
-BATCH_SIZE=12
+BATCH_SIZE=8
 PROMPTS_PER_PATCH=2
 CONSISTENCY_WEIGHT=0.02
 EMA_DECAY=0.999
 VAL_EVERY_N=2
 STORAGE=/nnunet_data
-CODE_DIR="${CODE_DIR:-${STORAGE}/NanoUNet_code/nanoUNet}"
-CODE_SHA="${CODE_SHA:?set CODE_SHA to the commit of feat/nnfoundation-zonly checked out in CODE_DIR}"
+CODE_SHA="${CODE_SHA:-}"   # optional: commit the image was built from; checked against $NANOUNET_GIT_SHA when both are set
 FRESH="${FRESH:-0}"
 SKIP_SUP="${SKIP_SUP:-0}"
 
@@ -69,23 +68,20 @@ export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 mkdir -p "$PIP_CACHE_DIR" "$NANOUNET_RESULTS" "$NANOUNET_TMPDIR" "$NANOUNET_PRETRAINED"
 
-[ -d "$CODE_DIR/nanounet" ] || { echo "FATAL: no code checkout at $CODE_DIR"; exit 1; }
-HAVE_SHA=$(git -C "$CODE_DIR" rev-parse HEAD)
-if [ "$HAVE_SHA" != "$CODE_SHA" ]; then
-  echo "FATAL: $CODE_DIR is at $HAVE_SHA, expected $CODE_SHA"
+if ! python3 -c "from nanounet.model.foundation import verify_foundation; from nanounet.cli.train_foundation import resolve_foundation" &>/dev/null; then
+  echo "FATAL: the image's nanounet is the old code (no nnFoundationCNN support)."
+  echo "Fix: rebuild the image from feat/nnfoundation-zonly and use a new --container-name"
   exit 1
 fi
-if [ -n "$(git -C "$CODE_DIR" status --porcelain --untracked-files=no)" ]; then
-  echo "FATAL: $CODE_DIR has uncommitted changes"
+if [ -n "$CODE_SHA" ] && [ -n "${NANOUNET_GIT_SHA:-}" ] && [ "$CODE_SHA" != "$NANOUNET_GIT_SHA" ]; then
+  echo "FATAL: image code is $NANOUNET_GIT_SHA, this script expects $CODE_SHA"
   exit 1
 fi
-export PYTHONPATH="$CODE_DIR"
-cd "$CODE_DIR"
-if ! python3 -m nanounet.cli.train --help &>/dev/null; then
-  echo "FATAL: python3 -m nanounet.cli.train is broken under PYTHONPATH=$CODE_DIR."
+if ! nanounet_train --help &>/dev/null; then
+  echo "FATAL: nanounet_train not found or broken."
   exit 1
 fi
-echo "code: $HAVE_SHA"
+echo "image code: ${NANOUNET_GIT_SHA:-unknown}"
 
 if [ "$SKIP_SUP" = 1 ] && [ "$FRESH" = 1 ]; then
   echo "FATAL: SKIP_SUP=1 and FRESH=1 are contradictory (FRESH wipes the supervised checkpoints FT needs)"
@@ -256,7 +252,7 @@ if [ "$SKIP_MAIN" = 0 ]; then
       break
     fi
     echo "=== nanounet_train (supervised) attempt $attempt/$MAIN_MAX_RETRIES ==="
-    setsid python3 -m nanounet.cli.train \
+    setsid nanounet_train \
       -d "$DATASET_ID" \
       -f "$FOLD" \
       --plans "$PLANS_NAME" \
@@ -348,7 +344,7 @@ run_ft() {
   local ft_args=("$@")
   unset WANDB_RUN_ID WANDB_RUN_PATH
   export WANDB_RESUME=never
-  setsid python3 -m nanounet.cli.train \
+  setsid nanounet_train \
     -d "$DATASET_ID" \
     -f "$FOLD" \
     --plans "$PLANS_NAME" \

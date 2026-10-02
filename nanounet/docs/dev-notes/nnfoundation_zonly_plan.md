@@ -585,7 +585,11 @@ author decisions A1–A6 as implemented, and anything in this plan that turned o
   (identical decoded content).
 - Frozen files unchanged: `splits_final.json` 1016c2be..., `cohorts.json` ec46f4d0...; test-patient guard 0 of 60.
 - Lesion weights on the new grid: 98.9 % of 5213 centroids matched, median match distance 0.98 voxel (gate 8).
-- Not yet measured (no GPU in the preprocessing session): step time at batch 12/10/8, so `SUP_EPOCHS=200` in
-  `nanounet/scripts/slurm_foundation_900_h200.sh` is provisional.
+- GPU gate (H200, 24 CPUs, node-local 20 GB cohort-stratified subset of 84 train cases, rclone copy 870 MB/s so ~25-40 min
+  for the full 1.3 TB): batch 12 peaks at 133 of 143 GB (~2 s/step, loader-limited here); batch 8 peaks at 94 GB,
+  1.15 s/step, GPU util median 93 %. Chosen: batch 8, `SUP_EPOCHS=250` (~90 h incl. val). An xl loader (16 workers)
+  is killed by an 80 GB cgroup, so size RAM >= 150 GB for the job (the SLURM script asks for 200 GB).
+- Smoke run (3 epochs, foundation loaded 448, guard 0 of 60) and `nanounet_predict` on a d013 and a KiTS case
+  (size/spacing/origin/direction equal to the input, 1.6 s per case on GPU) passed.
 - CPU `nanounet_predict` with the default `--batch-size 8` at a 192^3 patch exhausts RAM (>280 GB, silently
   OOM-killed); use `--batch-size 1` on CPU. The GPU path clamps the batch to free VRAM.
