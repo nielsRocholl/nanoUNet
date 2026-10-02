@@ -1,12 +1,21 @@
 # Preprocess
 
-Fingerprint the raw dataset, run the ResEnc planner, and resample cases to blosc2 (`3d_fullres`).
-Supports single dataset ids or merging multiple ids into one preprocessed folder.
+Fingerprint the raw dataset, write the plan, and resample cases to blosc2 (`3d_fullres`).
+**Default (foundation mode):** nnFoundationCNN topology and 192³ patch, per-image Z-score, and z-only
+resampling (each case's thickest axis to `--target-z` mm, the other axes keep native spacing and grid).
+`--no-foundation` restores the ResEnc planner at the dataset median spacing. Supports single ids or merging.
 
 ## Command
 
 ```bash
-nanounet_preprocess -d 001 --planner nnUNetPlannerResEncL -np 8
+export NANOUNET_PRETRAINED=/nnunet_data/NanoUNet_pretrained
+nanounet_preprocess -d 900 --target-z 1.0 --gpu-memory-gb 141 -np 16
+```
+
+Old behaviour (planner, median spacing, CTNormalization):
+
+```bash
+nanounet_preprocess -d 001 --no-foundation --planner nnUNetPlannerResEncL -np 8
 ```
 
 Merge example:
@@ -44,41 +53,45 @@ Regenerating sidecars overwrites files that existing checkpoints depend on. Back
 | `-d`, `--dataset_id` | int+ | (required) | One or more dataset ids, e.g. `-d 001` or `-d 1 2 3` for merge |
 | `--merged-id` | int | `999` | Output dataset id when merging multiple `-d` |
 | `--merged-name` | str | `Merged` | Name segment for merged folder `DatasetNNN_<name>` |
-| `--planner` | str | `nnUNetPlannerResEncL` | Planner class (e.g. `nnUNetPlannerResEncTiny`, `nnUNetPlannerResEncL`) |
+| `--planner` | str | `nnUNetPlannerResEncL` | Planner class (e.g. `nnUNetPlannerResEncTiny`); only with `--no-foundation` |
+| `--no-foundation` | flag | off | Use the ResEnc planner at the dataset median spacing instead of nnFoundationCNN + z-only resampling |
+| `--target-z` | float | `1.0` | Foundation mode: target spacing (mm) of each case's thickest axis (plans name `nnFoundationCNN_z1p0`) |
 | `-np`, `--num_processes` | int | `8` | Parallel workers for fingerprint / preprocess |
 | `--resume` | flag | off | Keep existing preprocess output; do not wipe `3d_fullres` folder |
-| `--gpu-memory-gb` | float | none | VRAM budget (GB) for planner patch shrink loop |
-| `--patch-vol` | choice | `large` | `small` (128) \| `medium` (192) \| `large` (256) \| `xlarge` (320) isotropic edge before aniso handling |
+| `--gpu-memory-gb` | float | none | VRAM budget (GB) the batch size is sized for (foundation: even batch, 141 → 12); planner patch shrink with `--no-foundation` |
+| `--patch-vol` | choice | `large` | `small` (128) \| `medium` (192) \| `large` (256) \| `xlarge` (320) isotropic edge before aniso handling; only with `--no-foundation` |
 | `--plans-name` | str | none | Basename of plans JSON (no `.json`); required with `--skip-plan` or `--sidecars-only` |
 | `--skip-fingerprint` | flag | off | Skip fingerprint; use existing `dataset_fingerprint.json` |
 | `--skip-plan` | flag | off | Skip planning; requires `--plans-name` |
 | `--sidecars-only` | flag | off | Regenerate `*_centroids.json` sidecars only; requires `--plans-name`; never touches `.b2nd`, plans, or `gt_segmentations` |
 | `--val-frac` | float | `0.15` | Held-out fraction for `splits_final.json`, balanced within each source dataset (see [`nanounet_build_splits`](../../cli/build_splits.py)) |
 | `--split-seed` | int | `12345` | RNG seed for the balanced train/val split |
-| `--no-splits` | flag | off | Skip writing `splits_final.json` / `cohorts.json` (e.g. re-preprocessing without disturbing an existing split) |
+| `--no-splits` | flag | off | Skip the `splits_final.json` / `cohorts.json` step (including its test-patient check) |
 | `--valset-config` | str | `None` | ROI config path; when set, also builds the fixed validation manifest via `nanounet_build_valset` |
 | `--valset-n` | int | `1500` | Patch count for the fixed validation manifest, only used with `--valset-config` |
 
-See [plan.md](plan.md) for `--patch-vol`, `--planner`, and `--gpu-memory-gb` trade-offs.
+See [plan.md](plan.md) for the foundation plan and the `--no-foundation` trade-offs.
 
 ## Inputs / outputs
 
 **Inputs**
 
 - `$NANOUNET_RAW/DatasetXXX_*/` — nnUNet raw layout (`imagesTr`, `labelsTr`, `dataset.json`)
-- Environment: `NANOUNET_RAW`, `NANOUNET_PREPROCESSED`
+- Environment: `NANOUNET_RAW`, `NANOUNET_PREPROCESSED`, and for foundation mode `NANOUNET_PRETRAINED`
+- `/nnunet_data/Longitudinal-CT/test_patients.csv` — the 60 hold-out patients, which must never appear in train or val (checked at split time)
 
 **Outputs** (under `$NANOUNET_PREPROCESSED/DatasetXXX_*/`)
 
 - `dataset_fingerprint.json`
-- `<plans>.json` — patch size, batch size, network topology
+- `<plans>.json` — patch size, batch size, network topology; foundation plans add `spacing_mode: z_only` and `pretrain_info` (checkpoint path + sha256)
+- `$NANOUNET_PRETRAINED/` — nnFoundationCNN checkpoint (CC-BY-SA-4.0), downloaded at plan time
 - `<plans>/3d_fullres/*.b2nd` — blosc2 training tensors
 - `<plans>/3d_fullres/*_centroids.json` — per-lesion centroid, bbox, EDT seed, and voxel count
 - `gt_segmentations/` — resampled labels (also under raw dataset folder)
-- `splits_final.json` — single balanced train/val split (skip with `--no-splits`)
+- `splits_final.json` — single balanced train/val split (skip with `--no-splits`). **Never rewritten:** if it exists it is verified against the data folder and kept (`✓ splits kept (sha256 …)`); only created when absent. Same for `cohorts.json`
 - `cohorts.json` — per-cohort sampling weights derived from `lesion_site` (see below); consumed by
   `nanounet_train`'s default cohort-weighted sampler
-- `valset_<n>.json` + `valset_<n>.targets.npz` — fixed validation manifest, only with `--valset-config`
+- `valset_<n>_<plans>.json` + `.targets.npz` — fixed validation manifest, only with `--valset-config`
 
 ### lesion_site and cohorts.json
 
@@ -117,4 +130,9 @@ derivatives change. `propagated.mode: "gaussian"` needs no table.
 | Wiped preprocess mid-run | Re-run without `--resume` | Use `--resume` to keep existing `3d_fullres` output |
 | `--sidecars-only needs --plans-name` | `--sidecars-only` without plans basename | Pass `--plans-name` for the dataset's existing plans json |
 | `--sidecars-only needs an existing preprocessed folder` | Target `<data_identifier>` folder missing | Run a full preprocess first (command shown in the error) |
+| `NANOUNET_PRETRAINED is not set` | Foundation mode needs a weights cache dir | `export NANOUNET_PRETRAINED=/nnunet_data/NanoUNet_pretrained` |
+| `No dataset fingerprint at` | Foundation plan reads spacings/shapes from the fingerprint | Run without `--skip-fingerprint` once |
+| `data_identifier '...' is already used by` | Plans name collides with another plans' data folder | Pass a new `--plans-name` |
+| `... does not match the dataset` | Existing `splits_final.json` disagrees with the data folder | Preprocess the missing cases (`--resume`); the file is never rewritten for you |
+| `... belong to Longitudinal-CT test patients` | A hold-out patient is in the dataset | Remove those cases from the raw `dataset.json` and rebuild the splits |
 | `A preprocess worker was killed with no Python exception (SIGKILL)` | OOM kill by the cgroup, not a code bug — large volumes can peak ~50 GB/worker during resampling | Lower `-np` (the error suggests half the current count) and rerun with `--resume` to skip already-finished cases |

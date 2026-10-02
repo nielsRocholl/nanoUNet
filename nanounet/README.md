@@ -14,6 +14,8 @@ python -m pip install -e .
 export NANOUNET_RAW="/path/to/NanoUNet_raw"
 export NANOUNET_PREPROCESSED="/path/to/NanoUNet_preprocessed"
 export NANOUNET_RESULTS="/path/to/NanoUNet_results"
+# nnFoundationCNN weights cache (downloaded once by nanounet_preprocess; CC-BY-SA-4.0)
+export NANOUNET_PRETRAINED="/path/to/NanoUNet_pretrained"
 
 # Host-RAM / checkpoint staging (see nanounet/docs/dev-notes/cgroup_memory.md)
 export NANOUNET_TMPDIR=/root/.cache/nanounet_tmp

@@ -7,22 +7,22 @@ training-ready preprocessed dataset -- nanounet_train needs nothing else."""
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 
-from batchgenerators.utilities.file_and_folder_operations import join, load_json
+from batchgenerators.utilities.file_and_folder_operations import join
 
 from core.ui import arg_rows, config_table, cprint, nano_header, nano_rule
-from nanounet.common import preprocessed_dir, raw_dir
+from nanounet.common import preprocessed_dir
 from nanounet.data.store.blosc2_dataset import Blosc2Folder
-from nanounet.plan.dataset.cohorts import run_cohorts
 from nanounet.plan.dataset.ids import convert_id_to_dataset_name
 from nanounet.plan.plans import Plans
 from nanounet.plan.prep.fingerprint import run_fingerprint
 from nanounet.plan.prep.merge import build_merged_raw
+from nanounet.model.foundation import fetch_foundation, verify_foundation
+from nanounet.plan.resenc.foundation_plan import run_foundation_plan
 from nanounet.plan.resenc.planner import run_plan
 from nanounet.plan.prep.preprocess import run_preprocess
-from nanounet.plan.dataset.splits import make_balanced_split
+from nanounet.plan.dataset.splits_safety import ensure_splits_and_cohorts
 
 PATCH_VOL = {"small": 128, "medium": 192, "large": 256, "xlarge": 320}
 
@@ -47,26 +47,11 @@ def _run_build_valset(did: int, ident: str, config_path: str, out_path: str, n_p
         sys.argv = old_argv
 
 
-def _write_splits_and_cohorts(did: int, ident: str, val_frac: float, seed: int) -> str:
-    pp = preprocessed_dir()
-    ds_name = convert_id_to_dataset_name(did)
-    pre = join(pp, ds_name)
-    pm = Plans(join(pre, ident + ".json"))
-    cm = pm.get_configuration("3d_fullres")
-    case_dir = join(pre, cm.data_identifier)
-    all_ids = Blosc2Folder.get_identifiers(case_dir)
-    dj = load_json(join(raw_dir(), ds_name, "dataset.json"))
-    ntr = dj.get("numTraining")
-    ids = all_ids[: int(ntr)] if ntr is not None else list(all_ids)
-
-    splits = make_balanced_split(ids, val_frac, seed)
-    splits_path = join(pre, "splits_final.json")
-    with open(splits_path, "w", encoding="utf-8") as f:
-        json.dump(splits, f)
-    cprint(f"[bold green]✓ splits[/bold green] → {splits_path}  ({len(splits[0]['train'])} train / {len(splits[0]['val'])} val)")
-
-    cohorts_path = run_cohorts(did, pre)
-    cprint(f"[bold green]✓ cohorts[/bold green] → {cohorts_path}")
+def _splits_and_cohorts(did: int, ident: str, val_frac: float, seed: int) -> str:
+    """Create-or-verify (never rewrite) splits_final.json and cohorts.json, with the test-patient guard."""
+    pre = join(preprocessed_dir(), convert_id_to_dataset_name(did))
+    case_dir = join(pre, Plans(join(pre, ident + ".json")).get_configuration("3d_fullres").data_identifier)
+    ensure_splits_and_cohorts(did, pre, set(Blosc2Folder.get_identifiers(case_dir)), val_frac, seed)
     return pre
 
 
@@ -85,19 +70,21 @@ def main() -> None:
         "--merged-name", default="Merged",
         help="name segment for the merged folder DatasetNNN_<name> (only used when several -d ids are given)",
     )
-    ap.add_argument("--planner", default="nnUNetPlannerResEncL", help="planner preset class, e.g. nnUNetPlannerResEncTiny or nnUNetPlannerResEncL")
+    ap.add_argument("--planner", default="nnUNetPlannerResEncL", help="planner preset class, e.g. nnUNetPlannerResEncTiny or nnUNetPlannerResEncL (ignored unless --no-foundation)")
+    ap.add_argument("--no-foundation", action="store_true", help="plan with the ResEnc planner at the dataset median spacing (old default) instead of nnFoundationCNN + z-only resampling")
+    ap.add_argument("--target-z", type=float, default=1.0, help="foundation mode: target spacing (mm) of each case's thickest axis; the other axes keep their native spacing")
     # nanochat-style: allow U8 (legacy snake flag; cluster scripts pass it)
     ap.add_argument("-np", "--num_processes", type=int, default=8, help="parallel worker processes for fingerprinting and preprocessing")
     ap.add_argument("--resume", action="store_true", help="skip cases already fully preprocessed instead of wiping and redoing the 3d_fullres folder")
     ap.add_argument(
         "--gpu-memory-gb", type=float, default=None,
-        help="VRAM budget (GB) for the planner's patch-shrink loop; default: the planner preset's own default VRAM target",
+        help="VRAM budget (GB) the batch size is sized for; default: the ResEnc-L preset's own default VRAM target",
     )
     ap.add_argument(
         "--patch-vol",
         choices=tuple(PATCH_VOL),
         default="large",
-        help="target patch volume edge (isotropic equivalent before aniso split); large=256 (nnU-Net default)",
+        help="target patch volume edge (isotropic equivalent before aniso split); large=256 (nnU-Net default); ignored unless --no-foundation",
     )
     ap.add_argument("--plans-name", default=None, help="basename of the plans JSON (no .json); required with --skip-plan or --sidecars-only")
     ap.add_argument("--skip-fingerprint", action="store_true", help="skip fingerprinting; reuse the existing dataset_fingerprint.json")
@@ -113,7 +100,7 @@ def main() -> None:
     ap.add_argument(
         "--valset-config",
         default=None,
-        help="roi config path; when set, also builds a fixed valset_<n>.json manifest via nanounet_build_valset",
+        help="roi config path; when set, also builds a fixed valset_<n>_<plans>.json manifest via nanounet_build_valset",
     )
     ap.add_argument("--valset-n", type=int, default=1500, help="patch count for --valset-config (default 1500)")
     args = ap.parse_args()
@@ -127,7 +114,10 @@ def main() -> None:
             "nanoUNet preprocess  merge "
             f"{','.join(str(i) for i in args.dataset_id)} -> Dataset{did:03d}_{args.merged_name}"
         )
-    config_table(arg_rows(ap, args))
+    rows = arg_rows(ap, args)
+    if not args.no_foundation:
+        rows = [(k, v, "ignored (foundation)" if k in ("planner", "patch-vol") else src) for k, v, src in rows]
+    config_table(rows)
     if args.sidecars_only:
         if not args.plans_name:
             ap.error("--sidecars-only needs --plans-name (identifies the existing plans json to read)")
@@ -140,6 +130,9 @@ def main() -> None:
         if not args.plans_name:
             ap.error("--skip-plan needs --plans-name (e.g. nnUNetResEncUNetTinyPlans)")
         ident = args.plans_name
+    elif not args.no_foundation:
+        ident = run_foundation_plan(did, args.plans_name, args.target_z, args.gpu_memory_gb, verify_foundation(fetch_foundation()))
+        nano_rule()
     else:
         ident = run_plan(
             did,
@@ -155,10 +148,10 @@ def main() -> None:
     artifacts = [f"preprocessed cases → {join(preprocessed_dir(), convert_id_to_dataset_name(did))}"]
     if not args.no_splits:
         nano_rule()
-        pre = _write_splits_and_cohorts(did, ident, args.val_frac, args.split_seed)
+        pre = _splits_and_cohorts(did, ident, args.val_frac, args.split_seed)
         artifacts += [f"splits_final.json → {join(pre, 'splits_final.json')}", f"cohorts.json → {join(pre, 'cohorts.json')}"]
         if args.valset_config:
-            val_out = join(pre, f"valset_{args.valset_n}.json")
+            val_out = join(pre, f"valset_{args.valset_n}_{ident}.json")
             _run_build_valset(did, ident, args.valset_config, val_out, args.valset_n)
             artifacts.append(f"valset manifest → {val_out}")
 
@@ -168,7 +161,7 @@ def main() -> None:
         cprint(f"  [dim]-[/dim] {a}")
     next_cmd = f"nanounet_train -d {did} -f 0 --plans {ident} --config nanounet/configs/default.json"
     if not args.no_splits and args.valset_config:
-        next_cmd += f" --val-manifest {join(preprocessed_dir(), convert_id_to_dataset_name(did), f'valset_{args.valset_n}.json')}"
+        next_cmd += f" --val-manifest {join(preprocessed_dir(), convert_id_to_dataset_name(did), f'valset_{args.valset_n}_{ident}.json')}"
     cprint(f"next: {next_cmd}")
 
 
