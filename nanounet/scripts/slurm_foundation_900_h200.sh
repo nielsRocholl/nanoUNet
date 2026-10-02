@@ -21,11 +21,12 @@
 # 2 warmup epochs, poly, deep supervision off. Not re-passed below; the config table prints them.
 #
 # WALL BUDGET (D10, ~4 d supervised). Measured on one H200, batch 8, 192^3 patch, prompts-per-patch 2, 24 CPUs:
-#   1.15 s/step => ~19 min per 1000-iter epoch; val every 2nd epoch adds ~2 min/epoch on average => ~21.5 min/epoch.
-#   GPU util median 93 %, peak 94 GB of 143 GB (batch 12 peaked at 133 GB, so batch 8 is the safe choice).
-#   SUP_EPOCHS = (96 h - ~0.7 h rclone staging - 3 h margin) * 3600 / 1290 s ~= 260 -> SUP_EPOCHS=250 (~90 h, 2.0 M patches).
-# qos=vram is 7 d: staging + supervised ~3.9 d + d013 FT ~1 d fits one allocation; a resume re-enters the state machine.
-#
+#   1.15 s/step => ~19 min per 1000-iter epoch; a 2000-patch validation pass takes ~6 min and runs every 2nd epoch
+#   => ~22.3 min/epoch on average. GPU util median 93 %, peak 94 GB of 143 GB (batch 12 peaked at 133 GB).
+#   Supervised 250 ep ~ 93 h (3.9 d, 2.0 M patches); d013 FT 80 ep ~ 30 h; rclone staging ~0.7 h => ~5.2 d of the 7 d qos.
+#   Both epoch counts are even on purpose: checkpoints are written at validation, and validation runs every 2nd epoch.
+#   To shorten: lower SUP_EPOCHS / FT_EPOCHS (keep them even).
+# Loader: --dl-bucket l (8 train / 4 val workers). xl (16/8) was killed by an 80 GB cgroup; it was not tested at 200 GB.
 # CODE: the container image must carry feat/nnfoundation-zonly (>= CODE_SHA). The job checks this below and refuses to
 # start on the old image. Use a NEW --container-name per image rebuild: a named container keeps its overlay on the node.
 # Resume is a state machine on NFS, not RESUME=last.ckpt. FRESH=1 wipes $OUT only.
@@ -48,18 +49,26 @@ CONSISTENCY_WEIGHT=0.02
 EMA_DECAY=0.999
 VAL_EVERY_N=2
 STORAGE=/nnunet_data
+RESULTS_ROOT="${STORAGE}/NanoUNet_results"
+REMOTE_ROOT="${STORAGE}/NanoUNet_preprocessed"
+LOCAL_ROOT=/root/NanoUNet_preprocessed
+# Rehearsal harness (tests only, never set in a real job): runs this whole script on a small copy of the data.
+if [ -n "${REHEARSAL_DIR:-}" ]; then
+  RESULTS_ROOT="$REHEARSAL_DIR/results"; REMOTE_ROOT="$REHEARSAL_DIR/remote"; LOCAL_ROOT="$REHEARSAL_DIR/local"
+  SUP_EPOCHS="${REH_SUP_EPOCHS:-2}"; FT_EPOCHS="${REH_FT_EPOCHS:-1}"; ITERS_PER_EPOCH="${REH_ITERS:-30}"
+fi
 CODE_SHA="${CODE_SHA:-}"   # optional: commit the image was built from; checked against $NANOUNET_GIT_SHA when both are set
 FRESH="${FRESH:-0}"
 SKIP_SUP="${SKIP_SUP:-0}"
 
-OUT="${STORAGE}/NanoUNet_results/nanounet/${DS_FOLDER}_${PLANS_NAME}_f${FOLD}_foundation"
+OUT="${RESULTS_ROOT}/nanounet/${DS_FOLDER}_${PLANS_NAME}_f${FOLD}_foundation"
 OUT_FT="${OUT}_ft"
 SUP_LAST="$OUT/checkpoints/last.ckpt"
 FT_LAST="$OUT_FT/finetune/last.ckpt"
 
 export PIP_CACHE_DIR=/root/.pip-cache
 export NANOUNET_RAW="${STORAGE}/NanoUNet_raw"
-export NANOUNET_RESULTS="${STORAGE}/NanoUNet_results"
+export NANOUNET_RESULTS="$RESULTS_ROOT"
 export NANOUNET_PRETRAINED=/root/NanoUNet_pretrained
 export NANOUNET_TMPDIR=/root/.cache/nanounet_tmp
 export OMP_NUM_THREADS=1
@@ -101,9 +110,9 @@ if [ "$FRESH" = 1 ]; then
   rm -rf "$OUT"
 fi
 
-LOCAL_PREP=/root/NanoUNet_preprocessed
+LOCAL_PREP="$LOCAL_ROOT"
 VALSET=valset_2000_${PLANS_NAME}
-REMOTE_PREP="${STORAGE}/NanoUNet_preprocessed/${DS_FOLDER}"
+REMOTE_PREP="${REMOTE_ROOT}/${DS_FOLDER}"
 mkdir -p "$LOCAL_PREP/${DS_FOLDER}"
 
 for f in "${REMOTE_PREP}/${PLANS_NAME}.json" "${REMOTE_PREP}/splits_final.json" \
@@ -269,7 +278,7 @@ if [ "$SKIP_MAIN" = 0 ]; then
       --loss dc_ce \
       --prompts-per-patch "$PROMPTS_PER_PATCH" \
       --consistency-weight "$CONSISTENCY_WEIGHT" \
-      --dl-bucket xl \
+      --dl-bucket l \
       --accelerator cuda \
       --precision 16-mixed \
       --wandb-name "Dataset900_f0_foundation_z1p0_sup" &
@@ -365,7 +374,7 @@ run_ft() {
     --consistency-warmup-epochs 0 \
     --ema-decay "$EMA_DECAY" \
     --monitor val_dice \
-    --dl-bucket xl \
+    --dl-bucket l \
     --accelerator cuda \
     --precision 16-mixed \
     --wandb-name "Dataset900_f0_foundation_d013_ft_80ep" &

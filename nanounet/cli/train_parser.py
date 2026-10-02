@@ -36,7 +36,7 @@ def build_train_parser() -> argparse.ArgumentParser:
     ap.add_argument("--no-wandb", action="store_true", help="Disable Weights & Biases logging (a CSVLogger under metrics/ is always on regardless).")
     ap.add_argument("--wandb-project", default="nanounet", help="W&B project name.")
     ap.add_argument("--wandb-name", default=None, help="W&B run name; default <Dataset>_f<fold>.")
-    ap.add_argument("--loss", "-loss", choices=("dc_ce", "cc_dc_ce"), default="dc_ce", metavar="MODE", help="Supervised loss: dc_ce (Dice+CE) or cc_dc_ce (CPU connected components; +100% epoch time vs dc_ce on A100-40GB, batch 2, 4 iters/epoch, median e1-e3, 2026-09-30).")
+    ap.add_argument("--loss", "-loss", choices=("dc_ce", "cc_dc_ce"), default="dc_ce", metavar="MODE", help="Supervised loss: dc_ce (Dice+CE) or cc_dc_ce (CPU connected components; +100%% epoch time vs dc_ce on A100-40GB, batch 2, 4 iters/epoch, median e1-e3, 2026-09-30).")
     ap.add_argument("--resume", default=None, help="Resume supervised training from this Lightning ckpt; must sit in a checkpoints/ or finetune/ dir; its recorded num_epochs must match --epochs; omit for a fresh run.")
     ap.add_argument("--init-weights", default=None, help="Load full net weights from this supervised ckpt (fresh optimizer/epoch count); conflicts with --resume, --mae-ckpt, --mae-pretrain; skips nnFoundationCNN weights.")
     ap.add_argument("--only-prefix", default=None, help="Restrict train/val case keys to those starting with this prefix, e.g. d013_.")
