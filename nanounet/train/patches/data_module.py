@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 
 from nanounet.common import ANISO_THRESHOLD, preprocessed_dir, raw_dir, setup_logging
 from nanounet.config import load_config
+from nanounet.data.patch.error_table import bind_roi_spacing
 from nanounet.data.augment import transforms as augment
 from nanounet.data.valset.manifest import build_val_dataloader, load_manifest
 from nanounet.data.loader.prefs import DataloaderBucket, build_iter_dataloader, init_dataloader_ipc
@@ -96,6 +97,9 @@ class NanoDataModule(pl.LightningDataModule):
         pl_path = join(pp, self.dataset_name, self.plans_identifier + ".json")
         self.pm = Plans(pl_path)
         self.cm = self.pm.get_configuration("3d_fullres")
+        # Empirical click offsets are table-mm; they need this dataset's spacing to become voxels.
+        self.roi_cfg = bind_roi_spacing(self.roi_cfg, self.cm.spacing)
+        self.val_cfg = bind_roi_spacing(self.val_cfg, self.cm.spacing)
         dj = load_json(join(raw, self.dataset_name, "dataset.json"))
         self.label_manager = self.pm.get_label_manager(dj)
         if self.batch_size is None:

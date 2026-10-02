@@ -18,6 +18,7 @@ from batchgenerators.utilities.file_and_folder_operations import join
 from core.ui import arg_rows, config_table, cprint, nano_header, nano_progress
 from nanounet.common import preprocessed_dir, resolve_user_config_path
 from nanounet.config import load_config
+from nanounet.data.patch.error_table import bind_roi_spacing
 from nanounet.data.store.blosc2_dataset import Blosc2Folder
 from nanounet.data.valset.manifest import SCENARIOS, SCHEMA_VERSION, SMALL_LESION_MAX_VOX, sidecar_path, config_stamp
 from nanounet.data.valset.alloc import allocate, load_cohorts, scenario_allocation
@@ -107,9 +108,8 @@ def main() -> None:
     cm = pm.get_configuration("3d_fullres")
     case_dir = join(pp, ds_name, cm.data_identifier)
     cfg_path = resolve_user_config_path(args.config)
-    roi_cfg = load_config(cfg_path)
+    roi_cfg = bind_roi_spacing(load_config(cfg_path), cm.spacing)
     patch_size = np.array(cm.patch_size)
-
     by_cohort, cohort_weights = load_cohorts(pp, ds_name, cohort_of)
     per_cohort_total = allocate({c: len(v) for c, v in by_cohort.items()}, args.n_patches, args.floor)
     shares = _parse_mix(args.mix)
