@@ -223,7 +223,9 @@ model take 578–706 s/epoch at 1000 iters/epoch, about 1.3–1.5× the pure GPU
 
 ## 3. Environment and working rules
 
-- The container is **ephemeral**. Commit and `git push origin <branch>` after every phase, not only at the end.
+- The container is **ephemeral**: unpushed code is lost when the session ends. **Commit and `git push origin
+  feat/nnfoundation-zonly` after every significant code change** (each new module, each wired-up feature, each
+  docs batch), not only at phase ends. Never leave more than ~1 hour of work unpushed.
   Work on a branch (e.g. `feat/nnfoundation-zonly`), never commit to `main` directly.
 - The image sets no `NANOUNET_*` variables. Export them in every shell:
   ```bash
@@ -547,7 +549,7 @@ local staging to `/root/NanoUNet_preprocessed`, the resume state machine,
 - **Stage B:** (P0 merged) P4 → P5 → the train half of P6 → remaining P9 docs → P7 steps 5–6 (lesion weights,
   valset; need P4 and the finished data) → P8 (throughput, smoke) → P10 → **STOP at H2**.
 
-One commit per phase minimum, pushed immediately (container is ephemeral). Every commit passes the nanochat-style
+Commit and push after every significant code change, and at least once per phase (container is ephemeral; unpushed work is lost). Every commit passes the nanochat-style
 checker (§0.2). Each commit message ends with the attribution line the session tells you to use.
 
 ## 6. Out of scope (do not do)
