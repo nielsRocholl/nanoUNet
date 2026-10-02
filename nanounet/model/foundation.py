@@ -89,8 +89,9 @@ def verify_foundation(path: str) -> dict:
     bad = [k for k, v in enc.items() if k not in sd or sd[k].shape != v.shape]
     if bad or len(enc) != N_ENCODER_TENSORS:
         raise SystemExit(  # nanochat-style: allow E1 (Fix: line is in the `fix` variable)
-            f"{path}: {len(enc) - len(bad)}/{len(enc)} encoder tensors match the net (expected {N_ENCODER_TENSORS}/{N_ENCODER_TENSORS}); first bad: {bad[:3]}.\n"
-            f"Expected the nnFoundationCNN ResEnc-L topology in nanounet/model/foundation.py ARCH_KWARGS.\n{fix}"
+            f"{path}: {len(enc)} encoder tensors, {len(enc) - len(bad)} matching the net by key and shape (first mismatches: {bad[:3]}).\n"
+            f"Expected {N_ENCODER_TENSORS} encoder tensors, all matching.\n"
+            f"This is not the nnFoundationCNN ResEnc-L topology in nanounet/model/foundation.py ARCH_KWARGS.\n{fix}"
         )
     return {
         "checkpoint_path": os.path.abspath(path),
