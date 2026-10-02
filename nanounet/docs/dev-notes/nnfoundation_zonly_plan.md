@@ -1,5 +1,6 @@
 # Plan: nnFoundation weights + z-only resampling as the nanoUNet default
 
+Date: 2026-10-02
 Status: **approved for implementation** (owner decisions recorded 2026-10-02). Nothing below is implemented yet.
 Audience: a fresh agent with no prior context. Everything you need is in this file. Read all of it before
 touching code, and follow the `nanochat-style` skill (`.claude/skills/nanochat-style/SKILL.md`) for every change.
